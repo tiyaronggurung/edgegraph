@@ -1,18 +1,28 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { runAnalysis } from "@/lib/analysisEngine";
 import { SPORTS, type Sport } from "@/lib/sports";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { ProbabilityBar } from "@/components/edge/ProbabilityBar";
+import { detectKalshiGraph } from "@/lib/kalshiDetect.functions";
 import { toast } from "sonner";
-import { Upload } from "lucide-react";
+import { Upload, Sparkles, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/analyze")({
   head: () => ({ meta: [{ title: "Analyze Graph — EdgeGraph AI" }] }),
   component: Analyze,
 });
+
+const fileToDataUrl = (f: File) =>
+  new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(f);
+  });
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -38,12 +48,52 @@ function Analyze() {
   const [sf, setSf] = useState<Record<string, string | boolean>>({});
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const detect = useServerFn(detectKalshiGraph);
 
   const upd = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const updSf = (k: string, v: string | boolean) => setSf((s) => ({ ...s, [k]: v }));
 
   const probA = Number(form.probabilityA || 0);
   const probB = Number(form.probabilityB || 0);
+
+  const runDetect = async () => {
+    if (!file) {
+      toast.error("Upload a Kalshi screenshot first.");
+      return;
+    }
+    setDetecting(true);
+    try {
+      const imageDataUrl = await fileToDataUrl(file);
+      const d = await detect({ data: { imageDataUrl } });
+      const sportKey = (["NBA", "NFL", "NHL", "MLB", "Tennis", "Soccer"] as Sport[]).includes(d.sport as Sport)
+        ? (d.sport as Sport)
+        : sport;
+      setSport(sportKey);
+      setForm((f) => ({
+        ...f,
+        league: d.league || f.league,
+        gameName: d.gameName || f.gameName,
+        teamA: d.teamA || f.teamA,
+        teamB: d.teamB || f.teamB,
+        score: d.score || f.score,
+        timePeriod: d.timePeriod || f.timePeriod,
+        probabilityA: String(Math.round(d.probabilityA ?? 0)),
+        probabilityB: String(Math.round(d.probabilityB ?? 0)),
+        oddsA: d.oddsA ? String(d.oddsA) : f.oddsA,
+        oddsB: d.oddsB ? String(d.oddsB) : f.oddsB,
+        volume: d.volume ? String(d.volume) : f.volume,
+        marketNotes: [d.marketNote, `Shape: ${d.shape}`, `Momentum: ${d.momentum}`, `Volatility: ${d.volatility}`]
+          .filter(Boolean)
+          .join(" · "),
+      }));
+      toast.success(`Detected: ${d.shape} (${Math.round(d.confidence * 100)}% confidence)`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setDetecting(false);
+    }
+  };
 
   const submit = async () => {
     if (!user) return;
@@ -124,6 +174,15 @@ function Analyze() {
               <span className="text-xs text-muted-foreground">PNG / JPG · stored privately</span>
             </label>
           </div>
+
+          <button
+            onClick={runDetect}
+            disabled={detecting || !file}
+            className="w-full py-2.5 border border-[color:var(--color-primary)] text-[color:var(--color-primary)] uppercase tracking-widest text-xs rounded hover:bg-[color:var(--color-primary)]/10 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {detecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {detecting ? "Detecting graph…" : "Detect from Kalshi screenshot"}
+          </button>
 
           <div className="border border-border bg-card rounded p-4">
             <h2 className="terminal-label mb-3">// Sport</h2>
