@@ -175,6 +175,15 @@ function Analyze() {
             </label>
           </div>
 
+          <button
+            onClick={runDetect}
+            disabled={detecting || !file}
+            className="w-full py-2.5 border border-[color:var(--color-primary)] text-[color:var(--color-primary)] uppercase tracking-widest text-xs rounded hover:bg-[color:var(--color-primary)]/10 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {detecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {detecting ? "Detecting graph…" : "Detect from Kalshi screenshot"}
+          </button>
+
           <div className="border border-border bg-card rounded p-4">
             <h2 className="terminal-label mb-3">// Sport</h2>
             <div className="grid grid-cols-3 gap-2">
