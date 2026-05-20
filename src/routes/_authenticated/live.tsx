@@ -1,40 +1,62 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { MiniProbChart } from "@/components/edge/MiniProbChart";
 import { PatternBadge } from "@/components/edge/PatternBadge";
 import { ActionBadge } from "@/components/edge/ActionBadge";
 import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
+import { getLiveGameStats, type LiveGameStats } from "@/lib/espn.functions";
 import { runAnalysis } from "@/lib/analysisEngine";
-import { Loader2, RefreshCw, ExternalLink } from "lucide-react";
+import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/live")({
   head: () => ({ meta: [{ title: "Live Kalshi Markets — EdgeGraph AI" }] }),
   component: LiveMarkets,
 });
 
+const SPORT_FILTERS = [
+  { key: "all", label: "All", match: () => true },
+  { key: "nba", label: "🏀 NBA", match: (s: string) => /nba|basketball/i.test(s) && !/wnba|college/i.test(s) },
+  { key: "wnba", label: "🏀 WNBA", match: (s: string) => /wnba/i.test(s) },
+  { key: "nfl", label: "🏈 NFL", match: (s: string) => /nfl|football/i.test(s) && !/college/i.test(s) },
+  { key: "mlb", label: "⚾ MLB", match: (s: string) => /mlb|baseball/i.test(s) },
+  { key: "nhl", label: "🏒 NHL", match: (s: string) => /nhl|hockey/i.test(s) },
+  { key: "soccer", label: "⚽ Soccer", match: (s: string) => /soccer|mls|epl|ucl|serie|liga|bundes/i.test(s) },
+  { key: "tennis", label: "🎾 Tennis", match: (s: string) => /tennis|atp|wta|open/i.test(s) },
+  { key: "golf", label: "⛳ Golf", match: (s: string) => /golf|pga|masters/i.test(s) },
+] as const;
+
+const VOLUME_OPTIONS = [0, 100, 1_000, 10_000, 100_000] as const;
+
 function LiveMarkets() {
   const eventsFn = useServerFn(getKalshiSportsEvents);
   const historyFn = useServerFn(getKalshiMarketHistory);
+  const statsFn = useServerFn(getLiveGameStats);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [sportFilter, setSportFilter] = useState<string>("all");
+  const [minVolume, setMinVolume] = useState<number>(0);
+  const [edge70Only, setEdge70Only] = useState(false);
 
   const eventsQuery = useQuery({
     queryKey: ["kalshi-sports", refreshKey],
-    queryFn: () => eventsFn({ data: { limit: 24 } }),
+    queryFn: () => eventsFn({ data: { limit: 30 } }),
     refetchInterval: 30_000,
   });
 
   // Flatten all markets so we can pull history per-market.
-  const allMarkets =
-    eventsQuery.data?.events.flatMap((e) =>
-      e.markets.map((m) => ({ event: e, market: m })),
-    ) ?? [];
+  const allMarkets = useMemo(
+    () =>
+      eventsQuery.data?.events.flatMap((e) =>
+        e.markets.map((m) => ({ event: e, market: m })),
+      ) ?? [],
+    [eventsQuery.data],
+  );
 
   const historyQueries = useQueries({
-    queries: allMarkets.slice(0, 24).map(({ market }) => ({
+    queries: allMarkets.slice(0, 30).map(({ market }) => ({
       queryKey: ["kalshi-history", market.ticker, refreshKey],
       queryFn: () => historyFn({ data: { ticker: market.ticker, limit: 60 } }),
       staleTime: 20_000,
@@ -48,14 +70,73 @@ function LiveMarkets() {
     if (ticker && q.data) historyByTicker.set(ticker, q.data.series);
   });
 
+  // Live ESPN game stats per market — best-effort match by event title + competition.
+  const statsQueries = useQueries({
+    queries: allMarkets.slice(0, 30).map(({ event, market }) => ({
+      queryKey: ["espn-stats", market.ticker, refreshKey],
+      queryFn: () =>
+        statsFn({
+          data: {
+            teamA: market.yesSubTitle || event.title,
+            leagueHint: event.competition || event.seriesTicker,
+          },
+        }),
+      staleTime: 20_000,
+      refetchInterval: 30_000,
+      retry: false,
+    })),
+  });
+
+  const statsByTicker = new Map<string, LiveGameStats | null>();
+  statsQueries.forEach((q, i) => {
+    const ticker = allMarkets[i]?.market.ticker;
+    if (ticker) statsByTicker.set(ticker, (q.data ?? null) as LiveGameStats | null);
+  });
+
+  // Build scored cards once, then filter.
+  const cards = useMemo(
+    () =>
+      allMarkets.map(({ event, market }) => {
+        const series100 = (historyByTicker.get(market.ticker) ?? []).map((p) => p * 100);
+        const yesPct = market.yesPrice * 100;
+        const noPct = 100 - yesPct;
+        const analysis = runAnalysis({
+          sport: "Soccer",
+          league: event.competition || event.seriesTicker,
+          gameName: event.title,
+          teamA: market.yesSubTitle || "YES",
+          teamB: "Field/NO",
+          probabilityA: yesPct,
+          probabilityB: noPct,
+          volume: market.volume24h,
+          sportFields: {},
+          notes: { market: detectShapeHint(series100) },
+        });
+        return { event, market, series100, yesPct, analysis, stats: statsByTicker.get(market.ticker) ?? null };
+      }),
+    // historyByTicker / statsByTicker rebuilt every render, intentional dep simplification
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allMarkets, historyQueries.map((q) => q.dataUpdatedAt).join(","), statsQueries.map((q) => q.dataUpdatedAt).join(",")],
+  );
+
+  const filtered = useMemo(() => {
+    const f = SPORT_FILTERS.find((s) => s.key === sportFilter) ?? SPORT_FILTERS[0];
+    return cards.filter((c) => {
+      const hint = `${c.event.competition} ${c.event.seriesTicker} ${c.event.title}`;
+      if (!f.match(hint)) return false;
+      if (c.market.volume24h < minVolume) return false;
+      if (edge70Only && !c.analysis.edge70Detected) return false;
+      return true;
+    });
+  }, [cards, sportFilter, minVolume, edge70Only]);
+
   return (
     <div className="space-y-5 font-mono">
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold uppercase tracking-wider">// Live Kalshi Sports</h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Public Kalshi market data · auto-refresh every 30s · {allMarkets.length} markets across{" "}
-            {eventsQuery.data?.events.length ?? 0} events
+            Kalshi + ESPN live · auto-refresh every 30s · showing {filtered.length} of {cards.length} markets
           </p>
         </div>
         <button
@@ -67,11 +148,58 @@ function LiveMarkets() {
         </button>
       </div>
 
-      <div className="border border-border bg-card rounded p-3 flex items-center gap-3 text-xs">
+      {/* Filters */}
+      <div className="border border-border bg-card rounded p-3 space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {SPORT_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setSportFilter(f.key)}
+              className={`px-3 py-1.5 text-xs uppercase tracking-wider rounded border ${
+                sportFilter === f.key
+                  ? "border-[color:var(--color-primary)] text-[color:var(--color-primary)] bg-[color:var(--color-primary)]/10"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Min vol 24h</span>
+            <select
+              value={minVolume}
+              onChange={(e) => setMinVolume(Number(e.target.value))}
+              className="bg-background border border-border rounded px-2 py-1 text-xs"
+            >
+              {VOLUME_OPTIONS.map((v) => (
+                <option key={v} value={v}>
+                  {v === 0 ? "any" : v.toLocaleString() + "+"}
+                </option>
+              ))}
+            </select>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer text-xs">
+            <input
+              type="checkbox"
+              checked={edge70Only}
+              onChange={(e) => setEdge70Only(e.target.checked)}
+              className="accent-[color:var(--color-primary)]"
+            />
+            <span className="uppercase tracking-widest text-muted-foreground">Edge70 only</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="border border-border bg-card rounded p-3 flex items-center gap-3 text-xs flex-wrap">
         <span className="h-2 w-2 rounded-full bg-[color:var(--color-primary)] shadow-[0_0_8px_var(--color-primary)]" />
         <span className="text-muted-foreground">Kalshi Public API</span>
         <span className="text-[color:var(--color-primary)] uppercase tracking-widest text-[10px]">LIVE</span>
-        <span className="ml-auto text-muted-foreground">No API key required for read-only sports markets.</span>
+        <span className="text-muted-foreground">·</span>
+        <span className="text-muted-foreground">ESPN scoreboard</span>
+        <span className="text-[color:var(--color-primary)] uppercase tracking-widest text-[10px]">LIVE</span>
+        <span className="ml-auto text-muted-foreground">Comeback alerts powered by live game state.</span>
       </div>
 
       {eventsQuery.isLoading && (
@@ -86,79 +214,63 @@ function LiveMarkets() {
         </div>
       )}
 
-      {!eventsQuery.isLoading && allMarkets.length === 0 && eventsQuery.data && (
+      {!eventsQuery.isLoading && filtered.length === 0 && cards.length > 0 && (
         <div className="border border-border bg-card rounded p-6 text-center text-sm text-muted-foreground">
-          No active sports markets returned by Kalshi right now. Try refresh.
+          No markets match the current filters. Try widening the sport or lowering min volume.
         </div>
       )}
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {allMarkets.map(({ event, market }) => {
-          const series100 = (historyByTicker.get(market.ticker) ?? []).map((p) => p * 100);
-          const yesPct = market.yesPrice * 100;
-          const noPct = 100 - yesPct;
-          // Treat the YES side as team A vs NO as the complement for the engine.
-          const analysis = runAnalysis({
-            sport: "Soccer", // generic fallback — Kalshi covers many sports; engine still works
-            league: event.competition || event.seriesTicker,
-            gameName: event.title,
-            teamA: market.yesSubTitle || "YES",
-            teamB: "Field/NO",
-            probabilityA: yesPct,
-            probabilityB: noPct,
-            volume: market.volume24h,
-            sportFields: {},
-            notes: { market: detectShapeHint(series100) },
-          });
-          return (
-            <div key={market.ticker} className="border border-border bg-card rounded p-4 space-y-2">
-              <div className="flex justify-between items-start gap-2">
-                <div className="min-w-0">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-widest truncate">
-                    {event.competition || event.seriesTicker}
-                  </div>
-                  <div className="font-bold text-sm truncate">{event.title}</div>
-                  <div className="text-xs text-muted-foreground truncate">{market.yesSubTitle}</div>
+        {filtered.map(({ event, market, series100, yesPct, analysis, stats }) => (
+          <div key={market.ticker} className="border border-border bg-card rounded p-4 space-y-2">
+            <div className="flex justify-between items-start gap-2">
+              <div className="min-w-0">
+                <div className="text-[10px] text-muted-foreground uppercase tracking-widest truncate">
+                  {event.competition || event.seriesTicker}
                 </div>
-                {analysis.edge70Detected && <Edge70Badge detected />}
+                <div className="font-bold text-sm truncate">{event.title}</div>
+                <div className="text-xs text-muted-foreground truncate">{market.yesSubTitle}</div>
               </div>
-
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-[color:var(--color-primary)]">{yesPct.toFixed(0)}%</span>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">yes</span>
-                <span className="ml-auto text-[10px] text-muted-foreground">
-                  vol24h {Math.round(market.volume24h).toLocaleString()}
-                </span>
-              </div>
-
-              {series100.length > 1 ? (
-                <MiniProbChart series={series100} width={280} height={70} />
-              ) : (
-                <div className="h-[70px] flex items-center justify-center text-[10px] text-muted-foreground border border-dashed border-border rounded">
-                  {historyQueries.some((q) => q.isLoading) ? "loading trades…" : "no recent trades"}
-                </div>
-              )}
-
-              <div className="flex justify-between items-center pt-1">
-                <PatternBadge pattern={analysis.pattern} />
-                <span className="text-xs text-muted-foreground">Edge {analysis.edgeScore.toFixed(1)}</span>
-              </div>
-              <ActionBadge action={analysis.recommendedAction} />
-
-              <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground">
-                <span className="truncate">{market.ticker}</span>
-                <a
-                  href={`https://kalshi.com/markets/${event.seriesTicker.toLowerCase()}/${event.eventTicker.toLowerCase()}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 hover:text-[color:var(--color-primary)]"
-                >
-                  Kalshi <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
+              {analysis.edge70Detected && <Edge70Badge detected />}
             </div>
-          );
-        })}
+
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-[color:var(--color-primary)]">{yesPct.toFixed(0)}%</span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-widest">yes</span>
+              <span className="ml-auto text-[10px] text-muted-foreground">
+                vol24h {Math.round(market.volume24h).toLocaleString()}
+              </span>
+            </div>
+
+            {series100.length > 1 ? (
+              <MiniProbChart series={series100} width={280} height={70} />
+            ) : (
+              <div className="h-[70px] flex items-center justify-center text-[10px] text-muted-foreground border border-dashed border-border rounded">
+                no recent trades
+              </div>
+            )}
+
+            <div className="flex justify-between items-center pt-1">
+              <PatternBadge pattern={analysis.pattern} />
+              <span className="text-xs text-muted-foreground">Edge {analysis.edgeScore.toFixed(1)}</span>
+            </div>
+            <ActionBadge action={analysis.recommendedAction} />
+
+            {stats && stats.state === "in" && <LiveStatsBlock stats={stats} />}
+
+            <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground">
+              <span className="truncate">{market.ticker}</span>
+              <a
+                href={`https://kalshi.com/markets/${event.seriesTicker.toLowerCase()}/${event.eventTicker.toLowerCase()}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 hover:text-[color:var(--color-primary)]"
+              >
+                Kalshi <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          </div>
+        ))}
       </div>
 
       <Disclaimer />
@@ -167,6 +279,43 @@ function LiveMarkets() {
           Upload a Kalshi screenshot to run full analysis →
         </Link>
       </div>
+    </div>
+  );
+}
+
+function LiveStatsBlock({ stats }: { stats: LiveGameStats }) {
+  const hot = stats.comebackScore >= 60;
+  return (
+    <div className="border border-border rounded p-2 bg-background/40 space-y-1">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+        <Activity className="h-3 w-3 text-[color:var(--color-primary)]" />
+        Live · {stats.shortDetail}
+      </div>
+      <div className="flex justify-between text-xs font-bold">
+        <span>
+          {stats.away.abbr} {stats.away.score}
+        </span>
+        <span className="text-muted-foreground">@</span>
+        <span>
+          {stats.home.abbr} {stats.home.score}
+        </span>
+      </div>
+      {stats.trailingTeam && (
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-muted-foreground">
+            Trailing: <span className="text-foreground">{stats.trailingTeam}</span> by {stats.scoreDiff}
+          </span>
+          <span
+            className={`flex items-center gap-1 font-bold uppercase tracking-widest ${
+              hot ? "text-[color:var(--color-primary)]" : "text-muted-foreground"
+            }`}
+          >
+            <TrendingUp className="h-3 w-3" /> Comeback {stats.comebackScore}
+          </span>
+        </div>
+      )}
+      <div className="text-[10px] text-muted-foreground leading-tight">{stats.comebackReason}</div>
+      {stats.lastPlay && <div className="text-[10px] text-muted-foreground italic truncate">"{stats.lastPlay}"</div>}
     </div>
   );
 }
