@@ -1,18 +1,28 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { runAnalysis } from "@/lib/analysisEngine";
 import { SPORTS, type Sport } from "@/lib/sports";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { ProbabilityBar } from "@/components/edge/ProbabilityBar";
+import { detectKalshiGraph } from "@/lib/kalshiDetect.functions";
 import { toast } from "sonner";
-import { Upload } from "lucide-react";
+import { Upload, Sparkles, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/analyze")({
   head: () => ({ meta: [{ title: "Analyze Graph — EdgeGraph AI" }] }),
   component: Analyze,
 });
+
+const fileToDataUrl = (f: File) =>
+  new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(f);
+  });
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
