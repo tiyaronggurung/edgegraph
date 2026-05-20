@@ -14,7 +14,310 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      analyses: {
+        Row: {
+          ai_reasoning: string | null
+          confidence_score: number | null
+          created_at: string
+          edge_score: number | null
+          edge70_detected: boolean | null
+          game_name: string | null
+          id: string
+          league: string | null
+          notes: Json | null
+          odds_a: number | null
+          odds_b: number | null
+          pattern_type: string | null
+          predicted_winner: string | null
+          probability_a: number | null
+          probability_b: number | null
+          recommended_action: string | null
+          risk_level: string | null
+          score: string | null
+          sport: string
+          sport_fields: Json | null
+          team_a: string | null
+          team_b: string | null
+          time_period: string | null
+          uploaded_image_url: string | null
+          user_id: string
+          volume: number | null
+        }
+        Insert: {
+          ai_reasoning?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          edge_score?: number | null
+          edge70_detected?: boolean | null
+          game_name?: string | null
+          id?: string
+          league?: string | null
+          notes?: Json | null
+          odds_a?: number | null
+          odds_b?: number | null
+          pattern_type?: string | null
+          predicted_winner?: string | null
+          probability_a?: number | null
+          probability_b?: number | null
+          recommended_action?: string | null
+          risk_level?: string | null
+          score?: string | null
+          sport: string
+          sport_fields?: Json | null
+          team_a?: string | null
+          team_b?: string | null
+          time_period?: string | null
+          uploaded_image_url?: string | null
+          user_id: string
+          volume?: number | null
+        }
+        Update: {
+          ai_reasoning?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          edge_score?: number | null
+          edge70_detected?: boolean | null
+          game_name?: string | null
+          id?: string
+          league?: string | null
+          notes?: Json | null
+          odds_a?: number | null
+          odds_b?: number | null
+          pattern_type?: string | null
+          predicted_winner?: string | null
+          probability_a?: number | null
+          probability_b?: number | null
+          recommended_action?: string | null
+          risk_level?: string | null
+          score?: string | null
+          sport?: string
+          sport_fields?: Json | null
+          team_a?: string | null
+          team_b?: string | null
+          time_period?: string | null
+          uploaded_image_url?: string | null
+          user_id?: string
+          volume?: number | null
+        }
+        Relationships: []
+      }
+      bets: {
+        Row: {
+          analysis_id: string | null
+          confidence_score: number | null
+          created_at: string
+          date: string
+          edge_score: number | null
+          game: string | null
+          id: string
+          notes: string | null
+          odds: number | null
+          pattern_type: string | null
+          pick: string | null
+          profit_loss: number | null
+          result: string | null
+          sport: string | null
+          stake: number | null
+          user_id: string
+        }
+        Insert: {
+          analysis_id?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          date?: string
+          edge_score?: number | null
+          game?: string | null
+          id?: string
+          notes?: string | null
+          odds?: number | null
+          pattern_type?: string | null
+          pick?: string | null
+          profit_loss?: number | null
+          result?: string | null
+          sport?: string | null
+          stake?: number | null
+          user_id: string
+        }
+        Update: {
+          analysis_id?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          date?: string
+          edge_score?: number | null
+          game?: string | null
+          id?: string
+          notes?: string | null
+          odds?: number | null
+          pattern_type?: string | null
+          pick?: string | null
+          profit_loss?: number | null
+          result?: string | null
+          sport?: string | null
+          stake?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bets_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graph_snapshots: {
+        Row: {
+          analysis_id: string
+          event_trigger: string | null
+          id: string
+          odds_a: number | null
+          odds_b: number | null
+          probability_a: number | null
+          probability_b: number | null
+          score_state: string | null
+          timestamp: string
+          user_id: string
+          volume: number | null
+        }
+        Insert: {
+          analysis_id: string
+          event_trigger?: string | null
+          id?: string
+          odds_a?: number | null
+          odds_b?: number | null
+          probability_a?: number | null
+          probability_b?: number | null
+          score_state?: string | null
+          timestamp?: string
+          user_id: string
+          volume?: number | null
+        }
+        Update: {
+          analysis_id?: string
+          event_trigger?: string | null
+          id?: string
+          odds_a?: number | null
+          odds_b?: number | null
+          probability_a?: number | null
+          probability_b?: number | null
+          score_state?: string | null
+          timestamp?: string
+          user_id?: string
+          volume?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_snapshots_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patterns: {
+        Row: {
+          best_use: string | null
+          condition_logic: string
+          description: string
+          example_behavior: string
+          icon: string | null
+          id: string
+          name: string
+          recommended_action: string
+          risk_level: string
+        }
+        Insert: {
+          best_use?: string | null
+          condition_logic: string
+          description: string
+          example_behavior: string
+          icon?: string | null
+          id?: string
+          name: string
+          recommended_action: string
+          risk_level: string
+        }
+        Update: {
+          best_use?: string | null
+          condition_logic?: string
+          description?: string
+          example_behavior?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          recommended_action?: string
+          risk_level?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          bankroll: number
+          created_at: string
+          default_unit: number
+          email: string | null
+          id: string
+          preferred_sports: string[]
+          risk_tolerance: string
+        }
+        Insert: {
+          bankroll?: number
+          created_at?: string
+          default_unit?: number
+          email?: string | null
+          id: string
+          preferred_sports?: string[]
+          risk_tolerance?: string
+        }
+        Update: {
+          bankroll?: number
+          created_at?: string
+          default_unit?: number
+          email?: string | null
+          id?: string
+          preferred_sports?: string[]
+          risk_tolerance?: string
+        }
+        Relationships: []
+      }
+      strategies: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          minimum_confidence: number | null
+          name: string
+          pattern_type: string | null
+          recommended_action: string | null
+          rules: string | null
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          minimum_confidence?: number | null
+          name: string
+          pattern_type?: string | null
+          recommended_action?: string | null
+          rules?: string | null
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          minimum_confidence?: number | null
+          name?: string
+          pattern_type?: string | null
+          recommended_action?: string | null
+          rules?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
