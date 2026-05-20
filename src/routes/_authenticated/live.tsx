@@ -269,7 +269,7 @@ function LiveMarkets() {
                   sport={inferSportLabel(event.competition || event.seriesTicker || event.title)}
                   odds={market.yesPrice}
                   patternType={analysis.pattern}
-                  confidence={analysis.confidence}
+                  confidence={analysis.confidenceScore}
                   edge={analysis.edgeScore}
                   notes={`Kalshi ${market.ticker} · ${analysis.recommendedAction}`}
                 />
