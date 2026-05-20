@@ -260,16 +260,28 @@ function LiveMarkets() {
 
             {stats && stats.state === "in" && <LiveStatsBlock stats={stats} />}
 
-            <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground">
+            <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground gap-2">
               <span className="truncate">{market.ticker}</span>
-              <a
-                href={`https://kalshi.com/markets/${event.seriesTicker.toLowerCase()}/${event.eventTicker.toLowerCase()}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 hover:text-[color:var(--color-primary)]"
-              >
-                Kalshi <ExternalLink className="h-3 w-3" />
-              </a>
+              <div className="flex items-center gap-2 shrink-0">
+                <SaveBetButton
+                  game={event.title}
+                  pick={`${market.yesSubTitle || "YES"} @ ${yesPct.toFixed(0)}%`}
+                  sport={inferSportLabel(event.competition || event.seriesTicker || event.title)}
+                  odds={market.yesPrice}
+                  patternType={analysis.pattern}
+                  confidence={analysis.confidence}
+                  edge={analysis.edgeScore}
+                  notes={`Kalshi ${market.ticker} · ${analysis.recommendedAction}`}
+                />
+                <a
+                  href={`https://kalshi.com/markets/${event.seriesTicker.toLowerCase()}/${event.eventTicker.toLowerCase()}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 hover:text-[color:var(--color-primary)]"
+                >
+                  Kalshi <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
             </div>
           </div>
         ))}
