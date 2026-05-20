@@ -9,8 +9,10 @@ import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
 import { getLiveGameStats, type LiveGameStats } from "@/lib/espn.functions";
+import { saveBetFromMarket } from "@/lib/bets.functions";
 import { runAnalysis } from "@/lib/analysisEngine";
-import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp } from "lucide-react";
+import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp, BookmarkPlus, Check } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/live")({
   head: () => ({ meta: [{ title: "Live Kalshi Markets — EdgeGraph AI" }] }),
@@ -258,16 +260,28 @@ function LiveMarkets() {
 
             {stats && stats.state === "in" && <LiveStatsBlock stats={stats} />}
 
-            <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground">
+            <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground gap-2">
               <span className="truncate">{market.ticker}</span>
-              <a
-                href={`https://kalshi.com/markets/${event.seriesTicker.toLowerCase()}/${event.eventTicker.toLowerCase()}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 hover:text-[color:var(--color-primary)]"
-              >
-                Kalshi <ExternalLink className="h-3 w-3" />
-              </a>
+              <div className="flex items-center gap-2 shrink-0">
+                <SaveBetButton
+                  game={event.title}
+                  pick={`${market.yesSubTitle || "YES"} @ ${yesPct.toFixed(0)}%`}
+                  sport={inferSportLabel(event.competition || event.seriesTicker || event.title)}
+                  odds={market.yesPrice}
+                  patternType={analysis.pattern}
+                  confidence={analysis.confidenceScore}
+                  edge={analysis.edgeScore}
+                  notes={`Kalshi ${market.ticker} · ${analysis.recommendedAction}`}
+                />
+                <a
+                  href={`https://kalshi.com/markets/${event.seriesTicker.toLowerCase()}/${event.eventTicker.toLowerCase()}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 hover:text-[color:var(--color-primary)]"
+                >
+                  Kalshi <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
             </div>
           </div>
         ))}
@@ -336,4 +350,79 @@ function detectShapeHint(series: number[]): string {
   if (rise > 15 && first - min > 5) hints.push("v-reversal");
   if (range > 25) hints.push("chaotic swinging");
   return hints.join(", ");
+}
+
+function inferSportLabel(hint: string): string {
+  const h = hint.toLowerCase();
+  if (/wnba/.test(h)) return "WNBA";
+  if (/nba|basketball/.test(h)) return "NBA";
+  if (/nfl|football/.test(h)) return "NFL";
+  if (/mlb|baseball/.test(h)) return "MLB";
+  if (/nhl|hockey/.test(h)) return "NHL";
+  if (/soccer|mls|epl|ucl|serie|liga|bundes/.test(h)) return "Soccer";
+  if (/tennis|atp|wta|open/.test(h)) return "Tennis";
+  if (/golf|pga|masters/.test(h)) return "Golf";
+  return "Other";
+}
+
+function SaveBetButton(props: {
+  game: string;
+  pick: string;
+  sport: string;
+  odds: number;
+  patternType: string;
+  confidence: number;
+  edge: number;
+  notes: string;
+}) {
+  const saveFn = useServerFn(saveBetFromMarket);
+  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
+
+  const onClick = async () => {
+    if (state !== "idle") return;
+    setState("saving");
+    try {
+      const res = await saveFn({
+        data: {
+          game: props.game,
+          pick: props.pick,
+          sport: props.sport,
+          odds: props.odds,
+          pattern_type: props.patternType,
+          confidence_score: props.confidence,
+          edge_score: props.edge,
+          notes: props.notes,
+        },
+      });
+      setState("saved");
+      toast.success(
+        res.linkedAnalysisId ? "Saved to Bets · linked to latest analysis" : "Saved to Bets",
+      );
+      setTimeout(() => setState("idle"), 2500);
+    } catch (e) {
+      setState("idle");
+      toast.error((e as Error).message || "Failed to save bet");
+    }
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={state !== "idle"}
+      className={`flex items-center gap-1 px-2 py-1 rounded border text-[10px] uppercase tracking-widest transition-colors ${
+        state === "saved"
+          ? "border-[color:var(--color-primary)] text-[color:var(--color-primary)]"
+          : "border-border hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]"
+      }`}
+    >
+      {state === "saving" ? (
+        <Loader2 className="h-3 w-3 animate-spin" />
+      ) : state === "saved" ? (
+        <Check className="h-3 w-3" />
+      ) : (
+        <BookmarkPlus className="h-3 w-3" />
+      )}
+      {state === "saved" ? "Saved" : "Save bet"}
+    </button>
+  );
 }
