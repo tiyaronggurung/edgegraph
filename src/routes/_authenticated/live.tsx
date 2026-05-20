@@ -9,8 +9,10 @@ import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
 import { getLiveGameStats, type LiveGameStats } from "@/lib/espn.functions";
+import { saveBetFromMarket } from "@/lib/bets.functions";
 import { runAnalysis } from "@/lib/analysisEngine";
-import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp } from "lucide-react";
+import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp, BookmarkPlus, Check } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/live")({
   head: () => ({ meta: [{ title: "Live Kalshi Markets — EdgeGraph AI" }] }),
