@@ -341,6 +341,17 @@ function LiveMarkets() {
               <LiveStatsBlock stats={stats} marketYesPct={yesPct} yesTeamHint={market.yesSubTitle} />
             )}
 
+            {kelly && kelly.hasEdge && kelly.stake > 0 && (
+              <div className="flex items-center justify-between text-[10px] font-mono border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/5 rounded px-1.5 py-1">
+                <span className="flex items-center gap-1 text-[color:var(--color-primary)] font-bold uppercase tracking-widest">
+                  <DollarSign className="h-3 w-3" /> Stake ${kelly.stake}
+                </span>
+                <span className="text-muted-foreground">
+                  {kelly.fractionPct.toFixed(1)}% bank · Kelly {kelly.kellyPct.toFixed(0)}% · {profile.risk}
+                </span>
+              </div>
+            )}
+
             <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground gap-2">
               <span className="truncate">{market.ticker}</span>
               <div className="flex items-center gap-2 shrink-0">
@@ -352,7 +363,10 @@ function LiveMarkets() {
                   patternType={analysis.pattern}
                   confidence={analysis.confidenceScore}
                   edge={analysis.edgeScore}
-                  notes={`Kalshi ${market.ticker} · ${analysis.recommendedAction}`}
+                  stake={kelly?.stake ?? 0}
+                  notes={`Kalshi ${market.ticker} · ${analysis.recommendedAction}${
+                    fv ? ` · fair ${(fv.fairProb * 100).toFixed(0)}%` : ""
+                  }${kelly?.stake ? ` · stake $${kelly.stake} (${profile.risk})` : ""}`}
                 />
                 <a
                   href={`https://kalshi.com/markets/${event.seriesTicker.toLowerCase()}/${event.eventTicker.toLowerCase()}`}
