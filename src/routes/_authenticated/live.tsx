@@ -9,6 +9,7 @@ import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
 import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/lib/espn.functions";
+import { getNoVigFairLine } from "@/lib/oddsApi.functions";
 import { saveBetFromMarket, getBankrollStats } from "@/lib/bets.functions";
 import { computeKellyStake, computeKellyPresets, type RiskTolerance } from "@/lib/kelly";
 import { detectMovement } from "@/lib/movement";
@@ -554,6 +555,7 @@ function LiveStatsBlock({
           </span>
         </div>
       )}
+      <BookConsensusRow stats={stats} marketYesPct={marketYesPct} yesTeamHint={yesTeamHint} />
       {stats.trailingTeam && (
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-muted-foreground">
@@ -591,6 +593,86 @@ function LiveStatsBlock({
     </div>
   );
 }
+
+function BookConsensusRow({
+  stats,
+  marketYesPct,
+  yesTeamHint,
+}: {
+  stats: LiveGameStats;
+  marketYesPct: number;
+  yesTeamHint?: string;
+}) {
+  const fn = useServerFn(getNoVigFairLine);
+  const q = useQuery({
+    queryKey: ["odds-novig", stats.league, stats.home.name, stats.away.name],
+    queryFn: () =>
+      fn({
+        data: {
+          league: stats.league,
+          homeName: stats.home.name,
+          awayName: stats.away.name,
+        },
+      }),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+    retry: false,
+  });
+
+  if (q.isLoading) {
+    return (
+      <div className="text-[10px] font-mono text-muted-foreground border border-border/40 rounded px-1.5 py-1 bg-background/40">
+        Book consensus…
+      </div>
+    );
+  }
+  if (!q.data || !q.data.ok) return null;
+
+  // The Odds API returns home/away probs. YES on Kalshi can be either team.
+  // Use the existing teamHint to pick which side maps to YES.
+  const hint = (yesTeamHint ?? "").toLowerCase();
+  const homeName = stats.home.name.toLowerCase();
+  const awayName = stats.away.name.toLowerCase();
+  const yesIsHome =
+    hint && (homeName.includes(hint) || hint.includes(stats.home.abbr.toLowerCase()));
+  const yesIsAway =
+    hint && (awayName.includes(hint) || hint.includes(stats.away.abbr.toLowerCase()));
+  const bookYesProb = yesIsAway
+    ? q.data.fairAwayProb
+    : yesIsHome
+      ? q.data.fairHomeProb
+      : q.data.fairHomeProb;
+  const bookYesPct = bookYesProb * 100;
+  const edge = bookYesPct - marketYesPct;
+  const edgeColor =
+    edge >= 5
+      ? "text-[color:var(--color-primary)]"
+      : edge <= -5
+        ? "text-[color:var(--color-destructive)]"
+        : "text-muted-foreground";
+
+  return (
+    <div
+      title={`No-vig consensus from ${q.data.books.length} book${
+        q.data.books.length === 1 ? "" : "s"
+      } · avg vig ${q.data.avgVigPct.toFixed(2)}%`}
+      className="flex items-center justify-between text-[10px] font-mono border border-border/60 rounded px-1.5 py-1 bg-background/60"
+    >
+      <span className="text-muted-foreground uppercase tracking-widest">
+        Book ({q.data.books.length})
+      </span>
+      <span className="text-muted-foreground">
+        Fair <span className="text-foreground font-bold">{bookYesPct.toFixed(0)}%</span>
+      </span>
+      <span className={`font-bold uppercase tracking-widest ${edgeColor}`}>
+        {edge >= 0 ? "+" : ""}
+        {edge.toFixed(0)}pt vs mkt
+      </span>
+    </div>
+  );
+}
+
+
 
 function BoxScoreTable({
   home,
