@@ -50,3 +50,32 @@ export const saveBetFromMarket = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true, betId: bet.id, linkedAnalysisId: bet.analysis_id };
   });
+
+export const getBankrollStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const [{ data: prof }, { data: bets }] = await Promise.all([
+      supabase.from("profiles").select("bankroll").maybeSingle(),
+      supabase.from("bets").select("stake, profit_loss, result"),
+    ]);
+    const bankroll = Number(prof?.bankroll ?? 1000);
+    let openStake = 0;
+    let realized = 0;
+    let openCount = 0;
+    let settledCount = 0;
+    for (const b of bets ?? []) {
+      const stake = Number(b.stake ?? 0);
+      const pl = Number(b.profit_loss ?? 0);
+      const result = String(b.result ?? "Pending");
+      if (result === "Pending") {
+        openStake += stake;
+        openCount += 1;
+      } else {
+        realized += pl;
+        settledCount += 1;
+      }
+    }
+    return { bankroll, openStake, openCount, realized, settledCount };
+  });
+
