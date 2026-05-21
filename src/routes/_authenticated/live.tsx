@@ -303,6 +303,7 @@ function LiveMarkets() {
                   unit: profile.unit,
                 })
               : null;
+          const move = detectMovement(series100, fv?.fairProb);
           return (
           <div key={market.ticker} className="border border-border bg-card rounded p-4 space-y-2">
             <div className="flex justify-between items-start gap-2">
@@ -329,6 +330,21 @@ function LiveMarkets() {
             ) : (
               <div className="h-[70px] flex items-center justify-center text-[10px] text-muted-foreground border border-dashed border-border rounded">
                 no recent trades
+              </div>
+            )}
+
+            {move.kind && (
+              <div
+                className={
+                  "text-[10px] font-mono font-bold uppercase tracking-widest rounded px-1.5 py-1 border " +
+                  (move.tone === "buy"
+                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+                    : move.tone === "fade"
+                    ? "border-red-500/50 bg-red-500/10 text-red-400"
+                    : "border-border bg-muted/30 text-muted-foreground")
+                }
+              >
+                {move.label}
               </div>
             )}
 
