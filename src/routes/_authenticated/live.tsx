@@ -411,16 +411,55 @@ function LiveMarkets() {
               <LiveStatsBlock stats={stats} marketYesPct={yesPct} yesTeamHint={market.yesSubTitle} />
             )}
 
-            {kelly && kelly.hasEdge && kelly.stake > 0 && (
-              <div className="flex items-center justify-between text-[10px] font-mono border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/5 rounded px-1.5 py-1">
-                <span className="flex items-center gap-1 text-[color:var(--color-primary)] font-bold uppercase tracking-widest">
-                  <DollarSign className="h-3 w-3" /> Stake ${kelly.stake}
-                </span>
-                <span className="text-muted-foreground">
-                  {kelly.fractionPct.toFixed(1)}% bank · Kelly {kelly.kellyPct.toFixed(0)}% · {profile.risk}
-                </span>
+            {presets && presets.hasEdge && presets.full > 0 && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+                  <span className="flex items-center gap-1 text-[color:var(--color-primary)]">
+                    <DollarSign className="h-3 w-3" /> Quick stake
+                  </span>
+                  <span>Kelly {presets.kellyPct.toFixed(0)}% · bank ${profile.bankroll}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  <PresetBetButton
+                    label="¼K"
+                    amount={presets.quarter}
+                    game={event.title}
+                    pick={`${market.yesSubTitle || "YES"} @ ${yesPct.toFixed(0)}%`}
+                    sport={inferSportLabel(event.competition || event.seriesTicker || event.title)}
+                    odds={market.yesPrice}
+                    patternType={analysis.pattern}
+                    confidence={analysis.confidenceScore}
+                    edge={analysis.edgeScore}
+                    notes={`Kalshi ${market.ticker} · ¼ Kelly${fv ? ` · fair ${(fv.fairProb * 100).toFixed(0)}%` : ""}`}
+                  />
+                  <PresetBetButton
+                    label="½K"
+                    amount={presets.half}
+                    game={event.title}
+                    pick={`${market.yesSubTitle || "YES"} @ ${yesPct.toFixed(0)}%`}
+                    sport={inferSportLabel(event.competition || event.seriesTicker || event.title)}
+                    odds={market.yesPrice}
+                    patternType={analysis.pattern}
+                    confidence={analysis.confidenceScore}
+                    edge={analysis.edgeScore}
+                    notes={`Kalshi ${market.ticker} · ½ Kelly${fv ? ` · fair ${(fv.fairProb * 100).toFixed(0)}%` : ""}`}
+                  />
+                  <PresetBetButton
+                    label="1K"
+                    amount={presets.full}
+                    game={event.title}
+                    pick={`${market.yesSubTitle || "YES"} @ ${yesPct.toFixed(0)}%`}
+                    sport={inferSportLabel(event.competition || event.seriesTicker || event.title)}
+                    odds={market.yesPrice}
+                    patternType={analysis.pattern}
+                    confidence={analysis.confidenceScore}
+                    edge={analysis.edgeScore}
+                    notes={`Kalshi ${market.ticker} · Full Kelly${fv ? ` · fair ${(fv.fairProb * 100).toFixed(0)}%` : ""}`}
+                  />
+                </div>
               </div>
             )}
+
 
             <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground gap-2">
               <span className="truncate">{market.ticker}</span>
