@@ -595,6 +595,7 @@ function SaveBetButton(props: {
   patternType: string;
   confidence: number;
   edge: number;
+  stake?: number;
   notes: string;
 }) {
   const saveFn = useServerFn(saveBetFromMarket);
@@ -613,6 +614,7 @@ function SaveBetButton(props: {
           pattern_type: props.patternType,
           confidence_score: props.confidence,
           edge_score: props.edge,
+          stake: props.stake,
           notes: props.notes,
         },
       });
