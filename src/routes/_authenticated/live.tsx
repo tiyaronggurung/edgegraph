@@ -8,7 +8,7 @@ import { ActionBadge } from "@/components/edge/ActionBadge";
 import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
-import { getLiveGameStats, computeFairProbability, type LiveGameStats, type FairValue } from "@/lib/espn.functions";
+import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/lib/espn.functions";
 import { saveBetFromMarket } from "@/lib/bets.functions";
 import { computeKellyStake, type RiskTolerance } from "@/lib/kelly";
 import { supabase } from "@/integrations/supabase/client";
