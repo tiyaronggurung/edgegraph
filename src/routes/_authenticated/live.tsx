@@ -265,6 +265,17 @@ function LiveMarkets() {
               ))}
             </select>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Min score</span>
+            <select
+              value={minScore}
+              onChange={(e) => setMinScore(Number(e.target.value))}
+              className="bg-background border border-border rounded px-2 py-1 text-xs"
+            >
+              {[0, 50, 70, 85].map((v) => (
+                <option key={v} value={v}>{v === 0 ? "any" : `★ ${v}+`}</option>
+              ))}
+            </select>
         </div>
       </div>
 
