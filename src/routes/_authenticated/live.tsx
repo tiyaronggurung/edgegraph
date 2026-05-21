@@ -339,6 +339,10 @@ function LiveMarkets() {
                   unit: profile.unit,
                 })
               : null;
+          const presets =
+            fv && fv.fairProb >= 0.55 && fv.edgePts >= 5
+              ? computeKellyPresets(fv.fairProb, market.yesPrice, profile.bankroll, profile.unit)
+              : null;
           const scoreTone =
             confidence.score >= 70
               ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400"
