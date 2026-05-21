@@ -291,7 +291,18 @@ function LiveMarkets() {
       )}
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {filtered.map(({ event, market, series100, yesPct, analysis, stats }) => (
+        {filtered.map(({ event, market, series100, yesPct, analysis, stats, fv }) => {
+          const kelly =
+            fv && fv.fairProb >= 0.55 && fv.edgePts >= 5
+              ? computeKellyStake({
+                  fairProb: fv.fairProb,
+                  yesPrice: market.yesPrice,
+                  bankroll: profile.bankroll,
+                  riskTolerance: profile.risk,
+                  unit: profile.unit,
+                })
+              : null;
+          return (
           <div key={market.ticker} className="border border-border bg-card rounded p-4 space-y-2">
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0">
