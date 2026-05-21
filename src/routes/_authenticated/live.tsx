@@ -297,7 +297,7 @@ function LiveMarkets() {
       )}
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {filtered.map(({ event, market, series100, yesPct, analysis, stats, fv }) => {
+        {filtered.map(({ event, market, series100, yesPct, analysis, stats, fv, movement: move, confidence }) => {
           const kelly =
             fv && fv.fairProb >= 0.55 && fv.edgePts >= 5
               ? computeKellyStake({
@@ -308,7 +308,12 @@ function LiveMarkets() {
                   unit: profile.unit,
                 })
               : null;
-          const move = detectMovement(series100, fv?.fairProb);
+          const scoreTone =
+            confidence.score >= 70
+              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400"
+              : confidence.score >= 50
+              ? "border-amber-500/60 bg-amber-500/10 text-amber-400"
+              : "border-border bg-muted/30 text-muted-foreground";
           return (
           <div key={market.ticker} className="border border-border bg-card rounded p-4 space-y-2">
             <div className="flex justify-between items-start gap-2">
@@ -319,7 +324,15 @@ function LiveMarkets() {
                 <div className="font-bold text-sm truncate">{event.title}</div>
                 <div className="text-xs text-muted-foreground truncate">{market.yesSubTitle}</div>
               </div>
-              {analysis.edge70Detected && <Edge70Badge detected />}
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <div
+                  className={`text-[10px] font-mono font-bold uppercase tracking-widest rounded px-1.5 py-0.5 border ${scoreTone}`}
+                  title={`Edge ${confidence.parts.edge}/40 · Lean ${confidence.parts.lean}/20 · Momentum ${confidence.parts.momentum}/15 · Liquidity ${confidence.parts.liquidity}/15 · Progress ${confidence.parts.progress}/10`}
+                >
+                  ★ {confidence.score} {confidence.grade}
+                </div>
+                {analysis.edge70Detected && <Edge70Badge detected />}
+              </div>
             </div>
 
             <div className="flex items-baseline gap-2">
