@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedStrategiesRouteImport } from './routes/_authenticated/strategies'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedPatternsRouteImport } from './routes/_authenticated/patterns'
+import { Route as AuthenticatedModelValidationRouteImport } from './routes/_authenticated/model-validation'
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedBacktestRouteImport } from './routes/_authenticated/backtest'
@@ -56,6 +57,12 @@ const AuthenticatedPatternsRoute = AuthenticatedPatternsRouteImport.update({
   path: '/patterns',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedModelValidationRoute =
+  AuthenticatedModelValidationRouteImport.update({
+    id: '/model-validation',
+    path: '/model-validation',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedLiveRoute = AuthenticatedLiveRouteImport.update({
   id: '/live',
   path: '/live',
@@ -90,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/backtest': typeof AuthenticatedBacktestRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/live': typeof AuthenticatedLiveRoute
+  '/model-validation': typeof AuthenticatedModelValidationRoute
   '/patterns': typeof AuthenticatedPatternsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/strategies': typeof AuthenticatedStrategiesRoute
@@ -103,6 +111,7 @@ export interface FileRoutesByTo {
   '/backtest': typeof AuthenticatedBacktestRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/live': typeof AuthenticatedLiveRoute
+  '/model-validation': typeof AuthenticatedModelValidationRoute
   '/patterns': typeof AuthenticatedPatternsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/strategies': typeof AuthenticatedStrategiesRoute
@@ -118,6 +127,7 @@ export interface FileRoutesById {
   '/_authenticated/backtest': typeof AuthenticatedBacktestRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/live': typeof AuthenticatedLiveRoute
+  '/_authenticated/model-validation': typeof AuthenticatedModelValidationRoute
   '/_authenticated/patterns': typeof AuthenticatedPatternsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/strategies': typeof AuthenticatedStrategiesRoute
@@ -133,6 +143,7 @@ export interface FileRouteTypes {
     | '/backtest'
     | '/dashboard'
     | '/live'
+    | '/model-validation'
     | '/patterns'
     | '/settings'
     | '/strategies'
@@ -146,6 +157,7 @@ export interface FileRouteTypes {
     | '/backtest'
     | '/dashboard'
     | '/live'
+    | '/model-validation'
     | '/patterns'
     | '/settings'
     | '/strategies'
@@ -160,6 +172,7 @@ export interface FileRouteTypes {
     | '/_authenticated/backtest'
     | '/_authenticated/dashboard'
     | '/_authenticated/live'
+    | '/_authenticated/model-validation'
     | '/_authenticated/patterns'
     | '/_authenticated/settings'
     | '/_authenticated/strategies'
@@ -224,6 +237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPatternsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/model-validation': {
+      id: '/_authenticated/model-validation'
+      path: '/model-validation'
+      fullPath: '/model-validation'
+      preLoaderRoute: typeof AuthenticatedModelValidationRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/live': {
       id: '/_authenticated/live'
       path: '/live'
@@ -267,6 +287,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedBacktestRoute: typeof AuthenticatedBacktestRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedLiveRoute: typeof AuthenticatedLiveRoute
+  AuthenticatedModelValidationRoute: typeof AuthenticatedModelValidationRoute
   AuthenticatedPatternsRoute: typeof AuthenticatedPatternsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedStrategiesRoute: typeof AuthenticatedStrategiesRoute
@@ -278,6 +299,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBacktestRoute: AuthenticatedBacktestRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedLiveRoute: AuthenticatedLiveRoute,
+  AuthenticatedModelValidationRoute: AuthenticatedModelValidationRoute,
   AuthenticatedPatternsRoute: AuthenticatedPatternsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedStrategiesRoute: AuthenticatedStrategiesRoute,

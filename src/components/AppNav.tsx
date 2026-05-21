@@ -10,6 +10,7 @@ const LINKS = [
   { to: "/live", label: "Live Markets" },
   { to: "/patterns", label: "Patterns" },
   { to: "/backtest", label: "Backtest" },
+  { to: "/model-validation", label: "Model" },
   { to: "/strategies", label: "Strategies" },
   { to: "/settings", label: "Settings" },
 ] as const;
