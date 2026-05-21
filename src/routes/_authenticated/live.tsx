@@ -7,6 +7,7 @@ import { PatternBadge } from "@/components/edge/PatternBadge";
 import { ActionBadge } from "@/components/edge/ActionBadge";
 import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
+import { VerdictCard } from "@/components/edge/VerdictCard";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
 import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/lib/espn.functions";
 import { getNoVigFairLine } from "@/lib/oddsApi.functions";
