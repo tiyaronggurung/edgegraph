@@ -198,13 +198,23 @@ function LiveMarkets() {
             Kalshi + ESPN live · auto-refresh every 30s · showing {filtered.length} of {cards.length} markets
           </p>
         </div>
-        <button
-          onClick={() => setRefreshKey((k) => k + 1)}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs uppercase tracking-wider rounded border border-border hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]"
-        >
-          {eventsQuery.isFetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <BankrollChip
+            bankroll={profile.bankroll}
+            openStake={bankrollQ.data?.openStake ?? 0}
+            openCount={bankrollQ.data?.openCount ?? 0}
+            realized={bankrollQ.data?.realized ?? 0}
+            settledCount={bankrollQ.data?.settledCount ?? 0}
+          />
+          <button
+            onClick={() => setRefreshKey((k) => k + 1)}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs uppercase tracking-wider rounded border border-border hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]"
+          >
+            {eventsQuery.isFetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            Refresh
+          </button>
+        </div>
+
       </div>
 
       {/* Filters */}
