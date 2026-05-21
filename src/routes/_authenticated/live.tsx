@@ -341,6 +341,20 @@ function LiveStatsBlock({
           {stats.home.abbr} {stats.home.score}
         </span>
       </div>
+      {fv && (
+        <div className="flex items-center justify-between text-[10px] font-mono border border-border/60 rounded px-1.5 py-1 bg-background/60">
+          <span className="text-muted-foreground">
+            Market <span className="text-foreground font-bold">{marketYesPct.toFixed(0)}%</span>
+          </span>
+          <span className="text-muted-foreground">
+            Fair <span className="text-foreground font-bold">{(fv.fairProb * 100).toFixed(0)}%</span>
+          </span>
+          <span className={`font-bold uppercase tracking-widest ${edgeColor}`}>
+            {fv.edgePts >= 0 ? "+" : ""}
+            {fv.edgePts.toFixed(0)}pt {edgeSignal}
+          </span>
+        </div>
+      )}
       {stats.trailingTeam && (
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-muted-foreground">
