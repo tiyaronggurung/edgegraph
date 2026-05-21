@@ -369,6 +369,25 @@ function inferSportLabel(hint: string): string {
   return "Other";
 }
 
+// Kalshi event sub_title looks like "CAR at MTL (May 23)" or "Carolina at Montreal".
+// Pull the two sides so ESPN can match a real live game.
+function parseTeamsFromEvent(
+  subTitle: string,
+  title: string,
+  yesSubTitle: string,
+): { a: string; b: string | undefined } {
+  const src = subTitle || title || "";
+  // Strip trailing parenthetical date.
+  const cleaned = src.replace(/\([^)]*\)\s*$/, "").trim();
+  const m = cleaned.match(/^(.+?)\s+(?:at|vs\.?|@|v\.?)\s+(.+?)$/i);
+  if (m) {
+    const left = m[1].trim();
+    const right = m[2].trim();
+    if (left && right) return { a: left, b: right };
+  }
+  return { a: yesSubTitle || title || src, b: undefined };
+}
+
 function SaveBetButton(props: {
   game: string;
   pick: string;
