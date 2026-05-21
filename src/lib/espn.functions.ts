@@ -166,6 +166,107 @@ function progressPctForLeague(league: EspnLeague, period: number, clock: string)
   }
 }
 
+// ESPN summary endpoint — returns team box score stats.
+async function fetchSummary(league: EspnLeague, eventId: string): Promise<any | null> {
+  try {
+    const res = await fetch(`${ESPN}/${league}/summary?event=${encodeURIComponent(eventId)}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function pickNum(stats: any[], names: string[]): number | undefined {
+  for (const n of names) {
+    const s = stats.find((x) => x?.name === n);
+    if (s && s.displayValue != null && s.displayValue !== "") {
+      const v = Number(String(s.displayValue).replace("%", ""));
+      if (Number.isFinite(v)) return v;
+    }
+  }
+  return undefined;
+}
+
+function buildTeamStatLine(
+  base: { name: string; abbr: string; homeAway: "home" | "away"; score: number },
+  raw: any[],
+): TeamStatLine {
+  const line: TeamStatLine = { ...base };
+  line.fgPct = pickNum(raw, ["fieldGoalPct", "fieldGoalsPct"]);
+  line.threePct = pickNum(raw, ["threePointFieldGoalPct", "threePointPct"]);
+  line.ftPct = pickNum(raw, ["freeThrowPct"]);
+  line.rebounds = pickNum(raw, ["totalRebounds", "rebounds"]);
+  line.offReb = pickNum(raw, ["offensiveRebounds"]);
+  line.assists = pickNum(raw, ["assists"]);
+  line.steals = pickNum(raw, ["steals"]);
+  line.blocks = pickNum(raw, ["blocks", "blockedShots"]);
+  line.turnovers = pickNum(raw, ["turnovers", "totalTurnovers"]);
+  line.pointsInPaint = pickNum(raw, ["pointsInPaint"]);
+  line.fastBreakPoints = pickNum(raw, ["fastBreakPoints"]);
+  line.pointsOffTurnovers = pickNum(raw, ["pointsOffTurnovers"]);
+  line.largestLead = pickNum(raw, ["largestLead"]);
+  line.shots = pickNum(raw, ["shotsTotal", "shots"]);
+  line.hits = pickNum(raw, ["hits"]);
+  line.faceoffPct = pickNum(raw, ["faceoffPercent", "faceoffWinPercent"]);
+  line.ppPct = pickNum(raw, ["powerPlayPct"]);
+  return line;
+}
+
+// Predict who closes out the game based on team-stat differentials + live score state.
+function computeOutcomeLean(
+  league: EspnLeague,
+  home: TeamStatLine,
+  away: TeamStatLine,
+  scoreDiff: number, // home - away
+  progressPct: number,
+): OutcomeLean {
+  const reasons: string[] = [];
+  let homeScore = 0; // positive = leans home
+
+  // Score-state weight grows with game progress.
+  const stateWeight = 0.5 + (progressPct / 100) * 1.5;
+  homeScore += scoreDiff * stateWeight;
+  if (Math.abs(scoreDiff) >= 2) {
+    reasons.push(`${scoreDiff > 0 ? home.abbr : away.abbr} leads by ${Math.abs(scoreDiff)}`);
+  }
+
+  // Basketball / hockey efficiency comparisons.
+  const cmp = (h?: number, a?: number, weight = 1, label = "") => {
+    if (h == null || a == null) return;
+    const diff = h - a;
+    if (Math.abs(diff) < 0.5) return;
+    homeScore += diff * weight;
+    if (Math.abs(diff) >= (label.includes("%") ? 3 : 2)) {
+      reasons.push(`${diff > 0 ? home.abbr : away.abbr} +${Math.abs(diff).toFixed(1)} ${label}`.trim());
+    }
+  };
+
+  if (league.startsWith("basketball")) {
+    cmp(home.fgPct, away.fgPct, 0.6, "FG%");
+    cmp(home.threePct, away.threePct, 0.5, "3P%");
+    cmp(home.ftPct, away.ftPct, 0.15, "FT%");
+    cmp(home.pointsInPaint, away.pointsInPaint, 0.1, "PIP");
+    cmp(home.fastBreakPoints, away.fastBreakPoints, 0.1, "FB");
+    cmp(home.assists, away.assists, 0.08, "AST");
+    cmp(home.rebounds, away.rebounds, 0.05, "REB");
+    cmp(home.offReb, away.offReb, 0.1, "OREB");
+    cmp(away.turnovers, home.turnovers, 0.25, "TO mgmt"); // fewer TOs = better
+    cmp(home.pointsOffTurnovers, away.pointsOffTurnovers, 0.15, "PTS off TO");
+  } else if (league.startsWith("hockey")) {
+    cmp(home.shots, away.shots, 0.3, "shots");
+    cmp(home.hits, away.hits, 0.05, "hits");
+    cmp(home.faceoffPct, away.faceoffPct, 0.05, "FO%");
+    cmp(home.ppPct, away.ppPct, 0.1, "PP%");
+  }
+
+  const magnitude = Math.min(100, Math.abs(homeScore) * 3.5 + 15);
+  const favored = Math.abs(homeScore) < 0.5 ? null : homeScore > 0 ? home.name : away.name;
+  return { favored, lean: Math.round(magnitude), reasons: reasons.slice(0, 4) };
+}
+
 export const getLiveGameStats = createServerFn({ method: "GET" })
   .inputValidator(
     z.object({
@@ -186,7 +287,7 @@ export const getLiveGameStats = createServerFn({ method: "GET" })
           name: c.team?.displayName ?? "",
           abbr: c.team?.abbreviation ?? "",
           score: Number(c.score ?? 0),
-          homeAway: c.homeAway,
+          homeAway: c.homeAway as "home" | "away",
         }));
         const matchA = teams.find((t: any) => teamMatches(data.teamA, t.name, t.abbr));
         const matchB = data.teamB ? teams.find((t: any) => teamMatches(data.teamB!, t.name, t.abbr)) : matchA;
@@ -194,19 +295,21 @@ export const getLiveGameStats = createServerFn({ method: "GET" })
 
         const home = teams.find((t: any) => t.homeAway === "home") ?? teams[0];
         const away = teams.find((t: any) => t.homeAway === "away") ?? teams[1];
-        const state = ev.status?.type?.state ?? "pre";
+        const state = (ev.status?.type?.state ?? "pre") as LiveGameStats["state"];
         const period = Number(ev.status?.period ?? 0);
         const clock = String(ev.status?.displayClock ?? "");
         const shortDetail = String(ev.status?.type?.shortDetail ?? "");
+        const eventId = String(ev.id ?? "");
 
         const scoreDiff = home.score - away.score;
         const trailing = scoreDiff === 0 ? null : scoreDiff < 0 ? home.name : away.name;
         const progress = progressPctForLeague(league, period, clock);
         const cb = computeComeback({ league, state, period, clock, scoreDiff, totalProgressPct: progress });
 
-        return {
+        const base: LiveGameStats = {
           league,
-          state: state as LiveGameStats["state"],
+          eventId,
+          state,
           shortDetail,
           period,
           clock,
@@ -219,6 +322,28 @@ export const getLiveGameStats = createServerFn({ method: "GET" })
           comebackScore: cb.score,
           comebackReason: cb.reason,
         };
+
+        // For in-progress (and just-finished) games, pull the box score and compute outcome lean.
+        if (state === "in" || state === "post") {
+          const summary = await fetchSummary(league, eventId);
+          const sumTeams = summary?.boxscore?.teams ?? [];
+          const homeRaw = sumTeams.find((t: any) => t.homeAway === "home")?.statistics ?? [];
+          const awayRaw = sumTeams.find((t: any) => t.homeAway === "away")?.statistics ?? [];
+          if (homeRaw.length || awayRaw.length) {
+            const homeLine = buildTeamStatLine(
+              { name: home.name, abbr: home.abbr, homeAway: "home", score: home.score },
+              homeRaw,
+            );
+            const awayLine = buildTeamStatLine(
+              { name: away.name, abbr: away.abbr, homeAway: "away", score: away.score },
+              awayRaw,
+            );
+            base.teamStats = { home: homeLine, away: awayLine };
+            base.outcomeLean = computeOutcomeLean(league, homeLine, awayLine, scoreDiff, progress);
+          }
+        }
+
+        return base;
       }
     }
     return null;
