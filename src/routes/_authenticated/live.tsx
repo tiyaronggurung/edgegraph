@@ -175,9 +175,10 @@ function LiveMarkets() {
           if (lean.favored !== yesTeam && lean.lean >= 40) return false;
         }
       }
+      if (minScore > 0 && c.confidence.score < minScore) return false;
       return true;
     });
-  }, [cards, sportFilter, minVolume, edge70Only, highConfOnly, minEdgePts]);
+  }, [cards, sportFilter, minVolume, edge70Only, highConfOnly, minEdgePts, minScore]);
 
   return (
     <div className="space-y-5 font-mono">
