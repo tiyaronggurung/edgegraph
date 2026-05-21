@@ -104,6 +104,9 @@ export type Database = {
       bets: {
         Row: {
           analysis_id: string | null
+          closing_captured_at: string | null
+          closing_odds: number | null
+          clv_percent: number | null
           confidence_score: number | null
           created_at: string
           date: string
@@ -122,6 +125,9 @@ export type Database = {
         }
         Insert: {
           analysis_id?: string | null
+          closing_captured_at?: string | null
+          closing_odds?: number | null
+          clv_percent?: number | null
           confidence_score?: number | null
           created_at?: string
           date?: string
@@ -140,6 +146,9 @@ export type Database = {
         }
         Update: {
           analysis_id?: string | null
+          closing_captured_at?: string | null
+          closing_odds?: number | null
+          clv_percent?: number | null
           confidence_score?: number | null
           created_at?: string
           date?: string
