@@ -40,12 +40,32 @@ function LiveMarkets() {
   const eventsFn = useServerFn(getKalshiSportsEvents);
   const historyFn = useServerFn(getKalshiMarketHistory);
   const statsFn = useServerFn(getLiveGameStats);
+  const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [sportFilter, setSportFilter] = useState<string>("all");
   const [minVolume, setMinVolume] = useState<number>(0);
   const [edge70Only, setEdge70Only] = useState(false);
   const [highConfOnly, setHighConfOnly] = useState(false);
   const [minEdgePts, setMinEdgePts] = useState<number>(8);
+
+  const profileQ = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("bankroll, default_unit, risk_tolerance")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+  const profile = {
+    bankroll: Number(profileQ.data?.bankroll ?? 1000),
+    unit: Number(profileQ.data?.default_unit ?? 25),
+    risk: (profileQ.data?.risk_tolerance ?? "Medium") as RiskTolerance,
+  };
 
   const eventsQuery = useQuery({
     queryKey: ["kalshi-sports", refreshKey],
