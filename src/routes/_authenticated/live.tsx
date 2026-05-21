@@ -148,7 +148,9 @@ function LiveMarkets() {
         });
         const stats = statsByTicker.get(market.ticker) ?? null;
         const fv = stats ? computeFairProbability(stats, yesPct, market.yesSubTitle) : null;
-        return { event, market, series100, yesPct, analysis, stats, fv };
+        const movement = detectMovement(series100, fv?.fairProb);
+        const confidence = computeConfidence({ fv, stats, movement, volume24h: market.volume24h });
+        return { event, market, series100, yesPct, analysis, stats, fv, movement, confidence };
       }),
     // historyByTicker / statsByTicker rebuilt every render, intentional dep simplification
     // eslint-disable-next-line react-hooks/exhaustive-deps
