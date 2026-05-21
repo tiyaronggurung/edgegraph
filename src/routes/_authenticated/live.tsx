@@ -262,7 +262,9 @@ function LiveMarkets() {
             </div>
             <ActionBadge action={analysis.recommendedAction} />
 
-            {stats && stats.state === "in" && <LiveStatsBlock stats={stats} />}
+            {stats && stats.state === "in" && (
+              <LiveStatsBlock stats={stats} marketYesPct={yesPct} yesTeamHint={market.yesSubTitle} />
+            )}
 
             <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground gap-2">
               <span className="truncate">{market.ticker}</span>
