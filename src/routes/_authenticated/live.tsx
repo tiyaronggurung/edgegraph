@@ -10,8 +10,11 @@ import { Disclaimer } from "@/components/edge/Disclaimer";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
 import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/lib/espn.functions";
 import { saveBetFromMarket } from "@/lib/bets.functions";
+import { computeKellyStake, type RiskTolerance } from "@/lib/kelly";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { runAnalysis } from "@/lib/analysisEngine";
-import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp, BookmarkPlus, Check } from "lucide-react";
+import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp, BookmarkPlus, Check, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/live")({
@@ -37,12 +40,32 @@ function LiveMarkets() {
   const eventsFn = useServerFn(getKalshiSportsEvents);
   const historyFn = useServerFn(getKalshiMarketHistory);
   const statsFn = useServerFn(getLiveGameStats);
+  const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [sportFilter, setSportFilter] = useState<string>("all");
   const [minVolume, setMinVolume] = useState<number>(0);
   const [edge70Only, setEdge70Only] = useState(false);
   const [highConfOnly, setHighConfOnly] = useState(false);
   const [minEdgePts, setMinEdgePts] = useState<number>(8);
+
+  const profileQ = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("bankroll, default_unit, risk_tolerance")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+  const profile = {
+    bankroll: Number(profileQ.data?.bankroll ?? 1000),
+    unit: Number(profileQ.data?.default_unit ?? 25),
+    risk: (profileQ.data?.risk_tolerance ?? "Medium") as RiskTolerance,
+  };
 
   const eventsQuery = useQuery({
     queryKey: ["kalshi-sports", refreshKey],
@@ -268,7 +291,18 @@ function LiveMarkets() {
       )}
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {filtered.map(({ event, market, series100, yesPct, analysis, stats }) => (
+        {filtered.map(({ event, market, series100, yesPct, analysis, stats, fv }) => {
+          const kelly =
+            fv && fv.fairProb >= 0.55 && fv.edgePts >= 5
+              ? computeKellyStake({
+                  fairProb: fv.fairProb,
+                  yesPrice: market.yesPrice,
+                  bankroll: profile.bankroll,
+                  riskTolerance: profile.risk,
+                  unit: profile.unit,
+                })
+              : null;
+          return (
           <div key={market.ticker} className="border border-border bg-card rounded p-4 space-y-2">
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0">
@@ -307,6 +341,17 @@ function LiveMarkets() {
               <LiveStatsBlock stats={stats} marketYesPct={yesPct} yesTeamHint={market.yesSubTitle} />
             )}
 
+            {kelly && kelly.hasEdge && kelly.stake > 0 && (
+              <div className="flex items-center justify-between text-[10px] font-mono border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/5 rounded px-1.5 py-1">
+                <span className="flex items-center gap-1 text-[color:var(--color-primary)] font-bold uppercase tracking-widest">
+                  <DollarSign className="h-3 w-3" /> Stake ${kelly.stake}
+                </span>
+                <span className="text-muted-foreground">
+                  {kelly.fractionPct.toFixed(1)}% bank · Kelly {kelly.kellyPct.toFixed(0)}% · {profile.risk}
+                </span>
+              </div>
+            )}
+
             <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground gap-2">
               <span className="truncate">{market.ticker}</span>
               <div className="flex items-center gap-2 shrink-0">
@@ -318,7 +363,10 @@ function LiveMarkets() {
                   patternType={analysis.pattern}
                   confidence={analysis.confidenceScore}
                   edge={analysis.edgeScore}
-                  notes={`Kalshi ${market.ticker} · ${analysis.recommendedAction}`}
+                  stake={kelly?.stake ?? 0}
+                  notes={`Kalshi ${market.ticker} · ${analysis.recommendedAction}${
+                    fv ? ` · fair ${(fv.fairProb * 100).toFixed(0)}%` : ""
+                  }${kelly?.stake ? ` · stake $${kelly.stake} (${profile.risk})` : ""}`}
                 />
                 <a
                   href={`https://kalshi.com/markets/${event.seriesTicker.toLowerCase()}/${event.eventTicker.toLowerCase()}`}
@@ -331,7 +379,8 @@ function LiveMarkets() {
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <Disclaimer />
@@ -546,6 +595,7 @@ function SaveBetButton(props: {
   patternType: string;
   confidence: number;
   edge: number;
+  stake?: number;
   notes: string;
 }) {
   const saveFn = useServerFn(saveBetFromMarket);
@@ -564,6 +614,7 @@ function SaveBetButton(props: {
           pattern_type: props.patternType,
           confidence_score: props.confidence,
           edge_score: props.edge,
+          stake: props.stake,
           notes: props.notes,
         },
       });

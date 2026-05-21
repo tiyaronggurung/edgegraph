@@ -10,6 +10,7 @@ const SaveBetSchema = z.object({
   pattern_type: z.string().max(64).optional(),
   confidence_score: z.number().min(0).max(100).optional(),
   edge_score: z.number().min(-100).max(100).optional(),
+  stake: z.number().min(0).max(1_000_000).optional(),
   notes: z.string().max(2000).optional(),
 });
 
@@ -41,7 +42,7 @@ export const saveBetFromMarket = createServerFn({ method: "POST" })
         edge_score: data.edge_score ?? null,
         notes: data.notes ?? null,
         result: "Pending",
-        stake: 0,
+        stake: data.stake ?? 0,
       })
       .select("id, analysis_id")
       .single();
