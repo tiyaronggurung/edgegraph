@@ -403,6 +403,14 @@ function LiveMarkets() {
               </div>
             )}
 
+            <VerdictCard
+              fairProb={fv?.fairProb}
+              marketYesPct={yesPct}
+              yesLabel={market.yesSubTitle}
+              pattern={analysis.pattern}
+              kellyHalfStake={presets?.half ?? null}
+            />
+
             <div className="flex justify-between items-center pt-1">
               <PatternBadge pattern={analysis.pattern} />
               <span className="text-xs text-muted-foreground">Edge {analysis.edgeScore.toFixed(1)}</span>
