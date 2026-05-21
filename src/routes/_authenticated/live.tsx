@@ -210,6 +210,32 @@ function LiveMarkets() {
             />
             <span className="uppercase tracking-widest text-muted-foreground">Edge70 only</span>
           </label>
+          <label className="flex items-center gap-2 cursor-pointer text-xs">
+            <input
+              type="checkbox"
+              checked={highConfOnly}
+              onChange={(e) => setHighConfOnly(e.target.checked)}
+              className="accent-[color:var(--color-primary)]"
+            />
+            <span className="uppercase tracking-widest text-muted-foreground">
+              High-confidence (Fair ≥70%)
+            </span>
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Min edge</span>
+            <select
+              value={minEdgePts}
+              onChange={(e) => setMinEdgePts(Number(e.target.value))}
+              disabled={!highConfOnly}
+              className="bg-background border border-border rounded px-2 py-1 text-xs disabled:opacity-50"
+            >
+              {[5, 8, 10, 15, 20].map((v) => (
+                <option key={v} value={v}>
+                  +{v}pts
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
