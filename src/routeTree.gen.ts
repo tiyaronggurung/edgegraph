@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedStrategiesRouteImport } from './routes/_authenticated/strategies'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedPatternsRouteImport } from './routes/_authenticated/patterns'
+import { Route as AuthenticatedPatternPerformanceRouteImport } from './routes/_authenticated/pattern-performance'
 import { Route as AuthenticatedModelValidationRouteImport } from './routes/_authenticated/model-validation'
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -58,6 +59,12 @@ const AuthenticatedPatternsRoute = AuthenticatedPatternsRouteImport.update({
   path: '/patterns',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedPatternPerformanceRoute =
+  AuthenticatedPatternPerformanceRouteImport.update({
+    id: '/pattern-performance',
+    path: '/pattern-performance',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedModelValidationRoute =
   AuthenticatedModelValidationRouteImport.update({
     id: '/model-validation',
@@ -105,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
+  '/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
   '/patterns': typeof AuthenticatedPatternsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/strategies': typeof AuthenticatedStrategiesRoute
@@ -120,6 +128,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
+  '/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
   '/patterns': typeof AuthenticatedPatternsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/strategies': typeof AuthenticatedStrategiesRoute
@@ -137,6 +146,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/live': typeof AuthenticatedLiveRoute
   '/_authenticated/model-validation': typeof AuthenticatedModelValidationRoute
+  '/_authenticated/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
   '/_authenticated/patterns': typeof AuthenticatedPatternsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/strategies': typeof AuthenticatedStrategiesRoute
@@ -154,6 +164,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/live'
     | '/model-validation'
+    | '/pattern-performance'
     | '/patterns'
     | '/settings'
     | '/strategies'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/live'
     | '/model-validation'
+    | '/pattern-performance'
     | '/patterns'
     | '/settings'
     | '/strategies'
@@ -185,6 +197,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/live'
     | '/_authenticated/model-validation'
+    | '/_authenticated/pattern-performance'
     | '/_authenticated/patterns'
     | '/_authenticated/settings'
     | '/_authenticated/strategies'
@@ -251,6 +264,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPatternsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/pattern-performance': {
+      id: '/_authenticated/pattern-performance'
+      path: '/pattern-performance'
+      fullPath: '/pattern-performance'
+      preLoaderRoute: typeof AuthenticatedPatternPerformanceRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/model-validation': {
       id: '/_authenticated/model-validation'
       path: '/model-validation'
@@ -309,6 +329,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedLiveRoute: typeof AuthenticatedLiveRoute
   AuthenticatedModelValidationRoute: typeof AuthenticatedModelValidationRoute
+  AuthenticatedPatternPerformanceRoute: typeof AuthenticatedPatternPerformanceRoute
   AuthenticatedPatternsRoute: typeof AuthenticatedPatternsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedStrategiesRoute: typeof AuthenticatedStrategiesRoute
@@ -321,6 +342,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedLiveRoute: AuthenticatedLiveRoute,
   AuthenticatedModelValidationRoute: AuthenticatedModelValidationRoute,
+  AuthenticatedPatternPerformanceRoute: AuthenticatedPatternPerformanceRoute,
   AuthenticatedPatternsRoute: AuthenticatedPatternsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedStrategiesRoute: AuthenticatedStrategiesRoute,
@@ -341,3 +363,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
