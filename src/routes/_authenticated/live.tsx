@@ -41,6 +41,8 @@ function LiveMarkets() {
   const [sportFilter, setSportFilter] = useState<string>("all");
   const [minVolume, setMinVolume] = useState<number>(0);
   const [edge70Only, setEdge70Only] = useState(false);
+  const [highConfOnly, setHighConfOnly] = useState(false);
+  const [minEdgePts, setMinEdgePts] = useState<number>(8);
 
   const eventsQuery = useQuery({
     queryKey: ["kalshi-sports", refreshKey],
@@ -118,7 +120,9 @@ function LiveMarkets() {
           sportFields: {},
           notes: { market: detectShapeHint(series100) },
         });
-        return { event, market, series100, yesPct, analysis, stats: statsByTicker.get(market.ticker) ?? null };
+        const stats = statsByTicker.get(market.ticker) ?? null;
+        const fv = stats ? computeFairProbability(stats, yesPct, market.yesSubTitle) : null;
+        return { event, market, series100, yesPct, analysis, stats, fv };
       }),
     // historyByTicker / statsByTicker rebuilt every render, intentional dep simplification
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,9 +136,20 @@ function LiveMarkets() {
       if (!f.match(hint)) return false;
       if (c.market.volume24h < minVolume) return false;
       if (edge70Only && !c.analysis.edge70Detected) return false;
+      if (highConfOnly) {
+        if (!c.fv) return false;
+        if (c.fv.fairProb < 0.7) return false;
+        if (c.fv.edgePts < minEdgePts) return false;
+        // Require outcome lean to agree with YES side if available.
+        const lean = c.stats?.outcomeLean;
+        if (lean?.favored) {
+          const yesTeam = c.fv.yesTeam === "home" ? c.stats!.home.name : c.stats!.away.name;
+          if (lean.favored !== yesTeam && lean.lean >= 40) return false;
+        }
+      }
       return true;
     });
-  }, [cards, sportFilter, minVolume, edge70Only]);
+  }, [cards, sportFilter, minVolume, edge70Only, highConfOnly, minEdgePts]);
 
   return (
     <div className="space-y-5 font-mono">
@@ -195,6 +210,32 @@ function LiveMarkets() {
             />
             <span className="uppercase tracking-widest text-muted-foreground">Edge70 only</span>
           </label>
+          <label className="flex items-center gap-2 cursor-pointer text-xs">
+            <input
+              type="checkbox"
+              checked={highConfOnly}
+              onChange={(e) => setHighConfOnly(e.target.checked)}
+              className="accent-[color:var(--color-primary)]"
+            />
+            <span className="uppercase tracking-widest text-muted-foreground">
+              High-confidence (Fair ≥70%)
+            </span>
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Min edge</span>
+            <select
+              value={minEdgePts}
+              onChange={(e) => setMinEdgePts(Number(e.target.value))}
+              disabled={!highConfOnly}
+              className="bg-background border border-border rounded px-2 py-1 text-xs disabled:opacity-50"
+            >
+              {[5, 8, 10, 15, 20].map((v) => (
+                <option key={v} value={v}>
+                  +{v}pts
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
