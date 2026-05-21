@@ -79,3 +79,60 @@ export const getBankrollStats = createServerFn({ method: "GET" })
     return { bankroll, openStake, openCount, realized, settledCount };
   });
 
+/**
+ * CLV (Closing Line Value) capture.
+ * For decimal odds: clv% = (entry_odds / closing_odds - 1) * 100
+ * Positive CLV = locked a better price than close — best long-run +EV signal.
+ */
+const CaptureClosingSchema = z.object({
+  betId: z.string().uuid(),
+  closingOdds: z.number().min(1.01).max(1000),
+});
+
+export const captureClosingLine = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => CaptureClosingSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: bet, error: fetchErr } = await supabase
+      .from("bets")
+      .select("id, odds, user_id")
+      .eq("id", data.betId)
+      .maybeSingle();
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!bet || bet.user_id !== userId) throw new Error("Bet not found");
+    const entry = Number(bet.odds ?? 0);
+    if (!entry || entry < 1.01) throw new Error("Entry odds missing or invalid");
+    const clv = (entry / data.closingOdds - 1) * 100;
+    const { error: updErr } = await supabase
+      .from("bets")
+      .update({
+        closing_odds: data.closingOdds,
+        closing_captured_at: new Date().toISOString(),
+        clv_percent: clv,
+      })
+      .eq("id", data.betId);
+    if (updErr) throw new Error(updErr.message);
+    return { ok: true, clvPercent: clv };
+  });
+
+export const getClvStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const { data: bets } = await supabase
+      .from("bets")
+      .select("id, clv_percent")
+      .not("clv_percent", "is", null);
+    const rows = bets ?? [];
+    if (!rows.length) return { avgClv: 0, captured: 0, positiveRate: 0 };
+    const sum = rows.reduce((s, b) => s + Number(b.clv_percent ?? 0), 0);
+    const pos = rows.filter((b) => Number(b.clv_percent ?? 0) > 0).length;
+    return {
+      avgClv: sum / rows.length,
+      captured: rows.length,
+      positiveRate: (pos / rows.length) * 100,
+    };
+  });
+
+
