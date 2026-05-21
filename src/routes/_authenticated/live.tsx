@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueries } from "@tanstack/react-query";
+import { useQuery, useQueries, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Fragment, useMemo, useState } from "react";
 import { MiniProbChart } from "@/components/edge/MiniProbChart";
@@ -9,8 +9,8 @@ import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
 import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/lib/espn.functions";
-import { saveBetFromMarket } from "@/lib/bets.functions";
-import { computeKellyStake, type RiskTolerance } from "@/lib/kelly";
+import { saveBetFromMarket, getBankrollStats } from "@/lib/bets.functions";
+import { computeKellyStake, computeKellyPresets, type RiskTolerance } from "@/lib/kelly";
 import { detectMovement } from "@/lib/movement";
 import { computeConfidence } from "@/lib/confidence";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +42,7 @@ function LiveMarkets() {
   const eventsFn = useServerFn(getKalshiSportsEvents);
   const historyFn = useServerFn(getKalshiMarketHistory);
   const statsFn = useServerFn(getLiveGameStats);
+  const bankrollFn = useServerFn(getBankrollStats);
   const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [sportFilter, setSportFilter] = useState<string>("all");
@@ -69,6 +70,14 @@ function LiveMarkets() {
     unit: Number(profileQ.data?.default_unit ?? 25),
     risk: (profileQ.data?.risk_tolerance ?? "Medium") as RiskTolerance,
   };
+
+  const bankrollQ = useQuery({
+    queryKey: ["bankroll-stats", user?.id, refreshKey],
+    queryFn: () => bankrollFn(),
+    enabled: !!user,
+    staleTime: 30_000,
+  });
+
 
   const eventsQuery = useQuery({
     queryKey: ["kalshi-sports", refreshKey],
@@ -189,13 +198,23 @@ function LiveMarkets() {
             Kalshi + ESPN live · auto-refresh every 30s · showing {filtered.length} of {cards.length} markets
           </p>
         </div>
-        <button
-          onClick={() => setRefreshKey((k) => k + 1)}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs uppercase tracking-wider rounded border border-border hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]"
-        >
-          {eventsQuery.isFetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <BankrollChip
+            bankroll={profile.bankroll}
+            openStake={bankrollQ.data?.openStake ?? 0}
+            openCount={bankrollQ.data?.openCount ?? 0}
+            realized={bankrollQ.data?.realized ?? 0}
+            settledCount={bankrollQ.data?.settledCount ?? 0}
+          />
+          <button
+            onClick={() => setRefreshKey((k) => k + 1)}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs uppercase tracking-wider rounded border border-border hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]"
+          >
+            {eventsQuery.isFetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            Refresh
+          </button>
+        </div>
+
       </div>
 
       {/* Filters */}
@@ -320,6 +339,10 @@ function LiveMarkets() {
                   unit: profile.unit,
                 })
               : null;
+          const presets =
+            fv && fv.fairProb >= 0.55 && fv.edgePts >= 5
+              ? computeKellyPresets(fv.fairProb, market.yesPrice, profile.bankroll, profile.unit)
+              : null;
           const scoreTone =
             confidence.score >= 70
               ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400"
@@ -388,16 +411,55 @@ function LiveMarkets() {
               <LiveStatsBlock stats={stats} marketYesPct={yesPct} yesTeamHint={market.yesSubTitle} />
             )}
 
-            {kelly && kelly.hasEdge && kelly.stake > 0 && (
-              <div className="flex items-center justify-between text-[10px] font-mono border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/5 rounded px-1.5 py-1">
-                <span className="flex items-center gap-1 text-[color:var(--color-primary)] font-bold uppercase tracking-widest">
-                  <DollarSign className="h-3 w-3" /> Stake ${kelly.stake}
-                </span>
-                <span className="text-muted-foreground">
-                  {kelly.fractionPct.toFixed(1)}% bank · Kelly {kelly.kellyPct.toFixed(0)}% · {profile.risk}
-                </span>
+            {presets && presets.hasEdge && presets.full > 0 && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+                  <span className="flex items-center gap-1 text-[color:var(--color-primary)]">
+                    <DollarSign className="h-3 w-3" /> Quick stake
+                  </span>
+                  <span>Kelly {presets.kellyPct.toFixed(0)}% · bank ${profile.bankroll}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  <PresetBetButton
+                    label="¼K"
+                    amount={presets.quarter}
+                    game={event.title}
+                    pick={`${market.yesSubTitle || "YES"} @ ${yesPct.toFixed(0)}%`}
+                    sport={inferSportLabel(event.competition || event.seriesTicker || event.title)}
+                    odds={market.yesPrice}
+                    patternType={analysis.pattern}
+                    confidence={analysis.confidenceScore}
+                    edge={analysis.edgeScore}
+                    notes={`Kalshi ${market.ticker} · ¼ Kelly${fv ? ` · fair ${(fv.fairProb * 100).toFixed(0)}%` : ""}`}
+                  />
+                  <PresetBetButton
+                    label="½K"
+                    amount={presets.half}
+                    game={event.title}
+                    pick={`${market.yesSubTitle || "YES"} @ ${yesPct.toFixed(0)}%`}
+                    sport={inferSportLabel(event.competition || event.seriesTicker || event.title)}
+                    odds={market.yesPrice}
+                    patternType={analysis.pattern}
+                    confidence={analysis.confidenceScore}
+                    edge={analysis.edgeScore}
+                    notes={`Kalshi ${market.ticker} · ½ Kelly${fv ? ` · fair ${(fv.fairProb * 100).toFixed(0)}%` : ""}`}
+                  />
+                  <PresetBetButton
+                    label="1K"
+                    amount={presets.full}
+                    game={event.title}
+                    pick={`${market.yesSubTitle || "YES"} @ ${yesPct.toFixed(0)}%`}
+                    sport={inferSportLabel(event.competition || event.seriesTicker || event.title)}
+                    odds={market.yesPrice}
+                    patternType={analysis.pattern}
+                    confidence={analysis.confidenceScore}
+                    edge={analysis.edgeScore}
+                    notes={`Kalshi ${market.ticker} · Full Kelly${fv ? ` · fair ${(fv.fairProb * 100).toFixed(0)}%` : ""}`}
+                  />
+                </div>
               </div>
             )}
+
 
             <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground gap-2">
               <span className="truncate">{market.ticker}</span>
@@ -697,3 +759,108 @@ function SaveBetButton(props: {
     </button>
   );
 }
+
+function BankrollChip(props: {
+  bankroll: number;
+  openStake: number;
+  openCount: number;
+  realized: number;
+  settledCount: number;
+}) {
+  const plTone =
+    props.realized > 0
+      ? "text-emerald-400"
+      : props.realized < 0
+        ? "text-[color:var(--color-destructive)]"
+        : "text-muted-foreground";
+  const plSign = props.realized > 0 ? "+" : "";
+  return (
+    <Link
+      to="/settings"
+      className="flex items-center gap-3 px-3 py-1.5 text-[10px] uppercase tracking-widest rounded border border-border bg-card hover:border-[color:var(--color-primary)] font-mono"
+      title="Bankroll · Open stake · Realized P/L (click to edit bankroll in Settings)"
+    >
+      <span className="flex items-center gap-1">
+        <DollarSign className="h-3 w-3 text-[color:var(--color-primary)]" />
+        <span className="text-muted-foreground">Bank</span>
+        <span className="font-bold text-foreground">${props.bankroll.toLocaleString()}</span>
+      </span>
+      <span className="text-border">|</span>
+      <span>
+        <span className="text-muted-foreground">Open</span>{" "}
+        <span className="font-bold text-foreground">${Math.round(props.openStake).toLocaleString()}</span>
+        <span className="text-muted-foreground"> ({props.openCount})</span>
+      </span>
+      <span className="text-border">|</span>
+      <span>
+        <span className="text-muted-foreground">P/L</span>{" "}
+        <span className={`font-bold ${plTone}`}>{plSign}${Math.round(props.realized).toLocaleString()}</span>
+      </span>
+    </Link>
+  );
+}
+
+function PresetBetButton(props: {
+  label: string;
+  amount: number;
+  game: string;
+  pick: string;
+  sport: string;
+  odds: number;
+  patternType: string;
+  confidence: number;
+  edge: number;
+  notes: string;
+}) {
+  const saveFn = useServerFn(saveBetFromMarket);
+  const qc = useQueryClient();
+  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
+  const disabled = state !== "idle" || props.amount <= 0;
+
+  const onClick = async () => {
+    if (disabled) return;
+    setState("saving");
+    try {
+      await saveFn({
+        data: {
+          game: props.game,
+          pick: props.pick,
+          sport: props.sport,
+          odds: props.odds,
+          pattern_type: props.patternType,
+          confidence_score: props.confidence,
+          edge_score: props.edge,
+          stake: props.amount,
+          notes: `${props.notes} · stake $${props.amount}`,
+        },
+      });
+      setState("saved");
+      toast.success(`Saved ${props.label} · $${props.amount}`);
+      qc.invalidateQueries({ queryKey: ["bankroll-stats"] });
+      setTimeout(() => setState("idle"), 2000);
+    } catch (e) {
+      setState("idle");
+      toast.error((e as Error).message || "Save failed");
+    }
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex flex-col items-center justify-center gap-0 py-1 rounded border text-[10px] font-mono uppercase tracking-widest transition-colors ${
+        state === "saved"
+          ? "border-[color:var(--color-primary)] text-[color:var(--color-primary)] bg-[color:var(--color-primary)]/10"
+          : props.amount <= 0
+            ? "border-border text-muted-foreground opacity-40"
+            : "border-border hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]"
+      }`}
+    >
+      <span className="font-bold">
+        {state === "saving" ? "…" : state === "saved" ? "✓" : props.label}
+      </span>
+      <span className="text-[9px]">${props.amount}</span>
+    </button>
+  );
+}
+

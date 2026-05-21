@@ -53,3 +53,42 @@ export function computeKellyStake(inp: KellyInputs): KellySuggestion {
     hasEdge: true,
   };
 }
+
+// Dollar stake at fractional-Kelly multipliers (¼, ½, full of raw Kelly).
+// Hard-caps at 5% of bankroll per ticket, rounds to nearest unit.
+export interface KellyPresets {
+  quarter: number;
+  half: number;
+  full: number;
+  hasEdge: boolean;
+  kellyPct: number;
+}
+export function computeKellyPresets(
+  fairProb: number,
+  yesPrice: number,
+  bankroll: number,
+  unit: number,
+): KellyPresets {
+  const p = fairProb;
+  const q = 1 - p;
+  const price = Math.max(0.01, Math.min(0.99, yesPrice));
+  const b = (1 - price) / price;
+  const kelly = (p * b - q) / b;
+  if (!Number.isFinite(kelly) || kelly <= 0) {
+    return { quarter: 0, half: 0, full: 0, hasEdge: false, kellyPct: kelly * 100 };
+  }
+  const u = Math.max(1, unit || 1);
+  const round = (frac: number) => {
+    const capped = Math.min(kelly * frac, HARD_CAP_PCT);
+    const dollars = capped * Math.max(0, bankroll);
+    return Math.max(0, Math.round(dollars / u) * u);
+  };
+  return {
+    quarter: round(0.25),
+    half: round(0.5),
+    full: round(1.0),
+    hasEdge: true,
+    kellyPct: kelly * 100,
+  };
+}
+
