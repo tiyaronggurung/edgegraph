@@ -71,6 +71,14 @@ function LiveMarkets() {
     risk: (profileQ.data?.risk_tolerance ?? "Medium") as RiskTolerance,
   };
 
+  const bankrollQ = useQuery({
+    queryKey: ["bankroll-stats", user?.id, refreshKey],
+    queryFn: () => bankrollFn(),
+    enabled: !!user,
+    staleTime: 30_000,
+  });
+
+
   const eventsQuery = useQuery({
     queryKey: ["kalshi-sports", refreshKey],
     queryFn: () => eventsFn({ data: { limit: 30 } }),
