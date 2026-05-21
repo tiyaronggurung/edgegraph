@@ -10,6 +10,7 @@ const SaveBetSchema = z.object({
   pattern_type: z.string().max(64).optional(),
   confidence_score: z.number().min(0).max(100).optional(),
   edge_score: z.number().min(-100).max(100).optional(),
+  stake: z.number().min(0).max(1_000_000).optional(),
   notes: z.string().max(2000).optional(),
 });
 
