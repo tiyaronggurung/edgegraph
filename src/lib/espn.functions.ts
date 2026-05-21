@@ -15,8 +15,43 @@ export type EspnLeague =
   | "hockey/nhl"
   | "soccer/all";
 
+export interface TeamStatLine {
+  name: string;
+  abbr: string;
+  homeAway: "home" | "away";
+  score: number;
+  // Common (NBA/WNBA) — null if not applicable to the league
+  fgPct?: number;
+  threePct?: number;
+  ftPct?: number;
+  rebounds?: number;
+  offReb?: number;
+  assists?: number;
+  steals?: number;
+  blocks?: number;
+  turnovers?: number;
+  pointsInPaint?: number;
+  fastBreakPoints?: number;
+  pointsOffTurnovers?: number;
+  largestLead?: number;
+  // Hockey
+  shots?: number;
+  hits?: number;
+  faceoffPct?: number;
+  ppPct?: number;
+  // Generic catch-all
+  extras?: Record<string, string>;
+}
+
+export interface OutcomeLean {
+  favored: string | null; // team name
+  lean: number; // 0..100 confidence toward favored side
+  reasons: string[];
+}
+
 export interface LiveGameStats {
   league: EspnLeague;
+  eventId: string;
   state: "pre" | "in" | "post";
   shortDetail: string;
   period: number;
@@ -29,6 +64,8 @@ export interface LiveGameStats {
   lastPlay?: string;
   comebackScore: number; // 0..100 — how plausible a comeback by the trailing side
   comebackReason: string;
+  teamStats?: { home: TeamStatLine; away: TeamStatLine };
+  outcomeLean?: OutcomeLean;
 }
 
 function leagueFromHint(hint: string): EspnLeague[] {
