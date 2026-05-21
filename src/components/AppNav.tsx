@@ -11,6 +11,7 @@ const LINKS = [
   { to: "/patterns", label: "Patterns" },
   { to: "/backtest", label: "Backtest" },
   { to: "/model-validation", label: "Model" },
+  { to: "/pattern-performance", label: "Patterns ROI" },
   { to: "/strategies", label: "Strategies" },
   { to: "/settings", label: "Settings" },
 ] as const;
