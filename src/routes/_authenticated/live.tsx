@@ -74,19 +74,23 @@ function LiveMarkets() {
 
   // Live ESPN game stats per market — best-effort match by event title + competition.
   const statsQueries = useQueries({
-    queries: allMarkets.slice(0, 30).map(({ event, market }) => ({
-      queryKey: ["espn-stats", market.ticker, refreshKey],
-      queryFn: () =>
-        statsFn({
-          data: {
-            teamA: market.yesSubTitle || event.title,
-            leagueHint: event.competition || event.seriesTicker,
-          },
-        }),
-      staleTime: 20_000,
-      refetchInterval: 30_000,
-      retry: false,
-    })),
+    queries: allMarkets.slice(0, 30).map(({ event, market }) => {
+      const teams = parseTeamsFromEvent(event.subTitle, event.title, market.yesSubTitle);
+      return {
+        queryKey: ["espn-stats", market.ticker, refreshKey],
+        queryFn: () =>
+          statsFn({
+            data: {
+              teamA: teams.a,
+              teamB: teams.b,
+              leagueHint: event.competition || event.seriesTicker,
+            },
+          }),
+        staleTime: 20_000,
+        refetchInterval: 30_000,
+        retry: false,
+      };
+    }),
   });
 
   const statsByTicker = new Map<string, LiveGameStats | null>();
