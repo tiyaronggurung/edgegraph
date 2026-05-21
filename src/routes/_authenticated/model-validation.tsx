@@ -146,13 +146,13 @@ function ModelValidation() {
         <StatCard
           label="Brier Score"
           value={stats.brier == null ? "—" : stats.brier.toFixed(4)}
-          accent={stats.brier == null ? "muted" : stats.brier < 0.25 ? "primary" : "danger"}
+          accent={stats.brier == null ? "info" : stats.brier < 0.25 ? "primary" : "danger"}
           sub={brierLabel(stats.brier)}
         />
         <StatCard
           label="Log Loss"
           value={stats.logLoss == null ? "—" : stats.logLoss.toFixed(4)}
-          accent={stats.logLoss == null ? "muted" : stats.logLoss < 0.693 ? "primary" : "danger"}
+          accent={stats.logLoss == null ? "info" : stats.logLoss < 0.693 ? "primary" : "danger"}
           sub="lower = better"
         />
         <StatCard
