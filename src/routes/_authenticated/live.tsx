@@ -396,15 +396,15 @@ function BoxScoreTable({
           const aWin = r.a != null && r.h != null && (r.label === "TO" ? r.a < r.h : r.a > r.h);
           const hWin = r.a != null && r.h != null && (r.label === "TO" ? r.h < r.a : r.h > r.a);
           return (
-            <>
-              <div key={`a-${r.label}`} className={`text-right ${aWin ? "text-[color:var(--color-primary)] font-bold" : ""}`}>
+            <Fragment key={r.label}>
+              <div className={`text-right ${aWin ? "text-[color:var(--color-primary)] font-bold" : ""}`}>
                 {fmt(r.a, r.pct)}
               </div>
-              <div key={`l-${r.label}`} className="text-center text-muted-foreground">{r.label}</div>
-              <div key={`h-${r.label}`} className={`text-left ${hWin ? "text-[color:var(--color-primary)] font-bold" : ""}`}>
+              <div className="text-center text-muted-foreground">{r.label}</div>
+              <div className={`text-left ${hWin ? "text-[color:var(--color-primary)] font-bold" : ""}`}>
                 {fmt(r.h, r.pct)}
               </div>
-            </>
+            </Fragment>
           );
         })}
       </div>
