@@ -260,6 +260,8 @@ function Dashboard() {
           </table>
         </div>
       </div>
+
+      <ClvLedger />
     </div>
   );
 }
