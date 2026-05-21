@@ -11,6 +11,7 @@ import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.func
 import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/lib/espn.functions";
 import { saveBetFromMarket } from "@/lib/bets.functions";
 import { computeKellyStake, type RiskTolerance } from "@/lib/kelly";
+import { detectMovement } from "@/lib/movement";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { runAnalysis } from "@/lib/analysisEngine";
