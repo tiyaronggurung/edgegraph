@@ -122,6 +122,10 @@ function LiveMarkets() {
         });
         return { event, market, series100, yesPct, analysis, stats: statsByTicker.get(market.ticker) ?? null };
       }),
+        const stats = statsByTicker.get(market.ticker) ?? null;
+        const fv = stats ? computeFairProbability(stats, yesPct, market.yesSubTitle) : null;
+        return { event, market, series100, yesPct, analysis, stats, fv };
+      }),
     // historyByTicker / statsByTicker rebuilt every render, intentional dep simplification
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [allMarkets, historyQueries.map((q) => q.dataUpdatedAt).join(","), statsQueries.map((q) => q.dataUpdatedAt).join(",")],
@@ -134,9 +138,20 @@ function LiveMarkets() {
       if (!f.match(hint)) return false;
       if (c.market.volume24h < minVolume) return false;
       if (edge70Only && !c.analysis.edge70Detected) return false;
+      if (highConfOnly) {
+        if (!c.fv) return false;
+        if (c.fv.fairProb < 0.7) return false;
+        if (c.fv.edgePts < minEdgePts) return false;
+        // Require outcome lean to agree with YES side if available.
+        const lean = c.stats?.outcomeLean;
+        if (lean?.favored) {
+          const yesTeam = c.fv.yesTeam === "home" ? c.stats!.home.name : c.stats!.away.name;
+          if (lean.favored !== yesTeam && lean.lean >= 40) return false;
+        }
+      }
       return true;
     });
-  }, [cards, sportFilter, minVolume, edge70Only]);
+  }, [cards, sportFilter, minVolume, edge70Only, highConfOnly, minEdgePts]);
 
   return (
     <div className="space-y-5 font-mono">
