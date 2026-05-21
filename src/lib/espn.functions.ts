@@ -68,6 +68,101 @@ export interface LiveGameStats {
   outcomeLean?: OutcomeLean;
 }
 
+export interface FairValue {
+  fairProb: number; // 0..1 probability the YES side wins
+  yesTeam: "home" | "away";
+  modelUsed: string;
+  edgePts: number; // (fairProb*100) - marketYesPct, signed (positive = YES underpriced)
+  inputs: { scoreDiffYes: number; timeRemMin: number; effDiff?: number; shotDiff?: number };
+}
+
+// Standard normal CDF (Abramowitz & Stegun 26.2.17).
+function normCdf(z: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989423 * Math.exp((-z * z) / 2);
+  let p =
+    d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  p = 1 - p;
+  return z >= 0 ? p : 1 - p;
+}
+
+const TOTAL_MIN: Record<EspnLeague, number> = {
+  "basketball/nba": 48,
+  "basketball/wnba": 40,
+  "basketball/mens-college-basketball": 40,
+  "football/nfl": 60,
+  "football/college-football": 60,
+  "hockey/nhl": 60,
+  "baseball/mlb": 27,
+  "soccer/all": 90,
+};
+
+/**
+ * Pure win-probability model. Computes the "fair" probability the YES side wins
+ * given live score + box-score stats, then compares to market YES price for edge.
+ * Returns null when the league has no supported model or the YES team can't be matched.
+ *
+ * NBA/WNBA: Stern-style logistic on score diff / sqrt(time remaining),
+ *   adjusted by FG% differential weighted by remaining minutes.
+ * NHL: time-amplified score-diff logistic, adjusted by shot differential.
+ * NFL/MLB/Soccer: not yet modeled — returns null.
+ */
+export function computeFairProbability(
+  stats: LiveGameStats,
+  marketYesPct: number,
+  yesTeamHint?: string,
+): FairValue | null {
+  if (stats.state !== "in") return null;
+  let yesTeam: "home" | "away" | null = null;
+  if (yesTeamHint) {
+    if (teamMatches(yesTeamHint, stats.home.name, stats.home.abbr)) yesTeam = "home";
+    else if (teamMatches(yesTeamHint, stats.away.name, stats.away.abbr)) yesTeam = "away";
+  }
+  if (!yesTeam) return null;
+
+  const total = TOTAL_MIN[stats.league];
+  const progress = progressPctForLeague(stats.league, stats.period, stats.clock);
+  const timeRemMin = Math.max(0.1, total * (1 - progress / 100));
+
+  const homeMinusAway = stats.home.score - stats.away.score;
+  const diffYes = yesTeam === "home" ? homeMinusAway : -homeMinusAway;
+
+  const ts = stats.teamStats;
+  let modelUsed: string;
+  let z: number;
+  let effDiff: number | undefined;
+  let shotDiff: number | undefined;
+
+  if (stats.league.startsWith("basketball")) {
+    modelUsed = "nba-logistic";
+    if (ts?.home.fgPct != null && ts?.away.fgPct != null) {
+      effDiff =
+        yesTeam === "home" ? ts.home.fgPct - ts.away.fgPct : ts.away.fgPct - ts.home.fgPct;
+    }
+    const adjDiff = diffYes + 0.15 * (effDiff ?? 0) * Math.sqrt(timeRemMin);
+    z = (adjDiff * 0.45) / Math.sqrt(timeRemMin + 0.25);
+  } else if (stats.league.startsWith("hockey")) {
+    modelUsed = "nhl-logistic";
+    if (ts?.home.shots != null && ts?.away.shots != null) {
+      shotDiff =
+        yesTeam === "home" ? ts.home.shots - ts.away.shots : ts.away.shots - ts.home.shots;
+    }
+    z = diffYes * (1.2 + 60 / Math.max(2, timeRemMin)) * 0.35 + (shotDiff ?? 0) * 0.015;
+  } else {
+    return null;
+  }
+
+  const fairProb = Math.max(0.02, Math.min(0.98, normCdf(z)));
+  const edgePts = fairProb * 100 - marketYesPct;
+  return {
+    fairProb,
+    yesTeam,
+    modelUsed,
+    edgePts,
+    inputs: { scoreDiffYes: diffYes, timeRemMin, effDiff, shotDiff },
+  };
+}
+
 function leagueFromHint(hint: string): EspnLeague[] {
   const h = hint.toLowerCase();
   if (h.includes("nba") || h.includes("basketball")) return ["basketball/nba", "basketball/wnba"];

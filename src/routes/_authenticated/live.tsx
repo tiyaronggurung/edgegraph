@@ -8,7 +8,7 @@ import { ActionBadge } from "@/components/edge/ActionBadge";
 import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
-import { getLiveGameStats, type LiveGameStats } from "@/lib/espn.functions";
+import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/lib/espn.functions";
 import { saveBetFromMarket } from "@/lib/bets.functions";
 import { runAnalysis } from "@/lib/analysisEngine";
 import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp, BookmarkPlus, Check } from "lucide-react";
@@ -262,7 +262,9 @@ function LiveMarkets() {
             </div>
             <ActionBadge action={analysis.recommendedAction} />
 
-            {stats && stats.state === "in" && <LiveStatsBlock stats={stats} />}
+            {stats && stats.state === "in" && (
+              <LiveStatsBlock stats={stats} marketYesPct={yesPct} yesTeamHint={market.yesSubTitle} />
+            )}
 
             <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground gap-2">
               <span className="truncate">{market.ticker}</span>
@@ -301,10 +303,29 @@ function LiveMarkets() {
   );
 }
 
-function LiveStatsBlock({ stats }: { stats: LiveGameStats }) {
+function LiveStatsBlock({
+  stats,
+  marketYesPct,
+  yesTeamHint,
+}: {
+  stats: LiveGameStats;
+  marketYesPct: number;
+  yesTeamHint?: string;
+}) {
   const hot = stats.comebackScore >= 60;
   const ts = stats.teamStats;
   const lean = stats.outcomeLean;
+  const fv = computeFairProbability(stats, marketYesPct, yesTeamHint);
+  const edgeColor =
+    fv == null
+      ? "text-muted-foreground"
+      : fv.edgePts >= 8
+        ? "text-[color:var(--color-primary)]"
+        : fv.edgePts <= -8
+          ? "text-[color:var(--color-destructive)]"
+          : "text-muted-foreground";
+  const edgeSignal =
+    fv == null ? "" : fv.edgePts >= 8 ? "▲ BUY" : fv.edgePts <= -8 ? "▼ FADE" : "· HOLD";
   return (
     <div className="border border-border rounded p-2 bg-background/40 space-y-1">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -320,6 +341,20 @@ function LiveStatsBlock({ stats }: { stats: LiveGameStats }) {
           {stats.home.abbr} {stats.home.score}
         </span>
       </div>
+      {fv && (
+        <div className="flex items-center justify-between text-[10px] font-mono border border-border/60 rounded px-1.5 py-1 bg-background/60">
+          <span className="text-muted-foreground">
+            Market <span className="text-foreground font-bold">{marketYesPct.toFixed(0)}%</span>
+          </span>
+          <span className="text-muted-foreground">
+            Fair <span className="text-foreground font-bold">{(fv.fairProb * 100).toFixed(0)}%</span>
+          </span>
+          <span className={`font-bold uppercase tracking-widest ${edgeColor}`}>
+            {fv.edgePts >= 0 ? "+" : ""}
+            {fv.edgePts.toFixed(0)}pt {edgeSignal}
+          </span>
+        </div>
+      )}
       {stats.trailingTeam && (
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-muted-foreground">
