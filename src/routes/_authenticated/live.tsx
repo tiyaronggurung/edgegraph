@@ -41,6 +41,8 @@ function LiveMarkets() {
   const [sportFilter, setSportFilter] = useState<string>("all");
   const [minVolume, setMinVolume] = useState<number>(0);
   const [edge70Only, setEdge70Only] = useState(false);
+  const [highConfOnly, setHighConfOnly] = useState(false);
+  const [minEdgePts, setMinEdgePts] = useState<number>(8);
 
   const eventsQuery = useQuery({
     queryKey: ["kalshi-sports", refreshKey],
