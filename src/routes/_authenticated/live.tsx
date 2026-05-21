@@ -276,6 +276,7 @@ function LiveMarkets() {
                 <option key={v} value={v}>{v === 0 ? "any" : `★ ${v}+`}</option>
               ))}
             </select>
+          </div>
         </div>
       </div>
 
