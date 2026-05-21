@@ -120,8 +120,6 @@ function LiveMarkets() {
           sportFields: {},
           notes: { market: detectShapeHint(series100) },
         });
-        return { event, market, series100, yesPct, analysis, stats: statsByTicker.get(market.ticker) ?? null };
-      }),
         const stats = statsByTicker.get(market.ticker) ?? null;
         const fv = stats ? computeFairProbability(stats, yesPct, market.yesSubTitle) : null;
         return { event, market, series100, yesPct, analysis, stats, fv };
