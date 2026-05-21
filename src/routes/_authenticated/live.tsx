@@ -12,6 +12,7 @@ import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/
 import { saveBetFromMarket } from "@/lib/bets.functions";
 import { computeKellyStake, type RiskTolerance } from "@/lib/kelly";
 import { detectMovement } from "@/lib/movement";
+import { computeConfidence } from "@/lib/confidence";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { runAnalysis } from "@/lib/analysisEngine";
@@ -48,6 +49,7 @@ function LiveMarkets() {
   const [edge70Only, setEdge70Only] = useState(false);
   const [highConfOnly, setHighConfOnly] = useState(false);
   const [minEdgePts, setMinEdgePts] = useState<number>(8);
+  const [minScore, setMinScore] = useState<number>(0);
 
   const profileQ = useQuery({
     queryKey: ["profile", user?.id],
@@ -146,7 +148,9 @@ function LiveMarkets() {
         });
         const stats = statsByTicker.get(market.ticker) ?? null;
         const fv = stats ? computeFairProbability(stats, yesPct, market.yesSubTitle) : null;
-        return { event, market, series100, yesPct, analysis, stats, fv };
+        const movement = detectMovement(series100, fv?.fairProb);
+        const confidence = computeConfidence({ fv, stats, movement, volume24h: market.volume24h });
+        return { event, market, series100, yesPct, analysis, stats, fv, movement, confidence };
       }),
     // historyByTicker / statsByTicker rebuilt every render, intentional dep simplification
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -171,9 +175,10 @@ function LiveMarkets() {
           if (lean.favored !== yesTeam && lean.lean >= 40) return false;
         }
       }
+      if (minScore > 0 && c.confidence.score < minScore) return false;
       return true;
     });
-  }, [cards, sportFilter, minVolume, edge70Only, highConfOnly, minEdgePts]);
+  }, [cards, sportFilter, minVolume, edge70Only, highConfOnly, minEdgePts, minScore]);
 
   return (
     <div className="space-y-5 font-mono">
@@ -260,6 +265,18 @@ function LiveMarkets() {
               ))}
             </select>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Min score</span>
+            <select
+              value={minScore}
+              onChange={(e) => setMinScore(Number(e.target.value))}
+              className="bg-background border border-border rounded px-2 py-1 text-xs"
+            >
+              {[0, 50, 70, 85].map((v) => (
+                <option key={v} value={v}>{v === 0 ? "any" : `★ ${v}+`}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -292,7 +309,7 @@ function LiveMarkets() {
       )}
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {filtered.map(({ event, market, series100, yesPct, analysis, stats, fv }) => {
+        {filtered.map(({ event, market, series100, yesPct, analysis, stats, fv, movement: move, confidence }) => {
           const kelly =
             fv && fv.fairProb >= 0.55 && fv.edgePts >= 5
               ? computeKellyStake({
@@ -303,7 +320,12 @@ function LiveMarkets() {
                   unit: profile.unit,
                 })
               : null;
-          const move = detectMovement(series100, fv?.fairProb);
+          const scoreTone =
+            confidence.score >= 70
+              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400"
+              : confidence.score >= 50
+              ? "border-amber-500/60 bg-amber-500/10 text-amber-400"
+              : "border-border bg-muted/30 text-muted-foreground";
           return (
           <div key={market.ticker} className="border border-border bg-card rounded p-4 space-y-2">
             <div className="flex justify-between items-start gap-2">
@@ -314,7 +336,15 @@ function LiveMarkets() {
                 <div className="font-bold text-sm truncate">{event.title}</div>
                 <div className="text-xs text-muted-foreground truncate">{market.yesSubTitle}</div>
               </div>
-              {analysis.edge70Detected && <Edge70Badge detected />}
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <div
+                  className={`text-[10px] font-mono font-bold uppercase tracking-widest rounded px-1.5 py-0.5 border ${scoreTone}`}
+                  title={`Edge ${confidence.parts.edge}/40 · Lean ${confidence.parts.lean}/20 · Momentum ${confidence.parts.momentum}/15 · Liquidity ${confidence.parts.liquidity}/15 · Progress ${confidence.parts.progress}/10`}
+                >
+                  ★ {confidence.score} {confidence.grade}
+                </div>
+                {analysis.edge70Detected && <Edge70Badge detected />}
+              </div>
             </div>
 
             <div className="flex items-baseline gap-2">
