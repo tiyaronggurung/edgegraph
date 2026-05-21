@@ -555,6 +555,7 @@ function LiveStatsBlock({
           </span>
         </div>
       )}
+      <BookConsensusRow stats={stats} marketYesPct={marketYesPct} yesTeamHint={yesTeamHint} />
       {stats.trailingTeam && (
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-muted-foreground">
