@@ -365,7 +365,8 @@ function LiveMarkets() {
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <Disclaimer />
