@@ -8,7 +8,7 @@ import { ActionBadge } from "@/components/edge/ActionBadge";
 import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
-import { getLiveGameStats, type LiveGameStats } from "@/lib/espn.functions";
+import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/lib/espn.functions";
 import { saveBetFromMarket } from "@/lib/bets.functions";
 import { runAnalysis } from "@/lib/analysisEngine";
 import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp, BookmarkPlus, Check } from "lucide-react";
