@@ -42,7 +42,7 @@ export const saveBetFromMarket = createServerFn({ method: "POST" })
         edge_score: data.edge_score ?? null,
         notes: data.notes ?? null,
         result: "Pending",
-        stake: 0,
+        stake: data.stake ?? 0,
       })
       .select("id, analysis_id")
       .single();
