@@ -303,6 +303,8 @@ function LiveMarkets() {
 
 function LiveStatsBlock({ stats }: { stats: LiveGameStats }) {
   const hot = stats.comebackScore >= 60;
+  const ts = stats.teamStats;
+  const lean = stats.outcomeLean;
   return (
     <div className="border border-border rounded p-2 bg-background/40 space-y-1">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -334,6 +336,78 @@ function LiveStatsBlock({ stats }: { stats: LiveGameStats }) {
       )}
       <div className="text-[10px] text-muted-foreground leading-tight">{stats.comebackReason}</div>
       {stats.lastPlay && <div className="text-[10px] text-muted-foreground italic truncate">"{stats.lastPlay}"</div>}
+
+      {ts && <BoxScoreTable home={ts.home} away={ts.away} league={stats.league} />}
+
+      {lean && lean.favored && (
+        <div className="mt-1 pt-1 border-t border-border/60">
+          <div className="flex items-center justify-between text-[10px]">
+            <span className="uppercase tracking-widest text-muted-foreground">Outcome lean</span>
+            <span className="font-bold text-[color:var(--color-primary)]">
+              {lean.favored.split(" ").slice(-1)[0]} · {lean.lean}
+            </span>
+          </div>
+          {lean.reasons.length > 0 && (
+            <div className="text-[10px] text-muted-foreground leading-tight">
+              {lean.reasons.join(" · ")}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BoxScoreTable({
+  home,
+  away,
+  league,
+}: {
+  home: import("@/lib/espn.functions").TeamStatLine;
+  away: import("@/lib/espn.functions").TeamStatLine;
+  league: LiveGameStats["league"];
+}) {
+  const rows: Array<{ label: string; a?: number; h?: number; pct?: boolean }> = [];
+  if (league.startsWith("basketball")) {
+    rows.push({ label: "FG%", a: away.fgPct, h: home.fgPct, pct: true });
+    rows.push({ label: "3P%", a: away.threePct, h: home.threePct, pct: true });
+    rows.push({ label: "FT%", a: away.ftPct, h: home.ftPct, pct: true });
+    rows.push({ label: "REB", a: away.rebounds, h: home.rebounds });
+    rows.push({ label: "AST", a: away.assists, h: home.assists });
+    rows.push({ label: "TO", a: away.turnovers, h: home.turnovers });
+    rows.push({ label: "PIP", a: away.pointsInPaint, h: home.pointsInPaint });
+    rows.push({ label: "PTS off TO", a: away.pointsOffTurnovers, h: home.pointsOffTurnovers });
+  } else if (league.startsWith("hockey")) {
+    rows.push({ label: "Shots", a: away.shots, h: home.shots });
+    rows.push({ label: "Hits", a: away.hits, h: home.hits });
+    rows.push({ label: "FO%", a: away.faceoffPct, h: home.faceoffPct, pct: true });
+    rows.push({ label: "PP%", a: away.ppPct, h: home.ppPct, pct: true });
+  }
+  const visible = rows.filter((r) => r.a != null || r.h != null);
+  if (visible.length === 0) return null;
+  const fmt = (v?: number, pct?: boolean) => (v == null ? "—" : pct ? `${v.toFixed(1)}%` : String(v));
+  return (
+    <div className="mt-1 pt-1 border-t border-border/60">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 text-[10px]">
+        <div className="text-right font-bold text-muted-foreground">{away.abbr}</div>
+        <div className="text-center uppercase tracking-widest text-muted-foreground">Stat</div>
+        <div className="text-left font-bold text-muted-foreground">{home.abbr}</div>
+        {visible.map((r) => {
+          const aWin = r.a != null && r.h != null && (r.label === "TO" ? r.a < r.h : r.a > r.h);
+          const hWin = r.a != null && r.h != null && (r.label === "TO" ? r.h < r.a : r.h > r.a);
+          return (
+            <>
+              <div key={`a-${r.label}`} className={`text-right ${aWin ? "text-[color:var(--color-primary)] font-bold" : ""}`}>
+                {fmt(r.a, r.pct)}
+              </div>
+              <div key={`l-${r.label}`} className="text-center text-muted-foreground">{r.label}</div>
+              <div key={`h-${r.label}`} className={`text-left ${hWin ? "text-[color:var(--color-primary)] font-bold" : ""}`}>
+                {fmt(r.h, r.pct)}
+              </div>
+            </>
+          );
+        })}
+      </div>
     </div>
   );
 }
