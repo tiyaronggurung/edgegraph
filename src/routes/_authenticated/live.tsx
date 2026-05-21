@@ -759,3 +759,108 @@ function SaveBetButton(props: {
     </button>
   );
 }
+
+function BankrollChip(props: {
+  bankroll: number;
+  openStake: number;
+  openCount: number;
+  realized: number;
+  settledCount: number;
+}) {
+  const plTone =
+    props.realized > 0
+      ? "text-emerald-400"
+      : props.realized < 0
+        ? "text-[color:var(--color-destructive)]"
+        : "text-muted-foreground";
+  const plSign = props.realized > 0 ? "+" : "";
+  return (
+    <Link
+      to="/settings"
+      className="flex items-center gap-3 px-3 py-1.5 text-[10px] uppercase tracking-widest rounded border border-border bg-card hover:border-[color:var(--color-primary)] font-mono"
+      title="Bankroll · Open stake · Realized P/L (click to edit bankroll in Settings)"
+    >
+      <span className="flex items-center gap-1">
+        <DollarSign className="h-3 w-3 text-[color:var(--color-primary)]" />
+        <span className="text-muted-foreground">Bank</span>
+        <span className="font-bold text-foreground">${props.bankroll.toLocaleString()}</span>
+      </span>
+      <span className="text-border">|</span>
+      <span>
+        <span className="text-muted-foreground">Open</span>{" "}
+        <span className="font-bold text-foreground">${Math.round(props.openStake).toLocaleString()}</span>
+        <span className="text-muted-foreground"> ({props.openCount})</span>
+      </span>
+      <span className="text-border">|</span>
+      <span>
+        <span className="text-muted-foreground">P/L</span>{" "}
+        <span className={`font-bold ${plTone}`}>{plSign}${Math.round(props.realized).toLocaleString()}</span>
+      </span>
+    </Link>
+  );
+}
+
+function PresetBetButton(props: {
+  label: string;
+  amount: number;
+  game: string;
+  pick: string;
+  sport: string;
+  odds: number;
+  patternType: string;
+  confidence: number;
+  edge: number;
+  notes: string;
+}) {
+  const saveFn = useServerFn(saveBetFromMarket);
+  const qc = useQueryClient();
+  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
+  const disabled = state !== "idle" || props.amount <= 0;
+
+  const onClick = async () => {
+    if (disabled) return;
+    setState("saving");
+    try {
+      await saveFn({
+        data: {
+          game: props.game,
+          pick: props.pick,
+          sport: props.sport,
+          odds: props.odds,
+          pattern_type: props.patternType,
+          confidence_score: props.confidence,
+          edge_score: props.edge,
+          stake: props.amount,
+          notes: `${props.notes} · stake $${props.amount}`,
+        },
+      });
+      setState("saved");
+      toast.success(`Saved ${props.label} · $${props.amount}`);
+      qc.invalidateQueries({ queryKey: ["bankroll-stats"] });
+      setTimeout(() => setState("idle"), 2000);
+    } catch (e) {
+      setState("idle");
+      toast.error((e as Error).message || "Save failed");
+    }
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex flex-col items-center justify-center gap-0 py-1 rounded border text-[10px] font-mono uppercase tracking-widest transition-colors ${
+        state === "saved"
+          ? "border-[color:var(--color-primary)] text-[color:var(--color-primary)] bg-[color:var(--color-primary)]/10"
+          : props.amount <= 0
+            ? "border-border text-muted-foreground opacity-40"
+            : "border-border hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]"
+      }`}
+    >
+      <span className="font-bold">
+        {state === "saving" ? "…" : state === "saved" ? "✓" : props.label}
+      </span>
+      <span className="text-[9px]">${props.amount}</span>
+    </button>
+  );
+}
+
