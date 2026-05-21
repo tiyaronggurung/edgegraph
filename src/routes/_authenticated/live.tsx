@@ -339,7 +339,7 @@ function LiveMarkets() {
               <div className="flex flex-col items-end gap-1 shrink-0">
                 <div
                   className={`text-[10px] font-mono font-bold uppercase tracking-widest rounded px-1.5 py-0.5 border ${scoreTone}`}
-                  title={`Edge ${confidence.parts.edge}/40 · Lean ${confidence.parts.lean}/20 · Momentum ${confidence.parts.momentum}/15 · Liquidity ${confidence.parts.liquidity}/15 · Progress ${confidence.parts.progress}/10`}
+                  title={"Edge " + confidence.parts.edge + "/40 · Lean " + confidence.parts.lean + "/20 · Momentum " + confidence.parts.momentum + "/15 · Liquidity " + confidence.parts.liquidity + "/15 · Progress " + confidence.parts.progress + "/10"}
                 >
                   ★ {confidence.score} {confidence.grade}
                 </div>
