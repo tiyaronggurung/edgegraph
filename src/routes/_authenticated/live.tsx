@@ -74,19 +74,23 @@ function LiveMarkets() {
 
   // Live ESPN game stats per market — best-effort match by event title + competition.
   const statsQueries = useQueries({
-    queries: allMarkets.slice(0, 30).map(({ event, market }) => ({
-      queryKey: ["espn-stats", market.ticker, refreshKey],
-      queryFn: () =>
-        statsFn({
-          data: {
-            teamA: market.yesSubTitle || event.title,
-            leagueHint: event.competition || event.seriesTicker,
-          },
-        }),
-      staleTime: 20_000,
-      refetchInterval: 30_000,
-      retry: false,
-    })),
+    queries: allMarkets.slice(0, 30).map(({ event, market }) => {
+      const teams = parseTeamsFromEvent(event.subTitle, event.title, market.yesSubTitle);
+      return {
+        queryKey: ["espn-stats", market.ticker, refreshKey],
+        queryFn: () =>
+          statsFn({
+            data: {
+              teamA: teams.a,
+              teamB: teams.b,
+              leagueHint: event.competition || event.seriesTicker,
+            },
+          }),
+        staleTime: 20_000,
+        refetchInterval: 30_000,
+        retry: false,
+      };
+    }),
   });
 
   const statsByTicker = new Map<string, LiveGameStats | null>();
@@ -363,6 +367,25 @@ function inferSportLabel(hint: string): string {
   if (/tennis|atp|wta|open/.test(h)) return "Tennis";
   if (/golf|pga|masters/.test(h)) return "Golf";
   return "Other";
+}
+
+// Kalshi event sub_title looks like "CAR at MTL (May 23)" or "Carolina at Montreal".
+// Pull the two sides so ESPN can match a real live game.
+function parseTeamsFromEvent(
+  subTitle: string,
+  title: string,
+  yesSubTitle: string,
+): { a: string; b: string | undefined } {
+  const src = subTitle || title || "";
+  // Strip trailing parenthetical date.
+  const cleaned = src.replace(/\([^)]*\)\s*$/, "").trim();
+  const m = cleaned.match(/^(.+?)\s+(?:at|vs\.?|@|v\.?)\s+(.+?)$/i);
+  if (m) {
+    const left = m[1].trim();
+    const right = m[2].trim();
+    if (left && right) return { a: left, b: right };
+  }
+  return { a: yesSubTitle || title || src, b: undefined };
 }
 
 function SaveBetButton(props: {
