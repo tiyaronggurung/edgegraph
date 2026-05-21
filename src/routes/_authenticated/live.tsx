@@ -9,6 +9,7 @@ import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
 import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/lib/espn.functions";
+import { getNoVigFairLine } from "@/lib/oddsApi.functions";
 import { saveBetFromMarket, getBankrollStats } from "@/lib/bets.functions";
 import { computeKellyStake, computeKellyPresets, type RiskTolerance } from "@/lib/kelly";
 import { detectMovement } from "@/lib/movement";
