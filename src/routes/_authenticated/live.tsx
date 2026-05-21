@@ -303,10 +303,29 @@ function LiveMarkets() {
   );
 }
 
-function LiveStatsBlock({ stats }: { stats: LiveGameStats }) {
+function LiveStatsBlock({
+  stats,
+  marketYesPct,
+  yesTeamHint,
+}: {
+  stats: LiveGameStats;
+  marketYesPct: number;
+  yesTeamHint?: string;
+}) {
   const hot = stats.comebackScore >= 60;
   const ts = stats.teamStats;
   const lean = stats.outcomeLean;
+  const fv = computeFairProbability(stats, marketYesPct, yesTeamHint);
+  const edgeColor =
+    fv == null
+      ? "text-muted-foreground"
+      : fv.edgePts >= 8
+        ? "text-[color:var(--color-primary)]"
+        : fv.edgePts <= -8
+          ? "text-[color:var(--color-destructive)]"
+          : "text-muted-foreground";
+  const edgeSignal =
+    fv == null ? "" : fv.edgePts >= 8 ? "▲ BUY" : fv.edgePts <= -8 ? "▼ FADE" : "· HOLD";
   return (
     <div className="border border-border rounded p-2 bg-background/40 space-y-1">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
