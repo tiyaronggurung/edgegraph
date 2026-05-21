@@ -12,6 +12,7 @@ import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/
 import { saveBetFromMarket } from "@/lib/bets.functions";
 import { computeKellyStake, type RiskTolerance } from "@/lib/kelly";
 import { detectMovement } from "@/lib/movement";
+import { computeConfidence } from "@/lib/confidence";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { runAnalysis } from "@/lib/analysisEngine";
