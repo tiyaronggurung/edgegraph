@@ -7,6 +7,7 @@ import { PatternBadge } from "@/components/edge/PatternBadge";
 import { ActionBadge } from "@/components/edge/ActionBadge";
 import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
+import { VerdictCard } from "@/components/edge/VerdictCard";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
 import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/lib/espn.functions";
 import { getNoVigFairLine } from "@/lib/oddsApi.functions";
@@ -401,6 +402,14 @@ function LiveMarkets() {
                 {move.label}
               </div>
             )}
+
+            <VerdictCard
+              fairProb={fv?.fairProb}
+              marketYesPct={yesPct}
+              yesLabel={market.yesSubTitle}
+              pattern={analysis.pattern}
+              kellyHalfStake={presets?.half ?? null}
+            />
 
             <div className="flex justify-between items-center pt-1">
               <PatternBadge pattern={analysis.pattern} />
