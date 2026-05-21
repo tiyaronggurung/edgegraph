@@ -42,6 +42,7 @@ function LiveMarkets() {
   const eventsFn = useServerFn(getKalshiSportsEvents);
   const historyFn = useServerFn(getKalshiMarketHistory);
   const statsFn = useServerFn(getLiveGameStats);
+  const bankrollFn = useServerFn(getBankrollStats);
   const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [sportFilter, setSportFilter] = useState<string>("all");
