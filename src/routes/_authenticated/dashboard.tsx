@@ -23,6 +23,43 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const { user } = useAuth();
   const [seeding, setSeeding] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickAmount, setQuickAmount] = useState("");
+  const [quickNote, setQuickNote] = useState("");
+  const [quickSaving, setQuickSaving] = useState(false);
+
+  const submitQuickLog = async () => {
+    if (!user) return;
+    const amt = Number(quickAmount);
+    if (!Number.isFinite(amt) || amt === 0) {
+      toast.error("Enter a non-zero amount (negative for losses)");
+      return;
+    }
+    setQuickSaving(true);
+    try {
+      const { error } = await supabase.from("bets").insert({
+        user_id: user.id,
+        game: "Quick log",
+        pick: quickNote || "Quick P/L entry",
+        sport: "Other",
+        stake: 0,
+        odds: 0,
+        result: amt >= 0 ? "Win" : "Loss",
+        profit_loss: amt,
+        notes: quickNote || null,
+      });
+      if (error) throw error;
+      toast.success(`Logged ${amt >= 0 ? "+" : ""}$${amt.toFixed(2)}`);
+      setQuickAmount("");
+      setQuickNote("");
+      setQuickOpen(false);
+      betsQ.refetch();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setQuickSaving(false);
+    }
+  };
 
   const analysesQ = useQuery({
     queryKey: ["analyses", user?.id],
