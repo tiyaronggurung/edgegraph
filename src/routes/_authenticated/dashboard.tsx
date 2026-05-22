@@ -308,6 +308,51 @@ function Dashboard() {
       </div>
 
       <ClvLedger />
+
+      <Dialog open={quickOpen} onOpenChange={setQuickOpen}>
+        <DialogContent className="font-mono">
+          <DialogHeader>
+            <DialogTitle className="uppercase tracking-wider text-sm">Quick log P/L</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs uppercase tracking-wider">Amount ($)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="50 for profit, -25 for loss"
+                value={quickAmount}
+                onChange={(e) => setQuickAmount(e.target.value)}
+                autoFocus
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Positive = profit, negative = loss.</p>
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider">Note (optional)</Label>
+              <Input
+                placeholder="e.g. Lakers parlay"
+                value={quickNote}
+                onChange={(e) => setQuickNote(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <button
+              onClick={() => setQuickOpen(false)}
+              className="text-xs uppercase tracking-wider px-3 py-2 border border-border rounded"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={submitQuickLog}
+              disabled={quickSaving}
+              className="text-xs uppercase tracking-wider px-3 py-2 border border-[color:var(--color-primary)] text-[color:var(--color-primary)] rounded hover:bg-[color:var(--color-primary)]/10"
+            >
+              {quickSaving ? "Saving…" : "Save"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
