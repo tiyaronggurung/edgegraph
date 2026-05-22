@@ -18,6 +18,12 @@ const GAME_SERIES = [
   { ticker: "KXUCLGAME", sport: "UCL Soccer" },
   { ticker: "KXLIGAMXSPREAD", sport: "Liga MX Soccer" },
   { ticker: "KXSUPERLIGGAME", sport: "Turkish Super Lig Soccer" },
+  { ticker: "KXATPMATCH", sport: "ATP Tennis" },
+  { ticker: "KXWTAMATCH", sport: "WTA Tennis" },
+  { ticker: "KXATPCHALLENGERMATCH", sport: "ATP Challenger Tennis" },
+  { ticker: "KXWTACHALLENGERMATCH", sport: "WTA Challenger Tennis" },
+  { ticker: "KXATPDOUBLES", sport: "ATP Doubles Tennis" },
+  { ticker: "KXWTADOUBLES", sport: "WTA Doubles Tennis" },
 ] as const;
 
 export interface KalshiMarketLite {
