@@ -118,7 +118,10 @@ function AnalysisResult() {
           probabilityB: Number(a.probability_b ?? 50),
           pattern: a.pattern_type ?? null,
           volume: a.volume != null ? Number(a.volume) : null,
-          lastPlay: a.notes?.live ?? a.notes?.market ?? null,
+          lastPlay: (a.notes && typeof a.notes === "object" && !Array.isArray(a.notes)
+            ? ((a.notes as Record<string, unknown>).live as string | undefined) ??
+              ((a.notes as Record<string, unknown>).market as string | undefined)
+            : undefined) ?? null,
           series,
         }}
       />
