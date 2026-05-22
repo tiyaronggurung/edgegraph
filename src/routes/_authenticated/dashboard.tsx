@@ -11,6 +11,9 @@ import { toast } from "sonner";
 import { useState } from "react";
 import type { ActionType } from "@/lib/analysisEngine";
 import { ClvLedger } from "@/components/edge/ClvLedger";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — EdgeGraph AI" }] }),
