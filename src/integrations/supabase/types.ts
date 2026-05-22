@@ -327,6 +327,60 @@ export type Database = {
         }
         Relationships: []
       }
+      verdict_log: {
+        Row: {
+          created_at: string
+          edge_pts: number | null
+          fair_prob: number | null
+          id: string
+          kelly_half: number | null
+          market_prob: number | null
+          market_ticker: string
+          market_title: string | null
+          pattern: string | null
+          resolved_at: string | null
+          result: string
+          side: string
+          side_label: string | null
+          user_id: string
+          verdict: string
+        }
+        Insert: {
+          created_at?: string
+          edge_pts?: number | null
+          fair_prob?: number | null
+          id?: string
+          kelly_half?: number | null
+          market_prob?: number | null
+          market_ticker: string
+          market_title?: string | null
+          pattern?: string | null
+          resolved_at?: string | null
+          result?: string
+          side: string
+          side_label?: string | null
+          user_id: string
+          verdict?: string
+        }
+        Update: {
+          created_at?: string
+          edge_pts?: number | null
+          fair_prob?: number | null
+          id?: string
+          kelly_half?: number | null
+          market_prob?: number | null
+          market_ticker?: string
+          market_title?: string | null
+          pattern?: string | null
+          resolved_at?: string | null
+          result?: string
+          side?: string
+          side_label?: string | null
+          user_id?: string
+          verdict?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
