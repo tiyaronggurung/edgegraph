@@ -427,6 +427,7 @@ function PatternsView({ sport, setSport, minN, setMinN, sports, totals, groups }
       )}
 
       <Disclaimer />
-    </div>
+    </>
   );
 }
+
