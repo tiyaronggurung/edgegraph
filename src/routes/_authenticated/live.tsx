@@ -409,6 +409,9 @@ function LiveMarkets() {
               yesLabel={market.yesSubTitle}
               pattern={analysis.pattern}
               kellyHalfStake={presets?.half ?? null}
+              userId={user?.id ?? null}
+              marketTicker={market.ticker}
+              marketTitle={event.title}
             />
 
             <div className="flex justify-between items-center pt-1">
