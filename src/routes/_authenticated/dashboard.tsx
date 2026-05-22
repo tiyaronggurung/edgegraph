@@ -202,6 +202,12 @@ function Dashboard() {
               {seeding ? "Loading…" : "+ Load demo data"}
             </button>
           )}
+          <button
+            onClick={() => setQuickOpen(true)}
+            className="text-xs uppercase tracking-wider px-3 py-2 border border-border rounded hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]"
+          >
+            $ Quick log P/L
+          </button>
           <Link
             to="/analyze"
             className="text-xs uppercase tracking-wider px-3 py-2 border border-[color:var(--color-primary)] text-[color:var(--color-primary)] rounded hover:bg-[color:var(--color-primary)]/10"
