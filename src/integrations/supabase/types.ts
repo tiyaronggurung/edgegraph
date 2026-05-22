@@ -329,6 +329,7 @@ export type Database = {
       }
       verdict_log: {
         Row: {
+          bet_id: string | null
           created_at: string
           edge_pts: number | null
           fair_prob: number | null
@@ -346,6 +347,7 @@ export type Database = {
           verdict: string
         }
         Insert: {
+          bet_id?: string | null
           created_at?: string
           edge_pts?: number | null
           fair_prob?: number | null
@@ -363,6 +365,7 @@ export type Database = {
           verdict?: string
         }
         Update: {
+          bet_id?: string | null
           created_at?: string
           edge_pts?: number | null
           fair_prob?: number | null
@@ -379,7 +382,15 @@ export type Database = {
           user_id?: string
           verdict?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "verdict_log_bet_id_fkey"
+            columns: ["bet_id"]
+            isOneToOne: false
+            referencedRelation: "bets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
