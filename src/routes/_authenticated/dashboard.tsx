@@ -11,6 +11,9 @@ import { toast } from "sonner";
 import { useState } from "react";
 import type { ActionType } from "@/lib/analysisEngine";
 import { ClvLedger } from "@/components/edge/ClvLedger";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — EdgeGraph AI" }] }),
@@ -20,6 +23,43 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const { user } = useAuth();
   const [seeding, setSeeding] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickAmount, setQuickAmount] = useState("");
+  const [quickNote, setQuickNote] = useState("");
+  const [quickSaving, setQuickSaving] = useState(false);
+
+  const submitQuickLog = async () => {
+    if (!user) return;
+    const amt = Number(quickAmount);
+    if (!Number.isFinite(amt) || amt === 0) {
+      toast.error("Enter a non-zero amount (negative for losses)");
+      return;
+    }
+    setQuickSaving(true);
+    try {
+      const { error } = await supabase.from("bets").insert({
+        user_id: user.id,
+        game: "Quick log",
+        pick: quickNote || "Quick P/L entry",
+        sport: "Other",
+        stake: 0,
+        odds: 0,
+        result: amt >= 0 ? "Win" : "Loss",
+        profit_loss: amt,
+        notes: quickNote || null,
+      });
+      if (error) throw error;
+      toast.success(`Logged ${amt >= 0 ? "+" : ""}$${amt.toFixed(2)}`);
+      setQuickAmount("");
+      setQuickNote("");
+      setQuickOpen(false);
+      betsQ.refetch();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setQuickSaving(false);
+    }
+  };
 
   const analysesQ = useQuery({
     queryKey: ["analyses", user?.id],
@@ -162,6 +202,12 @@ function Dashboard() {
               {seeding ? "Loading…" : "+ Load demo data"}
             </button>
           )}
+          <button
+            onClick={() => setQuickOpen(true)}
+            className="text-xs uppercase tracking-wider px-3 py-2 border border-border rounded hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]"
+          >
+            $ Quick log P/L
+          </button>
           <Link
             to="/analyze"
             className="text-xs uppercase tracking-wider px-3 py-2 border border-[color:var(--color-primary)] text-[color:var(--color-primary)] rounded hover:bg-[color:var(--color-primary)]/10"
@@ -262,6 +308,51 @@ function Dashboard() {
       </div>
 
       <ClvLedger />
+
+      <Dialog open={quickOpen} onOpenChange={setQuickOpen}>
+        <DialogContent className="font-mono">
+          <DialogHeader>
+            <DialogTitle className="uppercase tracking-wider text-sm">Quick log P/L</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs uppercase tracking-wider">Amount ($)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="50 for profit, -25 for loss"
+                value={quickAmount}
+                onChange={(e) => setQuickAmount(e.target.value)}
+                autoFocus
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Positive = profit, negative = loss.</p>
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider">Note (optional)</Label>
+              <Input
+                placeholder="e.g. Lakers parlay"
+                value={quickNote}
+                onChange={(e) => setQuickNote(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <button
+              onClick={() => setQuickOpen(false)}
+              className="text-xs uppercase tracking-wider px-3 py-2 border border-border rounded"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={submitQuickLog}
+              disabled={quickSaving}
+              className="text-xs uppercase tracking-wider px-3 py-2 border border-[color:var(--color-primary)] text-[color:var(--color-primary)] rounded hover:bg-[color:var(--color-primary)]/10"
+            >
+              {quickSaving ? "Saving…" : "Save"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
