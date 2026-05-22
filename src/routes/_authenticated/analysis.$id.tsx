@@ -8,7 +8,9 @@ import { RiskBadge } from "@/components/edge/RiskBadge";
 import { ActionBadge } from "@/components/edge/ActionBadge";
 import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
+import { DeepAnalyzePanel } from "@/components/edge/DeepAnalyzePanel";
 import { generateSimulatedSeries, type Pattern, type ActionType, type Risk } from "@/lib/analysisEngine";
+
 import { sportIcon } from "@/lib/sports";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useState } from "react";
@@ -104,6 +106,23 @@ function AnalysisResult() {
         <div className="terminal-label mb-2">// Simulated probability curve</div>
         <MiniProbChart series={series} width={800} height={140} />
       </div>
+
+      <DeepAnalyzePanel
+        input={{
+          sport: String(a.sport ?? "Other"),
+          teamA: String(a.team_a ?? "A"),
+          teamB: String(a.team_b ?? "B"),
+          score: a.score ?? null,
+          timePeriod: a.time_period ?? null,
+          probabilityA: Number(a.probability_a ?? 50),
+          probabilityB: Number(a.probability_b ?? 50),
+          pattern: a.pattern_type ?? null,
+          volume: a.volume != null ? Number(a.volume) : null,
+          lastPlay: a.notes?.live ?? a.notes?.market ?? null,
+          series,
+        }}
+      />
+
 
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="border border-border bg-card rounded p-4">
