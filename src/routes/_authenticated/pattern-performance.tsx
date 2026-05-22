@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { StatCard } from "@/components/edge/StatCard";
 import { Disclaimer } from "@/components/edge/Disclaimer";
+import { VerdictLogTab } from "@/components/edge/VerdictLogTab";
 import { useMemo, useState } from "react";
 import {
   BarChart,
@@ -54,6 +55,7 @@ function PatternPerformance() {
   const { user } = useAuth();
   const [sport, setSport] = useState("All");
   const [minN, setMinN] = useState(1);
+  const [tab, setTab] = useState<"patterns" | "verdicts">("patterns");
 
   const q = useQuery({
     queryKey: ["pattern-performance", user?.id],
@@ -167,6 +169,60 @@ function PatternPerformance() {
           numbers as noise.
         </p>
       </header>
+
+      <div className="flex gap-2 border-b border-border">
+        {[
+          { k: "patterns", label: "Pattern ROI" },
+          { k: "verdicts", label: "Verdict Log" },
+        ].map((t) => (
+          <button
+            key={t.k}
+            onClick={() => setTab(t.k as "patterns" | "verdicts")}
+            className={`px-4 py-2 text-xs uppercase tracking-widest border-b-2 -mb-px transition-colors ${
+              tab === t.k
+                ? "border-[color:var(--color-primary)] text-[color:var(--color-primary)]"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "verdicts" ? (
+        <>
+          <VerdictLogTab />
+          <Disclaimer />
+        </>
+      ) : (
+        <PatternsView
+          sport={sport}
+          setSport={setSport}
+          minN={minN}
+          setMinN={setMinN}
+          sports={sports}
+          totals={totals}
+          groups={groups}
+        />
+      )}
+    </div>
+  );
+}
+
+type PatternsViewProps = {
+  sport: string;
+  setSport: (s: string) => void;
+  minN: number;
+  setMinN: (n: number) => void;
+  sports: string[];
+  totals: { n: number; hitRate: number; roi: number; pnl: number; patterns: number };
+  groups: Group[];
+};
+
+function PatternsView({ sport, setSport, minN, setMinN, sports, totals, groups }: PatternsViewProps) {
+  return (
+    <>
+
 
       <div className="flex flex-wrap items-end gap-3 text-xs">
         <label className="flex flex-col gap-1">
@@ -371,6 +427,7 @@ function PatternPerformance() {
       )}
 
       <Disclaimer />
-    </div>
+    </>
   );
 }
+
