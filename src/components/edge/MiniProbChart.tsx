@@ -22,7 +22,13 @@ export function MiniProbChart({
   const area = `${d} L ${width} ${height} L 0 ${height} Z`;
   const gradId = `g-${Math.random().toString(36).slice(2, 8)}`;
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      className="block w-full h-auto max-w-full overflow-visible"
+      style={{ aspectRatio: `${width} / ${height}` }}
+    >
+    
       <defs>
         <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.45" />
