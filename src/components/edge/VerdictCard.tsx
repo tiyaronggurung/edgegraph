@@ -24,6 +24,8 @@ interface Props {
   userId?: string | null;
   marketTicker?: string | null;
   marketTitle?: string | null;
+  // Optional sport hint for alert sport-filter preference.
+  sport?: string | null;
 }
 
 // Session-scoped dedupe — never insert the same (user, ticker, side) twice
