@@ -3,6 +3,10 @@ import { CheckCircle2, Eye, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PlaceBetButton } from "@/components/edge/PlaceBetButton";
 import { LiveBetPL } from "@/components/edge/LiveBetPL";
+import { sendTransactionalEmail } from "@/lib/email/send";
+
+// Cross-tab dedupe for the bet alert email (per day, per user+ticker+side).
+const emailedKeys = new Set<string>();
 
 
 interface Props {
@@ -87,6 +91,61 @@ export function VerdictCard({
           firedRef.current = false;
         }
       });
+  }, [
+    hasFair,
+    verdict,
+    userId,
+    marketTicker,
+    marketTitle,
+    side,
+    sideLabel,
+    sideFairProb,
+    sideMarketPct,
+    edgePts,
+    pattern,
+    kellyHalfStake,
+  ]);
+
+  // Additive: email the user when AI verdict = BET (idempotent per day).
+  const emailedRef = useRef(false);
+  useEffect(() => {
+    if (emailedRef.current) return;
+    if (!hasFair || verdict !== "BET") return;
+    if (!userId || !marketTicker) return;
+    const day = new Date().toISOString().slice(0, 10);
+    const key = `${userId}|${marketTicker}|${side}|${day}`;
+    if (emailedKeys.has(key)) {
+      emailedRef.current = true;
+      return;
+    }
+    emailedKeys.add(key);
+    emailedRef.current = true;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const email = user?.email;
+        if (!email) return;
+        await sendTransactionalEmail({
+          templateName: "ai-bet-alert",
+          recipientEmail: email,
+          idempotencyKey: `bet-alert-${key}`,
+          templateData: {
+            marketTitle: marketTitle ?? marketTicker,
+            sideLabel,
+            fairProb: Number(sideFairProb.toFixed(2)),
+            marketProb: Number(sideMarketPct.toFixed(2)),
+            edgePts: Number(edgePts.toFixed(2)),
+            pattern: pattern ?? null,
+            kellyHalf: kellyHalfStake ?? null,
+          },
+        });
+      } catch (err) {
+        // Allow retry on next render if it failed.
+        emailedKeys.delete(key);
+        emailedRef.current = false;
+        console.warn("[bet-alert email] failed", err);
+      }
+    })();
   }, [
     hasFair,
     verdict,
