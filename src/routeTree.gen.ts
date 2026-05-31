@@ -19,6 +19,7 @@ import { Route as AuthenticatedPatternsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedPatternPerformanceRouteImport } from './routes/_authenticated/pattern-performance'
 import { Route as AuthenticatedModelValidationRouteImport } from './routes/_authenticated/model-validation'
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
+import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedBacktestRouteImport } from './routes/_authenticated/backtest'
 import { Route as AuthenticatedAnalyzeRouteImport } from './routes/_authenticated/analyze'
@@ -76,6 +77,11 @@ const AuthenticatedLiveRoute = AuthenticatedLiveRouteImport.update({
   path: '/live',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/analyze': typeof AuthenticatedAnalyzeRoute
   '/backtest': typeof AuthenticatedBacktestRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/history': typeof AuthenticatedHistoryRoute
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
   '/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/analyze': typeof AuthenticatedAnalyzeRoute
   '/backtest': typeof AuthenticatedBacktestRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/history': typeof AuthenticatedHistoryRoute
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
   '/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
@@ -144,6 +152,7 @@ export interface FileRoutesById {
   '/_authenticated/analyze': typeof AuthenticatedAnalyzeRoute
   '/_authenticated/backtest': typeof AuthenticatedBacktestRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/live': typeof AuthenticatedLiveRoute
   '/_authenticated/model-validation': typeof AuthenticatedModelValidationRoute
   '/_authenticated/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/analyze'
     | '/backtest'
     | '/dashboard'
+    | '/history'
     | '/live'
     | '/model-validation'
     | '/pattern-performance'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/analyze'
     | '/backtest'
     | '/dashboard'
+    | '/history'
     | '/live'
     | '/model-validation'
     | '/pattern-performance'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/_authenticated/analyze'
     | '/_authenticated/backtest'
     | '/_authenticated/dashboard'
+    | '/_authenticated/history'
     | '/_authenticated/live'
     | '/_authenticated/model-validation'
     | '/_authenticated/pattern-performance'
@@ -285,6 +297,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLiveRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/history': {
+      id: '/_authenticated/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof AuthenticatedHistoryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -327,6 +346,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAnalyzeRoute: typeof AuthenticatedAnalyzeRoute
   AuthenticatedBacktestRoute: typeof AuthenticatedBacktestRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedLiveRoute: typeof AuthenticatedLiveRoute
   AuthenticatedModelValidationRoute: typeof AuthenticatedModelValidationRoute
   AuthenticatedPatternPerformanceRoute: typeof AuthenticatedPatternPerformanceRoute
@@ -340,6 +360,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAnalyzeRoute: AuthenticatedAnalyzeRoute,
   AuthenticatedBacktestRoute: AuthenticatedBacktestRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedLiveRoute: AuthenticatedLiveRoute,
   AuthenticatedModelValidationRoute: AuthenticatedModelValidationRoute,
   AuthenticatedPatternPerformanceRoute: AuthenticatedPatternPerformanceRoute,
