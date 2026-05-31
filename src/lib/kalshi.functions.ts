@@ -141,14 +141,19 @@ export const getKalshiMarketHistory = createServerFn({ method: "GET" })
   .inputValidator(z.object({ ticker: z.string().min(1).max(120), limit: z.number().int().min(5).max(200).optional() }))
   .handler(async ({ data }): Promise<{ ticker: string; series: number[] }> => {
     const limit = data.limit ?? 60;
-    const json = await kalshiFetch(`/markets/trades?ticker=${encodeURIComponent(data.ticker)}&limit=${limit}`);
-    const trades: any[] = json.trades ?? [];
-    // Trades come newest first → reverse to oldest first for left-to-right charting.
-    const series = trades
-      .map((t) => Number(t.yes_price_dollars))
-      .filter((n) => Number.isFinite(n))
-      .reverse();
-    return { ticker: data.ticker, series };
+    try {
+      const json = await kalshiFetch(`/markets/trades?ticker=${encodeURIComponent(data.ticker)}&limit=${limit}`);
+      const trades: any[] = json.trades ?? [];
+      // Trades come newest first → reverse to oldest first for left-to-right charting.
+      const series = trades
+        .map((t) => Number(t.yes_price_dollars))
+        .filter((n) => Number.isFinite(n))
+        .reverse();
+      return { ticker: data.ticker, series };
+    } catch (err) {
+      console.warn("Kalshi history failed:", err);
+      return { ticker: data.ticker, series: [] };
+    }
   });
 
 // Fetch settlement status for a list of market tickers.
