@@ -160,7 +160,7 @@ export const getClvStats = createServerFn({ method: "GET" })
 const PlaceBetFromVerdictSchema = z.object({
   verdictId: z.string().uuid(),
   stake: z.number().min(0.01).max(1_000_000),
-  entryPrice: z.number().min(0.01).max(0.99),
+  entryPrice: z.number().min(0.01).max(1.0),
 });
 
 export const placeBetFromVerdict = createServerFn({ method: "POST" })
