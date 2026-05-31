@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { CheckCircle2, Eye, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PlaceBetButton } from "@/components/edge/PlaceBetButton";
+import { LiveBetPL } from "@/components/edge/LiveBetPL";
 
 
 interface Props {
