@@ -351,30 +351,51 @@ export type Database = {
       profiles: {
         Row: {
           bankroll: number
+          billing_interval: string | null
           created_at: string
+          current_period_end: string | null
           default_unit: number
           email: string | null
           id: string
+          is_admin: boolean
           preferred_sports: string[]
           risk_tolerance: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_status: string
+          subscription_tier: string
         }
         Insert: {
           bankroll?: number
+          billing_interval?: string | null
           created_at?: string
+          current_period_end?: string | null
           default_unit?: number
           email?: string | null
           id: string
+          is_admin?: boolean
           preferred_sports?: string[]
           risk_tolerance?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: string
+          subscription_tier?: string
         }
         Update: {
           bankroll?: number
+          billing_interval?: string | null
           created_at?: string
+          current_period_end?: string | null
           default_unit?: number
           email?: string | null
           id?: string
+          is_admin?: boolean
           preferred_sports?: string[]
           risk_tolerance?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: string
+          subscription_tier?: string
         }
         Relationships: []
       }
@@ -435,6 +456,66 @@ export type Database = {
           id?: string
           metadata?: Json | null
           reason?: string
+        }
+        Relationships: []
+      }
+      upgrade_events: {
+        Row: {
+          context: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json
+          target_plan: string | null
+          user_id: string | null
+        }
+        Insert: {
+          context?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          target_plan?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          context?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          target_plan?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      usage_counters: {
+        Row: {
+          ai_verdicts_used: number
+          bet_alerts_used: number
+          created_at: string
+          id: string
+          period_start: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_verdicts_used?: number
+          bet_alerts_used?: number
+          created_at?: string
+          id?: string
+          period_start: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_verdicts_used?: number
+          bet_alerts_used?: number
+          created_at?: string
+          id?: string
+          period_start?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
