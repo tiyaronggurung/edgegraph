@@ -7,6 +7,9 @@ import { PatternBadge } from "@/components/edge/PatternBadge";
 import { ActionBadge } from "@/components/edge/ActionBadge";
 import { toast } from "sonner";
 import type { ActionType } from "@/lib/analysisEngine";
+import { usePlan } from "@/hooks/usePlan";
+import { InlineUpgradePrompt } from "@/components/upgrade/UpgradePrompt";
+import { formatLimit } from "@/lib/plans/config";
 
 export const Route = createFileRoute("/_authenticated/strategies")({
   head: () => ({ meta: [{ title: "Strategies — EdgeGraph AI" }] }),
@@ -19,6 +22,7 @@ const ACTIONS: ActionType[] = ["Bet", "Wait", "Hedge", "Avoid", "Watch Only"];
 function Strategies() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const { plan, can } = usePlan();
   const q = useQuery({
     queryKey: ["strategies", user?.id],
     queryFn: async () => {
@@ -37,12 +41,38 @@ function Strategies() {
     q.refetch();
   };
 
+  const count = q.data?.length ?? 0;
+  const limit = plan.features.maxStrategies;
+  const canSave = can.saveStrategy(count);
+  const targetPlan = plan.tier === "free" ? "pro" : "vip";
+
   return (
     <div className="space-y-5 font-mono">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold uppercase tracking-wider">// Saved Strategies</h1>
-        <button onClick={() => setOpen(true)} className="text-xs uppercase tracking-wider px-3 py-2 border border-[color:var(--color-primary)] text-[color:var(--color-primary)] rounded">+ New strategy</button>
+      <div className="flex justify-between items-center gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold uppercase tracking-wider">// Saved Strategies</h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            {count} / {formatLimit(limit)} saved · {plan.name} plan
+          </p>
+        </div>
+        <button
+          onClick={() => canSave ? setOpen(true) : toast.error(`${plan.name} plan limit reached (${formatLimit(limit)} strategies)`)}
+          disabled={!canSave}
+          className="text-xs uppercase tracking-wider px-3 py-2 border border-[color:var(--color-primary)] text-[color:var(--color-primary)] rounded disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          + New strategy
+        </button>
       </div>
+
+      {!canSave && (
+        <InlineUpgradePrompt
+          title={targetPlan === "pro" ? "Unlock Pro" : "Go Unlimited with VIP"}
+          description={`You've reached your ${plan.name} plan limit of ${formatLimit(limit)} saved ${limit === 1 ? "strategy" : "strategies"}. Upgrade for ${targetPlan === "pro" ? "10" : "unlimited"} saves.`}
+          context="strategies-limit"
+          targetPlan={targetPlan}
+        />
+      )}
+
       <div className="grid md:grid-cols-2 gap-3">
         {(q.data ?? []).map((s) => (
           <div key={s.id} className="border border-border bg-card rounded p-4 space-y-3">
