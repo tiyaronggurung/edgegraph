@@ -1,9 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Eye, XCircle } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { PlaceBetButton } from "@/components/edge/PlaceBetButton";
 import { LiveBetPL } from "@/components/edge/LiveBetPL";
 import { sendTransactionalEmail } from "@/lib/email/send";
+import { incrementAlert, incrementVerdict, LIMIT_REACHED } from "@/lib/usage.functions";
+import { UpgradeModal } from "@/components/upgrade/UpgradePrompt";
 
 // Cross-tab dedupe for the bet alert email (per day, per user+ticker+side).
 const emailedKeys = new Set<string>();
@@ -37,6 +40,11 @@ export function VerdictCard({
   marketTicker,
   marketTitle,
 }: Props) {
+  const bumpAlert = useServerFn(incrementAlert);
+  const bumpVerdict = useServerFn(incrementVerdict);
+  const [limitOpen, setLimitOpen] = useState(false);
+  const [limitContext, setLimitContext] = useState<"bet-alert" | "ai-verdict">("ai-verdict");
+
   // Hooks must run unconditionally — compute everything, then early-return.
   const hasFair = fairProb != null && Number.isFinite(fairProb);
   const fairPct = hasFair ? (fairProb as number) * 100 : 0;
@@ -68,10 +76,20 @@ export function VerdictCard({
     }
     loggedKeys.add(key);
     firedRef.current = true;
-    // Fire-and-forget. Swallow errors so the live page never breaks.
-    void supabase
-      .from("verdict_log")
-      .insert({
+    // Gate via incrementVerdict — counts each unique BET verdict as an AI request.
+    (async () => {
+      try {
+        await bumpVerdict({ data: { idempotencyKey: key } });
+      } catch (e) {
+        if ((e as Error).message === LIMIT_REACHED) {
+          setLimitContext("ai-verdict");
+          setLimitOpen(true);
+        }
+        loggedKeys.delete(key);
+        firedRef.current = false;
+        return;
+      }
+      const { error } = await supabase.from("verdict_log").insert({
         user_id: userId,
         market_ticker: marketTicker,
         market_title: marketTitle ?? null,
@@ -83,14 +101,12 @@ export function VerdictCard({
         pattern: pattern ?? null,
         kelly_half: kellyHalfStake ?? null,
         verdict: "BET",
-      })
-      .then(({ error }) => {
-        if (error) {
-          // Allow retry next render if the insert actually failed.
-          loggedKeys.delete(key);
-          firedRef.current = false;
-        }
       });
+      if (error) {
+        loggedKeys.delete(key);
+        firedRef.current = false;
+      }
+    })();
   }, [
     hasFair,
     verdict,
@@ -122,6 +138,18 @@ export function VerdictCard({
     emailedRef.current = true;
     (async () => {
       try {
+        // Gate via incrementAlert — enforces per-tier monthly cap.
+        try {
+          await bumpAlert({ data: { idempotencyKey: key } });
+        } catch (e) {
+          if ((e as Error).message === LIMIT_REACHED) {
+            setLimitContext("bet-alert");
+            setLimitOpen(true);
+          }
+          emailedKeys.delete(key);
+          emailedRef.current = false;
+          return;
+        }
         const { data: { user } } = await supabase.auth.getUser();
         const email = user?.email;
         if (!email) return;
@@ -140,7 +168,6 @@ export function VerdictCard({
           },
         });
       } catch (err) {
-        // Allow retry on next render if it failed.
         emailedKeys.delete(key);
         emailedRef.current = false;
         console.warn("[bet-alert email] failed", err);
@@ -210,6 +237,13 @@ export function VerdictCard({
           <LiveBetPL marketTicker={marketTicker} side={side} />
         </>
       )}
+      <UpgradeModal
+        open={limitOpen}
+        onOpenChange={setLimitOpen}
+        context={limitContext}
+        title={limitContext === "bet-alert" ? "BET alert limit reached" : "AI verdict limit reached"}
+        description="You've used your Free monthly quota. Upgrade to Pro for unlimited verdicts and 100 BET alerts."
+      />
     </div>
   );
 }
