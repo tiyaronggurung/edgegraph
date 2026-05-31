@@ -347,15 +347,18 @@ function LiveMarkets() {
 function LiveGrid({
   filtered,
   profile,
+  userId,
 }: {
   filtered: any[];
   profile: { bankroll: number; unit: number; risk: RiskTolerance };
+  userId: string | null;
 }) {
   const { plan } = usePlan();
   const limit = plan.features.liveGamesVisible;
   const isLimited = Number.isFinite(limit);
   const visible = isLimited ? filtered.slice(0, limit) : filtered;
   const hiddenCount = isLimited ? Math.max(0, filtered.length - visible.length) : 0;
+  const user = { id: userId };
   return (
     <>
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
