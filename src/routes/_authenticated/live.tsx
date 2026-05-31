@@ -19,8 +19,10 @@ import { computeConfidence } from "@/lib/confidence";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { runAnalysis } from "@/lib/analysisEngine";
-import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp, BookmarkPlus, Check, DollarSign } from "lucide-react";
+import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp, BookmarkPlus, Check, DollarSign, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { usePlan } from "@/hooks/usePlan";
+import { InlineUpgradePrompt } from "@/components/upgrade/UpgradePrompt";
 
 export const Route = createFileRoute("/_authenticated/live")({
   head: () => ({ meta: [{ title: "Live Kalshi Markets — EdgeGraph AI" }] }),
