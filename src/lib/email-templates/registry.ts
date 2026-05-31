@@ -13,4 +13,5 @@ export interface TemplateEntry {
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'ai-bet-alert': aiBetAlert,
+  'daily-digest': dailyDigest,
 }
