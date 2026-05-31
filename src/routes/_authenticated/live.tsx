@@ -84,7 +84,7 @@ function LiveMarkets() {
 
   const eventsQuery = useQuery({
     queryKey: ["kalshi-sports", refreshKey],
-    queryFn: () => eventsFn({ data: { limit: 30 } }),
+    queryFn: () => eventsFn({ data: { limit: 120 } }),
     refetchInterval: 30_000,
   });
 
