@@ -40,6 +40,11 @@ export function VerdictCard({
   marketTicker,
   marketTitle,
 }: Props) {
+  const bumpAlert = useServerFn(incrementAlert);
+  const bumpVerdict = useServerFn(incrementVerdict);
+  const [limitOpen, setLimitOpen] = useState(false);
+  const [limitContext, setLimitContext] = useState<"bet-alert" | "ai-verdict">("ai-verdict");
+
   // Hooks must run unconditionally — compute everything, then early-return.
   const hasFair = fairProb != null && Number.isFinite(fairProb);
   const fairPct = hasFair ? (fairProb as number) * 100 : 0;
