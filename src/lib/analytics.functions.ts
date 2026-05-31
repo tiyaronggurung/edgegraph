@@ -24,7 +24,7 @@ export async function trackUpgradeEvent(args: TrackUpgradeArgs): Promise<void> {
       event_type: args.type,
       context: args.context ?? null,
       target_plan: args.targetPlan ?? null,
-      metadata: args.metadata ?? {},
+      metadata: (args.metadata ?? {}) as any,
     });
   } catch (err) {
     console.warn("[upgrade-analytics] insert failed", err);
