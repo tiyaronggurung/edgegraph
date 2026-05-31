@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { CheckCircle2, Eye, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { PlaceBetButton } from "@/components/edge/PlaceBetButton";
+
 
 interface Props {
   fairProb: number | null | undefined; // 0..1
