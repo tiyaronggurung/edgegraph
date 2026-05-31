@@ -16,8 +16,8 @@ interface Props {
 export function LiveBetPL({ marketTicker, side }: Props) {
   const fetchSignals = useServerFn(getCashoutSignals);
   const { data } = useQuery({
-    queryKey: ["cashout-signals"],
-    queryFn: () => fetchSignals({ data: {} as never }),
+    queryKey: ["cashout-signals-live"],
+    queryFn: () => fetchSignals(),
     refetchInterval: 30_000,
     staleTime: 25_000,
   });
