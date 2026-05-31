@@ -51,12 +51,34 @@ type ResultFilter = (typeof RESULT_FILTERS)[number];
 export function VerdictLogTab() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const settleFn = useServerFn(settlePendingKalshiBets);
   const [filter, setFilter] = useState<ResultFilter>("All");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [logRow, setLogRow] = useState<Row | null>(null);
   const [stakeInput, setStakeInput] = useState("");
   const [oddsInput, setOddsInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [settling, setSettling] = useState(false);
+
+  async function autoSettle() {
+    setSettling(true);
+    try {
+      const res = await settleFn();
+      if (res.settled > 0) {
+        toast.success(`Settled ${res.settled} of ${res.checked} pending bets`);
+        qc.invalidateQueries({ queryKey: ["verdict-log", user?.id] });
+        qc.invalidateQueries({ queryKey: ["verdict-log-bets", user?.id] });
+        qc.invalidateQueries({ queryKey: ["bankroll-stats"] });
+      } else {
+        toast.info(`Checked ${res.checked} pending — none resolved yet`);
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSettling(false);
+    }
+  }
+
 
   const q = useQuery({
     queryKey: ["verdict-log", user?.id],
