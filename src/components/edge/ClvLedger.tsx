@@ -255,3 +255,201 @@ function BetRowView({ bet, onCapture }: { bet: BetRow; onCapture: (v: number) =>
     </tr>
   );
 }
+
+function AddManualBetDialog() {
+  const qc = useQueryClient();
+  const addFn = useServerFn(addManualBet);
+  const [open, setOpen] = useState(false);
+  const [game, setGame] = useState("");
+  const [pick, setPick] = useState("");
+  const [sport, setSport] = useState("NBA");
+  const [odds, setOdds] = useState("");
+  const [stake, setStake] = useState("");
+  const [closingOdds, setClosingOdds] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const m = useMutation({
+    mutationFn: (vars: Parameters<typeof addManualBet>[0]["data"]) =>
+      addFn({ data: vars }),
+    onSuccess: () => {
+      toast.success("Bet added to CLV ledger");
+      qc.invalidateQueries({ queryKey: ["bets-clv"] });
+      qc.invalidateQueries({ queryKey: ["clv-stats"] });
+      setOpen(false);
+      setGame("");
+      setPick("");
+      setOdds("");
+      setStake("");
+      setClosingOdds("");
+      setNotes("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const submit = () => {
+    const oddsNum = parseFloat(odds);
+    if (!game.trim() || !pick.trim()) {
+      toast.error("Game and Pick are required");
+      return;
+    }
+    if (!Number.isFinite(oddsNum) || oddsNum <= 0) {
+      toast.error("Enter valid entry odds");
+      return;
+    }
+    let closingNum: number | undefined;
+    if (closingOdds.trim()) {
+      let n = parseFloat(closingOdds);
+      if (!Number.isFinite(n) || n <= 0) {
+        toast.error("Enter valid closing odds");
+        return;
+      }
+      // Auto-normalize percent entry (e.g. 77) for prediction markets
+      if (oddsNum <= 1 && n > 1) n = n / 100;
+      closingNum = n;
+    }
+    const stakeNum = stake.trim() ? parseFloat(stake) : undefined;
+    if (stakeNum != null && (!Number.isFinite(stakeNum) || stakeNum < 0)) {
+      toast.error("Enter valid stake");
+      return;
+    }
+
+    m.mutate({
+      game: game.trim(),
+      pick: pick.trim(),
+      sport,
+      odds: oddsNum,
+      stake: stakeNum,
+      closingOdds: closingNum,
+      notes: notes.trim() || undefined,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          size="sm"
+          className="shrink-0 gap-1 bg-[color:var(--color-primary)] text-[color:var(--color-primary-foreground)] hover:bg-[color:var(--color-primary)]/90"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add bet
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add bet manually</DialogTitle>
+          <DialogDescription>
+            Log a bet directly into the CLV ledger. Closing odds are optional —
+            you can lock them in later from the table.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="m-game">Game</Label>
+            <Input
+              id="m-game"
+              placeholder="e.g. Lakers vs Celtics"
+              value={game}
+              onChange={(e) => setGame(e.target.value)}
+              maxLength={255}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="m-sport">Sport</Label>
+              <Select value={sport} onValueChange={setSport}>
+                <SelectTrigger id="m-sport">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NBA">NBA</SelectItem>
+                  <SelectItem value="NFL">NFL</SelectItem>
+                  <SelectItem value="MLB">MLB</SelectItem>
+                  <SelectItem value="NHL">NHL</SelectItem>
+                  <SelectItem value="Soccer">Soccer</SelectItem>
+                  <SelectItem value="Tennis">Tennis</SelectItem>
+                  <SelectItem value="Kalshi">Kalshi</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="m-pick">Pick / Side</Label>
+              <Input
+                id="m-pick"
+                placeholder="e.g. Lakers -3.5"
+                value={pick}
+                onChange={(e) => setPick(e.target.value)}
+                maxLength={255}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="m-odds">Entry odds</Label>
+              <Input
+                id="m-odds"
+                type="number"
+                step="0.01"
+                placeholder="1.91 or 0.55"
+                value={odds}
+                onChange={(e) => setOdds(e.target.value)}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Decimal (≥ 1.01) or Kalshi price (0.01–1.00)
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="m-stake">Stake</Label>
+              <Input
+                id="m-stake"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="e.g. 25"
+                value={stake}
+                onChange={(e) => setStake(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="m-close">Closing odds (optional)</Label>
+            <Input
+              id="m-close"
+              type="number"
+              step="0.01"
+              placeholder="1.85 or 0.60"
+              value={closingOdds}
+              onChange={(e) => setClosingOdds(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="m-notes">Notes (optional)</Label>
+            <Textarea
+              id="m-notes"
+              rows={2}
+              maxLength={2000}
+              placeholder="Reasoning, book, etc."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={m.isPending}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={m.isPending}>
+            {m.isPending ? "Saving…" : "Add bet"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
