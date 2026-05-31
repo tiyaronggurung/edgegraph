@@ -107,6 +107,7 @@ function mapEvent(e: any, sportLabel: string): KalshiEventLite {
         volume24h: Number(m.volume_24h_fp ?? m.volume_24h ?? 0),
         openInterest: Number(m.open_interest_fp ?? m.open_interest ?? 0),
         recentYes: [],
+        closeTime: m.close_time ?? m.expected_expiration_time ?? m.expiration_time ?? null,
       })),
   };
 }
