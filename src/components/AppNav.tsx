@@ -1,7 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { usePlan } from "@/hooks/usePlan";
 import { useState, useRef, useEffect } from "react";
-import { Menu, X, Zap, LogOut, ChevronDown } from "lucide-react";
+import { Menu, X, Zap, LogOut, ChevronDown, Sparkles, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type LinkItem = { to: string; label: string };
