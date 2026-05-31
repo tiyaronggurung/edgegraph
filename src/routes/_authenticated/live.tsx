@@ -19,8 +19,10 @@ import { computeConfidence } from "@/lib/confidence";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { runAnalysis } from "@/lib/analysisEngine";
-import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp, BookmarkPlus, Check, DollarSign } from "lucide-react";
+import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp, BookmarkPlus, Check, DollarSign, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { usePlan } from "@/hooks/usePlan";
+import { InlineUpgradePrompt } from "@/components/upgrade/UpgradePrompt";
 
 export const Route = createFileRoute("/_authenticated/live")({
   head: () => ({ meta: [{ title: "Live Kalshi Markets — EdgeGraph AI" }] }),
@@ -337,8 +339,30 @@ function LiveMarkets() {
         </div>
       )}
 
+      <LiveGrid filtered={filtered} profile={profile} userId={user?.id ?? null} />
+    </div>
+  );
+}
+
+function LiveGrid({
+  filtered,
+  profile,
+  userId,
+}: {
+  filtered: any[];
+  profile: { bankroll: number; unit: number; risk: RiskTolerance };
+  userId: string | null;
+}) {
+  const { plan } = usePlan();
+  const limit = plan.features.liveGamesVisible;
+  const isLimited = Number.isFinite(limit);
+  const visible = isLimited ? filtered.slice(0, limit) : filtered;
+  const hiddenCount = isLimited ? Math.max(0, filtered.length - visible.length) : 0;
+  const user = { id: userId };
+  return (
+    <>
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {filtered.map(({ event, market, series100, yesPct, analysis, stats, fv, movement: move, confidence }) => {
+        {visible.map(({ event, market, series100, yesPct, analysis, stats, fv, movement: move, confidence }) => {
           const kelly =
             fv && fv.fairProb >= 0.55 && fv.edgePts >= 5
               ? computeKellyStake({
@@ -528,13 +552,40 @@ function LiveMarkets() {
         })}
       </div>
 
+      {hiddenCount > 0 && (
+        <div className="border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/5 rounded p-6 text-center space-y-3">
+          <div className="flex items-center justify-center gap-2 text-[color:var(--color-primary)]">
+            <Lock className="h-4 w-4" />
+            <span className="text-xs uppercase tracking-widest font-bold">
+              {hiddenCount} more live game{hiddenCount === 1 ? "" : "s"} locked
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">Upgrade to Pro to unlock all live games.</p>
+          <div className="flex justify-center gap-2">
+            <Link
+              to="/pricing"
+              search={{ plan: "pro" }}
+              className="text-xs uppercase tracking-wider px-4 py-2 border border-[color:var(--color-primary)] text-[color:var(--color-primary)] rounded hover:bg-[color:var(--color-primary)]/10"
+            >
+              Unlock Pro
+            </Link>
+            <Link
+              to="/pricing"
+              className="text-xs uppercase tracking-wider px-4 py-2 border border-border rounded hover:border-[color:var(--color-info)] hover:text-[color:var(--color-info)]"
+            >
+              Compare Plans
+            </Link>
+          </div>
+        </div>
+      )}
+
       <Disclaimer />
       <div className="text-[10px] text-muted-foreground text-center">
         <Link to="/analyze" className="hover:text-[color:var(--color-primary)] underline">
           Upload a Kalshi screenshot to run full analysis →
         </Link>
       </div>
-    </div>
+    </>
   );
 }
 
