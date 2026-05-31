@@ -3,6 +3,10 @@ import { CheckCircle2, Eye, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PlaceBetButton } from "@/components/edge/PlaceBetButton";
 import { LiveBetPL } from "@/components/edge/LiveBetPL";
+import { sendTransactionalEmail } from "@/lib/email/send";
+
+// Cross-tab dedupe for the bet alert email (per day, per user+ticker+side).
+const emailedKeys = new Set<string>();
 
 
 interface Props {
