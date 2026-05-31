@@ -152,11 +152,6 @@ function ClvLedgerInner() {
             <thead className="text-muted-foreground uppercase tracking-wider">
               <tr className="border-b border-border">
                 <th className="text-left p-3">Game</th>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="text-muted-foreground uppercase tracking-wider">
-              <tr className="border-b border-border">
-                <th className="text-left p-3">Game</th>
                 <th className="text-left p-3">Pick</th>
                 <th className="text-right p-3">Entry</th>
                 <th className="text-right p-3">Close</th>
