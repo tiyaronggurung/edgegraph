@@ -348,8 +348,68 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_digest_alerts: {
+        Row: {
+          alert_date: string
+          created_at: string
+          edge_pts: number | null
+          fair_prob: number | null
+          id: string
+          kelly_half: number | null
+          market_prob: number | null
+          market_ticker: string
+          market_title: string | null
+          pattern: string | null
+          sent: boolean
+          sent_at: string | null
+          side: string
+          side_label: string | null
+          sport: string | null
+          user_id: string
+        }
+        Insert: {
+          alert_date?: string
+          created_at?: string
+          edge_pts?: number | null
+          fair_prob?: number | null
+          id?: string
+          kelly_half?: number | null
+          market_prob?: number | null
+          market_ticker: string
+          market_title?: string | null
+          pattern?: string | null
+          sent?: boolean
+          sent_at?: string | null
+          side: string
+          side_label?: string | null
+          sport?: string | null
+          user_id: string
+        }
+        Update: {
+          alert_date?: string
+          created_at?: string
+          edge_pts?: number | null
+          fair_prob?: number | null
+          id?: string
+          kelly_half?: number | null
+          market_prob?: number | null
+          market_ticker?: string
+          market_title?: string | null
+          pattern?: string | null
+          sent?: boolean
+          sent_at?: string | null
+          side?: string
+          side_label?: string | null
+          sport?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          alert_frequency: string
+          alert_min_confidence: number
+          alert_sport_filters: string[]
           bankroll: number
           billing_interval: string | null
           created_at: string
@@ -366,6 +426,9 @@ export type Database = {
           subscription_tier: string
         }
         Insert: {
+          alert_frequency?: string
+          alert_min_confidence?: number
+          alert_sport_filters?: string[]
           bankroll?: number
           billing_interval?: string | null
           created_at?: string
@@ -382,6 +445,9 @@ export type Database = {
           subscription_tier?: string
         }
         Update: {
+          alert_frequency?: string
+          alert_min_confidence?: number
+          alert_sport_filters?: string[]
           bankroll?: number
           billing_interval?: string | null
           created_at?: string
