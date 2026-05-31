@@ -136,3 +136,134 @@ export const getClvStats = createServerFn({ method: "GET" })
   });
 
 
+
+// ──────────────────────────────────────────────────────────────────
+// Place Bet directly from a verdict — creates a bets row and links
+// it to the verdict_log row via bet_id. Idempotent: if the verdict
+// already has a bet_id, returns the existing bet.
+// ──────────────────────────────────────────────────────────────────
+const PlaceBetFromVerdictSchema = z.object({
+  verdictId: z.string().uuid(),
+  stake: z.number().min(0.01).max(1_000_000),
+  entryPrice: z.number().min(0.01).max(0.99),
+});
+
+export const placeBetFromVerdict = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => PlaceBetFromVerdictSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: vrow, error: vErr } = await supabase
+      .from("verdict_log")
+      .select("id, user_id, market_ticker, market_title, side, side_label, pattern, edge_pts, bet_id")
+      .eq("id", data.verdictId)
+      .maybeSingle();
+    if (vErr) throw new Error(vErr.message);
+    if (!vrow || vrow.user_id !== userId) throw new Error("Verdict not found");
+    if (vrow.bet_id) return { ok: true, betId: vrow.bet_id, alreadyExisted: true };
+
+    const { data: bet, error: insErr } = await supabase
+      .from("bets")
+      .insert({
+        user_id: userId,
+        game: vrow.market_title ?? vrow.market_ticker,
+        pick: `${vrow.side_label ?? vrow.side} (${vrow.market_ticker})`,
+        sport: "Kalshi",
+        odds: data.entryPrice,
+        stake: data.stake,
+        pattern_type: vrow.pattern,
+        edge_score: vrow.edge_pts ?? null,
+        result: "Pending",
+        notes: "Placed from VerdictCard",
+      })
+      .select("id")
+      .single();
+    if (insErr || !bet) throw new Error(insErr?.message ?? "Failed to create bet");
+
+    await supabase.from("verdict_log").update({ bet_id: bet.id }).eq("id", data.verdictId);
+    return { ok: true, betId: bet.id, alreadyExisted: false };
+  });
+
+// ──────────────────────────────────────────────────────────────────
+// Auto-settle pending Kalshi verdicts by polling each market status.
+// For every pending verdict_log row with a market_ticker, fetch
+// Kalshi market status; if settled (result yes/no), mark verdict +
+// linked bet with WIN/LOSS and compute P/L.
+// ──────────────────────────────────────────────────────────────────
+export const settlePendingKalshiBets = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: pending } = await supabase
+      .from("verdict_log")
+      .select("id, market_ticker, side, bet_id")
+      .eq("user_id", userId)
+      .eq("result", "Pending")
+      .limit(100);
+
+    const rows = pending ?? [];
+    if (rows.length === 0) return { checked: 0, settled: 0 };
+
+    const tickers = Array.from(new Set(rows.map((r) => r.market_ticker).filter(Boolean)));
+
+    const BASE = "https://api.elections.kalshi.com/trade-api/v2";
+    const statuses = await Promise.all(
+      tickers.map(async (ticker) => {
+        try {
+          const res = await fetch(`${BASE}/markets/${encodeURIComponent(ticker)}`, {
+            headers: { Accept: "application/json" },
+          });
+          if (!res.ok) return { ticker, status: "unknown", result: "" };
+          const json = await res.json();
+          const m = json.market ?? {};
+          return { ticker, status: String(m.status ?? ""), result: String(m.result ?? "") };
+        } catch {
+          return { ticker, status: "unknown", result: "" };
+        }
+      }),
+    );
+    const statusMap = new Map(statuses.map((s) => [s.ticker, s]));
+
+    let settled = 0;
+    for (const r of rows) {
+      const s = statusMap.get(r.market_ticker);
+      if (!s) continue;
+      const isSettled = s.status === "settled" || s.status === "finalized";
+      if (!isSettled) continue;
+      const yesWon = s.result === "yes";
+      const noWon = s.result === "no";
+      if (!yesWon && !noWon) continue;
+
+      const verdictResult = (r.side === "YES" && yesWon) || (r.side === "NO" && noWon) ? "WIN" : "LOSS";
+
+      await supabase
+        .from("verdict_log")
+        .update({ result: verdictResult, resolved_at: new Date().toISOString() })
+        .eq("id", r.id);
+
+      if (r.bet_id) {
+        const { data: bet } = await supabase
+          .from("bets")
+          .select("stake, odds")
+          .eq("id", r.bet_id)
+          .maybeSingle();
+        const stake = Number(bet?.stake ?? 0);
+        const odds = Number(bet?.odds ?? 0);
+        let pl = 0;
+        let betResult = "Pending";
+        if (verdictResult === "WIN") {
+          betResult = "Win";
+          pl = odds > 0 && odds < 1 ? stake * ((1 - odds) / odds) : 0;
+        } else {
+          betResult = "Loss";
+          pl = -stake;
+        }
+        await supabase
+          .from("bets")
+          .update({ result: betResult, profit_loss: pl })
+          .eq("id", r.bet_id);
+      }
+      settled += 1;
+    }
+    return { checked: rows.length, settled };
+  });
