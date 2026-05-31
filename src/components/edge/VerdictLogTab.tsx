@@ -284,7 +284,7 @@ export function VerdictLogTab() {
         />
       </div>
 
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
         {RESULT_FILTERS.map((f) => (
           <button
             key={f}
@@ -298,7 +298,17 @@ export function VerdictLogTab() {
             {f}
           </button>
         ))}
+        <button
+          onClick={autoSettle}
+          disabled={settling || stats.pending === 0}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs uppercase tracking-wider rounded border border-border hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)] disabled:opacity-50"
+          title="Check Kalshi for resolved markets and auto-mark WIN/LOSS"
+        >
+          {settling ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+          Auto-settle Kalshi
+        </button>
       </div>
+
 
       {filtered.length === 0 ? (
         <div className="border border-border bg-card rounded p-6 text-center text-sm text-muted-foreground">
