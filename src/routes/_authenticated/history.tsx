@@ -5,6 +5,8 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { VerdictLogTab } from "@/components/edge/VerdictLogTab";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { History } from "lucide-react";
+import { usePlan } from "@/hooks/usePlan";
+import { InlineUpgradePrompt } from "@/components/upgrade/UpgradePrompt";
 
 export const Route = createFileRoute("/_authenticated/history")({
   head: () => ({
@@ -18,15 +20,23 @@ export const Route = createFileRoute("/_authenticated/history")({
 
 function HistoryPage() {
   const { user } = useAuth();
+  const { plan } = usePlan();
+  const historyDays = plan.features.historyDays;
+  const isLimited = Number.isFinite(historyDays);
+  const cutoffIso = isLimited
+    ? new Date(Date.now() - historyDays * 24 * 60 * 60 * 1000).toISOString()
+    : null;
 
   const analysesQ = useQuery({
-    queryKey: ["analyses-history", user?.id],
+    queryKey: ["analyses-history", user?.id, cutoffIso],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("analyses")
         .select("id, created_at, sport, game_name, team_a, team_b, predicted_winner, edge_score, confidence_score, recommended_action")
         .order("created_at", { ascending: false })
         .limit(100);
+      if (cutoffIso) q = q.gte("created_at", cutoffIso);
+      const { data, error } = await q;
       if (error) throw new Error(error.message);
       return data ?? [];
     },
@@ -43,6 +53,7 @@ function HistoryPage() {
           <h1 className="text-xl font-bold tracking-widest uppercase">P&amp;L / History</h1>
           <p className="text-xs text-muted-foreground">
             Your bet log, live cashout alerts, and past analyses — all in one place.
+            {isLimited && ` · Showing last ${historyDays} days (${plan.name} plan)`}
           </p>
         </div>
       </div>
@@ -54,7 +65,9 @@ function HistoryPage() {
       <section className="border border-border rounded-lg bg-card">
         <header className="px-4 py-3 border-b border-border flex items-center justify-between">
           <h2 className="terminal-label">// Past analyses</h2>
-          <span className="text-xs text-muted-foreground">{analyses.length} total</span>
+          <span className="text-xs text-muted-foreground">
+            {analyses.length} {isLimited ? `· last ${historyDays}d` : "total"}
+          </span>
         </header>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -114,6 +127,15 @@ function HistoryPage() {
           </table>
         </div>
       </section>
+
+      {isLimited && (
+        <InlineUpgradePrompt
+          title="Unlock full history"
+          description={`Upgrade to Pro for unlimited betting history. You're currently seeing only the last ${historyDays} days.`}
+          context="history-limit"
+          targetPlan="pro"
+        />
+      )}
 
       <Disclaimer />
     </div>
