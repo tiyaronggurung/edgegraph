@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
 import { template as aiBetAlert } from './ai-bet-alert'
+import { template as dailyDigest } from './daily-digest'
 
 export interface TemplateEntry {
   component: ComponentType<any>
