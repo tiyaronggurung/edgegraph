@@ -269,8 +269,15 @@ function AddManualBetDialog() {
   const [notes, setNotes] = useState("");
 
   const m = useMutation({
-    mutationFn: (vars: Parameters<typeof addManualBet>[0]["data"]) =>
-      addFn({ data: vars }),
+    mutationFn: (vars: {
+      game: string;
+      pick: string;
+      sport: string;
+      odds: number;
+      stake?: number;
+      closingOdds?: number;
+      notes?: string;
+    }) => addFn({ data: vars }),
     onSuccess: () => {
       toast.success("Bet added to CLV ledger");
       qc.invalidateQueries({ queryKey: ["bets-clv"] });
