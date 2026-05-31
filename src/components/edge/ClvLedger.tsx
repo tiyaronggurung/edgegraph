@@ -136,14 +136,22 @@ function ClvLedgerInner() {
       </div>
 
       <div className="border border-border bg-card rounded">
-        <div className="p-4 border-b border-border">
-          <h2 className="terminal-label">// CLV ledger</h2>
-          <p className="text-xs text-muted-foreground mt-1">
-            Enter the closing odds (from any sportsbook or Kalshi at tip-off) to
-            score whether you got better-than-market price. CLV is the only
-            metric that proves edge before sample size is large enough for ROI.
-          </p>
+        <div className="p-4 border-b border-border flex items-start justify-between gap-4">
+          <div>
+            <h2 className="terminal-label">// CLV ledger</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Enter the closing odds (from any sportsbook or Kalshi at tip-off) to
+              score whether you got better-than-market price. CLV is the only
+              metric that proves edge before sample size is large enough for ROI.
+            </p>
+          </div>
+          <AddManualBetDialog />
         </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="text-muted-foreground uppercase tracking-wider">
+              <tr className="border-b border-border">
+                <th className="text-left p-3">Game</th>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="text-muted-foreground uppercase tracking-wider">
