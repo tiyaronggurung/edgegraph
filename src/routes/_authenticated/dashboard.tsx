@@ -224,7 +224,7 @@ function Dashboard() {
         <StatCard label="Edge70 Signals" value={edge70Count} accent="primary" sub="detected" />
         <StatCard label="Total P&L" value={`$${totalPL.toFixed(2)}`} accent={totalPL >= 0 ? "primary" : "danger"} />
         <StatCard label="ROI" value={`${roi.toFixed(1)}%`} accent={roi >= 0 ? "primary" : "danger"} />
-        <StatCard label="Bankroll" value={`$${Number(profileQ.data?.bankroll ?? 0).toFixed(0)}`} accent="info" />
+        <StatCard label="Current Balance" value={`$${(Number(profileQ.data?.bankroll ?? 0) + totalPL).toFixed(2)}`} accent={totalPL >= 0 ? "primary" : "danger"} sub={`from $${Number(profileQ.data?.bankroll ?? 0).toFixed(0)}`} />
         <StatCard label="Best Pattern" value={<span className="text-sm">{bestPattern}</span>} accent="primary" />
       </div>
 
