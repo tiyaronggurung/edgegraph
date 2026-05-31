@@ -267,3 +267,192 @@ export const settlePendingKalshiBets = createServerFn({ method: "POST" })
     }
     return { checked: rows.length, settled };
   });
+
+// ──────────────────────────────────────────────────────────────────
+// Cashout signals — for each pending bet, fetch current Kalshi price
+// and compute a recommendation: LOCK_PROFIT / CUT_LOSS / HOLD.
+// Pure read; the user decides whether to act via cashOutBet.
+// ──────────────────────────────────────────────────────────────────
+export type CashoutTier = "LOCK_PROFIT" | "CUT_LOSS" | "HOLD";
+
+export interface CashoutSignal {
+  verdictId: string;
+  betId: string;
+  ticker: string;
+  title: string | null;
+  side: "YES" | "NO" | string;
+  sideLabel: string | null;
+  stake: number;
+  entryPrice: number; // 0..1, price of the side bought
+  currentPrice: number; // 0..1, current price of the side held
+  estValue: number; // dollars you'd receive selling now
+  estPl: number; // estValue - stake
+  ratio: number; // currentPrice / entryPrice
+  tier: CashoutTier;
+  reason: string;
+}
+
+const LOCK_RATIO = 1.40;
+const CUT_RATIO = 0.55;
+
+export const getCashoutSignals = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ signals: CashoutSignal[] }> => {
+    const { supabase, userId } = context;
+    const { data: pending } = await supabase
+      .from("verdict_log")
+      .select("id, market_ticker, market_title, side, side_label, bet_id")
+      .eq("user_id", userId)
+      .eq("result", "Pending")
+      .not("bet_id", "is", null)
+      .limit(50);
+
+    const rows = pending ?? [];
+    if (rows.length === 0) return { signals: [] };
+
+    const betIds = rows.map((r) => r.bet_id!).filter(Boolean);
+    const { data: bets } = await supabase
+      .from("bets")
+      .select("id, stake, odds")
+      .in("id", betIds);
+    const betMap = new Map((bets ?? []).map((b) => [b.id, b]));
+
+    const tickers = Array.from(new Set(rows.map((r) => r.market_ticker).filter(Boolean)));
+    const BASE = "https://api.elections.kalshi.com/trade-api/v2";
+    const prices = await Promise.all(
+      tickers.map(async (ticker) => {
+        try {
+          const res = await fetch(`${BASE}/markets/${encodeURIComponent(ticker)}`, {
+            headers: { Accept: "application/json" },
+          });
+          if (!res.ok) return { ticker, yesPrice: null as number | null };
+          const json = await res.json();
+          const m = json.market ?? {};
+          // Prefer mid of bid/ask; fall back to last price.
+          const bid = Number(m.yes_bid_dollars ?? 0);
+          const ask = Number(m.yes_ask_dollars ?? 0);
+          const last = Number(m.last_price_dollars ?? 0);
+          let yesPrice: number | null = null;
+          if (bid > 0 && ask > 0) yesPrice = (bid + ask) / 2;
+          else if (last > 0) yesPrice = last;
+          else if (bid > 0) yesPrice = bid;
+          else if (ask > 0) yesPrice = ask;
+          return { ticker, yesPrice };
+        } catch {
+          return { ticker, yesPrice: null as number | null };
+        }
+      }),
+    );
+    const priceMap = new Map(prices.map((p) => [p.ticker, p.yesPrice]));
+
+    const signals: CashoutSignal[] = [];
+    for (const r of rows) {
+      const bet = betMap.get(r.bet_id!);
+      if (!bet) continue;
+      const stake = Number(bet.stake ?? 0);
+      const entry = Number(bet.odds ?? 0);
+      const yesPrice = priceMap.get(r.market_ticker);
+      if (!stake || !entry || entry <= 0 || entry >= 1 || yesPrice == null) continue;
+
+      const currentPrice = r.side === "NO" ? Math.max(0, Math.min(1, 1 - yesPrice)) : Math.max(0, Math.min(1, yesPrice));
+      const shares = stake / entry;
+      const estValue = shares * currentPrice;
+      const estPl = estValue - stake;
+      const ratio = currentPrice / entry;
+
+      let tier: CashoutTier = "HOLD";
+      let reason = `Holding — price moved ${((ratio - 1) * 100).toFixed(0)}%, edge intact`;
+      if (ratio >= LOCK_RATIO) {
+        tier = "LOCK_PROFIT";
+        reason = `Price up ${((ratio - 1) * 100).toFixed(0)}% — lock in +$${estPl.toFixed(2)} before reversal`;
+      } else if (ratio <= CUT_RATIO) {
+        tier = "CUT_LOSS";
+        reason = `Price down ${((1 - ratio) * 100).toFixed(0)}% — cut loss, recover $${estValue.toFixed(2)} of $${stake.toFixed(0)}`;
+      }
+
+      signals.push({
+        verdictId: r.id,
+        betId: r.bet_id!,
+        ticker: r.market_ticker,
+        title: r.market_title,
+        side: r.side,
+        sideLabel: r.side_label,
+        stake,
+        entryPrice: entry,
+        currentPrice,
+        estValue,
+        estPl,
+        ratio,
+        tier,
+        reason,
+      });
+    }
+
+    // Sort: actionable alerts first (LOCK_PROFIT, CUT_LOSS), then HOLD by abs(ratio-1) desc
+    signals.sort((a, b) => {
+      const rank = (t: CashoutTier) => (t === "HOLD" ? 1 : 0);
+      const dr = rank(a.tier) - rank(b.tier);
+      if (dr !== 0) return dr;
+      return Math.abs(b.ratio - 1) - Math.abs(a.ratio - 1);
+    });
+
+    return { signals };
+  });
+
+// ──────────────────────────────────────────────────────────────────
+// Cash out a pending bet — records the partial settle in our DB.
+// (Kalshi sell happens on Kalshi.com; this captures the result here.)
+// ──────────────────────────────────────────────────────────────────
+const CashOutSchema = z.object({
+  verdictId: z.string().uuid(),
+  exitPrice: z.number().min(0.01).max(0.99),
+});
+
+export const cashOutBet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => CashOutSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: vrow, error: vErr } = await supabase
+      .from("verdict_log")
+      .select("id, user_id, side, bet_id, result")
+      .eq("id", data.verdictId)
+      .maybeSingle();
+    if (vErr) throw new Error(vErr.message);
+    if (!vrow || vrow.user_id !== userId) throw new Error("Verdict not found");
+    if (vrow.result !== "Pending") throw new Error("Bet already settled");
+    if (!vrow.bet_id) throw new Error("No bet linked to this verdict");
+
+    const { data: bet } = await supabase
+      .from("bets")
+      .select("id, stake, odds")
+      .eq("id", vrow.bet_id)
+      .maybeSingle();
+    if (!bet) throw new Error("Linked bet not found");
+    const stake = Number(bet.stake ?? 0);
+    const entry = Number(bet.odds ?? 0);
+    if (!stake || !entry) throw new Error("Bet has no stake/entry price");
+
+    // exitPrice is YES price; flip for NO side
+    const sideExit = vrow.side === "NO" ? 1 - data.exitPrice : data.exitPrice;
+    const shares = stake / entry;
+    const proceeds = shares * sideExit;
+    const pl = proceeds - stake;
+    const betResult = pl > 0.01 ? "Win" : pl < -0.01 ? "Loss" : "Push";
+    const verdictResult = pl > 0.01 ? "WIN" : pl < -0.01 ? "LOSS" : "VOID";
+
+    await supabase
+      .from("verdict_log")
+      .update({ result: verdictResult, resolved_at: new Date().toISOString() })
+      .eq("id", data.verdictId);
+    await supabase
+      .from("bets")
+      .update({
+        result: betResult,
+        profit_loss: pl,
+        notes: `Cashed out @ ${sideExit.toFixed(2)} (entry ${entry.toFixed(2)})`,
+      })
+      .eq("id", vrow.bet_id);
+
+    return { ok: true, pl, exitPrice: sideExit };
+  });
