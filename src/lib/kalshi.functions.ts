@@ -45,12 +45,47 @@ export interface KalshiEventLite {
   markets: KalshiMarketLite[];
 }
 
+// Simple in-process throttle: serialize fetches with a minimum gap to avoid
+// bursting Kalshi's rate limit when we fan out across many series in parallel.
+const MIN_GAP_MS = 120;
+let lastCallAt = 0;
+let chain: Promise<unknown> = Promise.resolve();
+
+function schedule<T>(fn: () => Promise<T>): Promise<T> {
+  const run = async (): Promise<T> => {
+    const wait = Math.max(0, lastCallAt + MIN_GAP_MS - Date.now());
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastCallAt = Date.now();
+    return fn();
+  };
+  const next = chain.then(run, run);
+  // Keep the chain alive even if a call rejects.
+  chain = next.catch(() => undefined);
+  return next;
+}
+
 async function kalshiFetch(path: string): Promise<any> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) throw new Error(`Kalshi ${res.status}: ${await res.text().catch(() => "")}`);
-  return res.json();
+  const maxAttempts = 4;
+  let attempt = 0;
+  while (true) {
+    attempt++;
+    const res = await schedule(() =>
+      fetch(`${BASE}${path}`, { headers: { Accept: "application/json" } }),
+    );
+    if (res.ok) return res.json();
+
+    if (res.status === 429 && attempt < maxAttempts) {
+      const retryAfter = Number(res.headers.get("retry-after"));
+      const backoff = Number.isFinite(retryAfter) && retryAfter > 0
+        ? retryAfter * 1000
+        : 500 * Math.pow(2, attempt - 1);
+      const jitter = Math.floor(Math.random() * 150);
+      await new Promise((r) => setTimeout(r, backoff + jitter));
+      continue;
+    }
+
+    throw new Error(`Kalshi ${res.status}: ${await res.text().catch(() => "")}`);
+  }
 }
 
 function mapEvent(e: any, sportLabel: string): KalshiEventLite {
