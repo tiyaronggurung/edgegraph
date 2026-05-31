@@ -420,7 +420,7 @@ export const getCashoutSignals = createServerFn({ method: "POST" })
 // ──────────────────────────────────────────────────────────────────
 const CashOutSchema = z.object({
   verdictId: z.string().uuid(),
-  exitPrice: z.number().min(0.01).max(0.99),
+  exitPrice: z.number().min(0.01).max(1.0),
 });
 
 export const cashOutBet = createServerFn({ method: "POST" })
