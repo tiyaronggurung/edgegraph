@@ -2,12 +2,32 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { captureClosingLine, getClvStats } from "@/lib/bets.functions";
+import { addManualBet, captureClosingLine, getClvStats } from "@/lib/bets.functions";
 import { StatCard } from "@/components/edge/StatCard";
 import { toast } from "sonner";
 import { usePlan } from "@/hooks/usePlan";
 import { InlineUpgradePrompt } from "@/components/upgrade/UpgradePrompt";
-import { TrendingUp } from "lucide-react";
+import { Plus, TrendingUp } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 type BetRow = {
   id: string;
