@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { settlePendingKalshiBets } from "@/lib/bets.functions";
+import { CashoutAlerts } from "@/components/edge/CashoutAlerts";
 
 
 type Row = {
@@ -283,6 +284,9 @@ export function VerdictLogTab() {
           accent={stats.roi >= 0 ? "primary" : "danger"}
         />
       </div>
+
+      <CashoutAlerts />
+
 
       <div className="flex gap-2 flex-wrap items-center">
         {RESULT_FILTERS.map((f) => (
