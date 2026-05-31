@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { StatCard } from "@/components/edge/StatCard";
-import { Check, X, Minus, Loader2, DollarSign } from "lucide-react";
+import { Check, X, Minus, Loader2, DollarSign, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -15,6 +16,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { settlePendingKalshiBets } from "@/lib/bets.functions";
+
 
 type Row = {
   id: string;
@@ -48,12 +51,34 @@ type ResultFilter = (typeof RESULT_FILTERS)[number];
 export function VerdictLogTab() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const settleFn = useServerFn(settlePendingKalshiBets);
   const [filter, setFilter] = useState<ResultFilter>("All");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [logRow, setLogRow] = useState<Row | null>(null);
   const [stakeInput, setStakeInput] = useState("");
   const [oddsInput, setOddsInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [settling, setSettling] = useState(false);
+
+  async function autoSettle() {
+    setSettling(true);
+    try {
+      const res = await settleFn();
+      if (res.settled > 0) {
+        toast.success(`Settled ${res.settled} of ${res.checked} pending bets`);
+        qc.invalidateQueries({ queryKey: ["verdict-log", user?.id] });
+        qc.invalidateQueries({ queryKey: ["verdict-log-bets", user?.id] });
+        qc.invalidateQueries({ queryKey: ["bankroll-stats"] });
+      } else {
+        toast.info(`Checked ${res.checked} pending — none resolved yet`);
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSettling(false);
+    }
+  }
+
 
   const q = useQuery({
     queryKey: ["verdict-log", user?.id],
@@ -259,7 +284,7 @@ export function VerdictLogTab() {
         />
       </div>
 
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
         {RESULT_FILTERS.map((f) => (
           <button
             key={f}
@@ -273,7 +298,17 @@ export function VerdictLogTab() {
             {f}
           </button>
         ))}
+        <button
+          onClick={autoSettle}
+          disabled={settling || stats.pending === 0}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs uppercase tracking-wider rounded border border-border hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)] disabled:opacity-50"
+          title="Check Kalshi for resolved markets and auto-mark WIN/LOSS"
+        >
+          {settling ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+          Auto-settle Kalshi
+        </button>
       </div>
+
 
       {filtered.length === 0 ? (
         <div className="border border-border bg-card rounded p-6 text-center text-sm text-muted-foreground">
