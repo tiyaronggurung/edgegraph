@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { StatCard } from "@/components/edge/StatCard";
-import { Check, X, Minus, Loader2, DollarSign } from "lucide-react";
+import { Check, X, Minus, Loader2, DollarSign, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -15,6 +16,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { settlePendingKalshiBets } from "@/lib/bets.functions";
+
 
 type Row = {
   id: string;
