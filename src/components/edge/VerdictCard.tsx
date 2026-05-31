@@ -1,9 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Eye, XCircle } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { PlaceBetButton } from "@/components/edge/PlaceBetButton";
 import { LiveBetPL } from "@/components/edge/LiveBetPL";
 import { sendTransactionalEmail } from "@/lib/email/send";
+import { incrementAlert, incrementVerdict, LIMIT_REACHED } from "@/lib/usage.functions";
+import { UpgradeModal } from "@/components/upgrade/UpgradePrompt";
 
 // Cross-tab dedupe for the bet alert email (per day, per user+ticker+side).
 const emailedKeys = new Set<string>();
