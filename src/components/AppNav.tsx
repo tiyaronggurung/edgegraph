@@ -102,6 +102,7 @@ function NavDropdown({
 
 export function AppNav() {
   const { user, signOut } = useAuth();
+  const { tier, isAdmin } = usePlan();
   const [open, setOpen] = useState(false);
   const path = useRouterState({ select: (s) => s.location.pathname });
 
