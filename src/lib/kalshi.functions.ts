@@ -78,7 +78,7 @@ function mapEvent(e: any, sportLabel: string): KalshiEventLite {
 export const getKalshiSportsEvents = createServerFn({ method: "GET" })
   .inputValidator((d: { limit?: number; seriesTicker?: string } | undefined) => d ?? {})
   .handler(async ({ data }): Promise<{ events: KalshiEventLite[] }> => {
-    const limit = Math.min(Math.max(data.limit ?? 30, 1), 80);
+    const limit = Math.min(Math.max(data.limit ?? 30, 1), 150);
 
     // Single series fast-path.
     if (data.seriesTicker) {
@@ -93,8 +93,9 @@ export const getKalshiSportsEvents = createServerFn({ method: "GET" })
       return { events: (json.events ?? []).map((e: any) => mapEvent(e, label)) };
     }
 
-    // Fan out across all known game-series in parallel.
-    const perSeries = Math.max(3, Math.ceil(limit / GAME_SERIES.length));
+    // Fan out across all known game-series. Pull enough per series so a
+    // single live game in a sport never gets dropped by the global slice.
+    const perSeries = 25;
     const results = await Promise.all(
       GAME_SERIES.map(async ({ ticker, sport }) => {
         try {
@@ -112,19 +113,29 @@ export const getKalshiSportsEvents = createServerFn({ method: "GET" })
       }),
     );
 
-    // Flatten, keep only events with active markets, sort by best 24h volume desc.
+    // Flatten, keep only events with active markets.
+    // Rank: live/actively-trading games first (any market with volume_24h > 0),
+    // then by best 24h volume desc — so a live NBA game with low volume still
+    // beats an upcoming MLB game with zero volume, but high-volume markets
+    // still float to the top within each bucket.
     const all = results
       .flat()
       .filter((e) => e.markets.length > 0)
-      .sort((a, b) => {
-        const va = Math.max(0, ...a.markets.map((m) => m.volume24h));
-        const vb = Math.max(0, ...b.markets.map((m) => m.volume24h));
-        return vb - va;
+      .map((e) => {
+        const maxVol = Math.max(0, ...e.markets.map((m) => m.volume24h));
+        const isLive = maxVol > 0;
+        return { e, maxVol, isLive };
       })
-      .slice(0, limit);
+      .sort((a, b) => {
+        if (a.isLive !== b.isLive) return a.isLive ? -1 : 1;
+        return b.maxVol - a.maxVol;
+      })
+      .slice(0, limit)
+      .map((x) => x.e);
 
     return { events: all };
   });
+
 
 export const getKalshiMarketHistory = createServerFn({ method: "GET" })
   .inputValidator(z.object({ ticker: z.string().min(1).max(120), limit: z.number().int().min(5).max(200).optional() }))
