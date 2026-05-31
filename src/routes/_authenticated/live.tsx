@@ -549,13 +549,40 @@ function LiveGrid({
         })}
       </div>
 
+      {hiddenCount > 0 && (
+        <div className="border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/5 rounded p-6 text-center space-y-3">
+          <div className="flex items-center justify-center gap-2 text-[color:var(--color-primary)]">
+            <Lock className="h-4 w-4" />
+            <span className="text-xs uppercase tracking-widest font-bold">
+              {hiddenCount} more live game{hiddenCount === 1 ? "" : "s"} locked
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">Upgrade to Pro to unlock all live games.</p>
+          <div className="flex justify-center gap-2">
+            <Link
+              to="/pricing"
+              search={{ plan: "pro" }}
+              className="text-xs uppercase tracking-wider px-4 py-2 border border-[color:var(--color-primary)] text-[color:var(--color-primary)] rounded hover:bg-[color:var(--color-primary)]/10"
+            >
+              Unlock Pro
+            </Link>
+            <Link
+              to="/pricing"
+              className="text-xs uppercase tracking-wider px-4 py-2 border border-border rounded hover:border-[color:var(--color-info)] hover:text-[color:var(--color-info)]"
+            >
+              Compare Plans
+            </Link>
+          </div>
+        </div>
+      )}
+
       <Disclaimer />
       <div className="text-[10px] text-muted-foreground text-center">
         <Link to="/analyze" className="hover:text-[color:var(--color-primary)] underline">
           Upload a Kalshi screenshot to run full analysis →
         </Link>
       </div>
-    </div>
+    </>
   );
 }
 
