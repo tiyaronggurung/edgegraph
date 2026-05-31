@@ -42,9 +42,11 @@ export function VerdictCard({
   userId,
   marketTicker,
   marketTitle,
+  sport,
 }: Props) {
   const bumpAlert = useServerFn(incrementAlert);
   const bumpVerdict = useServerFn(incrementVerdict);
+  const evalAlert = useServerFn(evaluateAlert);
   const [limitOpen, setLimitOpen] = useState(false);
   const [limitContext, setLimitContext] = useState<"bet-alert" | "ai-verdict">("ai-verdict");
 
