@@ -339,7 +339,7 @@ function LiveMarkets() {
         </div>
       )}
 
-      <LiveGrid filtered={filtered} profile={profile} />
+      <LiveGrid filtered={filtered} profile={profile} userId={user?.id ?? null} />
     </div>
   );
 }
