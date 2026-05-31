@@ -6,6 +6,7 @@ import { PlaceBetButton } from "@/components/edge/PlaceBetButton";
 import { LiveBetPL } from "@/components/edge/LiveBetPL";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import { incrementAlert, incrementVerdict, LIMIT_REACHED } from "@/lib/usage.functions";
+import { evaluateAlert } from "@/lib/alert-prefs.functions";
 import { UpgradeModal } from "@/components/upgrade/UpgradePrompt";
 
 // Cross-tab dedupe for the bet alert email (per day, per user+ticker+side).
@@ -23,6 +24,8 @@ interface Props {
   userId?: string | null;
   marketTicker?: string | null;
   marketTitle?: string | null;
+  // Optional sport hint for alert sport-filter preference.
+  sport?: string | null;
 }
 
 // Session-scoped dedupe — never insert the same (user, ticker, side) twice
@@ -39,9 +42,11 @@ export function VerdictCard({
   userId,
   marketTicker,
   marketTitle,
+  sport,
 }: Props) {
   const bumpAlert = useServerFn(incrementAlert);
   const bumpVerdict = useServerFn(incrementVerdict);
+  const evalAlert = useServerFn(evaluateAlert);
   const [limitOpen, setLimitOpen] = useState(false);
   const [limitContext, setLimitContext] = useState<"bet-alert" | "ai-verdict">("ai-verdict");
 
@@ -123,6 +128,8 @@ export function VerdictCard({
   ]);
 
   // Additive: email the user when AI verdict = BET (idempotent per day).
+  // Wrapped with alert preferences (frequency / sport filter / confidence
+  // threshold). Badge rendering above is unaffected.
   const emailedRef = useRef(false);
   useEffect(() => {
     if (emailedRef.current) return;
@@ -138,7 +145,37 @@ export function VerdictCard({
     emailedRef.current = true;
     (async () => {
       try {
-        // Gate via incrementAlert — enforces per-tier monthly cap.
+        // 1. Evaluate prefs — may skip, queue digest, or pass-through to instant.
+        let decision: { action: "send_instant" | "queue_digest" | "skip" };
+        try {
+          decision = (await evalAlert({
+            data: {
+              confidence: Number(sideFairProb.toFixed(2)),
+              sport: sport ?? null,
+              marketTicker,
+              marketTitle: marketTitle ?? null,
+              side,
+              sideLabel,
+              fairProb: Number(sideFairProb.toFixed(2)),
+              marketProb: Number(sideMarketPct.toFixed(2)),
+              edgePts: Number(edgePts.toFixed(2)),
+              pattern: pattern ?? null,
+              kellyHalf: kellyHalfStake ?? null,
+            },
+          })) as any;
+        } catch (e) {
+          // If prefs evaluation fails, fall back to legacy instant behavior
+          // so we never silently break existing alert delivery.
+          console.warn("[bet-alert] evaluateAlert failed, falling back to instant", e);
+          decision = { action: "send_instant" };
+        }
+
+        if (decision.action === "skip" || decision.action === "queue_digest") {
+          // No email and no quota consumed.
+          return;
+        }
+
+        // 2. Instant path — count + send (existing logic).
         try {
           await bumpAlert({ data: { idempotencyKey: key } });
         } catch (e) {
@@ -186,6 +223,7 @@ export function VerdictCard({
     edgePts,
     pattern,
     kellyHalfStake,
+    sport,
   ]);
 
   if (!hasFair) return null;

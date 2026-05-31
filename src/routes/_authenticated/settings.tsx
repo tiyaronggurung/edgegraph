@@ -5,6 +5,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useEffect, useState } from "react";
 import { SPORTS } from "@/lib/sports";
 import { toast } from "sonner";
+import { AlertPreferencesCard } from "@/components/settings/AlertPreferencesCard";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — EdgeGraph AI" }] }),
@@ -122,6 +123,7 @@ graph_snapshots(id, analysis_id, user_id, timestamp,
             )}
           </div>
         </div>
+        <AlertPreferencesCard />
       </div>
     </div>
   );

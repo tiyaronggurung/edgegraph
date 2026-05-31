@@ -28,6 +28,7 @@ import { Route as AuthenticatedBacktestRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAnalyzeRouteImport } from './routes/_authenticated/analyze'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
+import { Route as ApiPublicSendDailyDigestsRouteImport } from './routes/api/public/send-daily-digests'
 import { Route as AuthenticatedAnalysisIdRouteImport } from './routes/_authenticated/analysis.$id'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
@@ -130,6 +131,12 @@ const LovableEmailSuppressionRoute = LovableEmailSuppressionRouteImport.update({
   path: '/lovable/email/suppression',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicSendDailyDigestsRoute =
+  ApiPublicSendDailyDigestsRouteImport.update({
+    id: '/api/public/send-daily-digests',
+    path: '/api/public/send-daily-digests',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedAnalysisIdRoute = AuthenticatedAnalysisIdRouteImport.update({
   id: '/analysis/$id',
   path: '/analysis/$id',
@@ -179,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/strategies': typeof AuthenticatedStrategiesRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/analysis/$id': typeof AuthenticatedAnalysisIdRoute
+  '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -204,6 +212,7 @@ export interface FileRoutesByTo {
   '/strategies': typeof AuthenticatedStrategiesRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/analysis/$id': typeof AuthenticatedAnalysisIdRoute
+  '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -231,6 +240,7 @@ export interface FileRoutesById {
   '/_authenticated/strategies': typeof AuthenticatedStrategiesRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/_authenticated/analysis/$id': typeof AuthenticatedAnalysisIdRoute
+  '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -258,6 +268,7 @@ export interface FileRouteTypes {
     | '/strategies'
     | '/email/unsubscribe'
     | '/analysis/$id'
+    | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
     | '/api/public/hooks/capture-closing-odds'
     | '/lovable/email/queue/process'
@@ -283,6 +294,7 @@ export interface FileRouteTypes {
     | '/strategies'
     | '/email/unsubscribe'
     | '/analysis/$id'
+    | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
     | '/api/public/hooks/capture-closing-odds'
     | '/lovable/email/queue/process'
@@ -309,6 +321,7 @@ export interface FileRouteTypes {
     | '/_authenticated/strategies'
     | '/email/unsubscribe'
     | '/_authenticated/analysis/$id'
+    | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
     | '/api/public/hooks/capture-closing-odds'
     | '/lovable/email/queue/process'
@@ -324,6 +337,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   UnsubscribeRoute: typeof UnsubscribeRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
+  ApiPublicSendDailyDigestsRoute: typeof ApiPublicSendDailyDigestsRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
   ApiPublicHooksCaptureClosingOddsRoute: typeof ApiPublicHooksCaptureClosingOddsRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
@@ -466,6 +480,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LovableEmailSuppressionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/send-daily-digests': {
+      id: '/api/public/send-daily-digests'
+      path: '/api/public/send-daily-digests'
+      fullPath: '/api/public/send-daily-digests'
+      preLoaderRoute: typeof ApiPublicSendDailyDigestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/analysis/$id': {
       id: '/_authenticated/analysis/$id'
       path: '/analysis/$id'
@@ -546,6 +567,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   UnsubscribeRoute: UnsubscribeRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
+  ApiPublicSendDailyDigestsRoute: ApiPublicSendDailyDigestsRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
   ApiPublicHooksCaptureClosingOddsRoute: ApiPublicHooksCaptureClosingOddsRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
