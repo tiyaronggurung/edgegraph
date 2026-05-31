@@ -388,6 +388,21 @@ function LiveMarkets() {
               </span>
             </div>
 
+            {market.closeTime && (() => {
+              const ms = new Date(market.closeTime).getTime() - Date.now();
+              if (!Number.isFinite(ms)) return null;
+              const abs = Math.abs(ms);
+              const d = Math.floor(abs / 86400000);
+              const h = Math.floor((abs % 86400000) / 3600000);
+              const m = Math.floor((abs % 3600000) / 60000);
+              const parts = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
+              return (
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                  {ms > 0 ? `closes in ${parts}` : `closed ${parts} ago`}
+                </div>
+              );
+            })()}
+
             {series100.length > 1 ? (
               <MiniProbChart series={series100} width={280} height={70} />
             ) : (
