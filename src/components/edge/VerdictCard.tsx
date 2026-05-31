@@ -6,6 +6,7 @@ import { PlaceBetButton } from "@/components/edge/PlaceBetButton";
 import { LiveBetPL } from "@/components/edge/LiveBetPL";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import { incrementAlert, incrementVerdict, LIMIT_REACHED } from "@/lib/usage.functions";
+import { evaluateAlert } from "@/lib/alert-prefs.functions";
 import { UpgradeModal } from "@/components/upgrade/UpgradePrompt";
 
 // Cross-tab dedupe for the bet alert email (per day, per user+ticker+side).
