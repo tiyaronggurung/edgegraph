@@ -38,6 +38,9 @@ export function CashoutAlerts() {
       qc.invalidateQueries({ queryKey: ["verdict-log", user?.id] });
       qc.invalidateQueries({ queryKey: ["verdict-log-bets", user?.id] });
       qc.invalidateQueries({ queryKey: ["bankroll-stats"] });
+      qc.invalidateQueries({ queryKey: ["bets", user?.id] });
+      qc.invalidateQueries({ queryKey: ["bets-clv"] });
+      qc.invalidateQueries({ queryKey: ["clv-stats"] });
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
