@@ -138,6 +138,18 @@ export function VerdictCard({
     emailedRef.current = true;
     (async () => {
       try {
+        // Gate via incrementAlert — enforces per-tier monthly cap.
+        try {
+          await bumpAlert({ data: { idempotencyKey: key } });
+        } catch (e) {
+          if ((e as Error).message === LIMIT_REACHED) {
+            setLimitContext("bet-alert");
+            setLimitOpen(true);
+          }
+          emailedKeys.delete(key);
+          emailedRef.current = false;
+          return;
+        }
         const { data: { user } } = await supabase.auth.getUser();
         const email = user?.email;
         if (!email) return;
@@ -156,7 +168,6 @@ export function VerdictCard({
           },
         });
       } catch (err) {
-        // Allow retry on next render if it failed.
         emailedKeys.delete(key);
         emailedRef.current = false;
         console.warn("[bet-alert email] failed", err);
