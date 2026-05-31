@@ -136,6 +136,18 @@ export function VerdictCard({
         )}
       </div>
       <div className="text-[10px] mt-1 opacity-80 leading-snug">{reason}</div>
+      {verdict === "BET" && userId && marketTicker && (
+        <PlaceBetButton
+          userId={userId}
+          marketTicker={marketTicker}
+          marketTitle={marketTitle ?? null}
+          side={side}
+          sideLabel={sideLabel}
+          defaultStake={kellyHalfStake && kellyHalfStake > 0 ? kellyHalfStake : 25}
+          defaultEntryPrice={Math.min(0.99, Math.max(0.01, sideMarketPct / 100))}
+        />
+      )}
     </div>
   );
 }
+
