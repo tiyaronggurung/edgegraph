@@ -160,7 +160,7 @@ export const getClvStats = createServerFn({ method: "GET" })
 const PlaceBetFromVerdictSchema = z.object({
   verdictId: z.string().uuid(),
   stake: z.number().min(0.01).max(1_000_000),
-  entryPrice: z.number().min(0.01).max(0.99),
+  entryPrice: z.number().min(0.01).max(1.0),
 });
 
 export const placeBetFromVerdict = createServerFn({ method: "POST" })
@@ -420,7 +420,7 @@ export const getCashoutSignals = createServerFn({ method: "POST" })
 // ──────────────────────────────────────────────────────────────────
 const CashOutSchema = z.object({
   verdictId: z.string().uuid(),
-  exitPrice: z.number().min(0.01).max(0.99),
+  exitPrice: z.number().min(0.01).max(1.0),
 });
 
 export const cashOutBet = createServerFn({ method: "POST" })
