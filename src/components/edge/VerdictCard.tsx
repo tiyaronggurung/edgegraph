@@ -76,10 +76,20 @@ export function VerdictCard({
     }
     loggedKeys.add(key);
     firedRef.current = true;
-    // Fire-and-forget. Swallow errors so the live page never breaks.
-    void supabase
-      .from("verdict_log")
-      .insert({
+    // Gate via incrementVerdict — counts each unique BET verdict as an AI request.
+    (async () => {
+      try {
+        await bumpVerdict({ data: { idempotencyKey: key } });
+      } catch (e) {
+        if ((e as Error).message === LIMIT_REACHED) {
+          setLimitContext("ai-verdict");
+          setLimitOpen(true);
+        }
+        loggedKeys.delete(key);
+        firedRef.current = false;
+        return;
+      }
+      const { error } = await supabase.from("verdict_log").insert({
         user_id: userId,
         market_ticker: marketTicker,
         market_title: marketTitle ?? null,
@@ -91,14 +101,12 @@ export function VerdictCard({
         pattern: pattern ?? null,
         kelly_half: kellyHalfStake ?? null,
         verdict: "BET",
-      })
-      .then(({ error }) => {
-        if (error) {
-          // Allow retry next render if the insert actually failed.
-          loggedKeys.delete(key);
-          firedRef.current = false;
-        }
       });
+      if (error) {
+        loggedKeys.delete(key);
+        firedRef.current = false;
+      }
+    })();
   }, [
     hasFair,
     verdict,
