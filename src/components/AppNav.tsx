@@ -8,6 +8,7 @@ const LINKS = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/analyze", label: "Analyze" },
   { to: "/live", label: "Live Markets" },
+  { to: "/history", label: "P&L / History" },
   { to: "/patterns", label: "Patterns" },
   { to: "/backtest", label: "Backtest" },
   { to: "/model-validation", label: "Model" },
