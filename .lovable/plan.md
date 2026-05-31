@@ -1,86 +1,119 @@
-# EdgeGraph AI — Build Plan
+# Subscription & Pricing System — Plan
 
-A dark, monospace "AI trading terminal" for sports betting graph analysis. 9 pages, Lovable Cloud (Supabase) auth + DB + storage, rule-based pattern engine ready for AI swap-in.
+You said "Stripe-ready structure, but do not break existing app logic." I'm reading that as: **build the entire pricing UI, plan config, limits enforcement, and gating now — but stop short of wiring real Stripe checkout.** When you're ready to take payments, we'll enable Stripe payments in one extra step and connect the upgrade buttons to it.
 
-## 1. Backend (Lovable Cloud)
+If you actually want live Stripe checkout in this same pass, tell me and I'll add the enable step at the front.
 
-Enable Lovable Cloud, then create schema via migration:
+---
 
-- `profiles` (id → auth.users, email, bankroll, default_unit, risk_tolerance, preferred_sports[], created_at) + trigger on signup
-- `analyses` (full fields per spec, user_id FK, uploaded_image_url)
-- `bets` (user_id, analysis_id FK nullable, result, profit_loss, …)
-- `patterns` (seeded with all 14 patterns)
-- `strategies` (user_id, rules, pattern_type, min_confidence, action, active)
-- `graph_snapshots` (analysis_id FK, timeseries point)
+## What I will build
 
-RLS: owner-only on `analyses`, `bets`, `strategies`, `profiles`; public read on `patterns`. Storage bucket `graph-uploads` (private, owner read/write via RLS).
+### 1. Plan config (single source of truth)
+New file `src/lib/plans/config.ts` — exports `PLANS` with the three tiers, monthly/annual prices, 20% annual discount, and a typed feature matrix:
+- `alertsPerMonth`, `verdictsPerMonth` (numbers, `Infinity` = unlimited)
+- `liveGamesLimit` (3 / all / all)
+- `historyDays` (7 / Infinity / Infinity)
+- `sports` (NBA only / 5 sports / all)
+- `patternLibrary` ('view' / 'full' / 'full+alerts')
+- `kelly` ('half' / 'full' / 'full+custom')
+- `savedStrategies` (1 / 10 / Infinity)
+- Booleans: `clvTracking`, `clvAdvanced`, `steamDetection`, `sharpMoneyTracker`, `dailyReport`, `weeklyReport`, `priorityDelivery`, `customAlertBuilder`, `vipCommunity`, `earlyAccess`
 
-Auth: email/password via Supabase. `_authenticated` layout route guards all pages except `/`. Session listener at root invalidates router + query cache.
+### 2. Database (schema only, no Stripe webhook yet)
+New migration adds to `profiles`:
+- `subscription_tier text default 'free'` ('free' | 'pro' | 'vip')
+- `subscription_status text default 'inactive'` ('active' | 'inactive' | 'past_due' | 'canceled')
+- `billing_interval text` ('month' | 'year' | null)
+- `current_period_end timestamptz`
+- `stripe_customer_id text` (nullable, populated later)
+- `stripe_subscription_id text` (nullable, populated later)
 
-## 2. Design System (`src/styles.css`)
+New table `usage_counters`:
+- `user_id`, `period_start date` (first of month), `alerts_sent int`, `verdicts_used int`
+- Unique on (user_id, period_start); RLS: own row only
 
-Dark only. Tokens in oklch approximating: bg `#080808`, card `#111111`, border `#1e1e1e`, primary/success `#00ff88` (neon green), destructive `#ef4444`, info `#3b82f6`, warning `#f59e0b`, muted-foreground `#8a8a8a`. JetBrains Mono via Google Fonts as global font. Tight radius (`0.25rem`), terminal feel: uppercase tracked labels, hairline borders, subtle glow on accents.
+### 3. Plan helper hook
+New `src/hooks/usePlan.ts`:
+- Reads `profiles.subscription_tier` + current month's `usage_counters`
+- Returns `{ plan, features, usage, can: { sendAlert(), useVerdict(), accessSport(s), saveStrategy(count), ... }, remaining: { alerts, verdicts } }`
+- Pure read; never mutates
 
-## 3. Routes (TanStack Start, file-based)
+### 4. Server functions for counters
+New `src/lib/usage.functions.ts` with `createServerFn` handlers:
+- `incrementAlert()` — atomic upsert + check, throws `LIMIT_REACHED` if over
+- `incrementVerdict()` — same pattern
+- Both protected by `requireSupabaseAuth`
 
-- `/` landing (public)
-- `/_authenticated/dashboard`
-- `/_authenticated/analyze`
-- `/_authenticated/analysis/$id` (result)
-- `/_authenticated/live`
-- `/_authenticated/patterns`
-- `/_authenticated/backtest`
-- `/_authenticated/strategies`
-- `/_authenticated/settings`
-- `/login`, `/signup`
+### 5. Pricing page
+New route `src/routes/pricing.tsx`:
+- 3 cards (Free / Pro / VIP Sharp), Pro flagged "Most Popular"
+- Monthly/Annual toggle, annual shows "Save 20%" badge + per-month effective price
+- VIP styled with premium accent (gradient border, sharp dark surface, refined typography) using existing semantic tokens — no new hex codes
+- Mobile: stack vertically, sticky toggle
+- CTA buttons:
+  - Current plan → disabled "Current plan"
+  - Free → "Get started" (no-op / sign-up)
+  - Pro/VIP → "Upgrade" — calls `startCheckout(tier, interval)` stub that currently just shows a toast "Stripe checkout coming soon"; ready to swap for real Stripe call later
+- Full comparison table below cards (all features × 3 tiers)
 
-Each route has its own `head()` metadata.
+### 6. Gating + upgrade prompts (additive only)
+New reusable `<UpgradePrompt>` dialog component + `useUpgradePrompt()` hook.
 
-## 4. Shared Components (`src/components/`)
+Wired into these existing flows **without changing their happy-path logic**:
+- **BET alert email** (`VerdictCard.tsx` new useEffect): before `sendTransactionalEmail`, call `incrementAlert()`. On `LIMIT_REACHED` → skip send, show upgrade prompt. Existing verdict_log insert + UI untouched.
+- **AI verdict request** (find the call site in analyze flow): wrap with `incrementVerdict()`. On limit → upgrade prompt, no API call.
+- **Live games list**: free users see top 3 + a locked-card row "Upgrade to see all X games"
+- **Strategies save**: button disabled with tooltip past limit
+- **Pattern library filters**: filters disabled with overlay for free
+- **History page**: free users see last 7 days + "Upgrade for full history"
+- **CLV page**: free users see paywall card
 
-`Nav` (sticky, logo + links + email + sign out, mobile hamburger), `Disclaimer`, `ConfidenceGauge` (SVG arc), `MiniProbChart` (SVG line + gradient), `ProbabilityBar`, `PatternBadge`, `RiskBadge`, `ActionBadge`, `Edge70Badge`, `StatCard`, `SportTab`, `AnalysisTable`, `BetModal`, `StrategyModal`, `SportFields` (switch by sport).
+### 7. Account/settings — current plan widget
+Add a small "Current Plan" card to `/dashboard` or settings showing tier + usage bars + "Manage subscription" link to `/pricing`.
 
-## 5. AI Engine (`src/lib/analysisEngine.ts`)
+### 8. Public guest flows
+**Untouched.** Pricing page is public (anyone can view), but no changes to join/status/booking flows. (Your repo doesn't appear to have those, but I'll grep to confirm before touching anything adjacent.)
 
-Pure TS, no deps. Exports `classifyPattern`, `computeEdgeScore`, `computeEdge70`, `recommendAction`, `runAnalysis(input)` returning the full result object. Implements all rules + sport-specific gates exactly as specified. Structured so a future model call can replace the body without changing callers.
+---
 
-Also `generateSimulatedSeries(pattern)` → array of points for the result-page chart, deterministic per pattern.
+## What I will NOT do in this pass
+- Enable Stripe payments / call `enable_stripe_payments`
+- Create real checkout sessions or webhooks
+- Modify the working live betting, verdict generation, pattern performance, or CLV page logic (only wrapping with gates)
+- Touch the email infrastructure (already working)
+- Add any new colors outside `src/styles.css` tokens
 
-## 6. Service Stubs (`src/services/`)
+When you're ready for live billing, the follow-up is small: enable Stripe payments, create the 4 prices (Pro monthly/annual, VIP monthly/annual), wire `startCheckout()` to a server function, add the webhook to update `profiles.subscription_tier`.
 
-`kalshiAPI.ts`, `sportsDataAPI.ts`, `oddsAPI.ts` — typed interfaces + mock implementations returning sample data; clearly marked TODO for real API keys (via Lovable secrets later).
+---
 
-## 7. Pages
+## Files touched
 
-Each page implemented to spec:
+**Created:**
+- `src/lib/plans/config.ts`
+- `src/hooks/usePlan.ts`
+- `src/lib/usage.functions.ts`
+- `src/routes/pricing.tsx`
+- `src/components/pricing/PricingCard.tsx`
+- `src/components/pricing/ComparisonTable.tsx`
+- `src/components/pricing/BillingToggle.tsx`
+- `src/components/upgrade/UpgradePrompt.tsx`
+- `src/hooks/useUpgradePrompt.ts`
+- `src/components/dashboard/PlanWidget.tsx`
+- Migration: `subscription_*` columns + `usage_counters` table
 
-- **Landing** — hero, 3 CTAs, how-it-works, sport badges, 6 pattern preview cards, Edge70 explainer, disclaimer.
-- **Dashboard** — 8 stat cards (computed from `analyses` + `bets`), recent analyses table, P&L by sport bar chart, win-rate-by-pattern horizontal bars (Recharts).
-- **Analyze** — two-column form, image upload to Storage, dynamic sport-specific fields, live probability bar, submit → runs engine → inserts `analyses` row + initial `graph_snapshots` → navigate to result.
-- **Result** — gauges, badges, simulated chart, Edge70 reasoning card, pattern breakdown, action display, Save-to-Backtest modal prefilled.
-- **Live Markets** — connector status bar (placeholder Connect buttons), sport tabs, demo market cards per sport.
-- **Pattern Library** — 14 cards with mini charts, risk filter buttons. Data from `patterns` table (seeded).
-- **Backtest** — analytics row, two charts, filterable bet table, Add Result modal.
-- **Strategies** — cards + New/Edit/Pause/Delete modal.
-- **Settings** — profile form (persists to `profiles`), risk tolerance, preferred sports, API key inputs (stored as Lovable secrets via flow), collapsible schema reference.
+**Edited (surgically — gates added around existing code, nothing replaced):**
+- `src/components/edge/VerdictCard.tsx` (gate the new bet-alert email only)
+- The AI verdict request call site
+- Live games list, strategies, patterns, history, CLV pages — each gets a gate wrapper, no logic changes
 
-## 8. Sample / Seed Data
+---
 
-- Migration seeds `patterns` table with all 14 entries.
-- On first sign-in (or via "Load demo data" button on dashboard if empty), insert 5 demo analyses, 5 bets, 3 strategies for that user.
-- Live Markets cards use static demo arrays per sport.
+## Questions before I start
 
-## 9. Technical Notes
+1. **Stripe right now, or stub for later?** (I'm assuming stub.)
+2. **Annual price display** — "$23.99/mo billed annually ($287.88/yr)" style ok? Pro annual = $239.90/yr (20% off $299.88), VIP annual = $575.90/yr.
+3. **Free tier auth** — should the 5-alert limit apply per calendar month or per rolling 30 days? I'm assuming **calendar month** (resets 1st of each month) — simpler and clearer to users.
+4. **Existing users** — everyone gets `subscription_tier='free'` by default. Want me to set you (`dipeshtamu95@gmail.com`) to `vip` for testing?
 
-- Use `createServerFn` + `requireSupabaseAuth` for all DB writes/reads of user data; browser client only for auth + storage upload + realtime if needed.
-- Recharts for bar charts; hand-rolled SVG for gauges / mini line charts (small, themed).
-- Form state with `react-hook-form` + `zod`; toasts via existing sonner.
-- Disclaimer component rendered on Analyze, Result, Live Markets, Backtest pages.
-
-## Out of scope (this build)
-
-- Real Kalshi / odds / sports-data integrations (stubs only).
-- Replacing rule engine with LLM (interface ready).
-- Payments / subscription tiers.
-
-Ready to implement on approval.
+Reply with answers + "go" and I'll build it.
