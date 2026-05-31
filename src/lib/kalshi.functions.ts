@@ -139,3 +139,27 @@ export const getKalshiMarketHistory = createServerFn({ method: "GET" })
       .reverse();
     return { ticker: data.ticker, series };
   });
+
+// Fetch settlement status for a list of market tickers.
+// Returns { ticker, status, result } where status is e.g. "active" | "settled" | "finalized"
+// and result is "yes" | "no" | "" (empty when not settled yet).
+export const getKalshiMarketsStatus = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ tickers: z.array(z.string().min(1).max(120)).min(1).max(50) }))
+  .handler(async ({ data }): Promise<{ statuses: { ticker: string; status: string; result: string }[] }> => {
+    const out = await Promise.all(
+      data.tickers.map(async (ticker) => {
+        try {
+          const json = await kalshiFetch(`/markets/${encodeURIComponent(ticker)}`);
+          const m = json.market ?? {};
+          return {
+            ticker,
+            status: String(m.status ?? "unknown"),
+            result: String(m.result ?? ""),
+          };
+        } catch {
+          return { ticker, status: "unknown", result: "" };
+        }
+      }),
+    );
+    return { statuses: out };
+  });
