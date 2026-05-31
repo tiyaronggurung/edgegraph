@@ -5,6 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { captureClosingLine, getClvStats } from "@/lib/bets.functions";
 import { StatCard } from "@/components/edge/StatCard";
 import { toast } from "sonner";
+import { usePlan } from "@/hooks/usePlan";
+import { InlineUpgradePrompt } from "@/components/upgrade/UpgradePrompt";
+import { TrendingUp } from "lucide-react";
 
 type BetRow = {
   id: string;
