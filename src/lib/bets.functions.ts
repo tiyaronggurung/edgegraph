@@ -86,7 +86,7 @@ export const getBankrollStats = createServerFn({ method: "GET" })
  */
 const CaptureClosingSchema = z.object({
   betId: z.string().uuid(),
-  closingOdds: z.number().min(1.01).max(1000),
+  closingOdds: z.number().min(0.01).max(1000),
 });
 
 export const captureClosingLine = createServerFn({ method: "POST" })
@@ -102,8 +102,22 @@ export const captureClosingLine = createServerFn({ method: "POST" })
     if (fetchErr) throw new Error(fetchErr.message);
     if (!bet || bet.user_id !== userId) throw new Error("Bet not found");
     const entry = Number(bet.odds ?? 0);
-    if (!entry || entry < 1.01) throw new Error("Entry odds missing or invalid");
-    const clv = (entry / data.closingOdds - 1) * 100;
+    if (!entry || entry <= 0) throw new Error("Entry odds missing or invalid");
+
+    // Auto-detect format by entry value:
+    //  - entry <= 1.0  → Kalshi/prediction-market price (0..1). CLV = (close-entry)/entry*100
+    //  - entry > 1.0   → decimal sportsbook odds. CLV = (entry/close - 1) * 100
+    const isPredictionMarket = entry <= 1;
+    if (isPredictionMarket && data.closingOdds > 1) {
+      throw new Error("Closing price must be ≤ 1.00 for prediction-market bets");
+    }
+    if (!isPredictionMarket && data.closingOdds < 1.01) {
+      throw new Error("Closing decimal odds must be ≥ 1.01");
+    }
+    const clv = isPredictionMarket
+      ? ((data.closingOdds - entry) / entry) * 100
+      : (entry / data.closingOdds - 1) * 100;
+
     const { error: updErr } = await supabase
       .from("bets")
       .update({
@@ -115,6 +129,7 @@ export const captureClosingLine = createServerFn({ method: "POST" })
     if (updErr) throw new Error(updErr.message);
     return { ok: true, clvPercent: clv };
   });
+
 
 export const getClvStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

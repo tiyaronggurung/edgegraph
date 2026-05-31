@@ -123,6 +123,8 @@ function BetRowView({ bet, onCapture }: { bet: BetRow; onCapture: (v: number) =>
   const [val, setVal] = useState("");
   const captured = bet.closing_odds != null;
   const clv = Number(bet.clv_percent ?? 0);
+  const entry = Number(bet.odds ?? 0);
+  const isPM = entry > 0 && entry <= 1; // Kalshi / prediction-market price
 
   return (
     <tr className="border-b border-border/50 hover:bg-muted/30">
@@ -131,7 +133,7 @@ function BetRowView({ bet, onCapture }: { bet: BetRow; onCapture: (v: number) =>
         <div className="text-[10px] text-muted-foreground uppercase">{bet.sport ?? ""}</div>
       </td>
       <td className="p-3">{bet.pick ?? "—"}</td>
-      <td className="p-3 text-right tabular-nums">{Number(bet.odds ?? 0).toFixed(2)}</td>
+      <td className="p-3 text-right tabular-nums">{entry.toFixed(2)}</td>
       <td className="p-3 text-right tabular-nums">
         {captured ? Number(bet.closing_odds).toFixed(2) : <span className="text-muted-foreground">—</span>}
       </td>
@@ -155,18 +157,32 @@ function BetRowView({ bet, onCapture }: { bet: BetRow; onCapture: (v: number) =>
             <input
               type="number"
               step="0.01"
-              min="1.01"
-              placeholder="e.g. 1.18"
+              min={isPM ? 0.01 : 1.01}
+              max={isPM ? 1 : undefined}
+              placeholder={isPM ? "0.77 or 77" : "e.g. 1.18"}
               value={val}
               onChange={(e) => setVal(e.target.value)}
               className="w-20 px-2 py-1 bg-background border border-border rounded text-xs tabular-nums"
             />
             <button
               onClick={() => {
-                const n = parseFloat(val);
-                if (!Number.isFinite(n) || n < 1.01) {
-                  toast.error("Enter decimal odds ≥ 1.01");
+                let n = parseFloat(val);
+                if (!Number.isFinite(n)) {
+                  toast.error("Enter a number");
                   return;
+                }
+                if (isPM) {
+                  // Accept percent (1-100) or decimal (0.01-1.00)
+                  if (n > 1) n = n / 100;
+                  if (n <= 0 || n > 1) {
+                    toast.error("Closing price must be between 0.01 and 1.00 (or 1–100%)");
+                    return;
+                  }
+                } else {
+                  if (n < 1.01) {
+                    toast.error("Enter decimal odds ≥ 1.01");
+                    return;
+                  }
                 }
                 onCapture(n);
               }}
