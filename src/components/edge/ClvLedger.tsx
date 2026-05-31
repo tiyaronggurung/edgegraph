@@ -22,7 +22,7 @@ type BetRow = {
 };
 
 export function ClvLedger() {
-  const { can, plan } = usePlan();
+  const { can } = usePlan();
   if (!can.accessClv()) {
     return (
       <div className="space-y-4">
@@ -51,6 +51,10 @@ export function ClvLedger() {
       </div>
     );
   }
+  return <ClvLedgerInner />;
+}
+
+function ClvLedgerInner() {
   const qc = useQueryClient();
   const capture = useServerFn(captureClosingLine);
   const statsFn = useServerFn(getClvStats);
