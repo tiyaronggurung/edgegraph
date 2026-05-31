@@ -471,3 +471,70 @@ export const cashOutBet = createServerFn({ method: "POST" })
 
     return { ok: true, pl, exitPrice: sideExit };
   });
+
+// ──────────────────────────────────────────────────────────────────
+// Manually add a bet to the CLV ledger (no analysis required).
+// Optionally accepts closing odds — if provided, computes CLV%
+// using the same logic as captureClosingLine.
+// ──────────────────────────────────────────────────────────────────
+const AddManualBetSchema = z.object({
+  game: z.string().trim().min(1).max(255),
+  pick: z.string().trim().min(1).max(255),
+  sport: z.string().trim().min(1).max(64),
+  odds: z.number().min(0.01).max(1000),
+  stake: z.number().min(0).max(1_000_000).optional(),
+  closingOdds: z.number().min(0.01).max(1000).optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+export const addManualBet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => AddManualBetSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const entry = data.odds;
+    const isPredictionMarket = entry <= 1;
+
+    let closingOdds: number | null = null;
+    let clvPercent: number | null = null;
+    let closingCapturedAt: string | null = null;
+
+    if (data.closingOdds != null) {
+      let close = data.closingOdds;
+      if (isPredictionMarket) {
+        if (close > 1) close = close / 100;
+        if (close <= 0 || close > 1) {
+          throw new Error("Closing price must be between 0.01 and 1.00 (or 1–100%)");
+        }
+      } else {
+        if (close < 1.01) throw new Error("Closing decimal odds must be ≥ 1.01");
+      }
+      closingOdds = close;
+      clvPercent = isPredictionMarket
+        ? ((close - entry) / entry) * 100
+        : (entry / close - 1) * 100;
+      closingCapturedAt = new Date().toISOString();
+    }
+
+    const { data: bet, error } = await supabase
+      .from("bets")
+      .insert({
+        user_id: userId,
+        game: data.game,
+        pick: data.pick,
+        sport: data.sport,
+        odds: entry,
+        stake: data.stake ?? 0,
+        notes: data.notes ?? null,
+        result: "Pending",
+        closing_odds: closingOdds,
+        clv_percent: clvPercent,
+        closing_captured_at: closingCapturedAt,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+    return { ok: true, betId: bet.id, clvPercent };
+  });
