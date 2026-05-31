@@ -33,6 +33,7 @@ export interface KalshiMarketLite {
   volume24h: number;
   openInterest: number;
   recentYes: number[]; // recent yes prices (oldest -> newest) for sparkline
+  closeTime: string | null; // ISO timestamp when market closes
 }
 
 export interface KalshiEventLite {
