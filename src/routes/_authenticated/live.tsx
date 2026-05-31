@@ -8,6 +8,7 @@ import { ActionBadge } from "@/components/edge/ActionBadge";
 import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { VerdictCard } from "@/components/edge/VerdictCard";
+import { AiCoachBanner } from "@/components/edge/AiCoachBanner";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
 import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/lib/espn.functions";
 import { getNoVigFairLine } from "@/lib/oddsApi.functions";
@@ -310,6 +311,13 @@ function LiveMarkets() {
         <span className="text-[color:var(--color-primary)] uppercase tracking-widest text-[10px]">LIVE</span>
         <span className="ml-auto text-muted-foreground">Comeback alerts powered by live game state.</span>
       </div>
+
+      <AiCoachBanner
+        cards={filtered}
+        bankroll={profile.bankroll}
+        unit={profile.unit}
+        userId={user?.id ?? null}
+      />
 
       {eventsQuery.isLoading && (
         <div className="flex items-center justify-center py-20 text-muted-foreground">
