@@ -237,6 +237,13 @@ export function VerdictCard({
           <LiveBetPL marketTicker={marketTicker} side={side} />
         </>
       )}
+      <UpgradeModal
+        open={limitOpen}
+        onOpenChange={setLimitOpen}
+        context={limitContext}
+        title={limitContext === "bet-alert" ? "BET alert limit reached" : "AI verdict limit reached"}
+        description="You've used your Free monthly quota. Upgrade to Pro for unlimited verdicts and 100 BET alerts."
+      />
     </div>
   );
 }
