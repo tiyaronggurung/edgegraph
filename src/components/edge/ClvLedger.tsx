@@ -22,6 +22,35 @@ type BetRow = {
 };
 
 export function ClvLedger() {
+  const { can, plan } = usePlan();
+  if (!can.accessClv()) {
+    return (
+      <div className="space-y-4">
+        <div className="border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/5 rounded p-8 text-center space-y-4">
+          <div className="flex justify-center">
+            <div className="h-12 w-12 rounded-full bg-[color:var(--color-primary)]/10 flex items-center justify-center">
+              <TrendingUp className="h-6 w-6 text-[color:var(--color-primary)]" />
+            </div>
+          </div>
+          <div>
+            <h2 className="text-lg font-bold uppercase tracking-wider neon-text">CLV Tracking</h2>
+            <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+              Track closing line value and measure whether your picks are beating the market.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Available on Pro and VIP Sharp plans.
+            </p>
+          </div>
+        </div>
+        <InlineUpgradePrompt
+          title="Unlock CLV Tracking"
+          description="CLV is the only metric that proves edge before sample size is large enough for ROI."
+          context="clv-paywall"
+          targetPlan="pro"
+        />
+      </div>
+    );
+  }
   const qc = useQueryClient();
   const capture = useServerFn(captureClosingLine);
   const statsFn = useServerFn(getClvStats);
