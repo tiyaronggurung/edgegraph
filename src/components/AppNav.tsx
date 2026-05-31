@@ -134,6 +134,19 @@ export function AppNav() {
           )}
         </div>
         <div className="hidden lg:flex items-center gap-3">
+          {isAdmin && (
+            <Link to="/admin" className="text-xs uppercase tracking-wider text-muted-foreground hover:text-[color:var(--color-primary)] flex items-center gap-1">
+              <Shield className="h-3 w-3" /> Admin
+            </Link>
+          )}
+          {tier === "free" && (
+            <Link
+              to="/pricing"
+              className="text-xs uppercase tracking-wider px-3 py-1.5 border border-[color:var(--color-primary)] text-[color:var(--color-primary)] rounded hover:bg-[color:var(--color-primary)]/10 flex items-center gap-1"
+            >
+              <Sparkles className="h-3 w-3" /> Upgrade
+            </Link>
+          )}
           <span className="text-xs text-muted-foreground truncate max-w-[180px]">{user?.email}</span>
           <button
             onClick={() => signOut()}
