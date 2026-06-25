@@ -5,6 +5,7 @@ import { Loader2, ExternalLink } from "lucide-react";
 import { getKalshiSportsEvents, type KalshiEventLite } from "@/lib/kalshi.functions";
 import { detectSoccer3Way, isSoccerEvent } from "@/lib/kalshiSoccer";
 import { ProbabilityBar } from "@/components/edge/ProbabilityBar";
+import { SoccerBetAlert } from "@/components/edge/SoccerBetAlert";
 
 interface SoccerCard {
   event: KalshiEventLite;
