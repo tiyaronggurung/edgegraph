@@ -5,6 +5,7 @@ import { Loader2, ExternalLink } from "lucide-react";
 import { getKalshiSportsEvents, type KalshiEventLite } from "@/lib/kalshi.functions";
 import { detectSoccer3Way, isSoccerEvent } from "@/lib/kalshiSoccer";
 import { ProbabilityBar } from "@/components/edge/ProbabilityBar";
+import { SoccerBetAlert } from "@/components/edge/SoccerBetAlert";
 
 interface SoccerCard {
   event: KalshiEventLite;
@@ -92,6 +93,8 @@ export function DashboardLiveSoccer() {
       <div className="grid md:grid-cols-2 gap-3 p-3">
         {top.map((c) => {
           const pred = pickPrediction(c.fair, c.teamA, c.teamB);
+          const rawForPick =
+            pred.top.key === "a" ? c.raw.a : pred.top.key === "draw" ? c.raw.draw : c.raw.b;
           const tone =
             pred.confidence === "HIGH"
               ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
@@ -103,6 +106,16 @@ export function DashboardLiveSoccer() {
               key={c.event.eventTicker}
               className="border border-border bg-background/40 rounded p-3 space-y-2"
             >
+              {pred.confidence === "HIGH" && (
+                <SoccerBetAlert
+                  marketTicker={c.event.eventTicker}
+                  marketTitle={`${c.teamA} vs ${c.teamB}`}
+                  pickLabel={pred.top.label}
+                  fairPct={pred.top.pct}
+                  marketPct={rawForPick * 100}
+                  edgePts={pred.top.pct - rawForPick * 100}
+                />
+              )}
               <div className="flex justify-between items-start gap-2">
                 <div className="min-w-0">
                   <div className="text-[10px] uppercase tracking-widest text-muted-foreground truncate">
