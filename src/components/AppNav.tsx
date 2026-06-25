@@ -12,6 +12,7 @@ const NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/analyze", label: "Analyze" },
   { to: "/live", label: "Live Markets" },
+  { to: "/live", label: "⚽ Soccer", search: { sport: "soccer" } },
   {
     label: "Research",
     children: [
