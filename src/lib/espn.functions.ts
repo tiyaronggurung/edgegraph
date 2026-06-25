@@ -13,7 +13,26 @@ export type EspnLeague =
   | "football/college-football"
   | "baseball/mlb"
   | "hockey/nhl"
-  | "soccer/all";
+  | `soccer/${string}`;
+
+// ESPN soccer league paths we actively check. World Cup is included so the
+// pipeline auto-works the day Kalshi lists those tickers; ESPN returns an
+// empty events array harmlessly when no matches are scheduled.
+const SOCCER_LEAGUES: EspnLeague[] = [
+  "soccer/eng.1",        // EPL
+  "soccer/usa.1",        // MLS
+  "soccer/uefa.champions", // UCL
+  "soccer/uefa.europa",  // Europa
+  "soccer/mex.1",        // Liga MX
+  "soccer/tur.1",        // Super Lig
+  "soccer/esp.1",        // La Liga
+  "soccer/ger.1",        // Bundesliga
+  "soccer/ita.1",        // Serie A
+  "soccer/fra.1",        // Ligue 1
+  "soccer/fifa.world",   // FIFA World Cup
+  "soccer/fifa.worldq.uefa",
+  "soccer/fifa.worldq.concacaf",
+];
 
 export interface TeamStatLine {
   name: string;
@@ -86,16 +105,20 @@ function normCdf(z: number): number {
   return z >= 0 ? p : 1 - p;
 }
 
-const TOTAL_MIN: Record<EspnLeague, number> = {
-  "basketball/nba": 48,
-  "basketball/wnba": 40,
-  "basketball/mens-college-basketball": 40,
-  "football/nfl": 60,
-  "football/college-football": 60,
-  "hockey/nhl": 60,
-  "baseball/mlb": 27,
-  "soccer/all": 90,
-};
+function totalMinFor(league: EspnLeague): number {
+  switch (league) {
+    case "basketball/nba": return 48;
+    case "basketball/wnba": return 40;
+    case "basketball/mens-college-basketball": return 40;
+    case "football/nfl": return 60;
+    case "football/college-football": return 60;
+    case "hockey/nhl": return 60;
+    case "baseball/mlb": return 27;
+    default:
+      // All `soccer/*` leagues
+      return 90;
+  }
+}
 
 /**
  * Pure win-probability model. Computes the "fair" probability the YES side wins
@@ -120,7 +143,7 @@ export function computeFairProbability(
   }
   if (!yesTeam) return null;
 
-  const total = TOTAL_MIN[stats.league];
+  const total = totalMinFor(stats.league);
   const progress = progressPctForLeague(stats.league, stats.period, stats.clock);
   const timeRemMin = Math.max(0.1, total * (1 - progress / 100));
 
@@ -165,14 +188,25 @@ export function computeFairProbability(
 
 function leagueFromHint(hint: string): EspnLeague[] {
   const h = hint.toLowerCase();
-  if (h.includes("nba") || h.includes("basketball")) return ["basketball/nba", "basketball/wnba"];
   if (h.includes("wnba")) return ["basketball/wnba"];
+  if (h.includes("nba") || h.includes("basketball")) return ["basketball/nba", "basketball/wnba"];
   if (h.includes("ncaab") || h.includes("college basketball")) return ["basketball/mens-college-basketball"];
   if (h.includes("nfl") || h.includes("football")) return ["football/nfl"];
   if (h.includes("mlb") || h.includes("baseball")) return ["baseball/mlb"];
   if (h.includes("nhl") || h.includes("hockey")) return ["hockey/nhl"];
-  if (h.includes("soccer") || h.includes("mls") || h.includes("serie") || h.includes("epl") || h.includes("ucl"))
-    return ["soccer/all"];
+  // Specific soccer leagues first, then generic fallback to all soccer feeds.
+  if (h.includes("epl") || h.includes("premier")) return ["soccer/eng.1", ...SOCCER_LEAGUES];
+  if (h.includes("mls")) return ["soccer/usa.1", ...SOCCER_LEAGUES];
+  if (h.includes("ucl") || h.includes("champions league")) return ["soccer/uefa.champions", ...SOCCER_LEAGUES];
+  if (h.includes("europa")) return ["soccer/uefa.europa", ...SOCCER_LEAGUES];
+  if (h.includes("liga mx") || h.includes("ligamx")) return ["soccer/mex.1", ...SOCCER_LEAGUES];
+  if (h.includes("super lig") || h.includes("superlig")) return ["soccer/tur.1", ...SOCCER_LEAGUES];
+  if (h.includes("la liga") || h.includes("laliga")) return ["soccer/esp.1", ...SOCCER_LEAGUES];
+  if (h.includes("bundes")) return ["soccer/ger.1", ...SOCCER_LEAGUES];
+  if (h.includes("serie a")) return ["soccer/ita.1", ...SOCCER_LEAGUES];
+  if (h.includes("ligue 1")) return ["soccer/fra.1", ...SOCCER_LEAGUES];
+  if (h.includes("world cup") || h.includes("fifa")) return ["soccer/fifa.world", ...SOCCER_LEAGUES];
+  if (h.includes("soccer")) return SOCCER_LEAGUES;
   // Default: try the big ones in order.
   return ["basketball/nba", "baseball/mlb", "hockey/nhl", "football/nfl"];
 }
@@ -253,8 +287,8 @@ function progressPctForLeague(league: EspnLeague, period: number, clock: string)
     case "baseball/mlb":
       // period = inning, no clock
       return Math.min(100, (period / 9) * 100);
-    case "soccer/all": {
-      // clock usually like "67'"
+    default: {
+      // All `soccer/*` leagues — ESPN clock usually like "67'"
       const min = Number((clock.match(/\d+/) ?? ["0"])[0]);
       return Math.min(100, (min / 90) * 100);
     }
