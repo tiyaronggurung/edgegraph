@@ -28,6 +28,9 @@ import { InlineUpgradePrompt } from "@/components/upgrade/UpgradePrompt";
 
 export const Route = createFileRoute("/_authenticated/live")({
   head: () => ({ meta: [{ title: "Live Kalshi Markets — EdgeGraph AI" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    sport: typeof s.sport === "string" ? s.sport : undefined,
+  }),
   component: LiveMarkets,
 });
 
@@ -51,8 +54,9 @@ function LiveMarkets() {
   const statsFn = useServerFn(getLiveGameStats);
   const bankrollFn = useServerFn(getBankrollStats);
   const { user } = useAuth();
+  const search = Route.useSearch();
   const [refreshKey, setRefreshKey] = useState(0);
-  const [sportFilter, setSportFilter] = useState<string>("all");
+  const [sportFilter, setSportFilter] = useState<string>(search.sport ?? "all");
   const [minVolume, setMinVolume] = useState<number>(0);
   const [edge70Only, setEdge70Only] = useState(false);
   const [highConfOnly, setHighConfOnly] = useState(false);
