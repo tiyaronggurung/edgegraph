@@ -228,11 +228,30 @@ function Analyze() {
             <div className="grid grid-cols-2 gap-3">
               <Field label={`Probability A (%) ${form.teamA}`}><input type="number" min={0} max={100} className={inputCls} value={form.probabilityA} onChange={(e) => upd("probabilityA", e.target.value)} /></Field>
               <Field label={`Probability B (%) ${form.teamB}`}><input type="number" min={0} max={100} className={inputCls} value={form.probabilityB} onChange={(e) => upd("probabilityB", e.target.value)} /></Field>
+              {sport === "Soccer" && (
+                <Field label="Probability Draw (%)">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    placeholder="leave blank for 2-way"
+                    className={inputCls}
+                    value={form.probabilityDraw}
+                    onChange={(e) => upd("probabilityDraw", e.target.value)}
+                  />
+                </Field>
+              )}
               <Field label="Odds A"><input type="number" step="0.01" className={inputCls} value={form.oddsA} onChange={(e) => upd("oddsA", e.target.value)} /></Field>
               <Field label="Odds B"><input type="number" step="0.01" className={inputCls} value={form.oddsB} onChange={(e) => upd("oddsB", e.target.value)} /></Field>
               <Field label="Volume / Liquidity"><input type="number" className={inputCls} value={form.volume} onChange={(e) => upd("volume", e.target.value)} /></Field>
             </div>
-            <ProbabilityBar a={probA} b={probB} labelA={form.teamA || "A"} labelB={form.teamB || "B"} />
+            <ProbabilityBar
+              a={probA}
+              b={probB}
+              draw={isSoccer3Way ? (probDraw as number) : undefined}
+              labelA={form.teamA || "A"}
+              labelB={form.teamB || "B"}
+            />
           </div>
 
           <div className="border border-border bg-card rounded p-4 space-y-3">
