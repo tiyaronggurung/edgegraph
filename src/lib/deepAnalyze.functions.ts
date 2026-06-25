@@ -9,6 +9,10 @@ const InputSchema = z.object({
   timePeriod: z.string().max(40).optional().nullable(),
   probabilityA: z.number().min(0).max(100),
   probabilityB: z.number().min(0).max(100),
+  // 3-way soccer support: when present, probabilityA + probabilityDraw +
+  // probabilityB should sum to ~100, and the model is told it's a 3-way market.
+  probabilityDraw: z.number().min(0).max(100).optional().nullable(),
+  marketType: z.enum(["2way", "3way"]).optional().nullable(),
   pattern: z.string().max(60).optional().nullable(),
   volume: z.number().min(0).optional().nullable(),
   lastPlay: z.string().max(400).optional().nullable(),
@@ -21,7 +25,7 @@ export interface DeepAnalyzeResult {
   pattern: string;
   momentum: "Up A" | "Up B" | "Flat";
   volatility: "Calm" | "Choppy" | "Panic";
-  action: "Bet A" | "Bet B" | "Hedge" | "Wait" | "Avoid";
+  action: "Bet A" | "Bet B" | "Bet Draw" | "Hedge" | "Wait" | "Avoid";
   confidence: number; // 0-100
   narrative: string;
   next_moves: { prob: number; target: string; why: string }[];
@@ -44,7 +48,7 @@ const TOOL = {
         },
         momentum: { type: "string", enum: ["Up A", "Up B", "Flat"] },
         volatility: { type: "string", enum: ["Calm", "Choppy", "Panic"] },
-        action: { type: "string", enum: ["Bet A", "Bet B", "Hedge", "Wait", "Avoid"] },
+        action: { type: "string", enum: ["Bet A", "Bet B", "Bet Draw", "Hedge", "Wait", "Avoid"] },
         confidence: { type: "number", minimum: 0, maximum: 100 },
         narrative: {
           type: "string",
