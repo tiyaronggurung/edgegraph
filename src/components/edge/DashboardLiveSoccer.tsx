@@ -106,6 +106,16 @@ export function DashboardLiveSoccer() {
               key={c.event.eventTicker}
               className="border border-border bg-background/40 rounded p-3 space-y-2"
             >
+              {pred.confidence === "HIGH" && (
+                <SoccerBetAlert
+                  marketTicker={c.event.eventTicker}
+                  marketTitle={`${c.teamA} vs ${c.teamB}`}
+                  pickLabel={pred.top.label}
+                  fairPct={pred.top.pct}
+                  marketPct={rawForPick * 100}
+                  edgePts={pred.top.pct - rawForPick * 100}
+                />
+              )}
               <div className="flex justify-between items-start gap-2">
                 <div className="min-w-0">
                   <div className="text-[10px] uppercase tracking-widest text-muted-foreground truncate">
