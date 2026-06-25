@@ -188,14 +188,25 @@ export function computeFairProbability(
 
 function leagueFromHint(hint: string): EspnLeague[] {
   const h = hint.toLowerCase();
-  if (h.includes("nba") || h.includes("basketball")) return ["basketball/nba", "basketball/wnba"];
   if (h.includes("wnba")) return ["basketball/wnba"];
+  if (h.includes("nba") || h.includes("basketball")) return ["basketball/nba", "basketball/wnba"];
   if (h.includes("ncaab") || h.includes("college basketball")) return ["basketball/mens-college-basketball"];
   if (h.includes("nfl") || h.includes("football")) return ["football/nfl"];
   if (h.includes("mlb") || h.includes("baseball")) return ["baseball/mlb"];
   if (h.includes("nhl") || h.includes("hockey")) return ["hockey/nhl"];
-  if (h.includes("soccer") || h.includes("mls") || h.includes("serie") || h.includes("epl") || h.includes("ucl"))
-    return ["soccer/all"];
+  // Specific soccer leagues first, then generic fallback to all soccer feeds.
+  if (h.includes("epl") || h.includes("premier")) return ["soccer/eng.1", ...SOCCER_LEAGUES];
+  if (h.includes("mls")) return ["soccer/usa.1", ...SOCCER_LEAGUES];
+  if (h.includes("ucl") || h.includes("champions league")) return ["soccer/uefa.champions", ...SOCCER_LEAGUES];
+  if (h.includes("europa")) return ["soccer/uefa.europa", ...SOCCER_LEAGUES];
+  if (h.includes("liga mx") || h.includes("ligamx")) return ["soccer/mex.1", ...SOCCER_LEAGUES];
+  if (h.includes("super lig") || h.includes("superlig")) return ["soccer/tur.1", ...SOCCER_LEAGUES];
+  if (h.includes("la liga") || h.includes("laliga")) return ["soccer/esp.1", ...SOCCER_LEAGUES];
+  if (h.includes("bundes")) return ["soccer/ger.1", ...SOCCER_LEAGUES];
+  if (h.includes("serie a")) return ["soccer/ita.1", ...SOCCER_LEAGUES];
+  if (h.includes("ligue 1")) return ["soccer/fra.1", ...SOCCER_LEAGUES];
+  if (h.includes("world cup") || h.includes("fifa")) return ["soccer/fifa.world", ...SOCCER_LEAGUES];
+  if (h.includes("soccer")) return SOCCER_LEAGUES;
   // Default: try the big ones in order.
   return ["basketball/nba", "baseball/mlb", "hockey/nhl", "football/nfl"];
 }
