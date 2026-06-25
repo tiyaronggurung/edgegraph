@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { Menu, X, Zap, LogOut, ChevronDown, Sparkles, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type LinkItem = { to: string; label: string };
+type LinkItem = { to: string; label: string; search?: Record<string, string> };
 type NavItem = LinkItem | { label: string; children: LinkItem[] };
 
 const NAV: NavItem[] = [
