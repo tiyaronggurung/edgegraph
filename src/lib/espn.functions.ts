@@ -13,7 +13,26 @@ export type EspnLeague =
   | "football/college-football"
   | "baseball/mlb"
   | "hockey/nhl"
-  | "soccer/all";
+  | `soccer/${string}`;
+
+// ESPN soccer league paths we actively check. World Cup is included so the
+// pipeline auto-works the day Kalshi lists those tickers; ESPN returns an
+// empty events array harmlessly when no matches are scheduled.
+const SOCCER_LEAGUES: EspnLeague[] = [
+  "soccer/eng.1",        // EPL
+  "soccer/usa.1",        // MLS
+  "soccer/uefa.champions", // UCL
+  "soccer/uefa.europa",  // Europa
+  "soccer/mex.1",        // Liga MX
+  "soccer/tur.1",        // Super Lig
+  "soccer/esp.1",        // La Liga
+  "soccer/ger.1",        // Bundesliga
+  "soccer/ita.1",        // Serie A
+  "soccer/fra.1",        // Ligue 1
+  "soccer/fifa.world",   // FIFA World Cup
+  "soccer/fifa.worldq.uefa",
+  "soccer/fifa.worldq.concacaf",
+];
 
 export interface TeamStatLine {
   name: string;
@@ -86,16 +105,20 @@ function normCdf(z: number): number {
   return z >= 0 ? p : 1 - p;
 }
 
-const TOTAL_MIN: Record<EspnLeague, number> = {
-  "basketball/nba": 48,
-  "basketball/wnba": 40,
-  "basketball/mens-college-basketball": 40,
-  "football/nfl": 60,
-  "football/college-football": 60,
-  "hockey/nhl": 60,
-  "baseball/mlb": 27,
-  "soccer/all": 90,
-};
+function totalMinFor(league: EspnLeague): number {
+  switch (league) {
+    case "basketball/nba": return 48;
+    case "basketball/wnba": return 40;
+    case "basketball/mens-college-basketball": return 40;
+    case "football/nfl": return 60;
+    case "football/college-football": return 60;
+    case "hockey/nhl": return 60;
+    case "baseball/mlb": return 27;
+    default:
+      // All `soccer/*` leagues
+      return 90;
+  }
+}
 
 /**
  * Pure win-probability model. Computes the "fair" probability the YES side wins
