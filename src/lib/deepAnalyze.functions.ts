@@ -92,13 +92,17 @@ function buildPrompt(d: DeepAnalyzeInput): string {
     `Matchup: ${d.teamA} vs ${d.teamB}`,
     d.score ? `Score: ${d.score}` : null,
     d.timePeriod ? `Time/period: ${d.timePeriod}` : null,
-    `Current market probability: ${d.teamA} ${d.probabilityA.toFixed(1)}% / ${d.teamB} ${d.probabilityB.toFixed(1)}%`,
+    d.marketType === "3way"
+      ? `Market type: 3-way (Team A win / Draw / Team B win). Current market: ${d.teamA} ${d.probabilityA.toFixed(1)}% / Draw ${(d.probabilityDraw ?? 0).toFixed(1)}% / ${d.teamB} ${d.probabilityB.toFixed(1)}%`
+      : `Current market probability: ${d.teamA} ${d.probabilityA.toFixed(1)}% / ${d.teamB} ${d.probabilityB.toFixed(1)}%`,
     `Probability series for ${d.teamA} (oldest→newest, ${d.series.length} samples): start ${first}, min ${min}, max ${max}, end ${last}. Tail: [${tail}].`,
     d.pattern ? `Engine-classified pattern: ${d.pattern}` : null,
     d.volume != null ? `Market volume: $${Math.round(d.volume).toLocaleString()}` : null,
     d.lastPlay ? `Last play / context: ${d.lastPlay}` : null,
     "",
-    "Classify the pattern, momentum, and volatility regime. Predict 2-4 next-move scenarios with probabilities that sum to ~100. Recommend an action (Bet A / Bet B / Hedge / Wait / Avoid). Be specific about why — cite the slope, volatility, and game-state leverage. Do NOT hedge with disclaimers; give a clear read.",
+    d.marketType === "3way"
+      ? "Classify the pattern, momentum, and volatility regime. Predict 2-4 next-move scenarios with probabilities that sum to ~100. Recommend an action (Bet A / Bet Draw / Bet B / Hedge / Wait / Avoid). In soccer, Draw is a real outcome — consider it explicitly when score is level and game is past the 70th minute, or when both sides are evenly matched. Be specific about why — cite the slope, volatility, and game-state leverage. Do NOT hedge with disclaimers; give a clear read."
+      : "Classify the pattern, momentum, and volatility regime. Predict 2-4 next-move scenarios with probabilities that sum to ~100. Recommend an action (Bet A / Bet B / Hedge / Wait / Avoid). Be specific about why — cite the slope, volatility, and game-state leverage. Do NOT hedge with disclaimers; give a clear read.",
   ]
     .filter(Boolean)
     .join("\n");
