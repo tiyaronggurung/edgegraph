@@ -8,6 +8,8 @@ import { ActionBadge } from "@/components/edge/ActionBadge";
 import { Edge70Badge } from "@/components/edge/Edge70Badge";
 import { Disclaimer } from "@/components/edge/Disclaimer";
 import { VerdictCard } from "@/components/edge/VerdictCard";
+import { ProbabilityBar } from "@/components/edge/ProbabilityBar";
+import { detectSoccer3Way } from "@/lib/kalshiSoccer";
 import { AiCoachBanner } from "@/components/edge/AiCoachBanner";
 import { getKalshiSportsEvents, getKalshiMarketHistory } from "@/lib/kalshi.functions";
 import { getLiveGameStats, computeFairProbability, type LiveGameStats } from "@/lib/espn.functions";
@@ -403,6 +405,27 @@ function LiveGrid({
                 {analysis.edge70Detected && <Edge70Badge detected />}
               </div>
             </div>
+
+            {(() => {
+              const tw = detectSoccer3Way(event);
+              if (!tw) return null;
+              return (
+                <div className="border border-border/60 rounded p-2 bg-background/40">
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                    3-way market (de-vigged)
+                  </div>
+                  <ProbabilityBar
+                    a={tw.fair.a * 100}
+                    b={tw.fair.b * 100}
+                    draw={tw.fair.draw * 100}
+                    labelA={tw.teamA}
+                    labelB={tw.teamB}
+                    labelDraw="Draw"
+                  />
+                </div>
+              );
+            })()}
+
 
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold text-[color:var(--color-primary)]">{yesPct.toFixed(0)}%</span>
