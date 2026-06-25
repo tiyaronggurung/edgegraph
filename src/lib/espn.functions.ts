@@ -143,7 +143,7 @@ export function computeFairProbability(
   }
   if (!yesTeam) return null;
 
-  const total = TOTAL_MIN[stats.league];
+  const total = totalMinFor(stats.league);
   const progress = progressPctForLeague(stats.league, stats.period, stats.clock);
   const timeRemMin = Math.max(0.1, total * (1 - progress / 100));
 
@@ -276,8 +276,8 @@ function progressPctForLeague(league: EspnLeague, period: number, clock: string)
     case "baseball/mlb":
       // period = inning, no clock
       return Math.min(100, (period / 9) * 100);
-    case "soccer/all": {
-      // clock usually like "67'"
+    default: {
+      // All `soccer/*` leagues — ESPN clock usually like "67'"
       const min = Number((clock.match(/\d+/) ?? ["0"])[0]);
       return Math.min(100, (min / 90) * 100);
     }
