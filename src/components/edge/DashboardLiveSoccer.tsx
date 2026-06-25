@@ -93,6 +93,8 @@ export function DashboardLiveSoccer() {
       <div className="grid md:grid-cols-2 gap-3 p-3">
         {top.map((c) => {
           const pred = pickPrediction(c.fair, c.teamA, c.teamB);
+          const rawForPick =
+            pred.top.key === "a" ? c.raw.a : pred.top.key === "draw" ? c.raw.draw : c.raw.b;
           const tone =
             pred.confidence === "HIGH"
               ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
