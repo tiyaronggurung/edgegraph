@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueries, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { MiniProbChart } from "@/components/edge/MiniProbChart";
 import { PatternBadge } from "@/components/edge/PatternBadge";
 import { ActionBadge } from "@/components/edge/ActionBadge";
@@ -57,6 +57,10 @@ function LiveMarkets() {
   const search = Route.useSearch();
   const [refreshKey, setRefreshKey] = useState(0);
   const [sportFilter, setSportFilter] = useState<string>(search.sport ?? "all");
+  useEffect(() => {
+    if (search.sport && search.sport !== sportFilter) setSportFilter(search.sport);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.sport]);
   const [minVolume, setMinVolume] = useState<number>(0);
   const [edge70Only, setEdge70Only] = useState(false);
   const [highConfOnly, setHighConfOnly] = useState(false);
