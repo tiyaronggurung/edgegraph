@@ -42,7 +42,7 @@ function Analyze() {
   const [sport, setSport] = useState<Sport>("NBA");
   const [form, setForm] = useState<Record<string, string>>({
     league: "", gameName: "", teamA: "", teamB: "", score: "", timePeriod: "", homeAway: "Home",
-    probabilityA: "65", probabilityB: "35", oddsA: "1.5", oddsB: "2.7", volume: "10000",
+    probabilityA: "65", probabilityB: "35", probabilityDraw: "", oddsA: "1.5", oddsB: "2.7", volume: "10000",
     liveNotes: "", injuryNotes: "", marketNotes: "",
   });
   const [sf, setSf] = useState<Record<string, string | boolean>>({});
@@ -56,6 +56,9 @@ function Analyze() {
 
   const probA = Number(form.probabilityA || 0);
   const probB = Number(form.probabilityB || 0);
+  const probDrawRaw = form.probabilityDraw.trim();
+  const probDraw = probDrawRaw === "" ? null : Number(probDrawRaw);
+  const isSoccer3Way = sport === "Soccer" && probDraw != null && Number.isFinite(probDraw);
 
   const runDetect = async () => {
     if (!file) {
