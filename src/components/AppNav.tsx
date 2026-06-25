@@ -5,13 +5,14 @@ import { useState, useRef, useEffect } from "react";
 import { Menu, X, Zap, LogOut, ChevronDown, Sparkles, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type LinkItem = { to: string; label: string };
+type LinkItem = { to: string; label: string; search?: Record<string, string> };
 type NavItem = LinkItem | { label: string; children: LinkItem[] };
 
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/analyze", label: "Analyze" },
   { to: "/live", label: "Live Markets" },
+  { to: "/live", label: "⚽ Soccer", search: { sport: "soccer" } },
   {
     label: "Research",
     children: [
@@ -119,8 +120,9 @@ export function AppNav() {
               <NavDropdown key={item.label} label={item.label} children={item.children} path={path} />
             ) : (
               <Link
-                key={item.to}
+                key={item.label}
                 to={item.to}
+                search={item.search as never}
                 className={cn(
                   "px-3 py-1.5 text-xs uppercase tracking-wider rounded transition",
                   path.startsWith(item.to)
@@ -163,8 +165,9 @@ export function AppNav() {
         <div className="lg:hidden border-t border-border bg-card px-4 py-3 flex flex-col gap-1">
           {ALL_LINKS.map((l) => (
             <Link
-              key={l.to}
+              key={l.label}
               to={l.to}
+              search={l.search as never}
               onClick={() => setOpen(false)}
               className="px-2 py-2 text-sm uppercase tracking-wider text-foreground hover:bg-muted rounded"
             >

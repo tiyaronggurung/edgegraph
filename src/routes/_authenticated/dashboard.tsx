@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import type { ActionType } from "@/lib/analysisEngine";
 import { ClvLedger } from "@/components/edge/ClvLedger";
+import { DashboardLiveSoccer } from "@/components/edge/DashboardLiveSoccer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -306,6 +307,8 @@ function Dashboard() {
           </table>
         </div>
       </div>
+
+      <DashboardLiveSoccer />
 
       <ClvLedger />
 
