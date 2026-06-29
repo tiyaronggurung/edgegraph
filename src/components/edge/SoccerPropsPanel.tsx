@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, ChevronUp, Loader2, Zap, TrendingUp, Activity } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Zap, TrendingUp, Activity, Target, Flame } from "lucide-react";
 import { LineChart, Line, YAxis, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import {
