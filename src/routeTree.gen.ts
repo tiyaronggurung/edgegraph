@@ -35,6 +35,7 @@ import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/l
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
 import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
+import { Route as ApiPublicHooksBackfillOutcomesRouteImport } from './routes/api/public/hooks/backfill-outcomes'
 
 const UnsubscribeRoute = UnsubscribeRouteImport.update({
   id: '/unsubscribe',
@@ -173,6 +174,12 @@ const ApiPublicHooksCaptureClosingOddsRoute =
     path: '/api/public/hooks/capture-closing-odds',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksBackfillOutcomesRoute =
+  ApiPublicHooksBackfillOutcomesRouteImport.update({
+    id: '/api/public/hooks/backfill-outcomes',
+    path: '/api/public/hooks/backfill-outcomes',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -195,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/analysis/$id': typeof AuthenticatedAnalysisIdRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -222,6 +230,7 @@ export interface FileRoutesByTo {
   '/analysis/$id': typeof AuthenticatedAnalysisIdRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -251,6 +260,7 @@ export interface FileRoutesById {
   '/_authenticated/analysis/$id': typeof AuthenticatedAnalysisIdRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -280,6 +290,7 @@ export interface FileRouteTypes {
     | '/analysis/$id'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/hooks/backfill-outcomes'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/recompute-predictions'
     | '/lovable/email/queue/process'
@@ -307,6 +318,7 @@ export interface FileRouteTypes {
     | '/analysis/$id'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/hooks/backfill-outcomes'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/recompute-predictions'
     | '/lovable/email/queue/process'
@@ -335,6 +347,7 @@ export interface FileRouteTypes {
     | '/_authenticated/analysis/$id'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/hooks/backfill-outcomes'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/recompute-predictions'
     | '/lovable/email/queue/process'
@@ -352,6 +365,7 @@ export interface RootRouteChildren {
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   ApiPublicSendDailyDigestsRoute: typeof ApiPublicSendDailyDigestsRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
+  ApiPublicHooksBackfillOutcomesRoute: typeof ApiPublicHooksBackfillOutcomesRoute
   ApiPublicHooksCaptureClosingOddsRoute: typeof ApiPublicHooksCaptureClosingOddsRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
@@ -543,6 +557,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCaptureClosingOddsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/backfill-outcomes': {
+      id: '/api/public/hooks/backfill-outcomes'
+      path: '/api/public/hooks/backfill-outcomes'
+      fullPath: '/api/public/hooks/backfill-outcomes'
+      preLoaderRoute: typeof ApiPublicHooksBackfillOutcomesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -590,6 +611,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   ApiPublicSendDailyDigestsRoute: ApiPublicSendDailyDigestsRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
+  ApiPublicHooksBackfillOutcomesRoute: ApiPublicHooksBackfillOutcomesRoute,
   ApiPublicHooksCaptureClosingOddsRoute: ApiPublicHooksCaptureClosingOddsRoute,
   ApiPublicHooksRecomputePredictionsRoute:
     ApiPublicHooksRecomputePredictionsRoute,

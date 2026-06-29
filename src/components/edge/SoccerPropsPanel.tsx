@@ -174,6 +174,17 @@ function PredictionView({
   const corners = byMarket("CORNERS");
   const age = Math.max(0, Math.round((Date.now() - pred.computedAt) / 1000));
 
+  // Devig the Kalshi 1X2 market into fair implied probabilities for the 4th column.
+  const marketImplied = useMemo(() => {
+    const legs: { pick: string; pct: number }[] = [];
+    if (marketHome != null) legs.push({ pick: "HOME", pct: marketHome });
+    if (marketDraw != null) legs.push({ pick: "DRAW", pct: marketDraw });
+    if (marketAway != null) legs.push({ pick: "AWAY", pct: marketAway });
+    const sum = legs.reduce((a, b) => a + Math.max(0, b.pct), 0);
+    if (sum <= 0) return new Map<string, number>();
+    return new Map(legs.map((l) => [l.pick, Math.max(0, l.pct) / sum]));
+  }, [marketHome, marketDraw, marketAway]);
+
   return (
     <div className="space-y-3">
       <div className="text-[10px] font-mono text-muted-foreground flex justify-between">
@@ -195,6 +206,7 @@ function PredictionView({
               prob={m.probability}
               stats={m.statsProb}
               ai={m.aiProb}
+              marketImplied={marketImplied.get(m.pick) ?? null}
               edgeMarket={
                 m.pick === "HOME" ? marketHome : m.pick === "DRAW" ? marketDraw : marketAway
               }
@@ -202,6 +214,7 @@ function PredictionView({
           ))}
         </div>
       </Section>
+
 
       <Section title="Both Teams To Score">
         <div className="grid grid-cols-2 gap-1">
@@ -303,6 +316,7 @@ function MarketCell({
   stats,
   ai,
   edgeMarket,
+  marketImplied,
   compact,
 }: {
   label: string;
@@ -310,6 +324,7 @@ function MarketCell({
   stats: number;
   ai: number | null;
   edgeMarket?: number;
+  marketImplied?: number | null;
   compact?: boolean;
 }) {
   const conf = Math.round(Math.abs(prob - 0.5) * 200);
@@ -322,6 +337,7 @@ function MarketCell({
         <div className="text-[9px] text-muted-foreground font-mono leading-tight">
           stat {(stats * 100).toFixed(0)}
           {ai != null ? ` · ai ${(ai * 100).toFixed(0)}` : ""}
+          {marketImplied != null ? ` · mkt ${(marketImplied * 100).toFixed(0)}` : ""}
           {edge != null ? ` · edge ${edge >= 0 ? "+" : ""}${edge.toFixed(0)}` : ""}
         </div>
       )}
