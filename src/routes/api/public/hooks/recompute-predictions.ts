@@ -277,6 +277,27 @@ async function processFixture(admin: any, fixtureId: string) {
     );
   }
 
+  // CLV snapshot: when the match closes (FT/AET/PEN), freeze the final ensemble
+  // for every market so we can later score model accuracy & compute CLV vs market.
+  const finalStatuses = new Set(["FT", "AET", "PEN", "ended", "closed", "Finished"]);
+  if (finalStatuses.has(snap.status)) {
+    await admin.from("prediction_closes").upsert(
+      markets.map((m) => ({
+        fixture_id: snap.fixtureId,
+        market: m.market,
+        pick: m.pick,
+        line: m.line ?? null,
+        ensemble_prob: m.probability,
+        stats_prob: m.statsProb,
+        ai_prob: m.aiProb,
+        market_prob: null,
+        outcome: null,
+        closed_at: now,
+      })),
+      { onConflict: "fixture_id,market,pick,line" },
+    );
+  }
+
   return { fixtureId: snap.fixtureId, ok: true };
 }
 
