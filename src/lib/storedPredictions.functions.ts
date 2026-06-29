@@ -70,3 +70,59 @@ export const getStoredPrediction = createServerFn({ method: "POST" })
       error: null,
     };
   });
+
+export interface HistoryPoint {
+  t: number; // epoch ms
+  probability: number;
+}
+
+export interface HistorySeries {
+  market: string;
+  pick: string;
+  line: number | null;
+  label: string;
+  points: HistoryPoint[];
+}
+
+function labelOf(market: string, pick: string, line: number | null) {
+  if (market === "1X2") return `1X2 ${pick}`;
+  if (market === "BTTS") return `BTTS ${pick}`;
+  if (market === "NEXT_GOAL") return `Next ${pick}`;
+  if (market === "GOALS") return `O${line} Goals`;
+  return `${market} ${pick}`;
+}
+
+export const getPredictionHistory = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ fixtureId: z.string().min(1) }).parse(d))
+  .handler(async ({ data }): Promise<{ series: HistorySeries[]; error: string | null }> => {
+    const sb = publicClient();
+    const { data: rows, error } = await sb
+      .from("prediction_history")
+      .select("market, pick, line, probability, computed_at")
+      .eq("fixture_id", data.fixtureId)
+      .order("computed_at", { ascending: true })
+      .limit(2000);
+    if (error) return { series: [], error: error.message };
+    const groups = new Map<string, HistorySeries>();
+    for (const r of rows ?? []) {
+      const market = r.market as string;
+      const pick = r.pick as string;
+      const line = (r.line as number | null) ?? null;
+      const key = `${market}|${pick}|${line ?? ""}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          market,
+          pick,
+          line,
+          label: labelOf(market, pick, line),
+          points: [],
+        });
+      }
+      groups.get(key)!.points.push({
+        t: new Date(r.computed_at as string).getTime(),
+        probability: Number(r.probability),
+      });
+    }
+    return { series: Array.from(groups.values()), error: null };
+  });
+
