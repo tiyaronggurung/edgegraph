@@ -140,10 +140,8 @@ function applyEnsemble(stats: StatsModelResult, ai: AiOutput | null) {
   });
 }
 
-async function processFixture(
-  admin: ReturnType<typeof createClient>,
-  fixtureId: string,
-) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function processFixture(admin: any, fixtureId: string) {
   const snap = await provider.fetchMatch(fixtureId);
   if (!snap) return { fixtureId, skipped: true };
   const stats = computeStatsModel(snap);
