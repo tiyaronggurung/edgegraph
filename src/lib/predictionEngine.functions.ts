@@ -4,15 +4,15 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { ApiFootballProvider } from "@/lib/providers/apiFootballProvider";
+import { getProvider } from "@/lib/providers";
 import type {
   LiveDataProvider,
   LiveMatchSnapshot,
 } from "@/lib/providers/liveProvider";
 import { computeStatsModel, type StatsModelResult } from "@/lib/models/poissonSoccer";
 
-// Single default provider for now; swap to Sportradar/Opta by changing this line.
-const provider: LiveDataProvider = new ApiFootballProvider();
+// Provider selected by LIVE_PROVIDER env var (default: api-football).
+const provider: LiveDataProvider = getProvider();
 
 export interface PredictionMarket {
   market: string;
