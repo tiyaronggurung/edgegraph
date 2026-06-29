@@ -140,6 +140,43 @@ function applyEnsemble(stats: StatsModelResult, ai: AiOutput | null) {
   });
 }
 
+interface MarketRow {
+  market: string;
+  pick: string;
+  line?: number | null;
+  probability: number;
+  statsProb: number;
+  aiProb: number | null;
+}
+
+function keyOf(m: { market: string; pick: string; line?: number | null }) {
+  return `${m.market}|${m.pick}|${m.line ?? ""}`;
+}
+
+function labelOf(m: { market: string; pick: string; line?: number | null }) {
+  if (m.market === "1X2") return `1X2 ${m.pick}`;
+  if (m.market === "BTTS") return `BTTS ${m.pick}`;
+  if (m.market === "NEXT_GOAL") return `Next Goal ${m.pick}`;
+  if (m.market === "GOALS") return `O/U ${m.line} ${m.pick}`;
+  if (m.market === "CORNERS") return `Corners ${m.pick} ${m.line}`;
+  return `${m.market} ${m.pick}`;
+}
+
+function describeRecentEvents(snap: LiveMatchSnapshot, sincePrevElapsed: number): string {
+  const fresh = snap.events.filter((e) => (e.minute ?? 0) > sincePrevElapsed);
+  if (!fresh.length) return "";
+  const parts: string[] = [];
+  const goals = fresh.filter((e) => e.type === "Goal");
+  const reds = fresh.filter((e) => e.type === "Card" && /red/i.test(e.detail));
+  const subs = fresh.filter((e) => e.type === "subst");
+  const var_ = fresh.filter((e) => e.type === "Var");
+  if (goals.length) parts.push(`${goals.length} goal${goals.length > 1 ? "s" : ""}`);
+  if (reds.length) parts.push(`${reds.length} red card`);
+  if (var_.length) parts.push("VAR review");
+  if (subs.length >= 2) parts.push("subs");
+  return parts.join(", ");
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function processFixture(admin: any, fixtureId: string) {
   const snap = await provider.fetchMatch(fixtureId);
@@ -147,18 +184,56 @@ async function processFixture(admin: any, fixtureId: string) {
   const stats = computeStatsModel(snap);
   const ai = await callAi(snap, stats);
   const markets = applyEnsemble(stats, ai);
+
+  // Fetch previous row to compute movement deltas.
+  const { data: prev } = await admin
+    .from("live_predictions")
+    .select("markets, elapsed")
+    .eq("fixture_id", snap.fixtureId)
+    .maybeSingle();
+
+  const prevMap = new Map<string, MarketRow>();
+  if (prev?.markets && Array.isArray(prev.markets)) {
+    for (const m of prev.markets as MarketRow[]) prevMap.set(keyOf(m), m);
+  }
+  const prevElapsed = (prev?.elapsed as number | null) ?? 0;
+  const sinceEvents = describeRecentEvents(snap, prevElapsed);
+
+  // Generate stat-driven delta narration (no AI call — free, deterministic).
+  const movementChanges: string[] = [];
+  for (const m of markets) {
+    const before = prevMap.get(keyOf(m));
+    if (!before) continue;
+    const deltaPp = (m.probability - before.probability) * 100;
+    if (Math.abs(deltaPp) < 5) continue;
+    const sign = deltaPp >= 0 ? "+" : "";
+    const tail = sinceEvents ? ` after ${sinceEvents}` : "";
+    movementChanges.push(`${labelOf(m)}: ${sign}${deltaPp.toFixed(0)}pp${tail}`);
+  }
+
+  const aiChanges = ai
+    ? ai.adjustments
+        .filter((a) => Math.abs(a.deltaPct) >= 3)
+        .map((a) => {
+          const sign = a.deltaPct >= 0 ? "+" : "";
+          const lineStr = a.line != null ? ` ${a.line}` : "";
+          return `${a.market} ${a.pick}${lineStr}: ${sign}${a.deltaPct.toFixed(0)}pp — ${a.reason}`;
+        })
+    : [];
+
   const explanation = ai
     ? {
         momentum: ai.momentum,
         summary: ai.summary,
         keyFactors: ai.keyFactors,
-        changes: ai.adjustments
-          .filter((a) => Math.abs(a.deltaPct) >= 3)
-          .map((a) => {
-            const sign = a.deltaPct >= 0 ? "+" : "";
-            const lineStr = a.line != null ? ` ${a.line}` : "";
-            return `${a.market} ${a.pick}${lineStr}: ${sign}${a.deltaPct.toFixed(0)}pp — ${a.reason}`;
-          }),
+        changes: [...movementChanges.slice(0, 5), ...aiChanges].slice(0, 8),
+      }
+    : movementChanges.length
+    ? {
+        momentum: "Even" as const,
+        summary: sinceEvents ? `Movement after ${sinceEvents}.` : "Stats-only update.",
+        keyFactors: [] as string[],
+        changes: movementChanges.slice(0, 8),
       }
     : null;
 
@@ -206,6 +281,7 @@ async function processFixture(admin: any, fixtureId: string) {
 
   return { fixtureId: snap.fixtureId, ok: true };
 }
+
 
 export const Route = createFileRoute("/api/public/hooks/recompute-predictions")({
   server: {
