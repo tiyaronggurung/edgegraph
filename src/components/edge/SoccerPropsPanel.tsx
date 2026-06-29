@@ -131,12 +131,15 @@ export function SoccerPropsPanel({ teamA, teamB, marketA, marketDraw, marketB }:
             <div className="text-[10px] text-amber-400">{predictQ.data.error}</div>
           )}
           {predictQ.data?.prediction && (
-            <PredictionView
-              pred={predictQ.data.prediction}
-              marketHome={marketA}
-              marketDraw={marketDraw}
-              marketAway={marketB}
-            />
+            <>
+              <PredictionView
+                pred={predictQ.data.prediction}
+                marketHome={marketA}
+                marketDraw={marketDraw}
+                marketAway={marketB}
+              />
+              <ProbabilityChart fixtureId={fixtureId!} computedAt={predictQ.data.prediction.computedAt} />
+            </>
           )}
         </div>
       )}
