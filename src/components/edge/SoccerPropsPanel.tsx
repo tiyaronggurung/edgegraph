@@ -1,13 +1,17 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, ChevronUp, Loader2, Zap, TrendingUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Zap, TrendingUp, Activity } from "lucide-react";
+import { LineChart, Line, YAxis, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import {
   listStoredLiveFixtures,
   getStoredPrediction,
+  getPredictionHistory,
+  type HistorySeries,
 } from "@/lib/storedPredictions.functions";
 import type { MatchPrediction } from "@/lib/predictionEngine.functions";
+
 
 interface Props {
   teamA: string;
@@ -127,12 +131,15 @@ export function SoccerPropsPanel({ teamA, teamB, marketA, marketDraw, marketB }:
             <div className="text-[10px] text-amber-400">{predictQ.data.error}</div>
           )}
           {predictQ.data?.prediction && (
-            <PredictionView
-              pred={predictQ.data.prediction}
-              marketHome={marketA}
-              marketDraw={marketDraw}
-              marketAway={marketB}
-            />
+            <>
+              <PredictionView
+                pred={predictQ.data.prediction}
+                marketHome={marketA}
+                marketDraw={marketDraw}
+                marketAway={marketB}
+              />
+              <ProbabilityChart fixtureId={fixtureId!} computedAt={predictQ.data.prediction.computedAt} />
+            </>
           )}
         </div>
       )}
@@ -343,6 +350,97 @@ function StatStrip({ snap }: { snap: MatchPrediction["snapshot"] }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+const CHART_COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#a855f7", "#06b6d4"];
+
+function ProbabilityChart({ fixtureId, computedAt }: { fixtureId: string; computedAt: number }) {
+  const historyFn = useServerFn(getPredictionHistory);
+  const q = useQuery({
+    queryKey: ["pred-history", fixtureId, computedAt],
+    queryFn: () => historyFn({ data: { fixtureId } }),
+    staleTime: 30_000,
+  });
+
+  const data = useMemo(() => {
+    const series = q.data?.series ?? [];
+    // Only chart the headline markets
+    const keep = series.filter(
+      (s: HistorySeries) =>
+        (s.market === "1X2" && (s.pick === "HOME" || s.pick === "AWAY")) ||
+        (s.market === "BTTS" && s.pick === "YES") ||
+        (s.market === "GOALS" && s.line === 2.5 && s.pick === "OVER"),
+    );
+    if (!keep.length) return { rows: [], keys: [] as HistorySeries[] };
+    const all = new Set<number>();
+    keep.forEach((s) => s.points.forEach((p) => all.add(p.t)));
+    const times = Array.from(all).sort((a, b) => a - b);
+    const rows = times.map((t) => {
+      const row: Record<string, number | string> = { t: new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) };
+      keep.forEach((s) => {
+        // Find closest point at or before t
+        let last: number | null = null;
+        for (const p of s.points) {
+          if (p.t <= t) last = p.probability * 100;
+          else break;
+        }
+        if (last != null) row[s.label] = Number(last.toFixed(1));
+      });
+      return row;
+    });
+    return { rows, keys: keep };
+  }, [q.data]);
+
+  if (q.isLoading) return <Spinner label="Loading probability trend…" />;
+  if (!data.rows.length) {
+    return (
+      <div className="text-[10px] text-muted-foreground italic">
+        Trend will appear after a few worker ticks.
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-border rounded p-2 bg-background/40">
+      <div className="text-[9px] uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1">
+        <Activity className="h-3 w-3" /> Probability Trend
+      </div>
+      <div className="h-32">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data.rows} margin={{ top: 2, right: 4, left: -28, bottom: 0 }}>
+            <XAxis dataKey="t" tick={{ fontSize: 8 }} stroke="currentColor" opacity={0.4} />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 8 }} stroke="currentColor" opacity={0.4} width={28} />
+            <Tooltip
+              contentStyle={{
+                background: "rgba(15,15,18,0.95)",
+                border: "1px solid hsl(var(--border))",
+                fontSize: 10,
+              }}
+            />
+            {data.keys.map((s, i) => (
+              <Line
+                key={s.label}
+                type="monotone"
+                dataKey={s.label}
+                stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                strokeWidth={1.5}
+                dot={false}
+                isAnimationActive={false}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-1 text-[9px]">
+        {data.keys.map((s, i) => (
+          <span key={s.label} className="flex items-center gap-1" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
+            <span className="inline-block w-2 h-0.5" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
+            {s.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
