@@ -459,6 +459,48 @@ export type Database = {
         }
         Relationships: []
       }
+      prediction_closes: {
+        Row: {
+          ai_prob: number | null
+          closed_at: string
+          ensemble_prob: number
+          fixture_id: string
+          id: number
+          line: number | null
+          market: string
+          market_prob: number | null
+          outcome: boolean | null
+          pick: string
+          stats_prob: number | null
+        }
+        Insert: {
+          ai_prob?: number | null
+          closed_at?: string
+          ensemble_prob: number
+          fixture_id: string
+          id?: number
+          line?: number | null
+          market: string
+          market_prob?: number | null
+          outcome?: boolean | null
+          pick: string
+          stats_prob?: number | null
+        }
+        Update: {
+          ai_prob?: number | null
+          closed_at?: string
+          ensemble_prob?: number
+          fixture_id?: string
+          id?: number
+          line?: number | null
+          market?: string
+          market_prob?: number | null
+          outcome?: boolean | null
+          pick?: string
+          stats_prob?: number | null
+        }
+        Relationships: []
+      }
       prediction_history: {
         Row: {
           ai_prob: number | null
