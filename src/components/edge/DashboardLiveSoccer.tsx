@@ -6,6 +6,7 @@ import { getKalshiSportsEvents, type KalshiEventLite } from "@/lib/kalshi.functi
 import { detectSoccer3Way, isSoccerEvent } from "@/lib/kalshiSoccer";
 import { ProbabilityBar } from "@/components/edge/ProbabilityBar";
 import { SoccerBetAlert } from "@/components/edge/SoccerBetAlert";
+import { SoccerPropsPanel } from "@/components/edge/SoccerPropsPanel";
 
 interface SoccerCard {
   event: KalshiEventLite;
@@ -162,6 +163,15 @@ export function DashboardLiveSoccer() {
                   Kalshi <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
+
+              <SoccerPropsPanel
+                teamA={c.teamA}
+                teamB={c.teamB}
+                marketA={c.fair.a * 100}
+                marketDraw={c.fair.draw * 100}
+                marketB={c.fair.b * 100}
+              />
+
             </div>
           );
         })}
