@@ -4,15 +4,13 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
-import { ApiFootballProvider } from "@/lib/providers/apiFootballProvider";
+import { getProvider } from "@/lib/providers";
 import { computeStatsModel } from "@/lib/models/poissonSoccer";
 
-// Reuse the AI adjuster + ensemble logic from the engine module by re-implementing
-// the small pure helpers here to avoid pulling a server fn into a route worker.
 import type { LiveMatchSnapshot } from "@/lib/providers/liveProvider";
 import type { StatsModelResult } from "@/lib/models/poissonSoccer";
 
-const provider = new ApiFootballProvider();
+const provider = getProvider();
 
 interface AiAdjustment {
   market: string;
