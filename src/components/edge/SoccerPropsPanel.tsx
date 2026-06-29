@@ -1,13 +1,13 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronDown, ChevronUp, Loader2, Zap, TrendingUp } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import {
-  predictMatch,
-  listLiveFixtures,
-  type PredictionMarket,
-  type MatchPrediction,
-} from "@/lib/predictionEngine.functions";
+  listStoredLiveFixtures,
+  getStoredPrediction,
+} from "@/lib/storedPredictions.functions";
+import type { MatchPrediction } from "@/lib/predictionEngine.functions";
 
 interface Props {
   teamA: string;
@@ -52,14 +52,14 @@ function tone(conf: number) {
 
 export function SoccerPropsPanel({ teamA, teamB, marketA, marketDraw, marketB }: Props) {
   const [open, setOpen] = useState(false);
-  const listFn = useServerFn(listLiveFixtures);
-  const predictFn = useServerFn(predictMatch);
+  const listFn = useServerFn(listStoredLiveFixtures);
+  const predictFn = useServerFn(getStoredPrediction);
+  const qc = useQueryClient();
 
   const fixturesQ = useQuery({
-    queryKey: ["engine-live-list"],
+    queryKey: ["stored-live-list"],
     queryFn: () => listFn(),
     refetchInterval: 60_000,
-    staleTime: 55_000,
     enabled: open,
   });
 
@@ -69,12 +69,34 @@ export function SoccerPropsPanel({ teamA, teamB, marketA, marketDraw, marketB }:
   }, [fixturesQ.data, teamA, teamB]);
 
   const predictQ = useQuery({
-    queryKey: ["engine-predict", fixtureId],
-    queryFn: () => predictFn({ data: { fixtureId: fixtureId!, includeAi: true } }),
+    queryKey: ["stored-predict", fixtureId],
+    queryFn: () => predictFn({ data: { fixtureId: fixtureId! } }),
     enabled: open && !!fixtureId,
-    refetchInterval: 30_000,
-    staleTime: 25_000,
+    refetchInterval: 60_000,
   });
+
+  // Realtime: push updates the moment the worker upserts new probabilities.
+  useEffect(() => {
+    if (!open || !fixtureId) return;
+    const channel = supabase
+      .channel(`live-pred-${fixtureId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "live_predictions",
+          filter: `fixture_id=eq.${fixtureId}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ["stored-predict", fixtureId] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [open, fixtureId, qc]);
 
   return (
     <div className="border-t border-border pt-2 mt-1">
@@ -84,30 +106,33 @@ export function SoccerPropsPanel({ teamA, teamB, marketA, marketDraw, marketB }:
         className="flex items-center justify-between w-full text-[10px] uppercase tracking-widest text-[color:var(--color-primary)] hover:opacity-80"
       >
         <span className="flex items-center gap-1">
-          <Zap className="h-3 w-3" /> EdgeGraph AI Engine · 7 markets
+          <Zap className="h-3 w-3" /> EdgeGraph AI Engine · live ensemble
         </span>
         {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       </button>
 
       {open && (
         <div className="mt-2 space-y-2">
-          {fixturesQ.isLoading && (
-            <Spinner label="Loading live feed…" />
-          )}
+          {fixturesQ.isLoading && <Spinner label="Loading live board…" />}
           {fixturesQ.data?.error && (
             <div className="text-[10px] text-amber-400">Feed: {fixturesQ.data.error}</div>
           )}
           {fixturesQ.data && !fixtureId && !fixturesQ.isLoading && (
             <div className="text-[10px] text-muted-foreground">
-              Match not currently live on stats provider. Predictions unlock at kickoff.
+              Match not yet computed by worker. Refreshes every minute at kickoff.
             </div>
           )}
-          {predictQ.isFetching && fixtureId && <Spinner label="Computing ensemble (stats + AI)…" />}
+          {predictQ.isLoading && fixtureId && <Spinner label="Loading prediction…" />}
           {predictQ.data?.error && (
             <div className="text-[10px] text-amber-400">{predictQ.data.error}</div>
           )}
           {predictQ.data?.prediction && (
-            <PredictionView pred={predictQ.data.prediction} marketHome={marketA} marketDraw={marketDraw} marketAway={marketB} />
+            <PredictionView
+              pred={predictQ.data.prediction}
+              marketHome={marketA}
+              marketDraw={marketDraw}
+              marketAway={marketB}
+            />
           )}
         </div>
       )}
@@ -140,14 +165,16 @@ function PredictionView({
   const nextGoal = byMarket("NEXT_GOAL");
   const goals = byMarket("GOALS");
   const corners = byMarket("CORNERS");
+  const age = Math.max(0, Math.round((Date.now() - pred.computedAt) / 1000));
 
   return (
     <div className="space-y-3">
       <div className="text-[10px] font-mono text-muted-foreground flex justify-between">
         <span>
-          ⏱ {pred.status} {pred.elapsed ? `${pred.elapsed}'` : ""} · {pred.goalsHome}-{pred.goalsAway}
+          ⏱ {pred.status} {pred.elapsed ? `${pred.elapsed}'` : ""} · {pred.goalsHome}-
+          {pred.goalsAway}
         </span>
-        <span>via {pred.providerId} + Poisson + Gemini</span>
+        <span>updated {age}s ago · live push</span>
       </div>
 
       <StatStrip snap={pred.snapshot} />
@@ -172,7 +199,13 @@ function PredictionView({
       <Section title="Both Teams To Score">
         <div className="grid grid-cols-2 gap-1">
           {btts.map((m) => (
-            <MarketCell key={m.pick} label={m.pick} prob={m.probability} stats={m.statsProb} ai={m.aiProb} />
+            <MarketCell
+              key={m.pick}
+              label={m.pick}
+              prob={m.probability}
+              stats={m.statsProb}
+              ai={m.aiProb}
+            />
           ))}
         </div>
       </Section>
@@ -196,7 +229,14 @@ function PredictionView({
           {goals
             .filter((m) => m.pick === "OVER")
             .map((m) => (
-              <MarketCell key={`o${m.line}`} label={`O ${m.line}`} prob={m.probability} stats={m.statsProb} ai={m.aiProb} compact />
+              <MarketCell
+                key={`o${m.line}`}
+                label={`O ${m.line}`}
+                prob={m.probability}
+                stats={m.statsProb}
+                ai={m.aiProb}
+                compact
+              />
             ))}
         </div>
       </Section>
@@ -204,7 +244,13 @@ function PredictionView({
       <Section title="Total Corners">
         <div className="grid grid-cols-2 gap-1">
           {corners.map((m) => (
-            <MarketCell key={m.pick} label={`${m.pick} ${m.line}`} prob={m.probability} stats={m.statsProb} ai={m.aiProb} />
+            <MarketCell
+              key={m.pick}
+              label={`${m.pick} ${m.line}`}
+              prob={m.probability}
+              stats={m.statsProb}
+              ai={m.aiProb}
+            />
           ))}
         </div>
       </Section>
@@ -256,7 +302,7 @@ function MarketCell({
   prob: number;
   stats: number;
   ai: number | null;
-  edgeMarket?: number; // 0..100 market %
+  edgeMarket?: number;
   compact?: boolean;
 }) {
   const conf = Math.round(Math.abs(prob - 0.5) * 200);
@@ -291,7 +337,9 @@ function StatStrip({ snap }: { snap: MatchPrediction["snapshot"] }) {
         <div key={l} className="bg-background/40 border border-border rounded p-1 text-center">
           <div className="text-muted-foreground uppercase tracking-widest">{l}</div>
           <div>
-            {h ?? "—"}<span className="text-muted-foreground">/</span>{a ?? "—"}
+            {h ?? "—"}
+            <span className="text-muted-foreground">/</span>
+            {a ?? "—"}
           </div>
         </div>
       ))}

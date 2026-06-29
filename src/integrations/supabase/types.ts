@@ -312,6 +312,60 @@ export type Database = {
           },
         ]
       }
+      live_predictions: {
+        Row: {
+          away_team: string
+          computed_at: string
+          elapsed: number | null
+          explanation: Json | null
+          fixture_id: string
+          goals_away: number
+          goals_home: number
+          home_team: string
+          league: string | null
+          markets: Json
+          provider_id: string
+          snapshot: Json
+          stats: Json
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          away_team: string
+          computed_at?: string
+          elapsed?: number | null
+          explanation?: Json | null
+          fixture_id: string
+          goals_away?: number
+          goals_home?: number
+          home_team: string
+          league?: string | null
+          markets: Json
+          provider_id: string
+          snapshot: Json
+          stats: Json
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          away_team?: string
+          computed_at?: string
+          elapsed?: number | null
+          explanation?: Json | null
+          fixture_id?: string
+          goals_away?: number
+          goals_home?: number
+          home_team?: string
+          league?: string | null
+          markets?: Json
+          provider_id?: string
+          snapshot?: Json
+          stats?: Json
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       patterns: {
         Row: {
           best_use: string | null
@@ -402,6 +456,42 @@ export type Database = {
           side_label?: string | null
           sport?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      prediction_history: {
+        Row: {
+          ai_prob: number | null
+          computed_at: string
+          fixture_id: string
+          id: number
+          line: number | null
+          market: string
+          pick: string
+          probability: number
+          stats_prob: number | null
+        }
+        Insert: {
+          ai_prob?: number | null
+          computed_at?: string
+          fixture_id: string
+          id?: number
+          line?: number | null
+          market: string
+          pick: string
+          probability: number
+          stats_prob?: number | null
+        }
+        Update: {
+          ai_prob?: number | null
+          computed_at?: string
+          fixture_id?: string
+          id?: number
+          line?: number | null
+          market?: string
+          pick?: string
+          probability?: number
+          stats_prob?: number | null
         }
         Relationships: []
       }
