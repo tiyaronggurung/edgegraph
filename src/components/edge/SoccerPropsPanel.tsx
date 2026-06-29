@@ -55,7 +55,7 @@ function tone(conf: number) {
 }
 
 export function SoccerPropsPanel({ teamA, teamB, marketA, marketDraw, marketB }: Props) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const listFn = useServerFn(listStoredLiveFixtures);
   const predictFn = useServerFn(getStoredPrediction);
   const qc = useQueryClient();
