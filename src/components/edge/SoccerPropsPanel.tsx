@@ -6,6 +6,7 @@ import {
   getLiveSoccerFixtures,
   getMatchStats,
   type LiveMatchStats,
+  type TeamStats,
 } from "@/lib/apiFootball.functions";
 import { predictSoccerProps } from "@/lib/soccerProps.functions";
 
