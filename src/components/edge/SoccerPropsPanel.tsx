@@ -316,6 +316,7 @@ function MarketCell({
   stats,
   ai,
   edgeMarket,
+  marketImplied,
   compact,
 }: {
   label: string;
@@ -323,6 +324,7 @@ function MarketCell({
   stats: number;
   ai: number | null;
   edgeMarket?: number;
+  marketImplied?: number | null;
   compact?: boolean;
 }) {
   const conf = Math.round(Math.abs(prob - 0.5) * 200);
@@ -335,6 +337,7 @@ function MarketCell({
         <div className="text-[9px] text-muted-foreground font-mono leading-tight">
           stat {(stats * 100).toFixed(0)}
           {ai != null ? ` · ai ${(ai * 100).toFixed(0)}` : ""}
+          {marketImplied != null ? ` · mkt ${(marketImplied * 100).toFixed(0)}` : ""}
           {edge != null ? ` · edge ${edge >= 0 ? "+" : ""}${edge.toFixed(0)}` : ""}
         </div>
       )}
