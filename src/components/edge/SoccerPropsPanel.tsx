@@ -191,11 +191,19 @@ function PredictionView({
         <span>
           ⏱ {pred.status} {pred.elapsed ? `${pred.elapsed}'` : ""} · {pred.goalsHome}-
           {pred.goalsAway}
+          {pred.explanation && (
+            <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/10 text-[color:var(--color-primary)] uppercase tracking-widest">
+              <Flame className="h-2.5 w-2.5" /> {pred.explanation.momentum}
+            </span>
+          )}
         </span>
         <span>updated {age}s ago · live push</span>
       </div>
 
+      <TopPicks pred={pred} marketImplied={marketImplied} />
+
       <StatStrip snap={pred.snapshot} />
+
 
       <Section title="Match Result (1X2)">
         <div className="grid grid-cols-3 gap-1">
