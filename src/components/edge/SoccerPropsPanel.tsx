@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, ChevronUp, Loader2, Zap, TrendingUp, Activity } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Zap, TrendingUp, Activity, Target, Flame } from "lucide-react";
 import { LineChart, Line, YAxis, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -55,7 +55,7 @@ function tone(conf: number) {
 }
 
 export function SoccerPropsPanel({ teamA, teamB, marketA, marketDraw, marketB }: Props) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const listFn = useServerFn(listStoredLiveFixtures);
   const predictFn = useServerFn(getStoredPrediction);
   const qc = useQueryClient();
@@ -191,11 +191,19 @@ function PredictionView({
         <span>
           ⏱ {pred.status} {pred.elapsed ? `${pred.elapsed}'` : ""} · {pred.goalsHome}-
           {pred.goalsAway}
+          {pred.explanation && (
+            <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/10 text-[color:var(--color-primary)] uppercase tracking-widest">
+              <Flame className="h-2.5 w-2.5" /> {pred.explanation.momentum}
+            </span>
+          )}
         </span>
         <span>updated {age}s ago · live push</span>
       </div>
 
+      <TopPicks pred={pred} marketImplied={marketImplied} />
+
       <StatStrip snap={pred.snapshot} />
+
 
       <Section title="Match Result (1X2)">
         <div className="grid grid-cols-3 gap-1">
@@ -329,16 +337,99 @@ function MarketCell({
 }) {
   const conf = Math.round(Math.abs(prob - 0.5) * 200);
   const edge = edgeMarket != null ? prob * 100 - edgeMarket : null;
+  const fair = prob > 0.02 ? (1 / prob).toFixed(2) : "—";
+  const tier = conf >= 60 ? "HIGH" : conf >= 30 ? "MED" : "LOW";
   return (
     <div className={`border rounded p-1.5 ${tone(conf)}`}>
-      <div className="text-[9px] uppercase tracking-widest opacity-80 truncate">{label}</div>
+      <div className="flex items-center justify-between gap-1">
+        <div className="text-[9px] uppercase tracking-widest opacity-80 truncate">{label}</div>
+        {!compact && <div className="text-[8px] font-bold opacity-70">{tier}</div>}
+      </div>
       <div className={`font-bold font-mono ${compact ? "text-xs" : "text-sm"}`}>{pct(prob)}</div>
+      {!compact && (
+        <div className="text-[9px] text-foreground/70 font-mono leading-tight">
+          fair ≥ {fair}
+        </div>
+      )}
       {!compact && (
         <div className="text-[9px] text-muted-foreground font-mono leading-tight">
           stat {(stats * 100).toFixed(0)}
           {ai != null ? ` · ai ${(ai * 100).toFixed(0)}` : ""}
           {marketImplied != null ? ` · mkt ${(marketImplied * 100).toFixed(0)}` : ""}
           {edge != null ? ` · edge ${edge >= 0 ? "+" : ""}${edge.toFixed(0)}` : ""}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TopPicks({
+  pred,
+  marketImplied,
+}: {
+  pred: MatchPrediction;
+  marketImplied: Map<string, number>;
+}) {
+  const teamLabel = (m: { market: string; pick: string; line?: number | null }) => {
+    if (m.market === "1X2" || m.market === "NEXT_GOAL") {
+      if (m.pick === "HOME") return pred.homeTeam;
+      if (m.pick === "AWAY") return pred.awayTeam;
+      return m.pick === "DRAW" ? "Draw" : "No goal";
+    }
+    if (m.market === "BTTS") return `BTTS ${m.pick}`;
+    if (m.market === "GOALS") return `${m.pick} ${m.line} goals`;
+    if (m.market === "CORNERS") return `${m.pick} ${m.line} corners`;
+    return `${m.market} ${m.pick}`;
+  };
+
+  const ranked = useMemo(() => {
+    return pred.markets
+      .filter((m) => m.probability > 0.05 && m.probability < 0.97)
+      .map((m) => {
+        const mkt =
+          m.market === "1X2" ? marketImplied.get(m.pick) ?? null : null;
+        const edge = mkt != null ? (m.probability - mkt) * 100 : 0;
+        const score = m.probability * 100 + Math.max(0, edge) * 2;
+        return { m, edge, mkt, score, fair: 1 / m.probability };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+  }, [pred, marketImplied]);
+
+  if (!ranked.length) return null;
+  const best = ranked[0];
+
+  return (
+    <div className="rounded-md border border-emerald-500/40 bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-transparent p-2.5 space-y-2">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-emerald-400">
+        <Target className="h-3 w-3" /> Model's Top Pick
+      </div>
+      <div className="flex items-baseline justify-between gap-2 flex-wrap">
+        <div className="text-sm font-bold text-foreground">
+          {teamLabel(best.m)}
+        </div>
+        <div className="font-mono text-xs text-emerald-400">
+          {pct(best.m.probability)} · bet ≥ {best.fair.toFixed(2)}
+          {best.edge !== 0 && (
+            <span className={best.edge > 0 ? "text-emerald-300 ml-1" : "text-rose-400 ml-1"}>
+              ({best.edge >= 0 ? "+" : ""}{best.edge.toFixed(0)}% edge)
+            </span>
+          )}
+        </div>
+      </div>
+      {ranked.length > 1 && (
+        <div className="border-t border-emerald-500/20 pt-1.5 space-y-0.5">
+          <div className="text-[9px] uppercase tracking-widest text-muted-foreground">
+            Other value
+          </div>
+          {ranked.slice(1).map((r, i) => (
+            <div key={i} className="flex justify-between text-[10px] font-mono">
+              <span className="text-foreground/80">{teamLabel(r.m)}</span>
+              <span className="text-muted-foreground">
+                {pct(r.m.probability)} · ≥ {r.fair.toFixed(2)}
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </div>
