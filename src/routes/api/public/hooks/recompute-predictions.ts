@@ -4,15 +4,13 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
-import { ApiFootballProvider } from "@/lib/providers/apiFootballProvider";
+import { getProvider } from "@/lib/providers";
 import { computeStatsModel } from "@/lib/models/poissonSoccer";
 
-// Reuse the AI adjuster + ensemble logic from the engine module by re-implementing
-// the small pure helpers here to avoid pulling a server fn into a route worker.
 import type { LiveMatchSnapshot } from "@/lib/providers/liveProvider";
 import type { StatsModelResult } from "@/lib/models/poissonSoccer";
 
-const provider = new ApiFootballProvider();
+const provider = getProvider();
 
 interface AiAdjustment {
   market: string;
@@ -276,6 +274,27 @@ async function processFixture(admin: any, fixtureId: string) {
         ai_prob: m.aiProb,
         computed_at: now,
       })),
+    );
+  }
+
+  // CLV snapshot: when the match closes (FT/AET/PEN), freeze the final ensemble
+  // for every market so we can later score model accuracy & compute CLV vs market.
+  const finalStatuses = new Set(["FT", "AET", "PEN", "ended", "closed", "Finished"]);
+  if (finalStatuses.has(snap.status)) {
+    await admin.from("prediction_closes").upsert(
+      markets.map((m) => ({
+        fixture_id: snap.fixtureId,
+        market: m.market,
+        pick: m.pick,
+        line: m.line ?? null,
+        ensemble_prob: m.probability,
+        stats_prob: m.statsProb,
+        ai_prob: m.aiProb,
+        market_prob: null,
+        outcome: null,
+        closed_at: now,
+      })),
+      { onConflict: "fixture_id,market,pick,line" },
     );
   }
 
