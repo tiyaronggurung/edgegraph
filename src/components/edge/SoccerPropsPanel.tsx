@@ -178,8 +178,8 @@ function StatGrid({
   homeName,
   awayName,
 }: {
-  home: ReturnType<typeof emptyStats>;
-  away: ReturnType<typeof emptyStats>;
+  home: TeamStats;
+  away: TeamStats;
   homeName: string;
   awayName: string;
 }) {
