@@ -25,6 +25,7 @@ import { Loader2, RefreshCw, ExternalLink, Activity, TrendingUp, BookmarkPlus, C
 import { toast } from "sonner";
 import { usePlan } from "@/hooks/usePlan";
 import { InlineUpgradePrompt } from "@/components/upgrade/UpgradePrompt";
+import { ModelLiveSoccerFeed } from "@/components/edge/ModelLiveSoccerFeed";
 
 export const Route = createFileRoute("/_authenticated/live")({
   head: () => ({ meta: [{ title: "Live Kalshi Markets — EdgeGraph AI" }] }),
@@ -350,6 +351,10 @@ function LiveMarkets() {
       )}
 
       <LiveGrid filtered={filtered} profile={profile} userId={user?.id ?? null} />
+
+      {(sportFilter === "all" || sportFilter === "soccer") && (
+        <ModelLiveSoccerFeed title="// Model Live Soccer · matches without Kalshi markets" />
+      )}
     </div>
   );
 }
