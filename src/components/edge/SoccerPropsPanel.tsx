@@ -157,7 +157,7 @@ export function SoccerPropsPanel({ teamA, teamB, marketA, marketDraw, marketB }:
   );
 }
 
-function emptyStats() {
+function emptyStats(): TeamStats {
   return {
     shots: null,
     shotsOnTarget: null,
