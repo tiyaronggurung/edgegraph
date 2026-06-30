@@ -75,7 +75,7 @@ function MarketRow({
     ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
     : "bg-red-500/15 text-red-400 border-red-500/40";
   const sug = suggestedStake(m, sizing);
-  const tradable = sug.contracts > 0 && m.edgeAbs >= 1 && m.secondsToClose > 30;
+  const tradable = m.gateAction === "BET" && sug.contracts > 0;
 
   // Flash background briefly on each tick
   const fresh = live.lastTickMs && Date.now() - live.lastTickMs < 600;
