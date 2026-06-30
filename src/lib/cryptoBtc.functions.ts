@@ -47,10 +47,33 @@ interface BtcMarketsResult {
   modelSource: "external" | "intra-window-diffusion";
 }
 
+const _kalshiCache = new Map<string, { at: number; data: any }>();
+const KALSHI_TTL_MS = 8_000;
+const _sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 async function kalshiFetch(path: string): Promise<any> {
-  const res = await fetch(`${KALSHI}${path}`, { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error(`Kalshi ${res.status}`);
-  return res.json();
+  const cached = _kalshiCache.get(path);
+  if (cached && Date.now() - cached.at < KALSHI_TTL_MS) return cached.data;
+
+  let lastErr: any;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(`${KALSHI}${path}`, { headers: { Accept: "application/json" } });
+    if (res.ok) {
+      const data = await res.json();
+      _kalshiCache.set(path, { at: Date.now(), data });
+      return data;
+    }
+    if (res.status === 429 || res.status >= 500) {
+      lastErr = new Error(`Kalshi ${res.status}`);
+      const retryAfter = Number(res.headers.get("retry-after")) || 0;
+      await _sleep(retryAfter > 0 ? retryAfter * 1000 : 400 * Math.pow(2, attempt));
+      continue;
+    }
+    throw new Error(`Kalshi ${res.status}`);
+  }
+  // Serve stale on persistent 429 rather than crashing the page.
+  if (cached) return cached.data;
+  throw lastErr ?? new Error("Kalshi failed");
 }
 
 async function fetchBtcCandles(): Promise<BtcCandle[]> {
