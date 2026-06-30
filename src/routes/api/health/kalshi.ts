@@ -43,14 +43,13 @@ export const Route = createFileRoute("/api/health/kalshi")({
         try {
           // Reuse the same validator the signing path uses.
           const { getValidatedKalshiKey } = await import("@/lib/cryptoTrades.functions");
-          // getValidatedKalshiKey is module-private; fall back via dynamic shape:
-          const key = await (getValidatedKalshiKey as any)();
-          const details = key.key.asymmetricKeyDetails ?? {};
+          const validated = await getValidatedKalshiKey();
+          const details = validated.key.asymmetricKeyDetails ?? {};
           return Response.json({
             ok: true,
             hasKeyId,
             hasPem: true,
-            keyType: key.key.asymmetricKeyType ?? null,
+            keyType: validated.key.asymmetricKeyType ?? null,
             modulusBits: (details as { modulusLength?: number }).modulusLength ?? null,
             signAlgorithm: "RSA-PSS (SHA-256, salt=digest)",
           });
