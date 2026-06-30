@@ -890,6 +890,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           bucket: b.bucket, n: b.n, hitRate: b.hitRate, meanProb: b.meanProb,
           brier: b.brier, a: b.a, b: b.b, active: b.active,
         })),
+        global: calibState.global,
       } : null,
     };
   },
