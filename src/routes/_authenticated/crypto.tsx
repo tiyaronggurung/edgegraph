@@ -677,6 +677,37 @@ function AutoTradePanel() {
     .filter(o => Date.now() - new Date(o.created_at).getTime() < 24 * 60 * 60 * 1000)
     .reduce((s, o) => s + (Number(o.pnl_usd) || 0), 0);
 
+  // Sound notifications for new live orders / fills (settled).
+  const [soundOn, setSoundOn] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem("crypto.orderSound") !== "off";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("crypto.orderSound", soundOn ? "on" : "off");
+    }
+  }, [soundOn]);
+  const prevOrdersRef = (useMemo(() => ({ current: null as null | Map<string, string> }), []));
+  useEffect(() => {
+    const next = new Map(liveOrders.map(o => [o.id, o.status]));
+    const prev = prevOrdersRef.current;
+    if (prev && soundOn) {
+      let placed = 0;
+      let filled = 0;
+      for (const [id, status] of next) {
+        const before = prev.get(id);
+        if (before === undefined) {
+          if (status === "placed") placed += 1;
+        } else if (before === "placed" && (status === "settled_win" || status === "settled_loss")) {
+          filled += 1;
+        }
+      }
+      if (placed > 0) playOrderPlaced();
+      if (filled > 0) setTimeout(() => playOrderFilled(), placed > 0 ? 250 : 0);
+    }
+    prevOrdersRef.current = next;
+  }, [liveOrders, soundOn, prevOrdersRef]);
+
   async function runLive() {
     const ok = window.confirm(
       "PLACE REAL MONEY ORDERS on Kalshi?\n\n" +
