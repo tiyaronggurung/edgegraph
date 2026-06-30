@@ -837,6 +837,7 @@ function AutoTradePanel() {
           >
             {forceBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
             {forceBusy ? "Forcing…" : "Force 1 trade (best pick)"}
+          </button>
         </div>
       </div>
 
