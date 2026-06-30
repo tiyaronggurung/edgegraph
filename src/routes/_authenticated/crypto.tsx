@@ -468,11 +468,15 @@ function TradeLog() {
               <td className="p-2 text-right">{fmt$(Number(t.stake_usd || 0))}</td>
               <td className="p-2">
                 {t.status === "submitted" && <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />submitted</span>}
+                {t.status === "settled" && (Number(t.pnl_usd ?? 0) >= 0
+                  ? <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">WIN</span>
+                  : <span className="inline-flex items-center gap-1 text-red-400 font-bold">LOSS</span>)}
+                {t.status === "closed" && <span className="text-yellow-400">closed</span>}
                 {t.status === "error" && <span className="inline-flex items-center gap-1 text-red-400" title={t.error}><XCircle className="h-3 w-3" />error</span>}
                 {t.status === "pending" && <span className="text-yellow-400">pending</span>}
-                {t.status !== "submitted" && t.status !== "error" && t.status !== "pending" && <span>{t.status}</span>}
+                {!["submitted","settled","closed","error","pending"].includes(t.status) && <span>{t.status}</span>}
               </td>
-              <td className="p-2 text-right">{t.pnl_usd != null ? fmt$(Number(t.pnl_usd)) : "—"}</td>
+              <td className="p-2 text-right">{t.pnl_usd != null ? <span className={Number(t.pnl_usd) >= 0 ? "text-emerald-400" : "text-red-400"}>{Number(t.pnl_usd) >= 0 ? "+" : ""}{fmt$(Number(t.pnl_usd))}</span> : "—"}</td>
             </tr>
           ))}
         </tbody>
