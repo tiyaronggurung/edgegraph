@@ -504,10 +504,26 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
 
     // (d) Microstructure features — funding, OI delta, basis, CVD, OFI.
     // (e) Deribit options-implied IV + 25Δ skew (Phase 1 · Step 3).
-    const [micro, options] = await Promise.all([
+    // (f) Self-learning Platt calibration from settled predictions (Step 4).
+    const [micro, options, calibState] = await Promise.all([
       fetchBinanceMicro(spot),
       fetchDeribitOptions(),
+      (async () => {
+        try {
+          const { getCalibrator } = await import("./cryptoCalibrator.server");
+          return await getCalibrator();
+        } catch (e) {
+          console.warn("calibrator load failed:", e);
+          return null;
+        }
+      })(),
     ]);
+    const applyCalib = await (async () => {
+      try {
+        const { applyCalibration } = await import("./cryptoCalibrator.server");
+        return applyCalibration;
+      } catch { return null; }
+    })();
 
     const events = (evJson.events ?? []) as any[];
     const markets: BtcMarket[] = [];
