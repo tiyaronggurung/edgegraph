@@ -596,6 +596,7 @@ function AutoTradePanel() {
   const qc = useQueryClient();
   const listFn = useServerFn(listAutoTradeOrders);
   const settleFn = useServerFn(settleAutoTradeOrders);
+  const autoExitFn = useServerFn(autoExitLivePositions);
   const runFn = useServerFn(runAutoTrade);
   const balanceFn = useServerFn(checkKalshiBalance);
   const diagFn = useServerFn(diagnoseKalshiAuth);
