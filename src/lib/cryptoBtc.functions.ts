@@ -88,6 +88,18 @@ export interface BtcMarket {
   gateAction: "BET" | "PASS";
   gateReason: string;        // human explanation of pass/bet
   thresholdParts: { base: number; calib: number; time: number; spread: number; regime: number; whale: number };
+  // ── Gap analysis: why strike & spot differ, and whether spot can traverse the gap
+  gapAnalysis: {
+    gapUsd: number;            // signed $: positive = spot ABOVE strike, negative = BELOW
+    gapPct: number;            // gapUsd / spot * 100
+    needsToMoveUsd: number;    // signed $ spot must move for locked side to WIN at close (0 if already winning)
+    needsDirection: "up" | "down" | "hold";
+    expectedMoveUsd: number;   // σ_eff·√(t/60)·spot/100 … i.e. 1σ remaining-window move in $
+    gapInSigmas: number;       // |needsToMoveUsd| / expectedMoveUsd (0 if already winning)
+    momentumSign: -1 | 0 | 1;  // sign of cvdRatio+ofi blend
+    momentumAlignsWithSide: boolean; // true = momentum helps locked side win
+    verdict: string;           // one-liner: "spot $83 below strike; NO needs −$83 in 128s (0.29σ); momentum +0.4 fights NO"
+  };
 }
 
 
