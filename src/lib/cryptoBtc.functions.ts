@@ -62,6 +62,29 @@ async function fetchBtcCandles(): Promise<BtcCandle[]> {
   return rows.map(([t, l, h, o, c, v]) => ({ t, o, h, l, c, v })).sort((a, b) => a.t - b.t);
 }
 
+// BRTI-style consolidated spot: median of Coinbase, Binance, Kraken mids.
+// Closes the basis gap with Kalshi's settlement index.
+async function fetchConsolidatedSpot(fallback: number): Promise<number> {
+  const sources = await Promise.allSettled([
+    fetch("https://api.exchange.coinbase.com/products/BTC-USD/ticker", { headers: { "User-Agent": "edgegraph/1.0" } })
+      .then(r => r.json()).then((j: any) => Number(j.price)),
+    fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT")
+      .then(r => r.json()).then((j: any) => Number(j.price)),
+    fetch("https://api.kraken.com/0/public/Ticker?pair=XBTUSD")
+      .then(r => r.json()).then((j: any) => {
+        const k = Object.values(j.result ?? {})[0] as any;
+        return Number(k?.c?.[0]);
+      }),
+  ]);
+  const vals = sources
+    .map(s => s.status === "fulfilled" ? s.value : NaN)
+    .filter(v => Number.isFinite(v) && v > 0)
+    .sort((a, b) => a - b);
+  if (!vals.length) return fallback;
+  const mid = Math.floor(vals.length / 2);
+  return vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
+}
+
 function normCdf(x: number): number {
   const sign = x < 0 ? -1 : 1;
   const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
@@ -88,12 +111,25 @@ function minuteSigma(candles: BtcCandle[]): number {
 // Conditional prob: given spot now after `elapsed` min into the window, what's
 // P(spot at close >= strike)? Only the REMAINING minutes diffuse — the realized
 // path is already locked in. This is what makes intra-window edge real.
+// (b) Empirical 0.6× correction for 1-min close-to-close noise (bid/ask bounce
+// inflates the raw stdev vs true settlement-window variance).
+const SIGMA_CORRECTION = 0.6;
+
 function probAboveCond(spot: number, strike: number, sigmaMin: number, minutesRemaining: number): number {
   const t = Math.max(1 / 60, minutesRemaining);
-  const sigma = sigmaMin * Math.sqrt(t);
+  const sigma = sigmaMin * SIGMA_CORRECTION * Math.sqrt(t);
   if (sigma <= 0) return spot >= strike ? 1 : 0;
   const d = (Math.log(strike / spot) + 0.5 * sigma * sigma) / sigma;
   return 1 - normCdf(d);
+}
+
+// (c) Pull model toward market when very little time remains — the residual
+// diffusion variance is mostly noise vs the already-locked path.
+function blendNearExpiry(modelP: number, marketP: number, minsRemaining: number): number {
+  if (minsRemaining >= 2) return modelP;
+  // weight on market grows from 0 at 2min to 0.85 at 0min
+  const w = Math.min(0.85, (2 - minsRemaining) / 2 * 0.85);
+  return modelP * (1 - w) + marketP * w;
 }
 
 function quarterKelly(p: number, priceYes: number): number {
@@ -146,7 +182,9 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
     ]);
 
     const recent = candles.slice(-60);
-    const spot = recent.length ? recent[recent.length - 1].c : 0;
+    const candleSpot = recent.length ? recent[recent.length - 1].c : 0;
+    // (a) Consolidated multi-venue spot (Coinbase + Binance + Kraken median).
+    const spot = await fetchConsolidatedSpot(candleSpot);
     const sigma = minuteSigma(recent);
     const now = Date.now();
     const hasExternal = !!process.env.CRYPTO_MODEL_URL;
@@ -178,6 +216,9 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           minutesRemaining: minsRemaining, yesPrice,
         });
         if (ext !== null) { p = ext; source = "external"; }
+
+        // (c) Shrink toward market in the final 2 minutes.
+        if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining);
 
         const edgePts = (p - yesPrice) * 100;
         const side: "YES" | "NO" = edgePts >= 0 ? "YES" : "NO";
