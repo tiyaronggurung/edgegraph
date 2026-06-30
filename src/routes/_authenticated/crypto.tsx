@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, useEffect } from "react";
-import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle, ArrowUp, ArrowDown } from "lucide-react";
+import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle, ArrowUp, ArrowDown, Volume2, VolumeX } from "lucide-react";
+import { playOrderPlaced, playOrderFilled } from "@/lib/orderSounds";
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades, checkKalshiBalance, diagnoseKalshiAuth, type KalshiDiagStep } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats } from "@/lib/cryptoPredictions.functions";
@@ -676,6 +677,37 @@ function AutoTradePanel() {
     .filter(o => Date.now() - new Date(o.created_at).getTime() < 24 * 60 * 60 * 1000)
     .reduce((s, o) => s + (Number(o.pnl_usd) || 0), 0);
 
+  // Sound notifications for new live orders / fills (settled).
+  const [soundOn, setSoundOn] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem("crypto.orderSound") !== "off";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("crypto.orderSound", soundOn ? "on" : "off");
+    }
+  }, [soundOn]);
+  const prevOrdersRef = (useMemo(() => ({ current: null as null | Map<string, string> }), []));
+  useEffect(() => {
+    const next = new Map(liveOrders.map(o => [o.id, o.status]));
+    const prev = prevOrdersRef.current;
+    if (prev && soundOn) {
+      let placed = 0;
+      let filled = 0;
+      for (const [id, status] of next) {
+        const before = prev.get(id);
+        if (before === undefined) {
+          if (status === "placed") placed += 1;
+        } else if (before === "placed" && (status === "settled_win" || status === "settled_loss")) {
+          filled += 1;
+        }
+      }
+      if (placed > 0) playOrderPlaced();
+      if (filled > 0) setTimeout(() => playOrderFilled(), placed > 0 ? 250 : 0);
+    }
+    prevOrdersRef.current = next;
+  }, [liveOrders, soundOn, prevOrdersRef]);
+
   async function runLive() {
     const ok = window.confirm(
       "PLACE REAL MONEY ORDERS on Kalshi?\n\n" +
@@ -731,6 +763,14 @@ function AutoTradePanel() {
           <div className="text-xs font-mono text-muted-foreground">
             {liveTotals.placed} live placed · <span className="text-emerald-400">{liveTotals.wins}W</span> / <span className="text-red-400">{liveTotals.losses}L</span> · PnL <span className={liveTotals.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}>{liveTotals.pnlUsd >= 0 ? "+" : ""}${liveTotals.pnlUsd.toFixed(2)}</span>
           </div>
+          <button
+            onClick={() => { setSoundOn(s => !s); if (!soundOn) playOrderPlaced(); }}
+            className="text-xs font-semibold p-1.5 rounded border border-border bg-muted/30 hover:bg-muted/50 flex items-center"
+            title={soundOn ? "Order sounds on — click to mute" : "Order sounds muted — click to enable"}
+            aria-label={soundOn ? "Mute order sounds" : "Unmute order sounds"}
+          >
+            {soundOn ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5 text-muted-foreground" />}
+          </button>
           <button
             onClick={testKalshi}
             disabled={testBusy}
