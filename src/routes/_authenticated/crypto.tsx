@@ -883,6 +883,38 @@ function CryptoPage() {
         </div>
       )}
 
+      {data?.regime && (
+        <div className="border border-border rounded-lg bg-card p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              AI regime classifier · {data.regime.source}
+            </div>
+            <div className="text-[10px] text-muted-foreground">
+              confidence <span className="font-mono">{(data.regime.confidence * 100).toFixed(0)}%</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className={`px-2 py-1 rounded text-xs font-mono uppercase tracking-wider ${
+              data.regime.regime === "breakout" ? "bg-amber-500/20 text-amber-300" :
+              data.regime.regime === "trend-up" ? "bg-emerald-500/20 text-emerald-300" :
+              data.regime.regime === "trend-down" ? "bg-red-500/20 text-red-300" :
+              data.regime.regime === "squeeze" ? "bg-purple-500/20 text-purple-300" :
+              data.regime.regime === "chop" ? "bg-slate-500/20 text-slate-300" :
+              "bg-muted text-muted-foreground"
+            }`}>
+              {data.regime.regime}
+            </div>
+            <div className="text-xs font-mono text-muted-foreground">
+              σ×<span className="text-foreground">{data.regime.sigmaMult.toFixed(2)}</span>
+              {" · "}drift bias <span className="text-foreground">{(data.regime.driftBiasPerMin * 10000).toFixed(1)} bp/min</span>
+            </div>
+          </div>
+          {data.regime.reason && (
+            <div className="text-xs text-muted-foreground italic">{data.regime.reason}</div>
+          )}
+        </div>
+      )}
+
       {data?.calibration && (
         <div className="border border-border rounded-lg bg-card p-3 space-y-2">
           <div className="flex items-center justify-between">
