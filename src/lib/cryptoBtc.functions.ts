@@ -717,13 +717,18 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           gateReason = "too close to expiry (<30s) — slippage risk";
         } else if (yesPrice <= 0.02 || yesPrice >= 0.98) {
           gateReason = "price pinned (≤2¢ or ≥98¢) — no room for edge";
+        } else if (sigDist < 0.5 && secondsToClose > 60) {
+          // Pin-risk gate: strike is <0.5σ from spot with >1min left. Even a
+          // "confident" model pick has ~50% true win rate here — one normal
+          // candle flips the outcome. Highest-loss-density bucket in BTC 15m.
+          gateReason = `coin-flip zone — strike only ${sigDist.toFixed(2)}σ from spot`;
         } else if (edgeAbs < requiredEdgePts) {
           gateReason = `edge ${edgeAbs.toFixed(1)}pts < required ${requiredEdgePts.toFixed(1)}pts`;
         } else if (kelly <= 0) {
           gateReason = "Kelly fraction ≤ 0";
         } else {
           gateAction = "BET";
-          gateReason = `edge ${edgeAbs.toFixed(1)}pts ≥ required ${requiredEdgePts.toFixed(1)}pts`;
+          gateReason = `edge ${edgeAbs.toFixed(1)}pts ≥ required ${requiredEdgePts.toFixed(1)}pts · safety ${sigDist.toFixed(2)}σ`;
         }
 
         markets.push({
