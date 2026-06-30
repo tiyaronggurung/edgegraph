@@ -311,7 +311,7 @@ export type KalshiDiagStep = {
   name: string;
   ok: boolean;
   detail?: string;
-  data?: Record<string, unknown>;
+  data?: Record<string, string | number | boolean | null>;
 };
 
 export const diagnoseKalshiAuth = createServerFn({ method: "GET" })
