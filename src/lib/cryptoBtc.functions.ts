@@ -194,6 +194,55 @@ function normCdf(x: number): number {
   return 0.5 * (1 + sign * y);
 }
 
+// Student-t CDF (regularized incomplete beta via Lentz continued fraction).
+// df=4 gives markedly fatter tails than Normal — BTC 1-min returns are
+// leptokurtic, so extreme moves happen far more often than Gaussian implies.
+// This is the #1 reason the old model collapsed to 0% / 99.9% and got blown out.
+function studentTCdf(x: number, df: number): number {
+  const lgamma = (z: number): number => {
+    const g = 7;
+    const c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+      771.32342877765313, -176.61502916214059, 12.507343278686905,
+      -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+    if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - lgamma(1 - z);
+    z -= 1;
+    let a = c[0];
+    const t = z + g + 0.5;
+    for (let i = 1; i < g + 2; i++) a += c[i] / (z + i);
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(a);
+  };
+  const betacf = (a: number, b: number, xv: number): number => {
+    const MAXIT = 200, EPS = 3e-7, FPMIN = 1e-30;
+    const qab = a + b, qap = a + 1, qam = a - 1;
+    let c = 1, d = 1 - qab * xv / qap;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    d = 1 / d;
+    let h = d;
+    for (let m = 1; m <= MAXIT; m++) {
+      const m2 = 2 * m;
+      let aa = m * (b - m) * xv / ((qam + m2) * (a + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d; h *= d * c;
+      aa = -(a + m) * (qab + m) * xv / ((a + m2) * (qap + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d; const del = d * c; h *= del;
+      if (Math.abs(del - 1) < EPS) break;
+    }
+    return h;
+  };
+  const incBeta = (a: number, b: number, xv: number): number => {
+    if (xv <= 0) return 0; if (xv >= 1) return 1;
+    const bt = Math.exp(lgamma(a + b) - lgamma(a) - lgamma(b) + a * Math.log(xv) + b * Math.log(1 - xv));
+    if (xv < (a + 1) / (a + b + 2)) return bt * betacf(a, b, xv) / a;
+    return 1 - bt * betacf(b, a, 1 - xv) / b;
+  };
+  const xx = df / (df + x * x);
+  const half = 0.5 * incBeta(df / 2, 0.5, xx);
+  return x >= 0 ? 1 - half : half;
+}
+
 function minuteSigma(candles: BtcCandle[]): number {
   if (candles.length < 5) return 0.0008;
   const rets: number[] = [];
@@ -204,22 +253,59 @@ function minuteSigma(candles: BtcCandle[]): number {
   if (!rets.length) return 0.0008;
   const m = rets.reduce((a, b) => a + b, 0) / rets.length;
   const v = rets.reduce((a, b) => a + (b - m) ** 2, 0) / Math.max(1, rets.length - 1);
-  return Math.max(1e-6, Math.sqrt(v));
+  const longSigma = Math.max(1e-6, Math.sqrt(v));
+  // Short-window σ (last 5 candles) — catches regime expansion. When BTC
+  // breaks out of chop, long-window σ lags by 30+ minutes; using max(short,long)
+  // widens the diffusion in real time so we stop pinning near-cert NOs into
+  // breakout candles.
+  const tail = rets.slice(-5);
+  if (tail.length >= 3) {
+    const mt = tail.reduce((a, b) => a + b, 0) / tail.length;
+    const vt = tail.reduce((a, b) => a + (b - mt) ** 2, 0) / Math.max(1, tail.length - 1);
+    const shortSigma = Math.max(1e-6, Math.sqrt(vt));
+    return Math.max(longSigma, shortSigma);
+  }
+  return longSigma;
 }
 
-// Conditional prob: given spot now after `elapsed` min into the window, what's
-// P(spot at close >= strike)? Only the REMAINING minutes diffuse — the realized
-// path is already locked in. This is what makes intra-window edge real.
-// (b) Empirical 0.6× correction for 1-min close-to-close noise (bid/ask bounce
-// inflates the raw stdev vs true settlement-window variance).
-const SIGMA_CORRECTION = 0.6;
+// Per-minute drift from the recent slope of log-returns. Captures intra-window
+// trend (e.g. BTC ramping into expiry) that mean-zero diffusion ignores.
+// Capped to ±0.005 / min so a single spike candle can't dominate.
+function minuteDrift(candles: BtcCandle[]): number {
+  const tail = candles.slice(-6);
+  if (tail.length < 3) return 0;
+  const rets: number[] = [];
+  for (let i = 1; i < tail.length; i++) {
+    const r = Math.log(tail[i].c / tail[i - 1].c);
+    if (Number.isFinite(r)) rets.push(r);
+  }
+  if (!rets.length) return 0;
+  const mu = rets.reduce((a, b) => a + b, 0) / rets.length;
+  return Math.max(-0.005, Math.min(0.005, mu));
+}
 
-function probAboveCond(spot: number, strike: number, sigmaMin: number, minutesRemaining: number): number {
+// Conditional prob: given spot now, P(spot at close >= strike). Uses Student-t
+// (df=4) for fat tails + recent drift, and clips to [0.02, 0.98] so the model
+// can't claim near-certainty on a 15-min BTC window.
+// (b) Empirical 0.6× correction for 1-min close-to-close noise (bid/ask bounce
+// inflates raw stdev vs true settlement-window variance).
+const SIGMA_CORRECTION = 0.6;
+const STUDENT_T_DF = 4;
+
+function probAboveCond(
+  spot: number,
+  strike: number,
+  sigmaMin: number,
+  minutesRemaining: number,
+  muMin: number = 0,
+): number {
   const t = Math.max(1 / 60, minutesRemaining);
   const sigma = sigmaMin * SIGMA_CORRECTION * Math.sqrt(t);
-  if (sigma <= 0) return spot >= strike ? 1 : 0;
-  const d = (Math.log(strike / spot) + 0.5 * sigma * sigma) / sigma;
-  return 1 - normCdf(d);
+  if (sigma <= 0) return spot >= strike ? 0.98 : 0.02;
+  const mu = muMin * t;
+  const d = (Math.log(strike / spot) - mu) / sigma;
+  const pAbove = 1 - studentTCdf(d, STUDENT_T_DF);
+  return Math.max(0.02, Math.min(0.98, pAbove));
 }
 
 // (c) Pull model toward market when very little time remains — but ONLY when
