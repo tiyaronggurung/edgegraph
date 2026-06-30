@@ -21,6 +21,15 @@ export interface BtcMicro {
   cvdSellUsd: number;        // taker sell USD notional in window
   ofi: number;               // (bidSize - askSize) / (bidSize + askSize) top 10 levels (-1..1)
   bookSpreadBps: number;     // best ask vs best bid in bps
+  // Step 6 — large/whale aggressive flows (≥ $250k single fills). Proxy for
+  // liquidation cascades; real liquidation feed is WS-only so we use this.
+  whaleBuyUsd1m: number;
+  whaleSellUsd1m: number;
+  whaleImbalance1m: number;  // (-1..1)
+  whaleBuyUsd5m: number;
+  whaleSellUsd5m: number;
+  whaleImbalance5m: number;  // (-1..1)
+  whaleCount5m: number;
 }
 
 export interface BtcOptions {
