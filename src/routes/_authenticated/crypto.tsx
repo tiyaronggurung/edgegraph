@@ -153,6 +153,7 @@ function MarketRow({
           {m.thresholdParts.time > 0 && <> +{m.thresholdParts.time.toFixed(1)}t</>}
           {m.thresholdParts.spread > 0 && <> +{m.thresholdParts.spread.toFixed(1)}spr</>}
           {m.thresholdParts.regime > 0 && <> +{m.thresholdParts.regime.toFixed(1)}reg</>}
+          {m.thresholdParts.whale !== 0 && <> <span className={m.thresholdParts.whale < 0 ? "text-emerald-400" : "text-red-400"}>{m.thresholdParts.whale > 0 ? "+" : ""}{m.thresholdParts.whale.toFixed(1)}whl</span></>}
         </div>
         <div className={`text-[10px] text-right ${m.gateAction === "BET" ? "text-emerald-400" : "text-muted-foreground"}`}>{m.gateReason}</div>
       </div>
