@@ -21,8 +21,13 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        // 1) Fetch market snapshot once (shared across users).
-        const markets = await getBtcMarkets();
+        // 1) Fetch market snapshot once (shared across users). Tolerate Kalshi 429s.
+        let markets;
+        try {
+          markets = await getBtcMarkets();
+        } catch (e) {
+          return Response.json({ ok: false, skipped: "markets fetch failed", error: String(e) }, { status: 200 });
+        }
 
         // 2) Iterate every profile and (a) settle (b) place if under cap.
         const { data: profiles } = await supabaseAdmin
