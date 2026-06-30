@@ -805,10 +805,10 @@ function AutoTradePanel() {
             </span>
           </h2>
           <p className="text-[11px] text-muted-foreground">
-            $20×3/click · entry edge≥5pts, σ≥1.25, ≥120s · auto-exit TP +70% / SL -50% / edge-decay 2¢ · halt -$60/24h
+            $20×3/click · entry edge≥5pts, σ≥1.25, ≥120s · auto-exit TP +70% / SL -50% / edge-decay 2¢ · halt 40 orders or -$80/24h
           </p>
           <p className="text-[10px] text-muted-foreground mt-0.5">
-            Live 24h: {liveCount24h}/10 orders · realized <span className={liveRealized24h >= 0 ? "text-emerald-400" : "text-red-400"}>{liveRealized24h >= 0 ? "+" : ""}${liveRealized24h.toFixed(2)}</span>
+            Live 24h: {liveCount24h}/40 orders · realized <span className={liveRealized24h >= 0 ? "text-emerald-400" : "text-red-400"}>{liveRealized24h >= 0 ? "+" : ""}${liveRealized24h.toFixed(2)}</span>
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
