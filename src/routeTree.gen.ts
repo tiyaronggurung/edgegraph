@@ -37,6 +37,7 @@ import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/e
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
 import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
 import { Route as ApiPublicHooksBackfillOutcomesRouteImport } from './routes/api/public/hooks/backfill-outcomes'
+import { Route as ApiPublicHooksAutoTradeRouteImport } from './routes/api/public/hooks/auto-trade'
 
 const UnsubscribeRoute = UnsubscribeRouteImport.update({
   id: '/unsubscribe',
@@ -186,6 +187,11 @@ const ApiPublicHooksBackfillOutcomesRoute =
     path: '/api/public/hooks/backfill-outcomes',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksAutoTradeRoute = ApiPublicHooksAutoTradeRouteImport.update({
+  id: '/api/public/hooks/auto-trade',
+  path: '/api/public/hooks/auto-trade',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -209,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/analysis/$id': typeof AuthenticatedAnalysisIdRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -238,6 +245,7 @@ export interface FileRoutesByTo {
   '/analysis/$id': typeof AuthenticatedAnalysisIdRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -269,6 +277,7 @@ export interface FileRoutesById {
   '/_authenticated/analysis/$id': typeof AuthenticatedAnalysisIdRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -300,6 +309,7 @@ export interface FileRouteTypes {
     | '/analysis/$id'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/recompute-predictions'
@@ -329,6 +339,7 @@ export interface FileRouteTypes {
     | '/analysis/$id'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/recompute-predictions'
@@ -359,6 +370,7 @@ export interface FileRouteTypes {
     | '/_authenticated/analysis/$id'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/recompute-predictions'
@@ -377,6 +389,7 @@ export interface RootRouteChildren {
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   ApiPublicSendDailyDigestsRoute: typeof ApiPublicSendDailyDigestsRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
+  ApiPublicHooksAutoTradeRoute: typeof ApiPublicHooksAutoTradeRoute
   ApiPublicHooksBackfillOutcomesRoute: typeof ApiPublicHooksBackfillOutcomesRoute
   ApiPublicHooksCaptureClosingOddsRoute: typeof ApiPublicHooksCaptureClosingOddsRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
@@ -583,6 +596,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksBackfillOutcomesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/auto-trade': {
+      id: '/api/public/hooks/auto-trade'
+      path: '/api/public/hooks/auto-trade'
+      fullPath: '/api/public/hooks/auto-trade'
+      preLoaderRoute: typeof ApiPublicHooksAutoTradeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -632,6 +652,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   ApiPublicSendDailyDigestsRoute: ApiPublicSendDailyDigestsRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
+  ApiPublicHooksAutoTradeRoute: ApiPublicHooksAutoTradeRoute,
   ApiPublicHooksBackfillOutcomesRoute: ApiPublicHooksBackfillOutcomesRoute,
   ApiPublicHooksCaptureClosingOddsRoute: ApiPublicHooksCaptureClosingOddsRoute,
   ApiPublicHooksRecomputePredictionsRoute:
@@ -643,13 +664,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

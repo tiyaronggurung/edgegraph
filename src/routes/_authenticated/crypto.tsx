@@ -6,7 +6,7 @@ import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCi
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats } from "@/lib/cryptoPredictions.functions";
-import { runAutoTrade, listAutoTradeOrders, settleAutoTradeOrders, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
+import { listAutoTradeOrders, settleAutoTradeOrders, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { toast } from "sonner";
 
@@ -593,7 +593,6 @@ function ModelAccuracyPanel() {
 
 function AutoTradePanel() {
   const qc = useQueryClient();
-  const runFn = useServerFn(runAutoTrade);
   const listFn = useServerFn(listAutoTradeOrders);
   const settleFn = useServerFn(settleAutoTradeOrders);
 
@@ -603,7 +602,7 @@ function AutoTradePanel() {
     refetchInterval: 30_000,
   });
 
-  // Opportunistic settle: every 60s, settle any closed paper orders.
+  // Opportunistic client-side settle (cron also settles server-side every 1m).
   useEffect(() => {
     let cancelled = false;
     const tick = async () => {
@@ -614,48 +613,34 @@ function AutoTradePanel() {
     return () => { cancelled = true; clearInterval(h); };
   }, [settleFn, qc]);
 
-  const run = useMutation({
-    mutationFn: () => runFn({ data: { mode: "paper", maxOrders: 5, stakeUsd: 10 } }),
-    onSuccess: (r) => {
-      toast.success(`Auto-trade: ${r.placed} paper orders placed (${r.skipped} skipped)`);
-      qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const orders = list.data?.orders ?? [];
   const totals = list.data?.totals;
+  const placed = totals?.placed ?? 0;
+  const cap = 5;
+  const remaining = Math.max(0, cap - placed);
 
   return (
     <div className="border border-border rounded-lg bg-card">
       <div className="px-4 py-2 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h2 className="text-sm uppercase tracking-wider text-muted-foreground">Auto-trade · paper mode</h2>
-          <p className="text-[11px] text-muted-foreground">Up to 5 picks at $10 each. Stricter than manual: ≥1.0σ safety AND momentum aligned. No real money until paper cycle proves clean.</p>
+          <h2 className="text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            Auto-trade · paper mode
+            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> AUTO
+            </span>
+          </h2>
+          <p className="text-[11px] text-muted-foreground">
+            $10 paper bet at the start of each new 15-min strike. Auto stops after {cap} trades. Cron runs every 1 min · {remaining} of {cap} remaining.
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          {totals && (
-            <div className="text-xs font-mono text-muted-foreground">
-              {totals.placed} total · <span className="text-emerald-400">{totals.wins}W</span> / <span className="text-red-400">{totals.losses}L</span> · PnL <span className={totals.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}>{totals.pnlUsd >= 0 ? "+" : ""}${totals.pnlUsd.toFixed(2)}</span>
-            </div>
-          )}
-          <button
-            disabled={run.isPending}
-            onClick={() => run.mutate()}
-            className="text-xs uppercase tracking-wider px-3 py-1.5 border border-[color:var(--color-primary)] rounded text-[color:var(--color-primary)] hover:bg-[color:var(--color-primary)]/10 disabled:opacity-30 flex items-center gap-1"
-          >
-            {run.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
-            Run 5 × $10 (paper)
-          </button>
-        </div>
+        {totals && (
+          <div className="text-xs font-mono text-muted-foreground">
+            {totals.placed} placed · <span className="text-emerald-400">{totals.wins}W</span> / <span className="text-red-400">{totals.losses}L</span> · PnL <span className={totals.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}>{totals.pnlUsd >= 0 ? "+" : ""}${totals.pnlUsd.toFixed(2)}</span>
+          </div>
+        )}
       </div>
-      {run.data && run.data.skipReasons.length > 0 && (
-        <div className="px-4 py-2 border-b border-border bg-amber-500/5 text-[10px] text-amber-400 font-mono">
-          Last run skipped: {run.data.skipReasons.slice(0, 5).join(" · ")}{run.data.skipReasons.length > 5 ? ` (+${run.data.skipReasons.length - 5} more)` : ""}
-        </div>
-      )}
       {orders.length === 0 ? (
-        <div className="p-6 text-center text-sm text-muted-foreground">No paper orders yet. Click "Run 5 × $10" to start.</div>
+        <div className="p-6 text-center text-sm text-muted-foreground">Waiting for the next eligible strike window. The cron will place a bet automatically.</div>
       ) : (
         <div className="max-h-[360px] overflow-y-auto">
           <table className="w-full text-xs">
