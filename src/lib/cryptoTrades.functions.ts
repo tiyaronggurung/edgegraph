@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const KALSHI_BASE = "https://api.elections.kalshi.com/trade-api/v2";
+const KALSHI_BASE = "https://api.kalshi.com/trade-api/v2";
 
 const PlaceOrderSchema = z.object({
   ticker: z.string().min(1),
