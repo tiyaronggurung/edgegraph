@@ -44,34 +44,58 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
   try {
     const { data: existing } = await supabaseAdmin
       .from("btc_model_predictions")
-      .select("id, snapshot_seconds_to_close, outcome")
+      .select("id, snapshot_seconds_to_close, outcome, side")
       .eq("ticker", input.ticker)
       .maybeSingle();
 
-    const row = {
-      ticker: input.ticker,
-      event_ticker: input.eventTicker,
-      strike: input.strike,
-      side: input.side,
-      model_prob: input.modelProb,
-      market_yes_price: input.marketYesPrice,
-      edge_pts: input.edgePts,
-      spot_at_snapshot: input.spot,
-      close_time: input.closeTime,
-      snapshot_seconds_to_close: input.secondsToClose,
-    };
-
     if (!existing) {
-      await supabaseAdmin.from("btc_model_predictions").insert(row);
+      // First snapshot: store the model's pick (side) — this is LOCKED for the
+      // life of the market, even if model prob drifts across 50% later.
+      await supabaseAdmin.from("btc_model_predictions").insert({
+        ticker: input.ticker,
+        event_ticker: input.eventTicker,
+        strike: input.strike,
+        side: input.side,
+        model_prob: input.modelProb,
+        market_yes_price: input.marketYesPrice,
+        edge_pts: input.edgePts,
+        spot_at_snapshot: input.spot,
+        close_time: input.closeTime,
+        snapshot_seconds_to_close: input.secondsToClose,
+      });
       return;
     }
     if (existing.outcome) return;
     if (input.secondsToClose < (existing.snapshot_seconds_to_close ?? 1e9)) {
-      await supabaseAdmin.from("btc_model_predictions").update(row).eq("id", existing.id);
+      // IMPORTANT: do NOT touch `side` — original pick is locked. Refresh only
+      // the transient telemetry so exit signals can see live drift.
+      await supabaseAdmin.from("btc_model_predictions").update({
+        model_prob: input.modelProb,
+        market_yes_price: input.marketYesPrice,
+        edge_pts: input.edgePts,
+        spot_at_snapshot: input.spot,
+        snapshot_seconds_to_close: input.secondsToClose,
+      }).eq("id", existing.id);
     }
   } catch (e) {
     console.warn("snapshotPrediction failed:", e);
   }
+}
+
+// Read the locked sides for a batch of tickers (one round-trip).
+export async function getLockedSides(tickers: string[]): Promise<Map<string, "YES" | "NO">> {
+  const out = new Map<string, "YES" | "NO">();
+  if (!tickers.length) return out;
+  try {
+    const { data } = await supabaseAdmin
+      .from("btc_model_predictions")
+      .select("ticker, side")
+      .in("ticker", tickers);
+    for (const r of data ?? []) out.set(r.ticker as string, r.side as "YES" | "NO");
+  } catch (e) {
+    console.warn("getLockedSides failed:", e);
+  }
+  return out;
 }
 
 export async function settleDuePredictions(): Promise<{ settled: number }> {
