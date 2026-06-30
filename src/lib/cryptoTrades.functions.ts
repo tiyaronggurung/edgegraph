@@ -487,17 +487,22 @@ export const sellKalshiOrder = createServerFn({ method: "POST" })
     if (trade.status !== "submitted") throw new Error(`Cannot close trade in status: ${trade.status}`);
     if (!trade.contracts || trade.contracts <= 0) throw new Error("Trade has no contracts");
 
-    const path = "/portfolio/orders";
+    const path = "/portfolio/events/orders";
     const headers = await signKalshi("POST", path);
 
+    // Sell = opposite side of position. YES holder sells via ask, NO holder via bid.
+    const priceDollars = (trade.side === "YES"
+      ? data.limitPriceCents
+      : 100 - data.limitPriceCents) / 100;
     const body = {
       ticker: trade.ticker,
       action: "sell",
-      side: trade.side === "YES" ? "yes" : "no",
+      side: trade.side === "YES" ? "ask" : "bid",
       type: "limit",
-      count: trade.contracts,
-      yes_price: trade.side === "YES" ? data.limitPriceCents : undefined,
-      no_price: trade.side === "NO" ? data.limitPriceCents : undefined,
+      count: String(trade.contracts),
+      price: priceDollars.toFixed(4),
+      time_in_force: "immediate_or_cancel",
+      self_trade_prevention_type: "taker_at_cross",
       client_order_id: `close-${trade.id}`,
     };
 
@@ -515,7 +520,8 @@ export const sellKalshiOrder = createServerFn({ method: "POST" })
     const entryCents = Math.round((Number(trade.stake_usd) / Number(trade.contracts)) * 100);
     const exitCents = data.limitPriceCents;
     const realizedPnl = ((exitCents - entryCents) / 100) * Number(trade.contracts);
-    const closeOrderId = json?.order?.order_id ?? json?.order_id ?? null;
+    const closeOrderId = json?.order_id ?? json?.order?.order_id ?? null;
+
 
     const prevRaw = (trade.raw as any) ?? {};
     await supabase.from("crypto_trades").update({
