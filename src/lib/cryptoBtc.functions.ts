@@ -182,8 +182,12 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
     ]);
 
     const recent = candles.slice(-60);
-    const spot = recent.length ? recent[recent.length - 1].c : 0;
+    const candleSpot = recent.length ? recent[recent.length - 1].c : 0;
+    // (a) Consolidated multi-venue spot (Coinbase + Binance + Kraken median).
+    const spot = await fetchConsolidatedSpot(candleSpot);
     const sigma = minuteSigma(recent);
+    const now = Date.now();
+    const hasExternal = !!process.env.CRYPTO_MODEL_URL;
     const now = Date.now();
     const hasExternal = !!process.env.CRYPTO_MODEL_URL;
 
