@@ -119,7 +119,9 @@ async function signKalshi(method: string, path: string): Promise<Record<string, 
   const { key, constants, createSign } = await getValidatedKalshiKey();
 
   const ts = Date.now().toString();
-  const msg = `${ts}${method}${path}`;
+  // Kalshi requires the signed path to match the server-visible URL path,
+  // which includes the /trade-api/v2 prefix.
+  const msg = `${ts}${method}/trade-api/v2${path}`;
   const signer = createSign("RSA-SHA256");
   signer.update(msg);
   signer.end();
