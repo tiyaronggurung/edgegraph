@@ -695,8 +695,9 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
     const candleSpot = recent.length ? recent[recent.length - 1].c : 0;
     // (a) Consolidated multi-venue spot (Coinbase + Binance + Kraken median).
     const spot = await fetchConsolidatedSpot(candleSpot);
-    const sigma = minuteSigma(recent);
-    const drift = minuteDrift(recent);
+    const { shortSigma, longSigma } = minuteSigmaPair(recent);
+    const sigmaRaw = Math.max(shortSigma, longSigma);
+    const driftRaw = minuteDrift(recent);
     const now = Date.now();
     const hasExternal = !!process.env.CRYPTO_MODEL_URL;
 
@@ -716,6 +717,26 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         }
       })(),
     ]);
+
+    // (g) AI regime classifier (5-min cached). Returns σ multiplier + drift bias
+    // applied to every market for this tick — captures macro context (chop vs
+    // breakout vs squeeze) that pure stats can't see.
+    const regimeState = await (async () => {
+      try {
+        const { getRegime } = await import("./cryptoRegime.server");
+        return await getRegime({
+          spot, sigmaShort: shortSigma, sigmaLong: longSigma, drift: driftRaw,
+          micro, options, recentCandles: recent,
+        });
+      } catch (e) {
+        console.warn("regime classifier failed:", e);
+        return null;
+      }
+    })();
+
+    // Apply regime knobs to σ and drift before they feed the diffusion model.
+    const sigma = sigmaRaw * (regimeState?.sigmaMult ?? 1);
+    const drift = Math.max(-0.005, Math.min(0.005, driftRaw + (regimeState?.driftBiasPerMin ?? 0)));
     const applyCalib = await (async () => {
       try {
         const { applyCalibration } = await import("./cryptoCalibrator.server");
