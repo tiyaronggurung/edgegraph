@@ -176,17 +176,19 @@ export const settleAutoTradeOrders = createServerFn({ method: "POST" })
     const pending = (due ?? []) as Array<{ id: string; ticker: string; side: "YES" | "NO"; strike: number; contracts: number; limit_cents: number; close_time: string }>;
     if (!pending.length) return { settled: 0 };
 
-    // Pull close prices from prediction_closes if the model already settled
-    // the corresponding minute window; fall back to skipping for next cycle.
-    const closeTimes = [...new Set(pending.map(o => o.close_time))];
+    // Pull settle prices from btc_model_predictions (already populated by the
+    // existing settle path for the same 15m windows). Skip orders whose
+    // window hasn't been settled yet — try again next call.
+    const tickers = [...new Set(pending.map(o => o.ticker))];
     const { data: closes } = await supabase
-      .from("prediction_closes")
-      .select("close_time, settle_price")
-      .in("close_time", closeTimes);
-    const priceByTime = new Map<string, number>(
-      ((closes ?? []) as Array<{ close_time: string; settle_price: number | null }>)
+      .from("btc_model_predictions")
+      .select("ticker, settle_price")
+      .in("ticker", tickers)
+      .not("settle_price", "is", null);
+    const priceByTicker = new Map<string, number>(
+      ((closes ?? []) as Array<{ ticker: string; settle_price: number | null }>)
         .filter(c => c.settle_price !== null)
-        .map(c => [new Date(c.close_time).toISOString(), Number(c.settle_price)]),
+        .map(c => [c.ticker, Number(c.settle_price)]),
     );
 
     let settled = 0;
