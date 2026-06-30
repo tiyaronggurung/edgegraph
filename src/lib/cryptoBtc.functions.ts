@@ -16,7 +16,13 @@ export interface BtcMicro {
   oiNotional: number;        // perp open interest USD
   oiDelta5mPct: number;      // % change in OI over last ~5 min
   basisBps: number;          // (perp - spot) / spot * 10000
+  cvdRatio: number;          // (buyVol - sellVol) / totalVol over last ~60s (-1..1)
+  cvdBuyUsd: number;         // taker buy USD notional in window
+  cvdSellUsd: number;        // taker sell USD notional in window
+  ofi: number;               // (bidSize - askSize) / (bidSize + askSize) top 10 levels (-1..1)
+  bookSpreadBps: number;     // best ask vs best bid in bps
 }
+
 
 export interface BtcMarket {
   ticker: string;
