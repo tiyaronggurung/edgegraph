@@ -8,6 +8,7 @@ import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshi
 import { getPredictionStats } from "@/lib/cryptoPredictions.functions";
 import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
+import { EquityMomentumPanel } from "@/components/EquityMomentumPanel";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/crypto")({
@@ -1025,6 +1026,8 @@ function CryptoPage() {
           </div>
 
           <ModelAccuracyPanel />
+
+          <EquityMomentumPanel />
 
           <AutoTradePanel />
 
