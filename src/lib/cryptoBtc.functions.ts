@@ -56,7 +56,9 @@ interface BtcMarketsResult {
   candles: BtcCandle[];
   markets: BtcMarket[];
   modelSource: "external" | "intra-window-diffusion";
+  micro: BtcMicro | null;
 }
+
 
 const _kalshiCache = new Map<string, { at: number; data: any }>();
 const KALSHI_TTL_MS = 8_000;
