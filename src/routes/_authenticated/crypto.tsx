@@ -423,6 +423,8 @@ function CryptoPage() {
             {data.markets.map(m => <MarketRow key={m.ticker} m={m} candles={data.candles} sizing={sizing} onPlace={setPending} liveSpot={live.price} />)}
           </div>
 
+          <ModelAccuracyPanel />
+
           <div>
             <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Trade log</h2>
             <TradeLog />
