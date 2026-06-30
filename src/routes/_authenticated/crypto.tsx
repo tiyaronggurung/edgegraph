@@ -499,6 +499,42 @@ function CryptoPage() {
       )}
 
 
+      {data?.options && (
+        <div className="border border-border rounded-lg bg-card p-3 space-y-2">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Options-implied (Deribit · nearest expiry {new Date(data.options.expiryMs).toUTCString().slice(5, 16)})
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 text-xs">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">ATM IV</div>
+              <div className="font-mono text-sm">{(data.options.atmIv * 100).toFixed(1)}%</div>
+              <div className="text-[10px] text-muted-foreground">annualized</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">25Δ Call IV</div>
+              <div className="font-mono text-sm">{(data.options.ivCall25 * 100).toFixed(1)}%</div>
+              <div className="text-[10px] text-muted-foreground">upside wing</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">25Δ Put IV</div>
+              <div className="font-mono text-sm">{(data.options.ivPut25 * 100).toFixed(1)}%</div>
+              <div className="text-[10px] text-muted-foreground">downside wing</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">25Δ Skew</div>
+              <div className={`font-mono text-sm ${data.options.skew25 > 0 ? "text-red-400" : "text-emerald-400"}`}>
+                {data.options.skew25 >= 0 ? "+" : ""}{(data.options.skew25 * 100).toFixed(2)}%
+              </div>
+              <div className="text-[10px] text-muted-foreground">{data.options.skew25 > 0 ? "downside fear" : "upside bias"}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Days to expiry</div>
+              <div className="font-mono text-sm">{(data.options.yearsToExpiry * 365).toFixed(2)}d</div>
+              <div className="text-[10px] text-muted-foreground">{data.options.sampleCount} strikes</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {q.isLoading && <div className="border border-border rounded-lg bg-card p-6 text-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Loading…</div>}
       {q.isError && <div className="border border-red-500/40 rounded-lg bg-card p-4 text-sm text-red-400">Failed to load Kalshi/Coinbase feeds.</div>}
