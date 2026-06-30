@@ -697,7 +697,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           requiredEdgePts,
           gateAction,
           gateReason,
-          thresholdParts: { base: tBase, calib: tCalib, time: tTime, spread: tSpread, regime: tRegime },
+          thresholdParts: { base: tBase, calib: tCalib, time: tTime, spread: tSpread, regime: tRegime, whale: tWhale },
         });
       }
     }
