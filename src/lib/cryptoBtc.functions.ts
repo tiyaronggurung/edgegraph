@@ -632,8 +632,13 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         // (c) Shrink toward market in the final 2 minutes.
         if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining);
 
-        const edgePts = (p - yesPrice) * 100;
-        const side: "YES" | "NO" = edgePts >= 0 ? "YES" : "NO";
+        const rawEdgePts = (p - yesPrice) * 100;
+        // Locked side wins; first snapshot picks the direction for the window.
+        const locked = lockedSides.get(m.ticker);
+        const side: "YES" | "NO" = locked ?? (rawEdgePts >= 0 ? "YES" : "NO");
+        // Edge is reported toward the locked side: positive = still favorable,
+        // negative = model has since drifted against the original pick.
+        const edgePts = side === "YES" ? rawEdgePts : -rawEdgePts;
         const edgeAbs = Math.abs(edgePts);
         const kelly = quarterKelly(p, yesPrice);
 
