@@ -27,20 +27,45 @@ async function signKalshi(method: string, path: string): Promise<Record<string, 
   const keyId = process.env.KALSHI_API_KEY_ID;
   const rawPem = process.env.KALSHI_PRIVATE_KEY_PEM;
   if (!keyId || !rawPem) throw new Error("Kalshi credentials not configured");
-  // Normalize PEM: convert literal "\n" to real newlines, and if the body has
-  // no line breaks at all, reflow it into a proper PEM block.
-  let pem = rawPem.replace(/\\n/g, "\n").replace(/\r/g, "").trim();
-  const headerMatch = pem.match(/-----BEGIN ([A-Z0-9 ]+)-----([\s\S]*?)-----END \1-----/);
-  if (headerMatch && !headerMatch[2].includes("\n")) {
-    const label = headerMatch[1];
-    const body = headerMatch[2].replace(/\s+/g, "");
-    const wrapped = body.match(/.{1,64}/g)?.join("\n") ?? body;
-    pem = `-----BEGIN ${label}-----\n${wrapped}\n-----END ${label}-----\n`;
+
+  // Normalize: strip surrounding quotes, convert literal \n to real newlines,
+  // strip CRs, and trim.
+  let pem = rawPem.trim();
+  if ((pem.startsWith('"') && pem.endsWith('"')) || (pem.startsWith("'") && pem.endsWith("'"))) {
+    pem = pem.slice(1, -1);
   }
+  pem = pem.replace(/\\n/g, "\n").replace(/\r/g, "").trim();
+
+  // If the secret was stored as bare base64 (no PEM armor), wrap it as PKCS#8.
+  if (!/-----BEGIN /.test(pem)) {
+    const body = pem.replace(/\s+/g, "");
+    const wrapped = body.match(/.{1,64}/g)?.join("\n") ?? body;
+    pem = `-----BEGIN PRIVATE KEY-----\n${wrapped}\n-----END PRIVATE KEY-----\n`;
+  } else {
+    // Reflow body if header/footer present but body has no line breaks.
+    const headerMatch = pem.match(/-----BEGIN ([A-Z0-9 ]+)-----([\s\S]*?)-----END \1-----/);
+    if (headerMatch && !headerMatch[2].includes("\n")) {
+      const label = headerMatch[1];
+      const body = headerMatch[2].replace(/\s+/g, "");
+      const wrapped = body.match(/.{1,64}/g)?.join("\n") ?? body;
+      pem = `-----BEGIN ${label}-----\n${wrapped}\n-----END ${label}-----\n`;
+    }
+  }
+
   const { createSign, createPrivateKey, constants } = await import("node:crypto");
+  let key;
+  try {
+    key = createPrivateKey({ key: pem, format: "pem" });
+  } catch (e: any) {
+    throw new Error(
+      "Kalshi private key could not be decoded. Paste the full PEM exactly as Kalshi gave it " +
+        "(including the -----BEGIN PRIVATE KEY----- and -----END PRIVATE KEY----- lines, with " +
+        "newlines preserved). Encrypted/passphrase-protected keys are not supported — export " +
+        "an unencrypted PKCS#8 PEM. Underlying error: " + (e?.message ?? String(e)),
+    );
+  }
   const ts = Date.now().toString();
   const msg = `${ts}${method}${path}`;
-  const key = createPrivateKey({ key: pem, format: "pem" });
   const signer = createSign("RSA-SHA256");
   signer.update(msg);
   signer.end();
