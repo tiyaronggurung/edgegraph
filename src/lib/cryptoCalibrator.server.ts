@@ -99,6 +99,7 @@ export async function getCalibrator(): Promise<CalibratorState> {
       asOf: new Date().toISOString(),
       totalSettled: 0, globalHitRate: 0, globalBrier: 0,
       buckets: [],
+      global: { a: 1, b: 0, n: 0, active: false },
     };
     _cache = { at: Date.now(), state: empty };
     return empty;
@@ -137,10 +138,21 @@ export async function getCalibrator(): Promise<CalibratorState> {
   const globalHitRate = totalSettled ? samples.filter(s => s.y === 1).length / totalSettled : 0;
   const globalBrier = totalSettled ? samples.reduce((a, s) => a + (s.p - s.y) ** 2, 0) / totalSettled : 0;
 
+  // Global Platt fit across all settled rows — activates much sooner than
+  // per-bucket fits and serves as the fallback whenever a bucket is cold.
+  const globalFit = fitPlatt(samples);
+  const global = {
+    a: globalFit.a,
+    b: globalFit.b,
+    n: totalSettled,
+    active: totalSettled >= GLOBAL_MIN_N,
+  };
+
   const state: CalibratorState = {
     asOf: new Date().toISOString(),
     totalSettled, globalHitRate, globalBrier,
     buckets,
+    global,
   };
   _cache = { at: Date.now(), state };
   return state;
@@ -148,11 +160,19 @@ export async function getCalibrator(): Promise<CalibratorState> {
 
 export function applyCalibration(p: number, secondsToClose: number, state: CalibratorState | null): { p: number; deltaPts: number; bucket: string; active: boolean } {
   const bucket = bucketOf(secondsToClose);
-  const fit = state?.buckets.find(b => b.bucket === bucket);
-  if (!fit || !fit.active || p <= 0 || p >= 1) {
-    return { p, deltaPts: 0, bucket, active: false };
+  if (p <= 0 || p >= 1 || !state) return { p, deltaPts: 0, bucket, active: false };
+  const fit = state.buckets.find(b => b.bucket === bucket);
+  // Prefer per-bucket fit when it has enough samples; otherwise fall back to
+  // the global fit so calibration kicks in long before any bucket reaches 30.
+  if (fit?.active) {
+    const x = logit(p);
+    const pNew = sigmoid(fit.a * x + fit.b);
+    return { p: pNew, deltaPts: (pNew - p) * 100, bucket, active: true };
   }
-  const x = logit(p);
-  const pNew = sigmoid(fit.a * x + fit.b);
-  return { p: pNew, deltaPts: (pNew - p) * 100, bucket, active: true };
+  if (state.global.active) {
+    const x = logit(p);
+    const pNew = sigmoid(state.global.a * x + state.global.b);
+    return { p: pNew, deltaPts: (pNew - p) * 100, bucket: `${bucket}+global`, active: true };
+  }
+  return { p, deltaPts: 0, bucket, active: false };
 }
