@@ -608,6 +608,10 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
       } catch { return null; }
     })();
 
+    // Forward-vol blended per-minute σ (realized + Deribit IV). Used by the
+    // diffusion prob and by the sigmaDistance "how safe is this pin" metric.
+    const sigmaEff = effectiveSigmaMin(sigma, options);
+
     const events = (evJson.events ?? []) as any[];
     const markets: BtcMarket[] = [];
 
