@@ -193,7 +193,7 @@ export const settleAutoTradeOrders = createServerFn({ method: "POST" })
 
     let settled = 0;
     for (const o of pending) {
-      const px = priceByTime.get(new Date(o.close_time).toISOString());
+      const px = priceByTicker.get(o.ticker);
       if (px === undefined) continue;
       const won = o.side === "YES" ? px >= Number(o.strike) : px < Number(o.strike);
       const pnl = won
