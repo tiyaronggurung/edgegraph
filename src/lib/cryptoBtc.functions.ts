@@ -109,6 +109,7 @@ export interface BtcCalibSummary {
   globalHitRate: number;
   globalBrier: number;
   buckets: Array<{ bucket: string; n: number; hitRate: number; meanProb: number; brier: number; a: number; b: number; active: boolean }>;
+  global: { a: number; b: number; n: number; active: boolean };
 }
 
 interface BtcMarketsResult {
@@ -889,6 +890,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           bucket: b.bucket, n: b.n, hitRate: b.hitRate, meanProb: b.meanProb,
           brier: b.brier, a: b.a, b: b.b, active: b.active,
         })),
+        global: calibState.global,
       } : null,
     };
   },

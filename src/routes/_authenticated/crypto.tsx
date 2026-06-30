@@ -913,6 +913,20 @@ function CryptoPage() {
               </div>
             ))}
           </div>
+          <div className={`border rounded p-2 text-xs ${data.calibration.global.active ? "border-emerald-500/40" : "border-border"}`}>
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Global fallback fit
+              </div>
+              <div className={`text-[9px] uppercase tracking-wider ${data.calibration.global.active ? "text-emerald-400" : "text-muted-foreground"}`}>
+                {data.calibration.global.active ? "LIVE" : `warmup (${data.calibration.global.n}/20)`}
+              </div>
+            </div>
+            <div className="text-[10px] text-muted-foreground font-mono">
+              n={data.calibration.global.n} · Platt a={data.calibration.global.a.toFixed(2)} b={data.calibration.global.b.toFixed(2)}
+              {" · "}applied when bucket has &lt;30 samples
+            </div>
+          </div>
         </div>
       )}
 
