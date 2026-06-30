@@ -764,6 +764,14 @@ function AutoTradePanel() {
             {liveTotals.placed} live placed · <span className="text-emerald-400">{liveTotals.wins}W</span> / <span className="text-red-400">{liveTotals.losses}L</span> · PnL <span className={liveTotals.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}>{liveTotals.pnlUsd >= 0 ? "+" : ""}${liveTotals.pnlUsd.toFixed(2)}</span>
           </div>
           <button
+            onClick={() => { setSoundOn(s => !s); if (!soundOn) playOrderPlaced(); }}
+            className="text-xs font-semibold p-1.5 rounded border border-border bg-muted/30 hover:bg-muted/50 flex items-center"
+            title={soundOn ? "Order sounds on — click to mute" : "Order sounds muted — click to enable"}
+            aria-label={soundOn ? "Mute order sounds" : "Unmute order sounds"}
+          >
+            {soundOn ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5 text-muted-foreground" />}
+          </button>
+          <button
             onClick={testKalshi}
             disabled={testBusy}
             className="text-xs font-semibold px-3 py-1.5 rounded border border-border bg-muted/30 hover:bg-muted/50 disabled:opacity-50 flex items-center gap-1.5"
