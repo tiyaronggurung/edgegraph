@@ -100,7 +100,7 @@ export async function getCalibrator(): Promise<CalibratorState> {
 
   const { data, error } = await supabaseAdmin
     .from("btc_model_predictions")
-    .select("model_prob, was_correct, side, snapshot_seconds_to_close")
+    .select("model_prob, was_correct, side, snapshot_seconds_to_close, settled_at")
     .not("was_correct", "is", null)
     .order("settled_at", { ascending: false })
     .limit(MAX_ROWS);
@@ -126,7 +126,11 @@ export async function getCalibrator(): Promise<CalibratorState> {
     const side = (r.side as string) === "YES" ? "YES" : "NO";
     // YES outcome iff (side==YES & correct) OR (side==NO & !correct)
     const yes: 0 | 1 = (side === "YES" ? correct : !correct) ? 1 : 0;
-    samples.push({ p, y: yes, bucket: bucketOf(Number(r.snapshot_seconds_to_close ?? 0)) });
+    samples.push({
+      p, y: yes,
+      bucket: bucketOf(Number(r.snapshot_seconds_to_close ?? 0)),
+      w: recencyWeight(r.settled_at as string | null),
+    });
   }
 
   const bucketKeys: BucketFit["bucket"][] = ["lt60", "60_300", "300_600", "ge600"];
