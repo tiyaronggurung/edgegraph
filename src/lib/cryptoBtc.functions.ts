@@ -111,12 +111,25 @@ function minuteSigma(candles: BtcCandle[]): number {
 // Conditional prob: given spot now after `elapsed` min into the window, what's
 // P(spot at close >= strike)? Only the REMAINING minutes diffuse — the realized
 // path is already locked in. This is what makes intra-window edge real.
+// (b) Empirical 0.6× correction for 1-min close-to-close noise (bid/ask bounce
+// inflates the raw stdev vs true settlement-window variance).
+const SIGMA_CORRECTION = 0.6;
+
 function probAboveCond(spot: number, strike: number, sigmaMin: number, minutesRemaining: number): number {
   const t = Math.max(1 / 60, minutesRemaining);
-  const sigma = sigmaMin * Math.sqrt(t);
+  const sigma = sigmaMin * SIGMA_CORRECTION * Math.sqrt(t);
   if (sigma <= 0) return spot >= strike ? 1 : 0;
   const d = (Math.log(strike / spot) + 0.5 * sigma * sigma) / sigma;
   return 1 - normCdf(d);
+}
+
+// (c) Pull model toward market when very little time remains — the residual
+// diffusion variance is mostly noise vs the already-locked path.
+function blendNearExpiry(modelP: number, marketP: number, minsRemaining: number): number {
+  if (minsRemaining >= 2) return modelP;
+  // weight on market grows from 0 at 2min to 0.85 at 0min
+  const w = Math.min(0.85, (2 - minsRemaining) / 2 * 0.85);
+  return modelP * (1 - w) + marketP * w;
 }
 
 function quarterKelly(p: number, priceYes: number): number {
