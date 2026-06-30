@@ -773,8 +773,8 @@ function AutoTradePanel() {
                           </details>
                         )}
                       </div>
-                    </li>
-                  </ol>
+                    </div>
+                  </li>
                 ))}
               </ol>
               <div className={`text-[11px] p-2 rounded border ${diag.ok ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-300" : "border-red-500/30 bg-red-500/5 text-red-300"}`}>
