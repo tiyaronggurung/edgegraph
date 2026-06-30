@@ -10,6 +10,14 @@ export interface BtcCandle {
   t: number; o: number; h: number; l: number; c: number; v: number;
 }
 
+export interface BtcMicro {
+  fundingRate: number;       // 8h funding rate (fraction, e.g. 0.0001 = +1bp / 8h)
+  fundingAnnualBps: number;  // annualized basis-points
+  oiNotional: number;        // perp open interest USD
+  oiDelta5mPct: number;      // % change in OI over last ~5 min
+  basisBps: number;          // (perp - spot) / spot * 10000
+}
+
 export interface BtcMarket {
   ticker: string;
   eventTicker: string;
@@ -31,7 +39,9 @@ export interface BtcMarket {
   windowOpenPrice: number;   // BTC price at strike-window open
   realizedMoveBps: number;   // (spot - open)/open * 10000
   modelYesProb: number;
+  modelBaseProb: number;     // diffusion-only prob (before micro adjustment)
   modelSource: "external" | "intra-window-diffusion";
+  microAdjPts: number;       // points added by microstructure features
   edgePts: number;
   side: "YES" | "NO";
   edgeAbs: number;
@@ -39,13 +49,16 @@ export interface BtcMarket {
   secondsToClose: number;
 }
 
+
 interface BtcMarketsResult {
   spot: number;
   asOf: string;
   candles: BtcCandle[];
   markets: BtcMarket[];
   modelSource: "external" | "intra-window-diffusion";
+  micro: BtcMicro | null;
 }
+
 
 const _kalshiCache = new Map<string, { at: number; data: any }>();
 const KALSHI_TTL_MS = 8_000;
@@ -197,6 +210,85 @@ async function fetchExternalProb(ctx: {
   } catch { return null; }
 }
 
+// ── PHASE 1 · STEP 1 ────────────────────────────────────────────────────────
+// Microstructure signals from Binance USDT-perp:
+//  · funding rate  — directional crowding tax
+//  · OI 5-min delta — fresh leverage building or unwinding
+//  · spot–perp basis — pressure / liquidation proxy
+// Cached 20s to stay friendly with public endpoints.
+let _microCache: { at: number; data: BtcMicro | null } | null = null;
+const MICRO_TTL_MS = 20_000;
+
+async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
+  if (_microCache && Date.now() - _microCache.at < MICRO_TTL_MS) return _microCache.data;
+  try {
+    const [fundingRes, oiRes, oiHistRes, perpRes] = await Promise.all([
+      fetch("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT"),
+      fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT"),
+      fetch("https://fapi.binance.com/futures/data/openInterestHist?symbol=BTCUSDT&period=5m&limit=2"),
+      fetch("https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT"),
+    ]);
+    if (!fundingRes.ok || !oiRes.ok || !perpRes.ok) throw new Error("micro http");
+    const funding: any = await fundingRes.json();
+    const oi: any = await oiRes.json();
+    const perp: any = await perpRes.json();
+    const hist: any[] = oiHistRes.ok ? await oiHistRes.json() : [];
+
+    const fundingRate = Number(funding.lastFundingRate ?? 0); // per 8h
+    const perpPrice = Number(perp.price ?? 0);
+    const oiContracts = Number(oi.openInterest ?? 0);
+    const oiNotional = oiContracts * perpPrice;
+    const basisBps = spot > 0 ? ((perpPrice - spot) / spot) * 10000 : 0;
+
+    let oiDelta5mPct = 0;
+    if (hist.length >= 2) {
+      const prev = Number(hist[0]?.sumOpenInterestValue ?? hist[0]?.sumOpenInterest ?? 0);
+      const curr = Number(hist[1]?.sumOpenInterestValue ?? hist[1]?.sumOpenInterest ?? 0);
+      if (prev > 0) oiDelta5mPct = ((curr - prev) / prev) * 100;
+    }
+
+    const data: BtcMicro = {
+      fundingRate,
+      fundingAnnualBps: fundingRate * 3 * 365 * 10000,
+      oiNotional,
+      oiDelta5mPct,
+      basisBps,
+    };
+    _microCache = { at: Date.now(), data };
+    return data;
+  } catch {
+    _microCache = { at: Date.now(), data: null };
+    return null;
+  }
+}
+
+// Logistic adjustment: shift YES probability by a small bounded amount when
+// microstructure signals lean one way. Bullish bias ⇒ raise YES prob.
+//
+// Conservative, hand-tuned coefficients. Bounded at ±4 points so a single
+// noisy signal cannot flip a call by itself.
+function microAdjustment(p: number, m: BtcMicro | null, secondsToClose: number): { p: number; deltaPts: number } {
+  if (!m || secondsToClose <= 30 || p <= 0 || p >= 1) return { p, deltaPts: 0 };
+
+  // z-style: positive = bullish for next 15m, negative = bearish.
+  // Funding > +0.01% / 8h = crowded longs (bearish lean — paying to be long).
+  const fundingZ = -Math.max(-3, Math.min(3, m.fundingRate / 0.00005));   // ±3 around ±2.5bps/8h
+  // OI rising while basis positive = fresh longs piling in (bullish short term, can revert).
+  // OI rising while basis negative = fresh shorts (bearish short term).
+  const oiZ = Math.max(-2, Math.min(2, m.oiDelta5mPct / 0.5)) * Math.sign(m.basisBps || 1);
+  // Basis blowout: |basis| > 5bps suggests imbalance; sign = direction of pressure.
+  const basisZ = Math.max(-2, Math.min(2, m.basisBps / 5));
+
+  const score = 0.35 * fundingZ + 0.25 * oiZ + 0.40 * basisZ; // ~±2.5 typical
+  // Convert score → logit shift, scale down hard, cap at ±0.18 logit (≈ ±4 prob points near 0.5).
+  const logitShift = Math.max(-0.18, Math.min(0.18, score * 0.05));
+  const eps = 1e-6;
+  const logit = Math.log(Math.max(eps, p) / Math.max(eps, 1 - p));
+  const pNew = 1 / (1 + Math.exp(-(logit + logitShift)));
+  return { p: pNew, deltaPts: (pNew - p) * 100 };
+}
+
+
 export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
   async (): Promise<BtcMarketsResult> => {
     const [evJson, candles] = await Promise.all([
@@ -211,6 +303,9 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
     const sigma = minuteSigma(recent);
     const now = Date.now();
     const hasExternal = !!process.env.CRYPTO_MODEL_URL;
+
+    // (d) Microstructure features — funding, OI delta, spot–perp basis.
+    const micro = await fetchBinanceMicro(spot);
 
     const events = (evJson.events ?? []) as any[];
     const markets: BtcMarket[] = [];
@@ -229,7 +324,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         const windowOpen = priceAt(recent, Math.floor(openMs / 1000)) || spot;
         const realizedMoveBps = windowOpen > 0 ? ((spot - windowOpen) / windowOpen) * 10000 : 0;
 
-        let p = spot > 0 && strike > 0
+        let pBase = spot > 0 && strike > 0
           ? probAboveCond(spot, strike, sigma, minsRemaining)
           : 0.5;
         let source: BtcMarket["modelSource"] = "intra-window-diffusion";
@@ -238,7 +333,11 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           ticker: m.ticker, strike, spot, windowOpen,
           minutesRemaining: minsRemaining, yesPrice,
         });
-        if (ext !== null) { p = ext; source = "external"; }
+        if (ext !== null) { pBase = ext; source = "external"; }
+
+        // (d) Apply microstructure logistic adjustment on top of base prob.
+        const adj = microAdjustment(pBase, micro, secondsToClose);
+        let p = adj.p;
 
         // (c) Shrink toward market in the final 2 minutes.
         if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining);
@@ -265,6 +364,8 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           openTime, closeTime,
           spot, windowOpenPrice: windowOpen, realizedMoveBps,
           modelYesProb: p,
+          modelBaseProb: pBase,
+          microAdjPts: adj.deltaPts,
           modelSource: source,
           edgePts, side, edgeAbs,
           kellyFraction: kelly,
@@ -309,6 +410,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
       candles: recent,
       markets,
       modelSource: hasExternal ? "external" : "intra-window-diffusion",
+      micro,
     };
   },
 );
