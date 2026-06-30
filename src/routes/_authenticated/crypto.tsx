@@ -445,6 +445,34 @@ function CryptoPage() {
         </div>
       </div>
 
+      {data?.micro && (
+        <div className="border border-border rounded-lg bg-card p-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Perp funding (8h)</div>
+            <div className={`font-mono text-sm ${data.micro.fundingRate >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {(data.micro.fundingRate * 100).toFixed(4)}% <span className="text-[10px] text-muted-foreground">({data.micro.fundingAnnualBps >= 0 ? "+" : ""}{data.micro.fundingAnnualBps.toFixed(0)}bps APR)</span>
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">OI Δ 5m</div>
+            <div className={`font-mono text-sm ${data.micro.oiDelta5mPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {data.micro.oiDelta5mPct >= 0 ? "+" : ""}{data.micro.oiDelta5mPct.toFixed(2)}%
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Spot–perp basis</div>
+            <div className={`font-mono text-sm ${data.micro.basisBps >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {data.micro.basisBps >= 0 ? "+" : ""}{data.micro.basisBps.toFixed(2)}bps
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Perp OI</div>
+            <div className="font-mono text-sm">${(data.micro.oiNotional / 1e9).toFixed(2)}B</div>
+          </div>
+        </div>
+      )}
+
+
       {q.isLoading && <div className="border border-border rounded-lg bg-card p-6 text-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Loading…</div>}
       {q.isError && <div className="border border-red-500/40 rounded-lg bg-card p-4 text-sm text-red-400">Failed to load Kalshi/Coinbase feeds.</div>}
 
