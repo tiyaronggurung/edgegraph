@@ -641,7 +641,15 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         const fundAbs = Math.abs(micro?.fundingRate ?? 0) / 0.00005; // z-ish
         const basisAbs = Math.abs(micro?.basisBps ?? 0) / 5;
         const tRegime = (fundAbs > 2 || basisAbs > 2) ? 1.5 : 0;
-        const requiredEdgePts = tBase + tCalib + tTime + tSpread + tRegime;
+        // Step 6 · Whale-flow regime: strong aligned whale flow LOWERS bar,
+        // contradictory whale flow RAISES it. |imbalance| > 0.6 = strong.
+        const wImb = micro?.whaleImbalance1m ?? 0;
+        const sideSign = side === "YES" ? 1 : -1;
+        let tWhale = 0;
+        if (Math.abs(wImb) > 0.6 && (micro?.whaleBuyUsd1m ?? 0) + (micro?.whaleSellUsd1m ?? 0) > 500_000) {
+          tWhale = Math.sign(wImb) === sideSign ? -1.0 : 1.5;
+        }
+        const requiredEdgePts = Math.max(1.5, tBase + tCalib + tTime + tSpread + tRegime + tWhale);
 
         let gateAction: "BET" | "PASS" = "PASS";
         let gateReason = "";
