@@ -125,11 +125,14 @@ function MarketRow({
         <span className="text-[10px] text-muted-foreground">BTC 60m · dashed = strike</span>
       </div>
 
-      <div className="flex flex-col items-end gap-1 min-w-[180px]">
+      <div className="flex flex-col items-end gap-1 min-w-[200px]">
         <div className={`px-2 py-0.5 text-[11px] uppercase tracking-wider border rounded ${sideColor}`}>Model: bet {m.side}</div>
         <div className="text-sm">Model YES prob <span className="font-bold">{(m.modelYesProb*100).toFixed(1)}%</span></div>
+        <div className="text-[10px] text-muted-foreground">
+          base {(m.modelBaseProb*100).toFixed(1)}% {m.microAdjPts >= 0 ? "+" : ""}{m.microAdjPts.toFixed(2)}pts micro
+        </div>
         <div className="text-xs">Edge <span className={confColor+" font-semibold"}>{m.edgePts>=0?"+":""}{m.edgePts.toFixed(1)} pts</span> <span className={"ml-1 "+confColor}>[{conf}]</span></div>
-        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{m.modelSource === "external" ? "your ML model" : "intra-window diffusion"}</div>
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{m.modelSource === "external" ? "your ML model" : "diffusion + microstructure"}</div>
       </div>
 
       <div className="flex flex-col items-stretch gap-1 min-w-[160px]">
