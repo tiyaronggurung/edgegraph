@@ -364,6 +364,16 @@ function CryptoPage() {
   const [pending, setPending] = useState<BtcMarket | null>(null);
   const live = useBinanceBtcSpot();
 
+  // Auto-refetch the instant any strike window closes so the next 15-min strike appears immediately.
+  useEffect(() => {
+    const markets = q.data?.markets ?? [];
+    if (!markets.length) return;
+    const soonest = Math.min(...markets.map(m => m.secondsToClose).filter(s => s > 0));
+    if (!Number.isFinite(soonest)) return;
+    const t = setTimeout(() => qc.invalidateQueries({ queryKey: ["btc-markets"] }), (soonest + 2) * 1000);
+    return () => clearTimeout(t);
+  }, [q.data, qc]);
+
   const place = useMutation({
     mutationFn: async (m: BtcMarket) => {
       const sug = suggestedStake(m, sizing);
