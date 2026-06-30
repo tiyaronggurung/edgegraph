@@ -514,6 +514,24 @@ function CryptoPage() {
               <div className="font-mono text-sm">{data.micro.bookSpreadBps.toFixed(2)}bps</div>
               <div className="text-[10px] text-muted-foreground">best bid/ask</div>
             </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Whales 1m (≥$250k)</div>
+              <div className={`font-mono text-sm ${data.micro.whaleImbalance1m >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {data.micro.whaleImbalance1m >= 0 ? "+" : ""}{(data.micro.whaleImbalance1m * 100).toFixed(0)}%
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                buy ${(data.micro.whaleBuyUsd1m / 1e6).toFixed(2)}M / sell ${(data.micro.whaleSellUsd1m / 1e6).toFixed(2)}M
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Whales 5m</div>
+              <div className={`font-mono text-sm ${data.micro.whaleImbalance5m >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {data.micro.whaleImbalance5m >= 0 ? "+" : ""}{(data.micro.whaleImbalance5m * 100).toFixed(0)}%
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                {data.micro.whaleCount5m} fills · ${((data.micro.whaleBuyUsd5m + data.micro.whaleSellUsd5m) / 1e6).toFixed(1)}M
+              </div>
+            </div>
           </div>
         </div>
       )}
