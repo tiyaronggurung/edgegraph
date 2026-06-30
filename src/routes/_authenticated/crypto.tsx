@@ -355,7 +355,7 @@ function CryptoPage() {
   const cfgFn = useServerFn(checkKalshiConfigured);
   const placeFn = useServerFn(placeKalshiOrder);
 
-  const q = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 30_000, staleTime: 15_000 });
+  const q = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 10_000, staleTime: 5_000 });
   const cfg = useQuery({ queryKey: ["kalshi-cfg"], queryFn: () => cfgFn(), staleTime: 60_000 });
 
   const [bankroll, setBankroll] = useState(1000);
