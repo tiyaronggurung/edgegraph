@@ -22,6 +22,8 @@ export const Route = createFileRoute("/_authenticated/crypto")({
 const fmt$ = (n: number) => n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const fmtTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
 const fmtCountdown = (s: number) => s <= 0 ? "closed" : `${Math.floor(s/60)}m ${(s%60).toString().padStart(2,"0")}s`;
+// Kalshi BTC 15m: YES = price closes ABOVE strike, NO = at/below. Show "UP" / "DOWN" to users.
+const dirLabel = (side: string) => side === "YES" ? "UP" : "DOWN";
 
 function Sparkline({ candles, strike }: { candles: BtcCandle[]; strike?: number }) {
   if (!candles.length) return <div className="h-12 text-xs text-muted-foreground">no data</div>;
@@ -127,7 +129,7 @@ function MarketRow({
 
       <div className="flex flex-col items-end gap-1 min-w-[220px]">
         <div className="flex items-center gap-2">
-          <div className={`px-2 py-0.5 text-[11px] uppercase tracking-wider border rounded ${sideColor}`}>Model: {m.side}</div>
+          <div className={`px-2 py-0.5 text-[11px] uppercase tracking-wider border rounded ${sideColor}`}>Model: {dirLabel(m.side)}</div>
           <div className={`px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider border rounded ${
             m.gateAction === "BET"
               ? "bg-[color:var(--color-primary)]/20 text-[color:var(--color-primary)] border-[color:var(--color-primary)]/60"
@@ -192,7 +194,7 @@ function TopPick({ markets }: { markets: BtcMarket[] }) {
         <span className="text-xs uppercase tracking-wider text-[color:var(--color-primary)]">Model Top Pick</span>
       </div>
       <div className="text-lg font-bold">
-        Bet <span className="text-[color:var(--color-primary)]">{pick.side}</span> · strike {fmt$(pick.strike)} · closes {fmtTime(pick.closeTime)}
+        Bet BTC goes <span className="text-[color:var(--color-primary)]">{dirLabel(pick.side)}</span> from strike {fmt$(pick.strike)} · closes {fmtTime(pick.closeTime)}
       </div>
       <div className="text-sm text-muted-foreground mt-1">
         Spot {fmt$(pick.spot)} · Model {(pick.modelYesProb*100).toFixed(1)}% vs market {(pick.yesPrice*100).toFixed(0)}¢ · edge {pick.edgePts>=0?"+":""}{pick.edgePts.toFixed(1)}pts
@@ -217,7 +219,7 @@ function ConfirmModal({
         </div>
         <div className="space-y-1 text-sm mb-4">
           <div><span className="text-muted-foreground">Market:</span> <code className="text-xs">{market.ticker}</code></div>
-          <div><span className="text-muted-foreground">Side:</span> <span className="font-bold">{market.side}</span> @ <span className="font-bold">{sug.limitCents}¢</span> limit</div>
+          <div><span className="text-muted-foreground">Direction:</span> <span className="font-bold">{dirLabel(market.side)}</span> ({market.side}) @ <span className="font-bold">{sug.limitCents}¢</span> limit</div>
           <div><span className="text-muted-foreground">Contracts:</span> <span className="font-bold">{sug.contracts}</span></div>
           <div><span className="text-muted-foreground">Max risk:</span> <span className="font-bold">{fmt$(sug.stakeUsd)}</span> ({((sug.stakeUsd/sizing.bankroll)*100).toFixed(2)}% of bankroll)</div>
           <div><span className="text-muted-foreground">Edge:</span> {market.edgePts>=0?"+":""}{market.edgePts.toFixed(1)} pts</div>
@@ -265,7 +267,7 @@ function TradeLog() {
             <tr key={t.id} className="border-t border-border">
               <td className="p-2">{new Date(t.created_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })}</td>
               <td className="p-2 font-mono">{t.ticker}</td>
-              <td className="p-2"><span className={t.side === "YES" ? "text-emerald-400" : "text-red-400"}>{t.side}</span></td>
+              <td className="p-2"><span className={t.side === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(t.side)}</span></td>
               <td className="p-2 text-right">{t.strike ? fmt$(Number(t.strike)) : "—"}</td>
               <td className="p-2 text-right">{t.spot_at_entry ? fmt$(Number(t.spot_at_entry)) : "—"}</td>
               <td className="p-2 text-right">{t.model_prob != null ? (Number(t.model_prob)*100).toFixed(1) + "%" : "—"}</td>
@@ -353,7 +355,7 @@ function ModelAccuracyPanel() {
                     <tr key={r.ticker} className="border-t border-border">
                       <td className="p-2">{new Date(r.closeTime).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
                       <td className="p-2 font-mono">{r.ticker}</td>
-                      <td className="p-2"><span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>{r.side}</span></td>
+                      <td className="p-2"><span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(r.side)}</span></td>
                       <td className="p-2 text-right">{fmt$(r.strike)}</td>
                       <td className="p-2 text-right">{(r.modelProb * 100).toFixed(1)}%</td>
                       <td className="p-2 text-right">{(r.marketYesPrice * 100).toFixed(0)}</td>
