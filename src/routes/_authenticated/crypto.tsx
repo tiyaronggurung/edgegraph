@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle, ArrowUp, ArrowDown } from "lucide-react";
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured } from "@/lib/cryptoTrades.functions";
@@ -355,7 +355,7 @@ function CryptoPage() {
   const cfgFn = useServerFn(checkKalshiConfigured);
   const placeFn = useServerFn(placeKalshiOrder);
 
-  const q = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 30_000, staleTime: 15_000 });
+  const q = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 10_000, staleTime: 5_000 });
   const cfg = useQuery({ queryKey: ["kalshi-cfg"], queryFn: () => cfgFn(), staleTime: 60_000 });
 
   const [bankroll, setBankroll] = useState(1000);
@@ -363,6 +363,16 @@ function CryptoPage() {
   const sizing: SizingState = { bankroll, kellyMult };
   const [pending, setPending] = useState<BtcMarket | null>(null);
   const live = useBinanceBtcSpot();
+
+  // Auto-refetch the instant any strike window closes so the next 15-min strike appears immediately.
+  useEffect(() => {
+    const markets = q.data?.markets ?? [];
+    if (!markets.length) return;
+    const soonest = Math.min(...markets.map(m => m.secondsToClose).filter(s => s > 0));
+    if (!Number.isFinite(soonest)) return;
+    const t = setTimeout(() => qc.invalidateQueries({ queryKey: ["btc-markets"] }), (soonest + 2) * 1000);
+    return () => clearTimeout(t);
+  }, [q.data, qc]);
 
   const place = useMutation({
     mutationFn: async (m: BtcMarket) => {
