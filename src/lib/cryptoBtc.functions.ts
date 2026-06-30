@@ -2,7 +2,6 @@
 // Model = lognormal diffusion CONDITIONED on intra-window realized price action.
 // Optional override: POST market context to CRYPTO_MODEL_URL and use returned {prob}.
 import { createServerFn } from "@tanstack/react-start";
-import { snapshotPrediction, settleDuePredictions } from "./cryptoPredictions.functions";
 
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
 const COINBASE = "https://api.exchange.coinbase.com";
