@@ -304,6 +304,9 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
     const now = Date.now();
     const hasExternal = !!process.env.CRYPTO_MODEL_URL;
 
+    // (d) Microstructure features — funding, OI delta, spot–perp basis.
+    const micro = await fetchBinanceMicro(spot);
+
     const events = (evJson.events ?? []) as any[];
     const markets: BtcMarket[] = [];
 
@@ -321,7 +324,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         const windowOpen = priceAt(recent, Math.floor(openMs / 1000)) || spot;
         const realizedMoveBps = windowOpen > 0 ? ((spot - windowOpen) / windowOpen) * 10000 : 0;
 
-        let p = spot > 0 && strike > 0
+        let pBase = spot > 0 && strike > 0
           ? probAboveCond(spot, strike, sigma, minsRemaining)
           : 0.5;
         let source: BtcMarket["modelSource"] = "intra-window-diffusion";
@@ -330,7 +333,11 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           ticker: m.ticker, strike, spot, windowOpen,
           minutesRemaining: minsRemaining, yesPrice,
         });
-        if (ext !== null) { p = ext; source = "external"; }
+        if (ext !== null) { pBase = ext; source = "external"; }
+
+        // (d) Apply microstructure logistic adjustment on top of base prob.
+        const adj = microAdjustment(pBase, micro, secondsToClose);
+        let p = adj.p;
 
         // (c) Shrink toward market in the final 2 minutes.
         if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining);
@@ -357,6 +364,8 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           openTime, closeTime,
           spot, windowOpenPrice: windowOpen, realizedMoveBps,
           modelYesProb: p,
+          modelBaseProb: pBase,
+          microAdjPts: adj.deltaPts,
           modelSource: source,
           edgePts, side, edgeAbs,
           kellyFraction: kelly,
@@ -401,6 +410,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
       candles: recent,
       markets,
       modelSource: hasExternal ? "external" : "intra-window-diffusion",
+      micro,
     };
   },
 );
