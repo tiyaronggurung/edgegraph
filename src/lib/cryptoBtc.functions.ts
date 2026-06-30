@@ -642,7 +642,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         const realizedMoveBps = windowOpen > 0 ? ((spot - windowOpen) / windowOpen) * 10000 : 0;
 
         let pDiffusion = spot > 0 && strike > 0
-          ? probAboveCond(spot, strike, sigma, minsRemaining)
+          ? probAboveCond(spot, strike, sigmaEff, minsRemaining)
           : 0.5;
         let source: BtcMarket["modelSource"] = "intra-window-diffusion";
 
@@ -665,18 +665,25 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         const cal = applyCalib ? applyCalib(p, secondsToClose, calibState) : { p, deltaPts: 0, bucket: "ge600", active: false };
         p = cal.p;
 
-        // (c) Shrink toward market in the final 2 minutes.
-        if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining);
+        // Locked side: first snapshot picks UP/DOWN for the window.
+        const lockedPre = lockedSides.get(m.ticker);
+        const tentativeSide: "YES" | "NO" = lockedPre ?? ((p - yesPrice) >= 0 ? "YES" : "NO");
+
+        // (c) Asymmetric blend toward market in the final 2 minutes — only when
+        // model trails market on the locked side, never when we're MORE confident
+        // than Kalshi (we read spot+time live; their book lags).
+        if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining, tentativeSide);
 
         const rawEdgePts = (p - yesPrice) * 100;
-        // Locked side wins; first snapshot picks the direction for the window.
-        const locked = lockedSides.get(m.ticker);
-        const side: "YES" | "NO" = locked ?? (rawEdgePts >= 0 ? "YES" : "NO");
+        const side: "YES" | "NO" = tentativeSide;
         // Edge is reported toward the locked side: positive = still favorable,
         // negative = model has since drifted against the original pick.
         const edgePts = side === "YES" ? rawEdgePts : -rawEdgePts;
         const edgeAbs = Math.abs(edgePts);
         const kelly = quarterKelly(p, yesPrice);
+
+        // Time/vol safety margin — how many σ from strike (locked side).
+        const sigDist = sigmaDistance(spot, strike, sigmaEff, minsRemaining);
 
         // ── STEP 5 · Edge gate ────────────────────────────────────────────
         const bucketFit = calibState?.buckets.find(b => b.bucket === cal.bucket);
