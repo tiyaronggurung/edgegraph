@@ -1,17 +1,13 @@
-// Kalshi BTC 15-min up/down markets + lightweight model prediction.
-// Public Kalshi + Coinbase Exchange feeds, no auth required.
+// Kalshi BTC 15-min up/down markets + model prediction.
+// Model = lognormal diffusion CONDITIONED on intra-window realized price action.
+// Optional override: POST market context to CRYPTO_MODEL_URL and use returned {prob}.
 import { createServerFn } from "@tanstack/react-start";
 
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
 const COINBASE = "https://api.exchange.coinbase.com";
 
 export interface BtcCandle {
-  t: number; // unix seconds (bar start)
-  o: number;
-  h: number;
-  l: number;
-  c: number;
-  v: number;
+  t: number; o: number; h: number; l: number; c: number; v: number;
 }
 
 export interface BtcMarket {
@@ -20,8 +16,8 @@ export interface BtcMarket {
   title: string;
   subTitle: string;
   yesSubTitle: string;
-  strike: number;            // floor_strike (target price)
-  yesPrice: number;          // 0..1 (last)
+  strike: number;
+  yesPrice: number;
   yesBid: number;
   yesAsk: number;
   noBid: number;
@@ -29,23 +25,26 @@ export interface BtcMarket {
   openInterest: number;
   volume: number;
   volume24h: number;
-  openTime: string | null;   // ISO — strike window start
-  closeTime: string | null;  // ISO — resolution
-  // Model output
-  spot: number;              // BTC spot at evaluation
-  modelYesProb: number;      // 0..1 — P(BTC avg ≥ strike at close)
-  edgePts: number;           // (modelYesProb*100) - (yesPrice*100). Positive => bet YES, negative => bet NO.
-  side: "YES" | "NO";        // which side has edge
-  edgeAbs: number;           // |edgePts|
-  kellyFraction: number;     // quarter-Kelly bankroll fraction
+  openTime: string | null;
+  closeTime: string | null;
+  spot: number;
+  windowOpenPrice: number;   // BTC price at strike-window open
+  realizedMoveBps: number;   // (spot - open)/open * 10000
+  modelYesProb: number;
+  modelSource: "external" | "intra-window-diffusion";
+  edgePts: number;
+  side: "YES" | "NO";
+  edgeAbs: number;
+  kellyFraction: number;     // quarter-Kelly bankroll fraction (display only)
   secondsToClose: number;
 }
 
 interface BtcMarketsResult {
   spot: number;
   asOf: string;
-  candles: BtcCandle[];      // last ~60 1-min bars, oldest -> newest
+  candles: BtcCandle[];
   markets: BtcMarket[];
+  modelSource: "external" | "intra-window-diffusion";
 }
 
 async function kalshiFetch(path: string): Promise<any> {
@@ -55,20 +54,15 @@ async function kalshiFetch(path: string): Promise<any> {
 }
 
 async function fetchBtcCandles(): Promise<BtcCandle[]> {
-  // Granularity 60s; Coinbase returns newest first. Reverse to oldest->newest.
   const res = await fetch(`${COINBASE}/products/BTC-USD/candles?granularity=60`, {
     headers: { Accept: "application/json", "User-Agent": "edgegraph/1.0" },
   });
   if (!res.ok) throw new Error(`Coinbase ${res.status}`);
   const rows = (await res.json()) as number[][];
-  return rows
-    .map(([t, l, h, o, c, v]) => ({ t, o, h, l, c, v }))
-    .sort((a, b) => a.t - b.t);
+  return rows.map(([t, l, h, o, c, v]) => ({ t, o, h, l, c, v })).sort((a, b) => a.t - b.t);
 }
 
-// Normal CDF via erf approximation.
 function normCdf(x: number): number {
-  // Abramowitz & Stegun 7.1.26
   const sign = x < 0 ? -1 : 1;
   const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
   const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
@@ -78,9 +72,8 @@ function normCdf(x: number): number {
   return 0.5 * (1 + sign * y);
 }
 
-// Per-minute log-return std-dev from candle closes.
 function minuteSigma(candles: BtcCandle[]): number {
-  if (candles.length < 5) return 0.0008; // ~8bps fallback
+  if (candles.length < 5) return 0.0008;
   const rets: number[] = [];
   for (let i = 1; i < candles.length; i++) {
     const r = Math.log(candles[i].c / candles[i - 1].c);
@@ -92,27 +85,57 @@ function minuteSigma(candles: BtcCandle[]): number {
   return Math.max(1e-6, Math.sqrt(v));
 }
 
-// Probability that BTC spot at close (≈ avg of last minute) ≥ strike.
-// Lognormal diffusion from current spot over t minutes, sigma_min per minute.
-function probAbove(spot: number, strike: number, sigmaMin: number, minutesToClose: number): number {
-  const t = Math.max(1 / 60, minutesToClose); // floor at 1 second
+// Conditional prob: given spot now after `elapsed` min into the window, what's
+// P(spot at close >= strike)? Only the REMAINING minutes diffuse — the realized
+// path is already locked in. This is what makes intra-window edge real.
+function probAboveCond(spot: number, strike: number, sigmaMin: number, minutesRemaining: number): number {
+  const t = Math.max(1 / 60, minutesRemaining);
   const sigma = sigmaMin * Math.sqrt(t);
   if (sigma <= 0) return spot >= strike ? 1 : 0;
-  // ln(S_T/S_0) ~ N(-sigma^2/2, sigma^2). P(S_T >= K) = 1 - N(d), d = (ln(K/S) + sigma^2/2)/sigma
   const d = (Math.log(strike / spot) + 0.5 * sigma * sigma) / sigma;
   return 1 - normCdf(d);
 }
 
 function quarterKelly(p: number, priceYes: number): number {
-  // Bet YES if p > priceYes; b = (1-price)/price ; f* = (bp - q)/b
-  // Bet NO otherwise; price_no = 1 - price_yes; q = 1 - p
   const betYes = p > priceYes;
   const price = betYes ? priceYes : 1 - priceYes;
   const prob = betYes ? p : 1 - p;
   if (price <= 0.01 || price >= 0.99) return 0;
   const b = (1 - price) / price;
   const f = (b * prob - (1 - prob)) / b;
-  return Math.max(0, Math.min(0.05, f * 0.25)); // quarter-Kelly, cap 5%
+  return Math.max(0, Math.min(0.05, f * 0.25));
+}
+
+// Find the candle closest to (but not after) a given unix-second timestamp.
+function priceAt(candles: BtcCandle[], unixSec: number): number {
+  if (!candles.length) return 0;
+  let best = candles[0];
+  for (const c of candles) {
+    if (c.t <= unixSec) best = c;
+    else break;
+  }
+  return best.c;
+}
+
+async function fetchExternalProb(ctx: {
+  ticker: string; strike: number; spot: number;
+  windowOpen: number; minutesRemaining: number; yesPrice: number;
+}): Promise<number | null> {
+  const url = process.env.CRYPTO_MODEL_URL;
+  if (!url) return null;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ctx),
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const j: any = await res.json();
+    const p = Number(j.prob ?? j.yes_prob ?? j.probability);
+    if (!Number.isFinite(p) || p < 0 || p > 1) return null;
+    return p;
+  } catch { return null; }
 }
 
 export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
@@ -126,6 +149,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
     const spot = recent.length ? recent[recent.length - 1].c : 0;
     const sigma = minuteSigma(recent);
     const now = Date.now();
+    const hasExternal = !!process.env.CRYPTO_MODEL_URL;
 
     const events = (evJson.events ?? []) as any[];
     const markets: BtcMarket[] = [];
@@ -135,14 +159,25 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         if (m.status !== "active") continue;
         const strike = Number(m.floor_strike ?? 0);
         const yesPrice = Number(m.last_price_dollars ?? m.yes_bid_dollars ?? 0);
+        const openTime = m.open_time ?? null;
         const closeTime = m.close_time ?? m.expected_expiration_time ?? null;
         const closeMs = closeTime ? new Date(closeTime).getTime() : now + 15 * 60_000;
-        const minsToClose = Math.max(0, (closeMs - now) / 60_000);
+        const openMs = openTime ? new Date(openTime).getTime() : closeMs - 15 * 60_000;
+        const minsRemaining = Math.max(0, (closeMs - now) / 60_000);
         const secondsToClose = Math.max(0, Math.round((closeMs - now) / 1000));
+        const windowOpen = priceAt(recent, Math.floor(openMs / 1000)) || spot;
+        const realizedMoveBps = windowOpen > 0 ? ((spot - windowOpen) / windowOpen) * 10000 : 0;
 
-        const p = spot > 0 && strike > 0
-          ? probAbove(spot, strike, sigma, minsToClose)
+        let p = spot > 0 && strike > 0
+          ? probAboveCond(spot, strike, sigma, minsRemaining)
           : 0.5;
+        let source: BtcMarket["modelSource"] = "intra-window-diffusion";
+
+        const ext = await fetchExternalProb({
+          ticker: m.ticker, strike, spot, windowOpen,
+          minutesRemaining: minsRemaining, yesPrice,
+        });
+        if (ext !== null) { p = ext; source = "external"; }
 
         const edgePts = (p - yesPrice) * 100;
         const side: "YES" | "NO" = edgePts >= 0 ? "YES" : "NO";
@@ -155,8 +190,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           title: e.title ?? m.title ?? "BTC 15m",
           subTitle: e.sub_title ?? "",
           yesSubTitle: m.yes_sub_title ?? "",
-          strike,
-          yesPrice,
+          strike, yesPrice,
           yesBid: Number(m.yes_bid_dollars ?? 0),
           yesAsk: Number(m.yes_ask_dollars ?? 0),
           noBid: Number(m.no_bid_dollars ?? 0),
@@ -164,20 +198,17 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           openInterest: Number(m.open_interest_fp ?? m.open_interest ?? 0),
           volume: Number(m.volume_fp ?? m.volume ?? 0),
           volume24h: Number(m.volume_24h_fp ?? m.volume_24h ?? 0),
-          openTime: m.open_time ?? null,
-          closeTime,
-          spot,
+          openTime, closeTime,
+          spot, windowOpenPrice: windowOpen, realizedMoveBps,
           modelYesProb: p,
-          edgePts,
-          side,
-          edgeAbs,
+          modelSource: source,
+          edgePts, side, edgeAbs,
           kellyFraction: kelly,
           secondsToClose,
         });
       }
     }
 
-    // Soonest-closing first.
     markets.sort((a, b) => a.secondsToClose - b.secondsToClose);
 
     return {
@@ -185,6 +216,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
       asOf: new Date().toISOString(),
       candles: recent,
       markets,
+      modelSource: hasExternal ? "external" : "intra-window-diffusion",
     };
   },
 );
