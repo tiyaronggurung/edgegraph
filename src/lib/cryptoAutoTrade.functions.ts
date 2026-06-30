@@ -340,7 +340,7 @@ export const settleAutoTradeOrders = createServerFn({ method: "POST" })
 const LIVE_TP_FRAC = 0.70;
 const LIVE_SL_FRAC = 0.50;
 const LIVE_EDGE_DECAY_CENTS = 2;
-const KALSHI_PUBLIC_BASE = "https://api.elections.kalshi.com/trade-api/v2";
+const KALSHI_PUBLIC_BASE = "https://api.kalshi.com/trade-api/v2";
 
 export const autoExitLivePositions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
