@@ -121,7 +121,7 @@ export const runAutoTrade = createServerFn({ method: "POST" })
           sigma_distance: m.sigmaDistance,
           gap_in_sigmas: m.gapAnalysis.gapInSigmas,
           seconds_to_close: m.secondsToClose,
-          close_time: m.closeTime,
+          close_time: m.closeTime ?? new Date(Date.now() + m.secondsToClose * 1000).toISOString(),
           status: "placed",
         })
         .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at")
