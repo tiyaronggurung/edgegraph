@@ -290,8 +290,34 @@ function computeExitSignal(trade: any, market: BtcMarket | undefined): OpenPosSi
 function OpenPositions({ markets }: { markets: BtcMarket[] }) {
   const listFn = useServerFn(listMyCryptoTrades);
   const sellFn = useServerFn(sellKalshiOrder);
+  const settleFn = useServerFn(settleExpiredTrades);
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["crypto-trades"], queryFn: () => listFn(), refetchInterval: 10_000 });
+
+  // Auto-settle: 10s after a position's close_time, fetch the resolved market
+  // from Kalshi and stamp WIN/LOSS + realized P&L on the trade row.
+  useEffect(() => {
+    let stopped = false;
+    const tick = async () => {
+      try {
+        const res: any = await settleFn({});
+        if (!stopped && res?.settled > 0) {
+          for (const r of res.results ?? []) {
+            toast[r.outcome === "WIN" ? "success" : "error"](
+              `${r.outcome}: ${r.pnl >= 0 ? "+" : ""}$${Number(r.pnl).toFixed(2)} (settled @ ${r.settleCents}¢)`,
+              { duration: 8000 },
+            );
+          }
+          qc.invalidateQueries({ queryKey: ["crypto-trades"] });
+          qc.invalidateQueries({ queryKey: ["btc-pred-stats"] });
+        }
+      } catch { /* swallow — next tick retries */ }
+    };
+    tick();
+    const id = setInterval(tick, 10_000);
+    return () => { stopped = true; clearInterval(id); };
+  }, [settleFn, qc]);
+
   const sell = useMutation({
     mutationFn: (vars: { tradeId: string; limitPriceCents: number }) => sellFn({ data: vars }),
     onSuccess: (res: any) => {
