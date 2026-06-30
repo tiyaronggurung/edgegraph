@@ -397,13 +397,17 @@ function microAdjustment(p: number, m: BtcMicro | null, secondsToClose: number):
   const cvdZ = Math.max(-2, Math.min(2, m.cvdRatio * 4)); // ratio 0.5 → z=2
   // Order-book imbalance: classic OFI alpha.
   const ofiZ = Math.max(-2, Math.min(2, m.ofi * 3));
+  // Whale aggression: large fills (≥$250k) lead spot on minute horizon.
+  // Use 1m for recency, blended with 5m for stability.
+  const whaleZ = Math.max(-2, Math.min(2, (m.whaleImbalance1m * 0.7 + m.whaleImbalance5m * 0.3) * 3));
 
   const score =
-    0.25 * fundingZ +
-    0.15 * oiZ +
-    0.25 * basisZ +
-    0.20 * cvdZ +
-    0.15 * ofiZ;
+    0.22 * fundingZ +
+    0.13 * oiZ +
+    0.22 * basisZ +
+    0.18 * cvdZ +
+    0.12 * ofiZ +
+    0.13 * whaleZ;
   // Convert score → logit shift, cap at ±0.27 logit (≈ ±6 prob points near 0.5).
   const logitShift = Math.max(-0.27, Math.min(0.27, score * 0.07));
   const eps = 1e-6;
