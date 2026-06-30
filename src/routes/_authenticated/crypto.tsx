@@ -252,6 +252,7 @@ function CryptoPage() {
   const [kellyMult, setKellyMult] = useState(0.25);
   const sizing: SizingState = { bankroll, kellyMult };
   const [pending, setPending] = useState<BtcMarket | null>(null);
+  const live = useBinanceBtcSpot();
 
   const place = useMutation({
     mutationFn: async (m: BtcMarket) => {
