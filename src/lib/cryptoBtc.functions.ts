@@ -69,6 +69,11 @@ export interface BtcMarket {
   edgeAbs: number;
   kellyFraction: number;     // quarter-Kelly bankroll fraction (display only)
   secondsToClose: number;
+  // ── PHASE 1 · STEP 5 — Edge gate ─────────────────────────────────────────
+  requiredEdgePts: number;   // dynamic threshold edge must clear to BET
+  gateAction: "BET" | "PASS";
+  gateReason: string;        // human explanation of pass/bet
+  thresholdParts: { base: number; calib: number; time: number; spread: number; regime: number };
 }
 
 
@@ -574,6 +579,39 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         const edgeAbs = Math.abs(edgePts);
         const kelly = quarterKelly(p, yesPrice);
 
+        // ── STEP 5 · Edge gate ────────────────────────────────────────────
+        const bucketFit = calibState?.buckets.find(b => b.bucket === cal.bucket);
+        const tBase = 3;
+        // Worse calibration Brier → require more edge. Brier 0.20 = neutral.
+        const tCalib = bucketFit && bucketFit.n >= 30
+          ? Math.max(0, Math.min(4, (bucketFit.brier - 0.20) * 30))
+          : 0.5; // cold start: small penalty until we have data
+        // Time-to-close: MMs sharpest in the final minute.
+        const tTime = secondsToClose < 60 ? 2 : secondsToClose < 300 ? 1 : 0;
+        // Wide book = stale prices; demand more edge.
+        const sp = micro?.bookSpreadBps ?? 0;
+        const tSpread = sp > 10 ? 2 : sp > 5 ? 1 : 0;
+        // Regime filter: extreme funding or basis squeeze = unstable, require more.
+        const fundAbs = Math.abs(micro?.fundingRate ?? 0) / 0.00005; // z-ish
+        const basisAbs = Math.abs(micro?.basisBps ?? 0) / 5;
+        const tRegime = (fundAbs > 2 || basisAbs > 2) ? 1.5 : 0;
+        const requiredEdgePts = tBase + tCalib + tTime + tSpread + tRegime;
+
+        let gateAction: "BET" | "PASS" = "PASS";
+        let gateReason = "";
+        if (secondsToClose <= 30) {
+          gateReason = "too close to expiry (<30s) — slippage risk";
+        } else if (yesPrice <= 0.02 || yesPrice >= 0.98) {
+          gateReason = "price pinned (≤2¢ or ≥98¢) — no room for edge";
+        } else if (edgeAbs < requiredEdgePts) {
+          gateReason = `edge ${edgeAbs.toFixed(1)}pts < required ${requiredEdgePts.toFixed(1)}pts`;
+        } else if (kelly <= 0) {
+          gateReason = "Kelly fraction ≤ 0";
+        } else {
+          gateAction = "BET";
+          gateReason = `edge ${edgeAbs.toFixed(1)}pts ≥ required ${requiredEdgePts.toFixed(1)}pts`;
+        }
+
         markets.push({
           ticker: m.ticker,
           eventTicker: e.event_ticker,
@@ -602,6 +640,10 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           edgePts, side, edgeAbs,
           kellyFraction: kelly,
           secondsToClose,
+          requiredEdgePts,
+          gateAction,
+          gateReason,
+          thresholdParts: { base: tBase, calib: tCalib, time: tTime, spread: tSpread, regime: tRegime },
         });
       }
     }
