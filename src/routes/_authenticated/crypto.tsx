@@ -165,6 +165,9 @@ function MarketRow({
           {m.thresholdParts.whale !== 0 && <> <span className={m.thresholdParts.whale < 0 ? "text-emerald-400" : "text-red-400"}>{m.thresholdParts.whale > 0 ? "+" : ""}{m.thresholdParts.whale.toFixed(1)}whl</span></>}
         </div>
         <div className={`text-[10px] text-right ${m.gateAction === "BET" ? "text-emerald-400" : "text-muted-foreground"}`}>{m.gateReason}</div>
+        <div className={`text-[10px] text-right font-mono ${m.gapAnalysis.momentumAlignsWithSide ? "text-emerald-400/80" : "text-amber-400/80"}`} title="Gap analysis: $ spot must traverse for locked side to win, in σ of remaining-window vol, plus momentum sign.">
+          gap {m.gapAnalysis.gapUsd >= 0 ? "+" : ""}${Math.round(m.gapAnalysis.gapUsd)} ({m.gapAnalysis.gapInSigmas.toFixed(2)}σ to flip) · mom {m.gapAnalysis.momentumSign > 0 ? "↑" : m.gapAnalysis.momentumSign < 0 ? "↓" : "—"} {m.gapAnalysis.momentumAlignsWithSide ? "with" : "vs"} {m.side}
+        </div>
       </div>
 
 
