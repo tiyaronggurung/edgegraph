@@ -82,7 +82,7 @@ export interface BtcMarket {
   requiredEdgePts: number;   // dynamic threshold edge must clear to BET
   gateAction: "BET" | "PASS";
   gateReason: string;        // human explanation of pass/bet
-  thresholdParts: { base: number; calib: number; time: number; spread: number; regime: number };
+  thresholdParts: { base: number; calib: number; time: number; spread: number; regime: number; whale: number };
 }
 
 
