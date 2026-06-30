@@ -23,26 +23,18 @@ const PlaceOrderSchema = z.object({
   closeTime: z.string().optional(),
 });
 
-async function signKalshi(method: string, path: string): Promise<Record<string, string>> {
-  const keyId = process.env.KALSHI_API_KEY_ID;
-  const rawPem = process.env.KALSHI_PRIVATE_KEY_PEM;
-  if (!keyId || !rawPem) throw new Error("Kalshi credentials not configured");
-
-  // Normalize: strip surrounding quotes, convert literal \n to real newlines,
-  // strip CRs, and trim.
-  let pem = rawPem.trim();
+function normalizeKalshiPem(raw: string): string {
+  let pem = raw.trim();
   if ((pem.startsWith('"') && pem.endsWith('"')) || (pem.startsWith("'") && pem.endsWith("'"))) {
     pem = pem.slice(1, -1);
   }
   pem = pem.replace(/\\n/g, "\n").replace(/\r/g, "").trim();
 
-  // If the secret was stored as bare base64 (no PEM armor), wrap it as PKCS#8.
   if (!/-----BEGIN /.test(pem)) {
     const body = pem.replace(/\s+/g, "");
     const wrapped = body.match(/.{1,64}/g)?.join("\n") ?? body;
     pem = `-----BEGIN PRIVATE KEY-----\n${wrapped}\n-----END PRIVATE KEY-----\n`;
   } else {
-    // Reflow body if header/footer present but body has no line breaks.
     const headerMatch = pem.match(/-----BEGIN ([A-Z0-9 ]+)-----([\s\S]*?)-----END \1-----/);
     if (headerMatch && !headerMatch[2].includes("\n")) {
       const label = headerMatch[1];
@@ -51,19 +43,81 @@ async function signKalshi(method: string, path: string): Promise<Record<string, 
       pem = `-----BEGIN ${label}-----\n${wrapped}\n-----END ${label}-----\n`;
     }
   }
+  return pem;
+}
+
+type ValidatedKalshiKey = {
+  key: import("node:crypto").KeyObject;
+  constants: typeof import("node:crypto").constants;
+  createSign: typeof import("node:crypto").createSign;
+};
+
+let cachedKey: ValidatedKalshiKey | null = null;
+let cachedKeyFingerprint: string | null = null;
+
+async function getValidatedKalshiKey(): Promise<ValidatedKalshiKey> {
+  const rawPem = process.env.KALSHI_PRIVATE_KEY_PEM;
+  if (!rawPem) throw new Error("KALSHI_PRIVATE_KEY_PEM is not configured");
+
+  // Re-validate if the secret value changed.
+  const fingerprint = `${rawPem.length}:${rawPem.slice(0, 16)}:${rawPem.slice(-16)}`;
+  if (cachedKey && cachedKeyFingerprint === fingerprint) return cachedKey;
+
+  const pem = normalizeKalshiPem(rawPem);
+
+  if (/-----BEGIN ENCRYPTED PRIVATE KEY-----/.test(pem)) {
+    throw new Error(
+      "KALSHI_PRIVATE_KEY_PEM is an encrypted/passphrase-protected key. " +
+        "Export an unencrypted PKCS#8 PEM from Kalshi (begins with " +
+        "'-----BEGIN PRIVATE KEY-----' or '-----BEGIN RSA PRIVATE KEY-----') and update the secret.",
+    );
+  }
 
   const { createSign, createPrivateKey, constants } = await import("node:crypto");
-  let key;
+  let key: import("node:crypto").KeyObject;
   try {
     key = createPrivateKey({ key: pem, format: "pem" });
   } catch (e: any) {
     throw new Error(
-      "Kalshi private key could not be decoded. Paste the full PEM exactly as Kalshi gave it " +
-        "(including the -----BEGIN PRIVATE KEY----- and -----END PRIVATE KEY----- lines, with " +
-        "newlines preserved). Encrypted/passphrase-protected keys are not supported — export " +
-        "an unencrypted PKCS#8 PEM. Underlying error: " + (e?.message ?? String(e)),
+      "KALSHI_PRIVATE_KEY_PEM could not be decoded. Paste the full PEM exactly as Kalshi gave it " +
+        "(including BEGIN/END lines, with newlines preserved). Underlying error: " +
+        (e?.message ?? String(e)),
     );
   }
+
+  if (key.asymmetricKeyType !== "rsa") {
+    throw new Error(
+      `KALSHI_PRIVATE_KEY_PEM must be an RSA key (got ${key.asymmetricKeyType ?? "unknown"}). ` +
+        "Kalshi requires RSA-PSS signatures.",
+    );
+  }
+
+  // Smoke-test: actually sign with RSA-PSS so a broken key fails here, not mid-order.
+  try {
+    const signer = createSign("RSA-SHA256");
+    signer.update("kalshi-key-validation");
+    signer.end();
+    signer.sign({
+      key,
+      padding: constants.RSA_PKCS1_PSS_PADDING,
+      saltLength: constants.RSA_PSS_SALTLEN_DIGEST,
+    });
+  } catch (e: any) {
+    throw new Error(
+      "KALSHI_PRIVATE_KEY_PEM failed RSA-PSS test sign: " + (e?.message ?? String(e)),
+    );
+  }
+
+  cachedKey = { key, constants, createSign };
+  cachedKeyFingerprint = fingerprint;
+  return cachedKey;
+}
+
+async function signKalshi(method: string, path: string): Promise<Record<string, string>> {
+  const keyId = process.env.KALSHI_API_KEY_ID;
+  if (!keyId) throw new Error("KALSHI_API_KEY_ID is not configured");
+  const { key, constants, createSign } = await getValidatedKalshiKey();
+
   const ts = Date.now().toString();
   const msg = `${ts}${method}${path}`;
   const signer = createSign("RSA-SHA256");
