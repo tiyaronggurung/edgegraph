@@ -679,11 +679,18 @@ function AutoTradePanel() {
   async function runLive() {
     const ok = window.confirm(
       "PLACE REAL MONEY ORDERS on Kalshi?\n\n" +
-      "• Up to 3 orders this session\n" +
-      "• $20 per order ($60 max exposure)\n" +
-      "• Stops if daily loss exceeds -$60\n" +
-      "• Only fires on edge ≥5pts, sigma ≥1.25σ, ≥120s to close\n\n" +
-      "Type-confirm not required — click OK to proceed.",
+      "ENTRY (all must pass):\n" +
+      "  • edge ≥ 5pts, sigma ≥ 1.25σ, ≥120s to close\n" +
+      "  • momentum aligned, equity overlay not blocking\n" +
+      "  • not already traded this ticker in 24h\n\n" +
+      "SIZE: $20/order · up to 3 orders this click · $60 max exposure\n" +
+      "DAILY: halt after 10 orders or realized ≤ -$60 in 24h\n\n" +
+      "EXIT (auto, checked every 60s):\n" +
+      "  • Take-profit: mark PnL ≥ +70% of stake\n" +
+      "  • Stop-loss:   mark PnL ≤ -50% of stake\n" +
+      "  • Edge decay:  price moved ≥2¢ against position\n" +
+      "  • Otherwise held to 15-min expiry & settled by Kalshi\n\n" +
+      "Click OK to proceed.",
     );
     if (!ok) return;
     setLiveBusy(true);
