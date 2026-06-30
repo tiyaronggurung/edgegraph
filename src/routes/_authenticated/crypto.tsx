@@ -237,6 +237,172 @@ function ConfirmModal({
   );
 }
 
+interface OpenPosSignal {
+  action: "CASH_OUT_PROFIT" | "CASH_OUT_FLIP" | "STOP_LOSS" | "HOLD";
+  label: string;
+  reason: string;
+  exitEdgePts: number;       // (currentSidePrice − modelSideProb) × 100. Positive = market overpaying us.
+  pnlUsd: number;
+  pnlPct: number;
+  exitCents: number;         // current best bid in cents on our side (sell-back price)
+  currentSideProb: number;
+}
+
+function computeExitSignal(trade: any, market: BtcMarket | undefined): OpenPosSignal | null {
+  if (!market) return null;
+  const contracts = Number(trade.contracts);
+  const stake = Number(trade.stake_usd);
+  if (!contracts || !stake) return null;
+  const entrySidePrice = stake / contracts; // dollars per contract on our side
+  const currentSidePrice = trade.side === "YES" ? market.yesBid : market.noBid;
+  if (!currentSidePrice || currentSidePrice <= 0) return null;
+  const modelSideProb = trade.side === "YES" ? market.modelYesProb : 1 - market.modelYesProb;
+  const exitEdgePts = (currentSidePrice - modelSideProb) * 100;
+  const pnlUsd = (currentSidePrice - entrySidePrice) * contracts;
+  const pnlPct = (currentSidePrice / entrySidePrice - 1) * 100;
+  const exitCents = Math.max(1, Math.min(99, Math.round(currentSidePrice * 100)));
+
+  // Decision logic:
+  //  • CASH_OUT_PROFIT: market overpays vs model by ≥3pts AND we're up money
+  //  • CASH_OUT_FLIP : model now disagrees with our side (model side prob < 0.40) AND we're still up
+  //  • STOP_LOSS     : model strongly against (< 0.25) AND down ≥30% of stake
+  //  • HOLD          : otherwise
+  let action: OpenPosSignal["action"] = "HOLD";
+  let label = "Hold";
+  let reason = `Model still ${(modelSideProb * 100).toFixed(0)}% on ${trade.side === "YES" ? "UP" : "DOWN"}`;
+  if (exitEdgePts >= 3 && pnlUsd > 0) {
+    action = "CASH_OUT_PROFIT";
+    label = "Cash out (profit)";
+    reason = `Market pays ${exitEdgePts.toFixed(1)}pts over fair — lock $${pnlUsd.toFixed(2)}`;
+  } else if (modelSideProb < 0.40 && pnlUsd > 0) {
+    action = "CASH_OUT_FLIP";
+    label = "Cash out (model flipped)";
+    reason = `Model side prob dropped to ${(modelSideProb*100).toFixed(0)}% — take $${pnlUsd.toFixed(2)} while ahead`;
+  } else if (modelSideProb < 0.25 && pnlUsd < -0.30 * stake) {
+    action = "STOP_LOSS";
+    label = "Stop loss";
+    reason = `Model only ${(modelSideProb*100).toFixed(0)}% — cap loss at $${pnlUsd.toFixed(2)}`;
+  }
+
+  return { action, label, reason, exitEdgePts, pnlUsd, pnlPct, exitCents, currentSideProb: modelSideProb };
+}
+
+function OpenPositions({ markets }: { markets: BtcMarket[] }) {
+  const listFn = useServerFn(listMyCryptoTrades);
+  const sellFn = useServerFn(sellKalshiOrder);
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["crypto-trades"], queryFn: () => listFn(), refetchInterval: 10_000 });
+  const sell = useMutation({
+    mutationFn: (vars: { tradeId: string; limitPriceCents: number }) => sellFn({ data: vars }),
+    onSuccess: (res: any) => {
+      toast.success(`Closed: realized $${Number(res.realizedPnl).toFixed(2)} @ ${res.exitCents}¢`);
+      qc.invalidateQueries({ queryKey: ["crypto-trades"] });
+    },
+    onError: (e: any) => toast.error(`Close failed: ${e?.message ?? "unknown"}`),
+  });
+  const [confirm, setConfirm] = useState<{ trade: any; sig: OpenPosSignal } | null>(null);
+
+  const open = useMemo(() => {
+    const trades = (q.data?.trades ?? []) as any[];
+    const now = Date.now();
+    const byTicker = new Map(markets.map(m => [m.ticker, m]));
+    return trades
+      .filter(t => t.status === "submitted" && t.close_time && new Date(t.close_time).getTime() > now)
+      .map(t => ({ trade: t, market: byTicker.get(t.ticker), sig: computeExitSignal(t, byTicker.get(t.ticker)) }))
+      .filter(x => x.sig !== null)
+      .sort((a, b) => {
+        const rank = (s: OpenPosSignal | null) => s?.action === "STOP_LOSS" ? 0 : s?.action === "CASH_OUT_PROFIT" ? 1 : s?.action === "CASH_OUT_FLIP" ? 2 : 3;
+        return rank(a.sig) - rank(b.sig);
+      });
+  }, [q.data, markets]);
+
+  if (!open.length) return null;
+
+  return (
+    <div className="border border-[color:var(--color-primary)]/40 rounded-lg bg-card">
+      <div className="px-4 py-2 border-b border-border flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-wider text-[color:var(--color-primary)]">Open positions · live exit signals</h2>
+        <span className="text-[10px] text-muted-foreground">refreshes 10s</span>
+      </div>
+      <div className="divide-y divide-border">
+        {open.map(({ trade: t, market, sig }) => {
+          if (!sig || !market) return null;
+          const isExit = sig.action !== "HOLD";
+          const actionColor = sig.action === "STOP_LOSS"
+            ? "border-red-500/60 bg-red-500/10 text-red-400"
+            : sig.action === "CASH_OUT_PROFIT"
+              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400"
+              : sig.action === "CASH_OUT_FLIP"
+                ? "border-yellow-500/60 bg-yellow-500/10 text-yellow-400"
+                : "border-border bg-muted/20 text-muted-foreground";
+          return (
+            <div key={t.id} className="p-3 grid grid-cols-1 lg:grid-cols-[1.5fr_1fr_1fr_auto] gap-3 items-center">
+              <div>
+                <div className="text-xs text-muted-foreground">{t.ticker}</div>
+                <div className="text-sm font-semibold">
+                  {t.contracts}× <span className={t.side === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(t.side)}</span> from {fmt$(Number(t.strike))} · closes {fmtCountdown(market.secondsToClose)}
+                </div>
+                <div className="text-[10px] text-muted-foreground">stake {fmt$(Number(t.stake_usd))} · entry {Math.round((Number(t.stake_usd)/Number(t.contracts))*100)}¢ · now {sig.exitCents}¢</div>
+              </div>
+              <div className="text-xs">
+                <div>Model now <span className="font-bold">{(sig.currentSideProb*100).toFixed(0)}%</span> on {dirLabel(t.side)}</div>
+                <div className="text-muted-foreground">exit edge {sig.exitEdgePts >= 0 ? "+" : ""}{sig.exitEdgePts.toFixed(1)}pts</div>
+              </div>
+              <div className="text-sm font-mono">
+                <div className={sig.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}>
+                  {sig.pnlUsd >= 0 ? "+" : ""}{fmt$(sig.pnlUsd)} ({sig.pnlPct >= 0 ? "+" : ""}{sig.pnlPct.toFixed(0)}%)
+                </div>
+                <div className={`text-[10px] inline-block px-1.5 py-0.5 rounded border mt-1 ${actionColor}`}>{sig.label}</div>
+              </div>
+              <div className="flex flex-col items-end gap-1 min-w-[140px]">
+                <button
+                  onClick={() => setConfirm({ trade: t, sig })}
+                  disabled={sell.isPending}
+                  className={`text-xs uppercase tracking-wider px-3 py-1.5 border rounded disabled:opacity-30 disabled:cursor-not-allowed ${
+                    isExit
+                      ? "border-[color:var(--color-primary)] text-[color:var(--color-primary)] hover:bg-[color:var(--color-primary)]/10"
+                      : "border-border text-muted-foreground hover:bg-muted/30"
+                  }`}
+                  title={sig.reason}
+                >
+                  Cash out @ {sig.exitCents}¢
+                </button>
+                <div className="text-[10px] text-muted-foreground text-right max-w-[180px]">{sig.reason}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {confirm && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setConfirm(null)}>
+          <div className="bg-card border border-border rounded-lg p-5 max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-400" />
+              <h3 className="font-bold">Confirm close — sell back to Kalshi</h3>
+            </div>
+            <div className="space-y-1 text-sm mb-4">
+              <div><span className="text-muted-foreground">Position:</span> {confirm.trade.contracts}× <span className="font-bold">{dirLabel(confirm.trade.side)}</span> ({confirm.trade.side}) @ {confirm.trade.ticker}</div>
+              <div><span className="text-muted-foreground">Sell @:</span> <span className="font-bold">{confirm.sig.exitCents}¢</span> limit ({confirm.trade.contracts} contracts)</div>
+              <div><span className="text-muted-foreground">Realized P&amp;L if filled:</span> <span className={`font-bold ${confirm.sig.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}`}>{confirm.sig.pnlUsd >= 0 ? "+" : ""}{fmt$(confirm.sig.pnlUsd)}</span></div>
+              <div className="text-xs text-muted-foreground pt-2">{confirm.sig.reason}</div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirm(null)} className="px-3 py-1.5 text-xs uppercase tracking-wider border border-border rounded">Cancel</button>
+              <button
+                onClick={() => { sell.mutate({ tradeId: confirm.trade.id, limitPriceCents: confirm.sig.exitCents }); setConfirm(null); }}
+                disabled={sell.isPending}
+                className="px-3 py-1.5 text-xs uppercase tracking-wider bg-[color:var(--color-primary)] text-black rounded disabled:opacity-50"
+              >
+                {sell.isPending ? <Loader2 className="h-3 w-3 animate-spin inline" /> : "Confirm close"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TradeLog() {
   const fn = useServerFn(listMyCryptoTrades);
   const q = useQuery({ queryKey: ["crypto-trades"], queryFn: () => fn(), refetchInterval: 30_000 });
