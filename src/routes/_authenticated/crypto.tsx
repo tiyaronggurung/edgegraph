@@ -22,6 +22,8 @@ export const Route = createFileRoute("/_authenticated/crypto")({
 const fmt$ = (n: number) => n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const fmtTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
 const fmtCountdown = (s: number) => s <= 0 ? "closed" : `${Math.floor(s/60)}m ${(s%60).toString().padStart(2,"0")}s`;
+// Kalshi BTC 15m: YES = price closes ABOVE strike, NO = at/below. Show "UP" / "DOWN" to users.
+const dirLabel = (side: string) => side === "YES" ? "UP" : "DOWN";
 
 function Sparkline({ candles, strike }: { candles: BtcCandle[]; strike?: number }) {
   if (!candles.length) return <div className="h-12 text-xs text-muted-foreground">no data</div>;
