@@ -118,6 +118,13 @@ function MarketRow({
           <span>OI ${m.openInterest.toFixed(0)}</span>
           <span>vol24h ${m.volume24h.toFixed(0)}</span>
           <span>realized {m.realizedMoveBps >= 0 ? "+" : ""}{m.realizedMoveBps.toFixed(0)}bps</span>
+          <span className={
+            m.sigmaDistance >= 2 ? "text-emerald-400 font-semibold" :
+            m.sigmaDistance >= 1 ? "text-yellow-400" :
+            "text-red-400"
+          } title="How many σ of remaining-window vol stand between spot and strike. >2 = ~97% safe on locked side, <0.5 = coin flip.">
+            safety {m.sigmaDistance.toFixed(2)}σ
+          </span>
         </div>
       </div>
 
