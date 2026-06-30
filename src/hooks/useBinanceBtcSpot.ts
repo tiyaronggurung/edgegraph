@@ -5,14 +5,19 @@ import { useEffect, useRef, useState } from "react";
 // Falls back silently to null on connection issues.
 export interface BinanceBtcSpot {
   price: number | null;
+  prevPrice: number | null;
+  direction: "up" | "down" | "flat";
   lastTickMs: number | null;
   connected: boolean;
 }
 
 export function useBinanceBtcSpot(): BinanceBtcSpot {
   const [price, setPrice] = useState<number | null>(null);
+  const [prevPrice, setPrevPrice] = useState<number | null>(null);
+  const [direction, setDirection] = useState<"up" | "down" | "flat">("flat");
   const [lastTickMs, setLastTickMs] = useState<number | null>(null);
   const [connected, setConnected] = useState(false);
+  const lastRef = useRef<number | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -30,6 +35,12 @@ export function useBinanceBtcSpot(): BinanceBtcSpot {
             const msg = JSON.parse(ev.data);
             const p = parseFloat(msg.p);
             if (Number.isFinite(p)) {
+              const last = lastRef.current;
+              if (last != null && p !== last) {
+                setPrevPrice(last);
+                setDirection(p > last ? "up" : "down");
+              }
+              lastRef.current = p;
               setPrice(p);
               setLastTickMs(Date.now());
             }
@@ -55,5 +66,5 @@ export function useBinanceBtcSpot(): BinanceBtcSpot {
     };
   }, []);
 
-  return { price, lastTickMs, connected };
+  return { price, prevPrice, direction, lastTickMs, connected };
 }

@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle, ArrowUp, ArrowDown } from "lucide-react";
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats } from "@/lib/cryptoPredictions.functions";
@@ -59,14 +59,16 @@ function suggestedStake(m: BtcMarket, s: SizingState): { contracts: number; stak
 }
 
 function MarketRow({
-  m, candles, sizing, onPlace, liveSpot,
+  m, candles, sizing, onPlace, live,
 }: {
   m: BtcMarket; candles: BtcCandle[]; sizing: SizingState;
   onPlace: (m: BtcMarket) => void;
-  liveSpot: number | null;
+  live: { price: number | null; direction: "up" | "down" | "flat"; lastTickMs: number | null; connected: boolean };
 }) {
-  const spot = liveSpot ?? m.spot;
+  const spot = live.price ?? m.spot;
   const above = spot >= m.strike;
+  const distance = spot - m.strike;
+  const distPct = (distance / m.strike) * 100;
   const conf = m.edgeAbs >= 10 ? "HIGH" : m.edgeAbs >= 5 ? "MED" : "LOW";
   const confColor = conf === "HIGH" ? "text-emerald-400" : conf === "MED" ? "text-yellow-400" : "text-muted-foreground";
   const sideColor = m.side === "YES"
@@ -74,6 +76,16 @@ function MarketRow({
     : "bg-red-500/15 text-red-400 border-red-500/40";
   const sug = suggestedStake(m, sizing);
   const tradable = sug.contracts > 0 && m.edgeAbs >= 1 && m.secondsToClose > 30;
+
+  // Flash background briefly on each tick
+  const fresh = live.lastTickMs && Date.now() - live.lastTickMs < 600;
+  const tickBg = fresh && live.direction === "up"
+    ? "bg-emerald-500/20"
+    : fresh && live.direction === "down"
+    ? "bg-red-500/20"
+    : "bg-transparent";
+  const TickIcon = live.direction === "up" ? ArrowUp : live.direction === "down" ? ArrowDown : null;
+  const tickColor = live.direction === "up" ? "text-emerald-400" : live.direction === "down" ? "text-red-400" : "text-muted-foreground";
 
   return (
     <div className="border border-border rounded-lg bg-card p-4 grid grid-cols-1 lg:grid-cols-[1fr_auto_auto_auto] gap-4 items-center">
@@ -84,12 +96,19 @@ function MarketRow({
             <ExternalLink className="h-3 w-3" />
           </a>
         </div>
-        <div className="text-base font-semibold">
-          Strike <span className="text-[color:var(--color-primary)]">{fmt$(m.strike)}</span>
-          <span className="mx-2 text-muted-foreground">·</span>
-          Spot <span className={above ? "text-emerald-400" : "text-red-400"}>{fmt$(spot)}</span>
-          {liveSpot != null && <span className="ml-1 text-[9px] text-emerald-400 uppercase tracking-wider">live</span>}
-          <span className="mx-2 text-muted-foreground">·</span>
+        <div className="text-base font-semibold flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span>Strike <span className="text-[color:var(--color-primary)]">{fmt$(m.strike)}</span></span>
+          <span className="text-muted-foreground">·</span>
+          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors duration-300 ${tickBg}`}>
+            Spot
+            <span className={above ? "text-emerald-400" : "text-red-400"}>{fmt$(spot)}</span>
+            {TickIcon && <TickIcon className={`h-3.5 w-3.5 ${tickColor}`} />}
+          </span>
+          <span className={`text-xs font-mono ${above ? "text-emerald-400" : "text-red-400"}`}>
+            {distance >= 0 ? "+" : ""}{fmt$(Math.round(distance))} ({distPct >= 0 ? "+" : ""}{distPct.toFixed(2)}%) vs strike
+          </span>
+          {live.connected && <span className="text-[9px] text-emerald-400 uppercase tracking-wider">live</span>}
+          <span className="text-muted-foreground">·</span>
           <span className="text-xs text-muted-foreground">closes {fmtTime(m.closeTime)} ({fmtCountdown(m.secondsToClose)})</span>
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
@@ -99,6 +118,7 @@ function MarketRow({
           <span>realized {m.realizedMoveBps >= 0 ? "+" : ""}{m.realizedMoveBps.toFixed(0)}bps</span>
         </div>
       </div>
+
 
       <div className="flex flex-col items-end gap-1">
         <Sparkline candles={candles} strike={m.strike} />
@@ -420,7 +440,7 @@ function CryptoPage() {
           <TopPick markets={data.markets} />
           <div className="space-y-2">
             {data.markets.length === 0 && <div className="border border-border rounded-lg bg-card p-6 text-center text-sm text-muted-foreground">No open BTC 15-min markets right now.</div>}
-            {data.markets.map(m => <MarketRow key={m.ticker} m={m} candles={data.candles} sizing={sizing} onPlace={setPending} liveSpot={live.price} />)}
+            {data.markets.map(m => <MarketRow key={m.ticker} m={m} candles={data.candles} sizing={sizing} onPlace={setPending} live={live} />)}
           </div>
 
           <ModelAccuracyPanel />
