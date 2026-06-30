@@ -743,6 +743,36 @@ function AutoTradePanel() {
     }
   }
 
+  async function runForce() {
+    const ok = window.confirm(
+      "FORCE one LIVE order on Kalshi at current price?\n\n" +
+      "Picks the model's strongest |edge| market (UP or DOWN) and places\n" +
+      "ONE $20 order at the current Kalshi quote.\n\n" +
+      "BYPASSED gates: edge≥5pts, σ≥1.25, ≥120s, momentum, equity overlay,\n" +
+      "24h-per-ticker dedupe.\n\n" +
+      "STILL enforced: kill switch, key health, daily 10-order / -$60 caps,\n" +
+      "and auto-exit (TP +70% / SL -50% / edge-decay 2¢).\n\n" +
+      "Click OK to proceed.",
+    );
+    if (!ok) return;
+    setForceBusy(true);
+    try {
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 20, maxOrders: 1, force: true } });
+      if (res.placed > 0) {
+        const o = res.orders[0];
+        toast.success(`Forced ${o.side === "YES" ? "UP" : "DOWN"} on ${o.ticker} @ ${o.limit_cents}¢ × ${o.contracts}`);
+      } else {
+        toast.error("Force order not placed", { description: res.skipReasons.slice(0, 3).join(" · ") || "No tradeable market." });
+      }
+      qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
+      qc.invalidateQueries({ queryKey: ["crypto-trades"] });
+    } catch (e: any) {
+      toast.error("Force order failed", { description: e?.message ?? String(e) });
+    } finally {
+      setForceBusy(false);
+    }
+  }
+
   return (
     <div className="border border-border rounded-lg bg-card">
       <div className="px-4 py-2 border-b border-border flex items-center justify-between flex-wrap gap-2">
