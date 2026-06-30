@@ -180,14 +180,19 @@ export async function submitKalshiBuy(
     throw e;
   }
 
+  // Kalshi V2: side=bid (YES) / ask (NO), decimal-dollar price, IOC
+  const priceDollars = (data.side === "YES"
+    ? data.limitPriceCents
+    : 100 - data.limitPriceCents) / 100;
   const body = {
     ticker: data.ticker,
     action: "buy",
-    side: data.side === "YES" ? "yes" : "no",
+    side: data.side === "YES" ? "bid" : "ask",
     type: "limit",
-    count: data.contracts,
-    yes_price: data.side === "YES" ? data.limitPriceCents : undefined,
-    no_price: data.side === "NO" ? data.limitPriceCents : undefined,
+    count: String(data.contracts),
+    price: priceDollars.toFixed(4),
+    time_in_force: "immediate_or_cancel",
+    self_trade_prevention_type: "taker_at_cross",
     client_order_id: trade.id,
   };
 
@@ -205,10 +210,11 @@ export async function submitKalshiBuy(
     throw new Error(msg);
   }
 
-  const orderId = json?.order?.order_id ?? json?.order_id ?? null;
+  const orderId = json?.order_id ?? json?.order?.order_id ?? null;
   await supabase.from("crypto_trades").update({
     status: "submitted", kalshi_order_id: orderId, raw: json,
   }).eq("id", trade.id);
+
 
   return { ok: true, tradeId: trade.id, orderId, response: json };
 }
