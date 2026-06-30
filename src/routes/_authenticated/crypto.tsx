@@ -314,7 +314,11 @@ function CryptoPage() {
         </label>
         <div className="space-y-1">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">BTC spot · Markets · Updated</div>
-          <div className="text-sm font-mono">{data ? fmt$(data.spot) : "—"} · {data?.markets.length ?? 0} · {data ? fmtTime(data.asOf) : "—"}</div>
+          <div className="text-sm font-mono">
+            {live.price != null ? fmt$(live.price) : data ? fmt$(data.spot) : "—"}
+            {live.connected && <span className="ml-1 text-[9px] text-emerald-400 uppercase tracking-wider">live</span>}
+            {" · "}{data?.markets.length ?? 0} · {data ? fmtTime(data.asOf) : "—"}
+          </div>
         </div>
       </div>
 
