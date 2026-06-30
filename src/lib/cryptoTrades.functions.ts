@@ -217,3 +217,66 @@ export const sellKalshiOrder = createServerFn({ method: "POST" })
     return { ok: true, realizedPnl, exitCents, entryCents, closeOrderId };
   });
 
+// ── STEP 8 · Auto-Settle Expired Trades ───────────────────────────────────
+// 10s after close_time, fetch the resolved market from Kalshi and stamp the
+// trade with the realized P&L. YES wins → 1.00, NO wins → 0.00. P&L =
+// (settleCents − entryCents)/100 × contracts. Idempotent: skips already-
+// settled/closed/errored rows; safe to poll every 10s from the client.
+async function signKalshiGet(path: string): Promise<Record<string, string>> {
+  return signKalshi("GET", path);
+}
+
+export const settleExpiredTrades = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const cutoff = new Date(Date.now() - 10_000).toISOString();
+    const { data: trades, error } = await supabase
+      .from("crypto_trades")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "submitted")
+      .not("close_time", "is", null)
+      .lt("close_time", cutoff)
+      .limit(25);
+    if (error) throw new Error(error.message);
+    if (!trades?.length) return { settled: 0, results: [] };
+
+    const results: Array<{ tradeId: string; outcome: string; pnl: number; settleCents: number }> = [];
+    for (const t of trades) {
+      try {
+        const path = `/markets/${encodeURIComponent(t.ticker)}`;
+        const headers = await signKalshiGet(path);
+        const res = await fetch(`${KALSHI_BASE}${path}`, {
+          headers: { ...headers, Accept: "application/json" },
+        });
+        const json: any = await res.json().catch(() => ({}));
+        const m = json?.market ?? json;
+        const status = m?.status as string | undefined;
+        const result = (m?.result ?? "") as string; // "yes" | "no" | ""
+        if (status !== "settled" && status !== "finalized" && !result) {
+          // Not resolved yet; leave for next poll.
+          continue;
+        }
+        const yesWon = result === "yes";
+        const settleCents = yesWon ? 100 : 0;
+        const sideWon = (t.side === "YES" && yesWon) || (t.side === "NO" && !yesWon);
+        const entryCents = Math.round((Number(t.stake_usd) / Number(t.contracts)) * 100);
+        const pnl = ((sideWon ? 100 : 0) - entryCents) / 100 * Number(t.contracts);
+        const prevRaw = (t.raw as any) ?? {};
+        await supabase.from("crypto_trades").update({
+          status: "settled",
+          pnl_usd: pnl,
+          raw: { ...prevRaw, settle: { at: new Date().toISOString(), result, settle_cents: settleCents, entry_cents: entryCents, market: m } },
+        }).eq("id", t.id);
+        results.push({ tradeId: t.id, outcome: sideWon ? "WIN" : "LOSS", pnl, settleCents });
+      } catch (e: any) {
+        // Don't poison the loop; just record on the trade.
+        await supabase.from("crypto_trades").update({
+          error: `settle: ${e?.message ?? "unknown"}`,
+        }).eq("id", t.id);
+      }
+    }
+    return { settled: results.length, results };
+  });
+
