@@ -78,6 +78,11 @@ export interface BtcMarket {
   edgeAbs: number;
   kellyFraction: number;     // quarter-Kelly bankroll fraction (display only)
   secondsToClose: number;
+  // ── PHASE 1 · STEP 9 — Time/vol safety margin ─────────────────────────────
+  // How many σ of remaining-window move it would take for spot to cross strike.
+  // >2σ ≈ 97% safe on the locked side; <0.5σ ≈ coin flip. Drives exit signals.
+  sigmaDistance: number;
+  sigmaMinEffective: number; // realized + IV blended per-minute σ used by the model
   // ── PHASE 1 · STEP 5 — Edge gate ─────────────────────────────────────────
   requiredEdgePts: number;   // dynamic threshold edge must clear to BET
   gateAction: "BET" | "PASS";
