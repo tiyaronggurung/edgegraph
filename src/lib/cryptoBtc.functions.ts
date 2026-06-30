@@ -188,8 +188,6 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
     const sigma = minuteSigma(recent);
     const now = Date.now();
     const hasExternal = !!process.env.CRYPTO_MODEL_URL;
-    const now = Date.now();
-    const hasExternal = !!process.env.CRYPTO_MODEL_URL;
 
     const events = (evJson.events ?? []) as any[];
     const markets: BtcMarket[] = [];
