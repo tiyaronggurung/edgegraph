@@ -6,7 +6,7 @@ import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCi
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades, checkKalshiBalance, diagnoseKalshiAuth, type KalshiDiagStep } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats } from "@/lib/cryptoPredictions.functions";
-import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
+import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, autoExitLivePositions, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { EquityMomentumPanel } from "@/components/EquityMomentumPanel";
 import { toast } from "sonner";
@@ -596,6 +596,7 @@ function AutoTradePanel() {
   const qc = useQueryClient();
   const listFn = useServerFn(listAutoTradeOrders);
   const settleFn = useServerFn(settleAutoTradeOrders);
+  const autoExitFn = useServerFn(autoExitLivePositions);
   const runFn = useServerFn(runAutoTrade);
   const balanceFn = useServerFn(checkKalshiBalance);
   const diagFn = useServerFn(diagnoseKalshiAuth);
@@ -641,16 +642,22 @@ function AutoTradePanel() {
     refetchInterval: 30_000,
   });
 
-  // Opportunistic client-side settle (cron also settles server-side every 1m).
+  // Opportunistic client-side settle + auto-exit (cron also runs server-side).
+  // Auto-exit checks open live positions every minute against TP/SL/edge-decay
+  // thresholds and closes via Kalshi sell when triggered.
   useEffect(() => {
     let cancelled = false;
     const tick = async () => {
-      try { await settleFn(); if (!cancelled) qc.invalidateQueries({ queryKey: ["auto-trade-orders"] }); } catch { /* ignore */ }
+      try {
+        await autoExitFn();
+        await settleFn();
+        if (!cancelled) qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
+      } catch { /* ignore */ }
     };
     tick();
     const h = setInterval(tick, 60_000);
     return () => { cancelled = true; clearInterval(h); };
-  }, [settleFn, qc]);
+  }, [settleFn, autoExitFn, qc]);
 
   const orders = list.data?.orders ?? [];
   const liveOrders = orders.filter(o => o.mode === "live");
@@ -672,11 +679,18 @@ function AutoTradePanel() {
   async function runLive() {
     const ok = window.confirm(
       "PLACE REAL MONEY ORDERS on Kalshi?\n\n" +
-      "• Up to 3 orders this session\n" +
-      "• $20 per order ($60 max exposure)\n" +
-      "• Stops if daily loss exceeds -$60\n" +
-      "• Only fires on edge ≥5pts, sigma ≥1.25σ, ≥120s to close\n\n" +
-      "Type-confirm not required — click OK to proceed.",
+      "ENTRY (all must pass):\n" +
+      "  • edge ≥ 5pts, sigma ≥ 1.25σ, ≥120s to close\n" +
+      "  • momentum aligned, equity overlay not blocking\n" +
+      "  • not already traded this ticker in 24h\n\n" +
+      "SIZE: $20/order · up to 3 orders this click · $60 max exposure\n" +
+      "DAILY: halt after 10 orders or realized ≤ -$60 in 24h\n\n" +
+      "EXIT (auto, checked every 60s):\n" +
+      "  • Take-profit: mark PnL ≥ +70% of stake\n" +
+      "  • Stop-loss:   mark PnL ≤ -50% of stake\n" +
+      "  • Edge decay:  price moved ≥2¢ against position\n" +
+      "  • Otherwise held to 15-min expiry & settled by Kalshi\n\n" +
+      "Click OK to proceed.",
     );
     if (!ok) return;
     setLiveBusy(true);
@@ -707,7 +721,7 @@ function AutoTradePanel() {
             </span>
           </h2>
           <p className="text-[11px] text-muted-foreground">
-            Manual real-money testing only — $20×3 max/session, edge overlay required, halt at -$60/24h.
+            $20×3/click · entry edge≥5pts, σ≥1.25, ≥120s · auto-exit TP +70% / SL -50% / edge-decay 2¢ · halt -$60/24h
           </p>
           <p className="text-[10px] text-muted-foreground mt-0.5">
             Live 24h: {liveCount24h}/10 orders · realized <span className={liveRealized24h >= 0 ? "text-emerald-400" : "text-red-400"}>{liveRealized24h >= 0 ? "+" : ""}${liveRealized24h.toFixed(2)}</span>

@@ -113,7 +113,7 @@ export async function getValidatedKalshiKey(): Promise<ValidatedKalshiKey> {
   return cachedKey;
 }
 
-async function signKalshi(method: string, path: string): Promise<Record<string, string>> {
+export async function signKalshi(method: string, path: string): Promise<Record<string, string>> {
   const keyId = process.env.KALSHI_API_KEY_ID;
   if (!keyId) throw new Error("KALSHI_API_KEY_ID is not configured");
   const { key, constants, createSign } = await getValidatedKalshiKey();

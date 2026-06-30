@@ -312,3 +312,133 @@ export const settleAutoTradeOrders = createServerFn({ method: "POST" })
     }
     return { settled };
   });
+
+// ── STEP 9 · Auto-Exit Live Positions ─────────────────────────────────────
+// Combined exit policy for live auto-trade orders, evaluated every minute:
+//   • Take-profit: mark PnL ≥ +70% of stake → close at current bid
+//   • Stop-loss:   mark PnL ≤ -50% of stake → close at current bid
+//   • Edge decay:  price moved ≥2¢ against our side → close at current bid
+// Paper orders and manual crypto_trades are untouched. Settlement still
+// happens via settleAutoTradeOrders for any position not exited early.
+const LIVE_TP_FRAC = 0.70;
+const LIVE_SL_FRAC = 0.50;
+const LIVE_EDGE_DECAY_CENTS = 2;
+const KALSHI_PUBLIC_BASE = "https://api.elections.kalshi.com/trade-api/v2";
+
+export const autoExitLivePositions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ exited: number; reasons: string[] }> => {
+    const { supabase, userId } = context;
+    const reasons: string[] = [];
+
+    // Only act when live is enabled — safe no-op otherwise.
+    if (process.env.KALSHI_LIVE_ENABLED !== "true") return { exited: 0, reasons: ["live_disabled"] };
+
+    const nowIso = new Date().toISOString();
+    const { data: open } = await supabase
+      .from("auto_trade_orders")
+      .select("id, ticker, side, stake_usd, contracts, limit_cents, close_time")
+      .eq("user_id", userId)
+      .eq("mode", "live")
+      .eq("status", "placed")
+      .gt("close_time", nowIso)
+      .limit(20);
+
+    const rows = (open ?? []) as Array<{ id: string; ticker: string; side: "YES" | "NO"; stake_usd: number; contracts: number; limit_cents: number; close_time: string }>;
+    if (!rows.length) return { exited: 0, reasons: [] };
+
+    let exited = 0;
+    for (const r of rows) {
+      // Pull current market quote (public endpoint, no auth needed).
+      let yesBid = 0, yesAsk = 0;
+      try {
+        const res = await fetch(`${KALSHI_PUBLIC_BASE}/markets/${encodeURIComponent(r.ticker)}`, { headers: { Accept: "application/json" } });
+        if (!res.ok) { reasons.push(`${r.ticker}: quote http ${res.status}`); continue; }
+        const j: any = await res.json();
+        const m = j?.market ?? {};
+        yesBid = Math.round(Number(m.yes_bid ?? 0));
+        yesAsk = Math.round(Number(m.yes_ask ?? 0));
+        if (yesBid <= 0 || yesAsk <= 0 || yesBid > 99 || yesAsk > 99) {
+          reasons.push(`${r.ticker}: no quote (bid=${yesBid}, ask=${yesAsk})`);
+          continue;
+        }
+      } catch (e: any) {
+        reasons.push(`${r.ticker}: quote err ${e?.message ?? "x"}`);
+        continue;
+      }
+
+      // For YES position: we'd sell INTO the yes bid → mark = yes_bid.
+      // For NO  position: NO bid = 100 - yes_ask         → mark = 100 - yes_ask.
+      const markCents = r.side === "YES" ? yesBid : 100 - yesAsk;
+      const entryCents = r.limit_cents;
+      const markPnl = ((markCents - entryCents) / 100) * r.contracts;
+      const tpThreshold = LIVE_TP_FRAC * Number(r.stake_usd);
+      const slThreshold = -LIVE_SL_FRAC * Number(r.stake_usd);
+      const adverseCents = entryCents - markCents; // +ve = moved against us
+
+      let exitReason: "tp" | "sl" | "edge" | null = null;
+      if (markPnl >= tpThreshold) exitReason = "tp";
+      else if (markPnl <= slThreshold) exitReason = "sl";
+      else if (adverseCents >= LIVE_EDGE_DECAY_CENTS) exitReason = "edge";
+
+      if (!exitReason) continue;
+
+      // Race-safe claim: only one process closes this row.
+      const { data: claimed, error: claimErr } = await supabase
+        .from("auto_trade_orders")
+        .update({ status: "closing" })
+        .eq("id", r.id)
+        .eq("status", "placed")
+        .select("id")
+        .maybeSingle();
+      if (claimErr || !claimed) { reasons.push(`${r.ticker}: claim lost`); continue; }
+
+      // Place a Kalshi sell at the current bid (most likely to fill).
+      const sellLimitCents = Math.max(1, Math.min(99, markCents));
+      try {
+        const { signKalshi } = await import("./cryptoTrades.functions");
+        const path = "/portfolio/orders";
+        const headers = await signKalshi("POST", path);
+        const body = {
+          ticker: r.ticker,
+          action: "sell",
+          side: r.side === "YES" ? "yes" : "no",
+          type: "limit",
+          count: r.contracts,
+          yes_price: r.side === "YES" ? sellLimitCents : undefined,
+          no_price: r.side === "NO" ? sellLimitCents : undefined,
+          client_order_id: `auto-exit-${r.id}`.slice(0, 64),
+        };
+        const res = await fetch(`${KALSHI_PUBLIC_BASE}${path}`, {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(body),
+        });
+        const j: any = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const msg = j?.error?.message ?? `http ${res.status}`;
+          // Revert claim so a later tick can retry (or expiry settles it).
+          await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", r.id);
+          reasons.push(`${r.ticker}: sell failed — ${msg}`);
+          continue;
+        }
+        const realizedPnl = ((sellLimitCents - entryCents) / 100) * r.contracts;
+        const newStatus = realizedPnl > 0 ? "settled_win" : "settled_loss";
+        await supabase
+          .from("auto_trade_orders")
+          .update({
+            status: newStatus,
+            settle_price: sellLimitCents / 100,
+            pnl_usd: realizedPnl,
+            settled_at: new Date().toISOString(),
+          })
+          .eq("id", r.id);
+        exited++;
+        reasons.push(`${r.ticker}: ${exitReason} closed @ ${sellLimitCents}¢ (pnl $${realizedPnl.toFixed(2)})`);
+      } catch (e: any) {
+        await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", r.id);
+        reasons.push(`${r.ticker}: sell err ${e?.message ?? "x"}`);
+      }
+    }
+    return { exited, reasons: reasons.slice(0, 20) };
+  });
