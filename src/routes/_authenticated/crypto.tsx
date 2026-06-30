@@ -602,6 +602,7 @@ function AutoTradePanel() {
   const balanceFn = useServerFn(checkKalshiBalance);
   const diagFn = useServerFn(diagnoseKalshiAuth);
   const [liveBusy, setLiveBusy] = useState(false);
+  const [forceBusy, setForceBusy] = useState(false);
   const [testBusy, setTestBusy] = useState(false);
   const [diagBusy, setDiagBusy] = useState(false);
   const [diag, setDiag] = useState<null | { ok: boolean; steps: KalshiDiagStep[]; summary: string; serverTimeIso: string }>(null);
