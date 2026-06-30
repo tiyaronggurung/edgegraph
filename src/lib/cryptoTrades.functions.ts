@@ -386,7 +386,7 @@ export const diagnoseKalshiAuth = createServerFn({ method: "GET" })
           headerNames: Object.keys(headers).sort().join(","),
           keyIdHeader: headers["KALSHI-ACCESS-KEY"]?.slice(0, 4) + "…" + headers["KALSHI-ACCESS-KEY"]?.slice(-4),
           timestamp: headers["KALSHI-ACCESS-TIMESTAMP"] ?? null,
-          signedMessage: `${headers["KALSHI-ACCESS-TIMESTAMP"]}${method}${path}`,
+          signedMessage: `${headers["KALSHI-ACCESS-TIMESTAMP"]}${method}/trade-api/v2${path}`,
         },
       });
     } catch (e: any) {
