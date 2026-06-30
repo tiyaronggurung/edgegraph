@@ -69,6 +69,11 @@ export interface BtcMarket {
   edgeAbs: number;
   kellyFraction: number;     // quarter-Kelly bankroll fraction (display only)
   secondsToClose: number;
+  // ── PHASE 1 · STEP 5 — Edge gate ─────────────────────────────────────────
+  requiredEdgePts: number;   // dynamic threshold edge must clear to BET
+  gateAction: "BET" | "PASS";
+  gateReason: string;        // human explanation of pass/bet
+  thresholdParts: { base: number; calib: number; time: number; spread: number; regime: number };
 }
 
 
