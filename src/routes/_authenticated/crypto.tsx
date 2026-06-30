@@ -851,13 +851,21 @@ function AutoTradePanel() {
             {liveBusy ? "Placing…" : "Run LIVE auto-trade"}
           </button>
           <button
-            onClick={runForce}
+            onClick={() => setAutoLoop(v => !v)}
+            className={`text-xs font-semibold px-3 py-1.5 rounded border flex items-center gap-1.5 ${autoLoop ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+            title="Auto-loop: every 60s, force-buy top model picks (up to 2 × $20). Daily caps still apply."
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${autoLoop ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground"}`} />
+            {autoLoop ? "Auto-loop ON (60s)" : "Auto-loop OFF"}
+          </button>
+          <button
+            onClick={() => runForce()}
             disabled={forceBusy || liveBusy}
             className="text-xs font-semibold px-3 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 disabled:opacity-50 flex items-center gap-1.5"
-            title="Force ONE live order on the model's strongest pick — bypasses entry gates, daily caps still apply"
+            title="Force up to 2 live orders on the model's top picks — bypasses entry gates, daily caps still apply"
           >
             {forceBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
-            {forceBusy ? "Forcing…" : "Force 1 trade (best pick)"}
+            {forceBusy ? "Forcing…" : "Force trade (top picks)"}
           </button>
         </div>
       </div>
