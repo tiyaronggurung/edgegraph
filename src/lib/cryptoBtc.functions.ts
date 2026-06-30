@@ -244,30 +244,35 @@ function studentTCdf(x: number, df: number): number {
   return x >= 0 ? 1 - half : half;
 }
 
-function minuteSigma(candles: BtcCandle[]): number {
-  if (candles.length < 5) return 0.0008;
+function minuteSigmaPair(candles: BtcCandle[]): { shortSigma: number; longSigma: number } {
+  if (candles.length < 5) return { shortSigma: 0.0008, longSigma: 0.0008 };
   const rets: number[] = [];
   for (let i = 1; i < candles.length; i++) {
     const r = Math.log(candles[i].c / candles[i - 1].c);
     if (Number.isFinite(r)) rets.push(r);
   }
-  if (!rets.length) return 0.0008;
+  if (!rets.length) return { shortSigma: 0.0008, longSigma: 0.0008 };
   const m = rets.reduce((a, b) => a + b, 0) / rets.length;
   const v = rets.reduce((a, b) => a + (b - m) ** 2, 0) / Math.max(1, rets.length - 1);
   const longSigma = Math.max(1e-6, Math.sqrt(v));
-  // Short-window σ (last 5 candles) — catches regime expansion. When BTC
-  // breaks out of chop, long-window σ lags by 30+ minutes; using max(short,long)
-  // widens the diffusion in real time so we stop pinning near-cert NOs into
-  // breakout candles.
   const tail = rets.slice(-5);
   if (tail.length >= 3) {
     const mt = tail.reduce((a, b) => a + b, 0) / tail.length;
     const vt = tail.reduce((a, b) => a + (b - mt) ** 2, 0) / Math.max(1, tail.length - 1);
     const shortSigma = Math.max(1e-6, Math.sqrt(vt));
-    return Math.max(longSigma, shortSigma);
+    return { shortSigma, longSigma };
   }
-  return longSigma;
+  return { shortSigma: longSigma, longSigma };
 }
+
+function minuteSigma(candles: BtcCandle[]): number {
+  // Short-window σ (last 5 candles) catches regime expansion. When BTC breaks
+  // out of chop, long-window σ lags 30+ minutes; max(short,long) widens the
+  // diffusion in real time so we stop pinning near-cert NOs into breakout candles.
+  const { shortSigma, longSigma } = minuteSigmaPair(candles);
+  return Math.max(longSigma, shortSigma);
+}
+
 
 // Per-minute drift from the recent slope of log-returns. Captures intra-window
 // trend (e.g. BTC ramping into expiry) that mean-zero diffusion ignores.
