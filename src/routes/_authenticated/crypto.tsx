@@ -598,8 +598,12 @@ function AutoTradePanel() {
   const settleFn = useServerFn(settleAutoTradeOrders);
   const runFn = useServerFn(runAutoTrade);
   const balanceFn = useServerFn(checkKalshiBalance);
+  const diagFn = useServerFn(diagnoseKalshiAuth);
   const [liveBusy, setLiveBusy] = useState(false);
   const [testBusy, setTestBusy] = useState(false);
+  const [diagBusy, setDiagBusy] = useState(false);
+  const [diag, setDiag] = useState<null | { ok: boolean; steps: KalshiDiagStep[]; summary: string; serverTimeIso: string }>(null);
+  const [diagOpen, setDiagOpen] = useState(false);
 
   async function testKalshi() {
     setTestBusy(true);
@@ -615,6 +619,19 @@ function AutoTradePanel() {
       toast.error("Pre-flight failed", { description: e?.message ?? String(e) });
     } finally {
       setTestBusy(false);
+    }
+  }
+
+  async function runDiagnostics() {
+    setDiagBusy(true);
+    setDiagOpen(true);
+    try {
+      const r = await diagFn();
+      setDiag(r);
+    } catch (e: any) {
+      toast.error("Diagnostics failed", { description: e?.message ?? String(e) });
+    } finally {
+      setDiagBusy(false);
     }
   }
 
