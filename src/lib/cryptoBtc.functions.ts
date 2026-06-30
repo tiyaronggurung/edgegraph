@@ -23,6 +23,17 @@ export interface BtcMicro {
   bookSpreadBps: number;     // best ask vs best bid in bps
 }
 
+export interface BtcOptions {
+  expiryMs: number;          // nearest Deribit expiry timestamp
+  yearsToExpiry: number;
+  underlying: number;        // Deribit's BTC index price
+  atmIv: number;             // ATM implied vol (annualized fraction, e.g. 0.55)
+  skew25: number;            // (iv_25dPut - iv_25dCall) / iv_atm  (>0 = downside fear)
+  ivPut25: number;
+  ivCall25: number;
+  sampleCount: number;       // # of option contracts used
+}
+
 
 export interface BtcMarket {
   ticker: string;
