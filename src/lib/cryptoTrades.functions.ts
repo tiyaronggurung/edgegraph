@@ -303,6 +303,155 @@ export const checkKalshiBalance = createServerFn({ method: "GET" })
     }
   });
 
+// Detailed auth diagnostics — runs every check independently and returns a
+// structured report so the UI can pinpoint exactly which step fails (env var
+// missing, PEM unparseable, sign smoke-test broken, HTTP 401 from Kalshi, …).
+// Read-only. Never places an order.
+export type KalshiDiagStep = {
+  name: string;
+  ok: boolean;
+  detail?: string;
+  data?: Record<string, string | number | boolean | null>;
+};
+
+export const diagnoseKalshiAuth = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async (): Promise<{ ok: boolean; steps: KalshiDiagStep[]; summary: string; serverTimeIso: string }> => {
+    const steps: KalshiDiagStep[] = [];
+    const push = (s: KalshiDiagStep) => { steps.push(s); return s.ok; };
+
+    // 1) Env presence
+    const keyId = process.env.KALSHI_API_KEY_ID ?? "";
+    const rawPem = process.env.KALSHI_PRIVATE_KEY_PEM ?? "";
+    const keyIdOk = !!keyId;
+    push({
+      name: "KALSHI_API_KEY_ID secret present",
+      ok: keyIdOk,
+      detail: keyIdOk
+        ? `length=${keyId.length}, preview=${keyId.slice(0, 4)}…${keyId.slice(-4)}`
+        : "Missing. Add it via Settings → Secrets. Kalshi shows this on the API Keys page.",
+    });
+    const pemOk = !!rawPem;
+    push({
+      name: "KALSHI_PRIVATE_KEY_PEM secret present",
+      ok: pemOk,
+      detail: pemOk
+        ? `length=${rawPem.length} chars, starts with "${rawPem.slice(0, 27).replace(/\n/g, "⏎")}"`
+        : "Missing. Paste the full PEM (BEGIN/END lines included) into the secret.",
+    });
+
+    if (!keyIdOk || !pemOk) {
+      return {
+        ok: false,
+        steps,
+        summary: "Required secret(s) not configured. /portfolio/balance will return 401 because no KALSHI-ACCESS-KEY header can be sent.",
+        serverTimeIso: new Date().toISOString(),
+      };
+    }
+
+    // 2) PEM parse + RSA-PSS smoke test
+    let validated: ValidatedKalshiKey | null = null;
+    try {
+      validated = await getValidatedKalshiKey();
+      const details = (validated.key.asymmetricKeyDetails ?? {}) as { modulusLength?: number };
+      push({
+        name: "Private key parses & passes RSA-PSS sign smoke test",
+        ok: true,
+        detail: `keyType=${validated.key.asymmetricKeyType}, modulusBits=${details.modulusLength ?? "?"}`,
+        data: { keyType: validated.key.asymmetricKeyType ?? null, modulusBits: details.modulusLength ?? null },
+      });
+    } catch (e: any) {
+      push({ name: "Private key parses & passes RSA-PSS sign smoke test", ok: false, detail: e?.message ?? String(e) });
+      return {
+        ok: false,
+        steps,
+        summary: "PEM is unusable. Re-export an unencrypted PKCS#8 RSA key from Kalshi and update the secret.",
+        serverTimeIso: new Date().toISOString(),
+      };
+    }
+
+    // 3) Build signed headers
+    const method = "GET";
+    const path = "/portfolio/balance";
+    let headers: Record<string, string> = {};
+    try {
+      headers = await signKalshi(method, path);
+      push({
+        name: "Built signed request headers",
+        ok: true,
+        detail: `Sending: ${Object.keys(headers).sort().join(", ")} (signature length=${headers["KALSHI-ACCESS-SIGNATURE"]?.length ?? 0})`,
+        data: {
+          headerNames: Object.keys(headers).sort().join(","),
+          keyIdHeader: headers["KALSHI-ACCESS-KEY"]?.slice(0, 4) + "…" + headers["KALSHI-ACCESS-KEY"]?.slice(-4),
+          timestamp: headers["KALSHI-ACCESS-TIMESTAMP"] ?? null,
+          signedMessage: `${headers["KALSHI-ACCESS-TIMESTAMP"]}${method}${path}`,
+        },
+      });
+    } catch (e: any) {
+      push({ name: "Built signed request headers", ok: false, detail: e?.message ?? String(e) });
+      return { ok: false, steps, summary: "Could not build signed headers.", serverTimeIso: new Date().toISOString() };
+    }
+
+    // 4) Live call to /portfolio/balance
+    let httpStatus = 0;
+    let kalshiServerDate = "";
+    let bodySnippet = "";
+    let parsedBody: any = null;
+    try {
+      const res = await fetch(`${KALSHI_BASE}${path}`, { method, headers });
+      httpStatus = res.status;
+      kalshiServerDate = res.headers.get("date") ?? "";
+      const text = await res.text();
+      bodySnippet = text.slice(0, 400);
+      try { parsedBody = JSON.parse(text); } catch { /* keep text */ }
+      const ok = res.ok;
+      push({
+        name: `GET ${path} → HTTP ${httpStatus}`,
+        ok,
+        detail: ok
+          ? `balance=${parsedBody?.balance ?? "?"}¢, payout=${parsedBody?.payout ?? "?"}¢`
+          : `Body: ${bodySnippet || "(empty)"}`,
+        data: {
+          status: httpStatus,
+          kalshiServerDate,
+          kalshiErrorCode: parsedBody?.error?.code ?? parsedBody?.code ?? null,
+          kalshiErrorMessage: parsedBody?.error?.message ?? parsedBody?.message ?? null,
+        },
+      });
+    } catch (e: any) {
+      push({ name: `GET ${path}`, ok: false, detail: `Network error: ${e?.message ?? String(e)}` });
+      return { ok: false, steps, summary: "Network failure reaching Kalshi.", serverTimeIso: new Date().toISOString() };
+    }
+
+    // 5) Clock skew check (Kalshi rejects timestamps too far from server time)
+    if (kalshiServerDate) {
+      const kalshiMs = Date.parse(kalshiServerDate);
+      const localMs = Date.now();
+      const skewMs = Math.abs(kalshiMs - localMs);
+      const ok = skewMs < 30_000;
+      push({
+        name: "Server clock vs Kalshi (signature timestamp drift)",
+        ok,
+        detail: `Local=${new Date(localMs).toISOString()} · Kalshi=${kalshiServerDate} · skew=${(skewMs / 1000).toFixed(1)}s${ok ? "" : " — Kalshi rejects timestamps drifting >30s"}`,
+        data: { skewMs },
+      });
+    }
+
+    // 6) Summary — pinpoint the 401 cause
+    let summary = "All checks passed.";
+    if (httpStatus === 401) {
+      summary = "Kalshi returned 401 UNAUTHORIZED with valid signed headers. Most common causes: (a) KALSHI_API_KEY_ID belongs to a different environment (demo vs prod — this app targets api.elections.kalshi.com prod), (b) the private key PEM does not match this API key ID, (c) the API key was revoked or expired in your Kalshi account. Verify the key ID + PEM pair on kalshi.com → Profile → API Keys.";
+    } else if (httpStatus === 403) {
+      summary = "Kalshi returned 403 FORBIDDEN. Key authenticated but lacks permission for /portfolio/balance — check API key scopes.";
+    } else if (httpStatus >= 500) {
+      summary = `Kalshi server error ${httpStatus}. Not a credential issue — retry shortly.`;
+    } else if (httpStatus >= 400) {
+      summary = `Kalshi returned ${httpStatus}. See body snippet above for details.`;
+    }
+
+    return { ok: httpStatus === 200, steps, summary, serverTimeIso: new Date().toISOString() };
+  });
+
 // ── STEP 7 · Position Manager ──────────────────────────────────────────────
 // Close an existing open position by selling our side back to Kalshi at a
 // limit price. Realized P&L = (exitCents − entryCents) / 100 × contracts.
