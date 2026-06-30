@@ -642,16 +642,22 @@ function AutoTradePanel() {
     refetchInterval: 30_000,
   });
 
-  // Opportunistic client-side settle (cron also settles server-side every 1m).
+  // Opportunistic client-side settle + auto-exit (cron also runs server-side).
+  // Auto-exit checks open live positions every minute against TP/SL/edge-decay
+  // thresholds and closes via Kalshi sell when triggered.
   useEffect(() => {
     let cancelled = false;
     const tick = async () => {
-      try { await settleFn(); if (!cancelled) qc.invalidateQueries({ queryKey: ["auto-trade-orders"] }); } catch { /* ignore */ }
+      try {
+        await autoExitFn();
+        await settleFn();
+        if (!cancelled) qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
+      } catch { /* ignore */ }
     };
     tick();
     const h = setInterval(tick, 60_000);
     return () => { cancelled = true; clearInterval(h); };
-  }, [settleFn, qc]);
+  }, [settleFn, autoExitFn, qc]);
 
   const orders = list.data?.orders ?? [];
   const liveOrders = orders.filter(o => o.mode === "live");
