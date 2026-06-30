@@ -209,13 +209,40 @@ function probAboveCond(spot: number, strike: number, sigmaMin: number, minutesRe
   return 1 - normCdf(d);
 }
 
-// (c) Pull model toward market when very little time remains — the residual
-// diffusion variance is mostly noise vs the already-locked path.
-function blendNearExpiry(modelP: number, marketP: number, minsRemaining: number): number {
+// (c) Pull model toward market when very little time remains — but ONLY when
+// the model is LESS confident on the locked side than the market is. If the
+// model is more confident than Kalshi (we see spot + time clearly while their
+// order book lags), we keep our edge instead of dampening it toward them.
+function blendNearExpiry(modelP: number, marketP: number, minsRemaining: number, side: "YES" | "NO"): number {
   if (minsRemaining >= 2) return modelP;
-  // weight on market grows from 0 at 2min to 0.85 at 0min
+  // Model's confidence in the locked side.
+  const modelSideP = side === "YES" ? modelP : 1 - modelP;
+  const marketSideP = side === "YES" ? marketP : 1 - marketP;
+  // Only blend toward market if model trails market — never dampen high-conviction pins.
+  if (modelSideP >= marketSideP) return modelP;
   const w = Math.min(0.85, (2 - minsRemaining) / 2 * 0.85);
   return modelP * (1 - w) + marketP * w;
+}
+
+// Forward-vol-aware effective per-minute σ: blend realized 1m σ (backward) with
+// Deribit ATM IV (forward). IV is annualized; convert to per-minute: σ_min = atmIv/√525600.
+// Weight = 0.6 realized + 0.4 implied when IV is available; fall back to pure realized.
+function effectiveSigmaMin(realizedSigmaMin: number, opts: BtcOptions | null): number {
+  if (!opts || !Number.isFinite(opts.atmIv) || opts.atmIv <= 0) return realizedSigmaMin;
+  const ivPerMin = opts.atmIv / Math.sqrt(525600);
+  // Sanity-cap: implied shouldn't drag effective beyond ±3× realized.
+  const capped = Math.max(realizedSigmaMin / 3, Math.min(realizedSigmaMin * 3, ivPerMin));
+  return 0.6 * realizedSigmaMin + 0.4 * capped;
+}
+
+// How many σ of remaining-window move stands between spot and strike.
+// >2σ = locked side is ~97% safe; <0.5σ = essentially a coin flip.
+function sigmaDistance(spot: number, strike: number, sigmaMin: number, minutesRemaining: number): number {
+  if (spot <= 0 || strike <= 0 || sigmaMin <= 0) return 0;
+  const t = Math.max(1 / 60, minutesRemaining);
+  const stdMove = sigmaMin * SIGMA_CORRECTION * Math.sqrt(t);
+  if (stdMove <= 0) return 0;
+  return Math.abs(Math.log(spot / strike)) / stdMove;
 }
 
 function quarterKelly(p: number, priceYes: number): number {
