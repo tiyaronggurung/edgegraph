@@ -130,6 +130,9 @@ function MarketRow({
         <div className="text-sm">Model YES prob <span className="font-bold">{(m.modelYesProb*100).toFixed(1)}%</span></div>
         <div className="text-[10px] text-muted-foreground">
           base {(m.modelBaseProb*100).toFixed(1)}% {m.microAdjPts >= 0 ? "+" : ""}{m.microAdjPts.toFixed(2)}pts micro
+          {m.optionsImpliedProb !== null && (
+            <> · opt {(m.optionsImpliedProb*100).toFixed(1)}% <span className={m.optionsBlendPts >= 0 ? "text-emerald-400" : "text-red-400"}>({m.optionsBlendPts >= 0 ? "+" : ""}{m.optionsBlendPts.toFixed(2)}pts)</span></>
+          )}
         </div>
         <div className="text-xs">Edge <span className={confColor+" font-semibold"}>{m.edgePts>=0?"+":""}{m.edgePts.toFixed(1)} pts</span> <span className={"ml-1 "+confColor}>[{conf}]</span></div>
         <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{m.modelSource === "external" ? "your ML model" : "diffusion + microstructure"}</div>
