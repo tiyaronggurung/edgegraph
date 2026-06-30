@@ -121,48 +121,48 @@ async function loadSymbol(s: typeof SYMBOLS[number], key: string): Promise<Equit
   }
 }
 
-export const getEquitySignal = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<EquitySignalResult> => {
-    const key = process.env.FINNHUB_API_KEY;
-    if (!key) {
-      return {
-        asOf: new Date().toISOString(),
-        symbols: SYMBOLS.map(s => ({ symbol: s.symbol, label: s.label, price: null, ret30sPct: null, ret1mPct: null, sigma: null, direction: "flat", available: false, note: "no_api_key" })),
-        score: 0, sigma: 0, regime: "neutral", strength: "none",
-        btcImpact: { edgeAdjustPts: 0, wouldBlock: "none", explanation: "FINNHUB_API_KEY not set." },
-      };
-    }
-    const symbols = await Promise.all(SYMBOLS.map(s => loadSymbol(s, key)));
-    // Re-normalize weights over available symbols
-    let totalW = 0, scoreW = 0, sigmaW = 0;
-    for (let i = 0; i < SYMBOLS.length; i++) {
-      const sig = symbols[i];
-      if (!sig.available || sig.ret1mPct == null) continue;
-      totalW += SYMBOLS[i].weight;
-      scoreW += SYMBOLS[i].weight * sig.ret1mPct;
-      sigmaW += SYMBOLS[i].weight * Math.abs(sig.sigma ?? 0);
-    }
-    const score = totalW > 0 ? scoreW / totalW : 0;
-    const sigmaAvg = totalW > 0 ? sigmaW / totalW : 0;
-    const absScore = Math.abs(score);
-    const regime: EquitySignalResult["regime"] = absScore < 0.03 ? "neutral" : score > 0 ? "risk_on" : "risk_off";
-    const strength: EquitySignalResult["strength"] =
-      regime === "neutral" ? "none" : sigmaAvg >= 1.5 || absScore >= 0.15 ? "strong" : "mild";
-    // Hypothetical impact for the BTC trade. Edge adjustment in points (Kalshi cents).
-    // Strong move: +/-3pts toward direction; mild: +/-1pt. Strong opposite move blocks.
-    const edgeAdjustPts = regime === "neutral" ? 0 : (strength === "strong" ? 3 : 1) * (regime === "risk_on" ? 1 : -1);
-    const wouldBlock: EquitySignalResult["btcImpact"]["wouldBlock"] =
-      strength === "strong" && regime === "risk_off" ? "block_up"
-      : strength === "strong" && regime === "risk_on" ? "block_down"
-      : "none";
-    const dirText = regime === "risk_on" ? "UP" : regime === "risk_off" ? "DOWN" : "flat";
-    const explanation =
-      regime === "neutral" ? "Equities flat — no adjustment."
-      : `Equities ${dirText} (${strength}) → ${edgeAdjustPts >= 0 ? "+" : ""}${edgeAdjustPts}pt edge to BTC ${dirText}${wouldBlock !== "none" ? `, would block opposite-direction trade` : ""}.`;
+export async function computeEquitySignal(): Promise<EquitySignalResult> {
+  const key = process.env.FINNHUB_API_KEY;
+  if (!key) {
     return {
       asOf: new Date().toISOString(),
-      symbols, score, sigma: sigmaAvg, regime, strength,
-      btcImpact: { edgeAdjustPts, wouldBlock, explanation },
+      symbols: SYMBOLS.map(s => ({ symbol: s.symbol, label: s.label, price: null, ret30sPct: null, ret1mPct: null, sigma: null, direction: "flat", available: false, note: "no_api_key" })),
+      score: 0, sigma: 0, regime: "neutral", strength: "none",
+      btcImpact: { edgeAdjustPts: 0, wouldBlock: "none", explanation: "FINNHUB_API_KEY not set." },
     };
-  });
+  }
+  const symbols = await Promise.all(SYMBOLS.map(s => loadSymbol(s, key)));
+  let totalW = 0, scoreW = 0, sigmaW = 0;
+  for (let i = 0; i < SYMBOLS.length; i++) {
+    const sig = symbols[i];
+    if (!sig.available || sig.ret1mPct == null) continue;
+    totalW += SYMBOLS[i].weight;
+    scoreW += SYMBOLS[i].weight * sig.ret1mPct;
+    sigmaW += SYMBOLS[i].weight * Math.abs(sig.sigma ?? 0);
+  }
+  const score = totalW > 0 ? scoreW / totalW : 0;
+  const sigmaAvg = totalW > 0 ? sigmaW / totalW : 0;
+  const absScore = Math.abs(score);
+  const regime: EquitySignalResult["regime"] = absScore < 0.03 ? "neutral" : score > 0 ? "risk_on" : "risk_off";
+  const strength: EquitySignalResult["strength"] =
+    regime === "neutral" ? "none" : sigmaAvg >= 1.5 || absScore >= 0.15 ? "strong" : "mild";
+  const edgeAdjustPts = regime === "neutral" ? 0 : (strength === "strong" ? 3 : 1) * (regime === "risk_on" ? 1 : -1);
+  const wouldBlock: EquitySignalResult["btcImpact"]["wouldBlock"] =
+    strength === "strong" && regime === "risk_off" ? "block_up"
+    : strength === "strong" && regime === "risk_on" ? "block_down"
+    : "none";
+  const dirText = regime === "risk_on" ? "UP" : regime === "risk_off" ? "DOWN" : "flat";
+  const explanation =
+    regime === "neutral" ? "Equities flat — no adjustment."
+    : `Equities ${dirText} (${strength}) → ${edgeAdjustPts >= 0 ? "+" : ""}${edgeAdjustPts}pt edge to BTC ${dirText}${wouldBlock !== "none" ? `, would block opposite-direction trade` : ""}.`;
+  return {
+    asOf: new Date().toISOString(),
+    symbols, score, sigma: sigmaAvg, regime, strength,
+    btcImpact: { edgeAdjustPts, wouldBlock, explanation },
+  };
+}
+
+export const getEquitySignal = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async (): Promise<EquitySignalResult> => computeEquitySignal());
+
