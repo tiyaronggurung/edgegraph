@@ -6,7 +6,7 @@ import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCi
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats } from "@/lib/cryptoPredictions.functions";
-import { listAutoTradeOrders, settleAutoTradeOrders, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
+import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { toast } from "sonner";
 
@@ -595,6 +595,8 @@ function AutoTradePanel() {
   const qc = useQueryClient();
   const listFn = useServerFn(listAutoTradeOrders);
   const settleFn = useServerFn(settleAutoTradeOrders);
+  const runFn = useServerFn(runAutoTrade);
+  const [liveBusy, setLiveBusy] = useState(false);
 
   const list = useQuery({
     queryKey: ["auto-trade-orders"],
@@ -619,26 +621,74 @@ function AutoTradePanel() {
   const cap = 5;
   const remaining = Math.max(0, cap - placed);
 
+  const liveOrders = orders.filter(o => o.mode === "live");
+  const liveCount24h = liveOrders.filter(o => Date.now() - new Date(o.created_at).getTime() < 24 * 60 * 60 * 1000).length;
+  const liveRealized24h = liveOrders
+    .filter(o => Date.now() - new Date(o.created_at).getTime() < 24 * 60 * 60 * 1000)
+    .reduce((s, o) => s + (Number(o.pnl_usd) || 0), 0);
+
+  async function runLive() {
+    const ok = window.confirm(
+      "PLACE REAL MONEY ORDERS on Kalshi?\n\n" +
+      "• Up to 3 orders this session\n" +
+      "• $20 per order ($60 max exposure)\n" +
+      "• Stops if daily loss exceeds -$60\n" +
+      "• Only fires on edge ≥5pts, sigma ≥1.25σ, ≥120s to close\n\n" +
+      "Type-confirm not required — click OK to proceed.",
+    );
+    if (!ok) return;
+    setLiveBusy(true);
+    try {
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 20, maxOrders: 3 } });
+      if (res.placed > 0) {
+        toast.success(`Placed ${res.placed} live order${res.placed === 1 ? "" : "s"} on Kalshi.`);
+      } else {
+        toast.info("No live orders placed.", { description: res.skipReasons.slice(0, 3).join(" · ") || "No eligible markets." });
+      }
+      qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
+      qc.invalidateQueries({ queryKey: ["crypto-trades"] });
+    } catch (e: any) {
+      toast.error("Live auto-trade failed", { description: e?.message ?? String(e) });
+    } finally {
+      setLiveBusy(false);
+    }
+  }
+
   return (
     <div className="border border-border rounded-lg bg-card">
       <div className="px-4 py-2 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            Auto-trade · paper mode
+            Auto-trade · paper + live
             <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> AUTO
             </span>
           </h2>
           <p className="text-[11px] text-muted-foreground">
-            $10 paper bet at the start of each new 15-min strike. Auto stops after {cap} trades. Cron runs every 1 min · {remaining} of {cap} remaining.
+            $10 paper bet via cron each new 15-min strike (stops after {cap}, {remaining} left). Live: click button — $20×3 max/session, halt at -$60/24h.
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            Live 24h: {liveCount24h}/10 orders · realized <span className={liveRealized24h >= 0 ? "text-emerald-400" : "text-red-400"}>{liveRealized24h >= 0 ? "+" : ""}${liveRealized24h.toFixed(2)}</span>
           </p>
         </div>
-        {totals && (
-          <div className="text-xs font-mono text-muted-foreground">
-            {totals.placed} placed · <span className="text-emerald-400">{totals.wins}W</span> / <span className="text-red-400">{totals.losses}L</span> · PnL <span className={totals.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}>{totals.pnlUsd >= 0 ? "+" : ""}${totals.pnlUsd.toFixed(2)}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          {totals && (
+            <div className="text-xs font-mono text-muted-foreground">
+              {totals.placed} placed · <span className="text-emerald-400">{totals.wins}W</span> / <span className="text-red-400">{totals.losses}L</span> · PnL <span className={totals.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}>{totals.pnlUsd >= 0 ? "+" : ""}${totals.pnlUsd.toFixed(2)}</span>
+            </div>
+          )}
+          <button
+            onClick={runLive}
+            disabled={liveBusy}
+            className="text-xs font-semibold px-3 py-1.5 rounded border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-50 flex items-center gap-1.5"
+            title="Place real-money Kalshi orders with strict guardrails"
+          >
+            {liveBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+            {liveBusy ? "Placing…" : "Run LIVE auto-trade"}
+          </button>
+        </div>
       </div>
+
       {orders.length === 0 ? (
         <div className="p-6 text-center text-sm text-muted-foreground">Waiting for the next eligible strike window. The cron will place a bet automatically.</div>
       ) : (
