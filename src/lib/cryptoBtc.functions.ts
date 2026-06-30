@@ -59,6 +59,8 @@ export interface BtcMarket {
   modelBaseProb: number;     // diffusion-only prob (before micro adjustment)
   modelSource: "external" | "intra-window-diffusion";
   microAdjPts: number;       // points added by microstructure features
+  optionsImpliedProb: number | null; // Deribit Black-Scholes prob (null if unavailable)
+  optionsBlendPts: number;   // pts contributed by options blend
   edgePts: number;
   side: "YES" | "NO";
   edgeAbs: number;
@@ -74,6 +76,7 @@ interface BtcMarketsResult {
   markets: BtcMarket[];
   modelSource: "external" | "intra-window-diffusion";
   micro: BtcMicro | null;
+  options: BtcOptions | null;
 }
 
 
