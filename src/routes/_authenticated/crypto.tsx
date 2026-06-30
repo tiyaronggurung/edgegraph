@@ -698,6 +698,15 @@ function AutoTradePanel() {
             </div>
           )}
           <button
+            onClick={testKalshi}
+            disabled={testBusy}
+            className="text-xs font-semibold px-3 py-1.5 rounded border border-border bg-muted/30 hover:bg-muted/50 disabled:opacity-50 flex items-center gap-1.5"
+            title="Read-only: signs a request to Kalshi /portfolio/balance to verify credentials"
+          >
+            {testBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+            {testBusy ? "Testing…" : "Test Kalshi connection"}
+          </button>
+          <button
             onClick={runLive}
             disabled={liveBusy}
             className="text-xs font-semibold px-3 py-1.5 rounded border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-50 flex items-center gap-1.5"
