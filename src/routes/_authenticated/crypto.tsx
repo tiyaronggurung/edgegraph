@@ -743,35 +743,56 @@ function AutoTradePanel() {
     }
   }
 
-  async function runForce() {
-    const ok = window.confirm(
-      "FORCE one LIVE order on Kalshi at current price?\n\n" +
-      "Picks the model's strongest |edge| market (UP or DOWN) and places\n" +
-      "ONE $20 order at the current Kalshi quote.\n\n" +
-      "BYPASSED gates: edge≥5pts, σ≥1.25, ≥120s, momentum, equity overlay,\n" +
-      "24h-per-ticker dedupe.\n\n" +
-      "STILL enforced: kill switch, key health, daily 10-order / -$60 caps,\n" +
-      "and auto-exit (TP +70% / SL -50% / edge-decay 2¢).\n\n" +
-      "Click OK to proceed.",
-    );
-    if (!ok) return;
+  async function runForce(opts?: { silent?: boolean }) {
+    const silent = opts?.silent === true;
+    if (!silent) {
+      const ok = window.confirm(
+        "FORCE LIVE orders on Kalshi at current price?\n\n" +
+        "Picks the model's top |edge| markets (UP or DOWN) and places\n" +
+        "up to 2 × $20 orders at current Kalshi quotes.\n\n" +
+        "BYPASSED: edge/σ/momentum/equity/24h-dedupe gates.\n" +
+        "ENFORCED: kill switch, key health, 40 orders / -$80 in 24h,\n" +
+        "auto-exit (TP +70% / SL -50% / edge-decay 2¢).\n\n" +
+        "Click OK to proceed.",
+      );
+      if (!ok) return;
+    }
     setForceBusy(true);
     try {
-      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 20, maxOrders: 1, force: true } });
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 20, maxOrders: 2, force: true } });
       if (res.placed > 0) {
-        const o = res.orders[0];
-        toast.success(`Forced ${o.side === "YES" ? "UP" : "DOWN"} on ${o.ticker} @ ${o.limit_cents}¢ × ${o.contracts}`);
-      } else {
+        toast.success(`Forced ${res.placed} order${res.placed === 1 ? "" : "s"}: ${res.orders.map(o => `${o.side === "YES" ? "UP" : "DOWN"} ${o.ticker} @ ${o.limit_cents}¢`).join(", ")}`);
+      } else if (!silent) {
         toast.error("Force order not placed", { description: res.skipReasons.slice(0, 3).join(" · ") || "No tradeable market." });
       }
       qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
       qc.invalidateQueries({ queryKey: ["crypto-trades"] });
     } catch (e: any) {
-      toast.error("Force order failed", { description: e?.message ?? String(e) });
+      if (!silent) toast.error("Force order failed", { description: e?.message ?? String(e) });
     } finally {
       setForceBusy(false);
     }
   }
+
+  // Auto-loop: every 60s, fire force-buy on top model picks. Daily caps still apply.
+  const [autoLoop, setAutoLoop] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoLoop") === "on";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("crypto.autoLoop", autoLoop ? "on" : "off");
+    }
+  }, [autoLoop]);
+  useEffect(() => {
+    if (!autoLoop) return;
+    let cancelled = false;
+    const tick = async () => { if (!cancelled) await runForce({ silent: true }); };
+    tick();
+    const h = setInterval(tick, 60_000);
+    return () => { cancelled = true; clearInterval(h); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLoop]);
 
   return (
     <div className="border border-border rounded-lg bg-card">
