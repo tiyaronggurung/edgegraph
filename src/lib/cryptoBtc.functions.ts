@@ -579,6 +579,18 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
     const events = (evJson.events ?? []) as any[];
     const markets: BtcMarket[] = [];
 
+    // Lock model side per ticker: first snapshot wins for the life of the
+    // market, so the UI never flips UP↔DOWN mid-window even if live prob
+    // drifts across 50%.
+    const allTickers: string[] = [];
+    for (const e of events) for (const m of e.markets ?? []) if (m?.ticker) allTickers.push(m.ticker);
+    const lockedSides = await (async () => {
+      try {
+        const { getLockedSides } = await import("./cryptoPredictions.server");
+        return await getLockedSides(allTickers);
+      } catch { return new Map<string, "YES" | "NO">(); }
+    })();
+
     for (const e of events) {
       for (const m of e.markets ?? []) {
         if (m.status !== "active") continue;
