@@ -609,6 +609,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
       markets,
       modelSource: hasExternal ? "external" : "intra-window-diffusion",
       micro,
+      options,
     };
   },
 );
