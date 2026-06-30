@@ -21,6 +21,15 @@ export interface BtcMicro {
   cvdSellUsd: number;        // taker sell USD notional in window
   ofi: number;               // (bidSize - askSize) / (bidSize + askSize) top 10 levels (-1..1)
   bookSpreadBps: number;     // best ask vs best bid in bps
+  // Step 6 — large/whale aggressive flows (≥ $250k single fills). Proxy for
+  // liquidation cascades; real liquidation feed is WS-only so we use this.
+  whaleBuyUsd1m: number;
+  whaleSellUsd1m: number;
+  whaleImbalance1m: number;  // (-1..1)
+  whaleBuyUsd5m: number;
+  whaleSellUsd5m: number;
+  whaleImbalance5m: number;  // (-1..1)
+  whaleCount5m: number;
 }
 
 export interface BtcOptions {
@@ -73,7 +82,7 @@ export interface BtcMarket {
   requiredEdgePts: number;   // dynamic threshold edge must clear to BET
   gateAction: "BET" | "PASS";
   gateReason: string;        // human explanation of pass/bet
-  thresholdParts: { base: number; calib: number; time: number; spread: number; regime: number };
+  thresholdParts: { base: number; calib: number; time: number; spread: number; regime: number; whale: number };
 }
 
 
@@ -257,13 +266,16 @@ const MICRO_TTL_MS = 15_000;
 async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
   if (_microCache && Date.now() - _microCache.at < MICRO_TTL_MS) return _microCache.data;
   try {
-    const sinceMs = Date.now() - 60_000; // last 60s of taker flow
-    const [fundingRes, oiRes, oiHistRes, perpRes, tradesRes, depthRes] = await Promise.all([
+    const nowMs = Date.now();
+    const since60s = nowMs - 60_000;
+    const since5m = nowMs - 5 * 60_000;
+    const [fundingRes, oiRes, oiHistRes, perpRes, tradesRes, trades5mRes, depthRes] = await Promise.all([
       fetch("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT"),
       fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT"),
       fetch("https://fapi.binance.com/futures/data/openInterestHist?symbol=BTCUSDT&period=5m&limit=2"),
       fetch("https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT"),
-      fetch(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&startTime=${sinceMs}&limit=1000`),
+      fetch(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&startTime=${since60s}&limit=1000`),
+      fetch(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&startTime=${since5m}&limit=1000`),
       fetch("https://fapi.binance.com/fapi/v1/depth?symbol=BTCUSDT&limit=20"),
     ]);
     if (!fundingRes.ok || !oiRes.ok || !perpRes.ok) throw new Error("micro http");
@@ -273,6 +285,7 @@ async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
     const perp: any = await perpRes.json();
     const hist: any[] = oiHistRes.ok ? await oiHistRes.json() : [];
     const trades: any[] = tradesRes.ok ? await tradesRes.json() : [];
+    const trades5m: any[] = trades5mRes.ok ? await trades5mRes.json() : [];
     const depth: any = depthRes.ok ? await depthRes.json() : { bids: [], asks: [] };
 
     const fundingRate = Number(funding.lastFundingRate ?? 0);
@@ -291,6 +304,8 @@ async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
     // Taker CVD over the window. `m=true` means buyer is the market maker,
     // so the trade was a SELL aggression; `m=false` means BUY aggression.
     let cvdBuyUsd = 0, cvdSellUsd = 0;
+    let whaleBuy1m = 0, whaleSell1m = 0;
+    const WHALE_USD = 250_000;
     for (const t of trades) {
       const price = Number(t.p);
       const qty = Number(t.q);
@@ -298,9 +313,29 @@ async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
       const usd = price * qty;
       if (t.m) cvdSellUsd += usd;
       else cvdBuyUsd += usd;
+      if (usd >= WHALE_USD) {
+        if (t.m) whaleSell1m += usd; else whaleBuy1m += usd;
+      }
     }
     const totalUsd = cvdBuyUsd + cvdSellUsd;
     const cvdRatio = totalUsd > 0 ? (cvdBuyUsd - cvdSellUsd) / totalUsd : 0;
+    const whaleTot1m = whaleBuy1m + whaleSell1m;
+    const whaleImbalance1m = whaleTot1m > 0 ? (whaleBuy1m - whaleSell1m) / whaleTot1m : 0;
+
+    // 5-minute whale aggregation from the wider aggTrades window.
+    let whaleBuy5m = 0, whaleSell5m = 0, whaleCount5m = 0;
+    for (const t of trades5m) {
+      const price = Number(t.p);
+      const qty = Number(t.q);
+      if (!Number.isFinite(price) || !Number.isFinite(qty)) continue;
+      const usd = price * qty;
+      if (usd >= WHALE_USD) {
+        whaleCount5m++;
+        if (t.m) whaleSell5m += usd; else whaleBuy5m += usd;
+      }
+    }
+    const whaleTot5m = whaleBuy5m + whaleSell5m;
+    const whaleImbalance5m = whaleTot5m > 0 ? (whaleBuy5m - whaleSell5m) / whaleTot5m : 0;
 
     // Order-book imbalance: sum sizes for top 10 levels each side.
     const bids: [string, string][] = depth.bids ?? [];
@@ -327,6 +362,13 @@ async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
       cvdSellUsd,
       ofi,
       bookSpreadBps,
+      whaleBuyUsd1m: whaleBuy1m,
+      whaleSellUsd1m: whaleSell1m,
+      whaleImbalance1m,
+      whaleBuyUsd5m: whaleBuy5m,
+      whaleSellUsd5m: whaleSell5m,
+      whaleImbalance5m,
+      whaleCount5m,
     };
     _microCache = { at: Date.now(), data };
     return data;
@@ -355,13 +397,17 @@ function microAdjustment(p: number, m: BtcMicro | null, secondsToClose: number):
   const cvdZ = Math.max(-2, Math.min(2, m.cvdRatio * 4)); // ratio 0.5 → z=2
   // Order-book imbalance: classic OFI alpha.
   const ofiZ = Math.max(-2, Math.min(2, m.ofi * 3));
+  // Whale aggression: large fills (≥$250k) lead spot on minute horizon.
+  // Use 1m for recency, blended with 5m for stability.
+  const whaleZ = Math.max(-2, Math.min(2, (m.whaleImbalance1m * 0.7 + m.whaleImbalance5m * 0.3) * 3));
 
   const score =
-    0.25 * fundingZ +
-    0.15 * oiZ +
-    0.25 * basisZ +
-    0.20 * cvdZ +
-    0.15 * ofiZ;
+    0.22 * fundingZ +
+    0.13 * oiZ +
+    0.22 * basisZ +
+    0.18 * cvdZ +
+    0.12 * ofiZ +
+    0.13 * whaleZ;
   // Convert score → logit shift, cap at ±0.27 logit (≈ ±6 prob points near 0.5).
   const logitShift = Math.max(-0.27, Math.min(0.27, score * 0.07));
   const eps = 1e-6;
@@ -595,7 +641,15 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         const fundAbs = Math.abs(micro?.fundingRate ?? 0) / 0.00005; // z-ish
         const basisAbs = Math.abs(micro?.basisBps ?? 0) / 5;
         const tRegime = (fundAbs > 2 || basisAbs > 2) ? 1.5 : 0;
-        const requiredEdgePts = tBase + tCalib + tTime + tSpread + tRegime;
+        // Step 6 · Whale-flow regime: strong aligned whale flow LOWERS bar,
+        // contradictory whale flow RAISES it. |imbalance| > 0.6 = strong.
+        const wImb = micro?.whaleImbalance1m ?? 0;
+        const sideSign = side === "YES" ? 1 : -1;
+        let tWhale = 0;
+        if (Math.abs(wImb) > 0.6 && (micro?.whaleBuyUsd1m ?? 0) + (micro?.whaleSellUsd1m ?? 0) > 500_000) {
+          tWhale = Math.sign(wImb) === sideSign ? -1.0 : 1.5;
+        }
+        const requiredEdgePts = Math.max(1.5, tBase + tCalib + tTime + tSpread + tRegime + tWhale);
 
         let gateAction: "BET" | "PASS" = "PASS";
         let gateReason = "";
@@ -643,7 +697,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           requiredEdgePts,
           gateAction,
           gateReason,
-          thresholdParts: { base: tBase, calib: tCalib, time: tTime, spread: tSpread, regime: tRegime },
+          thresholdParts: { base: tBase, calib: tCalib, time: tTime, spread: tSpread, regime: tRegime, whale: tWhale },
         });
       }
     }
