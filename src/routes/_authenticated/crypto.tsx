@@ -175,9 +175,9 @@ function MarketRow({
 
 function TopPick({ markets }: { markets: BtcMarket[] }) {
   const pick = useMemo(() => {
-    const eligible = markets.filter(m => m.secondsToClose > 60 && m.edgeAbs >= 3);
+    const eligible = markets.filter(m => m.gateAction === "BET");
     if (!eligible.length) return null;
-    return [...eligible].sort((a,b) => b.edgeAbs - a.edgeAbs)[0];
+    return [...eligible].sort((a,b) => (b.edgeAbs - b.requiredEdgePts) - (a.edgeAbs - a.requiredEdgePts))[0];
   }, [markets]);
   if (!pick) return (
     <div className="border border-border rounded-lg bg-card p-4 text-sm text-muted-foreground">
