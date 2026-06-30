@@ -150,3 +150,70 @@ export const checkKalshiConfigured = createServerFn({ method: "GET" })
     configured: !!(process.env.KALSHI_API_KEY_ID && process.env.KALSHI_PRIVATE_KEY_PEM),
     externalModel: !!process.env.CRYPTO_MODEL_URL,
   }));
+
+// ── STEP 7 · Position Manager ──────────────────────────────────────────────
+// Close an existing open position by selling our side back to Kalshi at a
+// limit price. Realized P&L = (exitCents − entryCents) / 100 × contracts.
+// Logs the close on the original trade row; never invents new trade rows so
+// the daily ledger stays one-bet-per-row.
+const SellOrderSchema = z.object({
+  tradeId: z.string().uuid(),
+  limitPriceCents: z.number().int().min(1).max(99),
+});
+
+export const sellKalshiOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => SellOrderSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: trade, error: tErr } = await supabase
+      .from("crypto_trades")
+      .select("*")
+      .eq("id", data.tradeId)
+      .eq("user_id", userId)
+      .single();
+    if (tErr || !trade) throw new Error("Trade not found");
+    if (trade.status !== "submitted") throw new Error(`Cannot close trade in status: ${trade.status}`);
+    if (!trade.contracts || trade.contracts <= 0) throw new Error("Trade has no contracts");
+
+    const path = "/portfolio/orders";
+    const headers = await signKalshi("POST", path);
+
+    const body = {
+      ticker: trade.ticker,
+      action: "sell",
+      side: trade.side === "YES" ? "yes" : "no",
+      type: "limit",
+      count: trade.contracts,
+      yes_price: trade.side === "YES" ? data.limitPriceCents : undefined,
+      no_price: trade.side === "NO" ? data.limitPriceCents : undefined,
+      client_order_id: `close-${trade.id}`,
+    };
+
+    const res = await fetch(`${KALSHI_BASE}${path}`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json: any = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = json?.error?.message ?? json?.message ?? `Kalshi ${res.status}`;
+      throw new Error(msg);
+    }
+
+    const entryCents = Math.round((Number(trade.stake_usd) / Number(trade.contracts)) * 100);
+    const exitCents = data.limitPriceCents;
+    const realizedPnl = ((exitCents - entryCents) / 100) * Number(trade.contracts);
+    const closeOrderId = json?.order?.order_id ?? json?.order_id ?? null;
+
+    const prevRaw = (trade.raw as any) ?? {};
+    await supabase.from("crypto_trades").update({
+      status: "closed",
+      pnl_usd: realizedPnl,
+      raw: { ...prevRaw, close: { at: new Date().toISOString(), exit_cents: exitCents, entry_cents: entryCents, kalshi_order_id: closeOrderId, response: json } },
+    }).eq("id", trade.id);
+
+    return { ok: true, realizedPnl, exitCents, entryCents, closeOrderId };
+  });
+
