@@ -358,7 +358,7 @@ export const diagnoseKalshiAuth = createServerFn({ method: "GET" })
         name: "Private key parses & passes RSA-PSS sign smoke test",
         ok: true,
         detail: `keyType=${validated.key.asymmetricKeyType}, modulusBits=${details.modulusLength ?? "?"}`,
-        data: { keyType: validated.key.asymmetricKeyType, modulusBits: details.modulusLength ?? null },
+        data: { keyType: validated.key.asymmetricKeyType ?? null, modulusBits: details.modulusLength ?? null },
       });
     } catch (e: any) {
       push({ name: "Private key parses & passes RSA-PSS sign smoke test", ok: false, detail: e?.message ?? String(e) });
