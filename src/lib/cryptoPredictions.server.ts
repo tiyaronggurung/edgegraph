@@ -190,7 +190,7 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
         winRate: settledAll.length ? correctAll / settledAll.length : 0,
       },
     },
-    recent: all.slice(0, 30).map(r => ({
+    recent: all.map(r => ({
       ticker: r.ticker as string,
       side: r.side as "YES" | "NO",
       strike: Number(r.strike),
