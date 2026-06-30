@@ -175,6 +175,84 @@ export type Database = {
           },
         ]
       }
+      crypto_trades: {
+        Row: {
+          bankroll_usd: number | null
+          close_time: string | null
+          contracts: number
+          created_at: string
+          edge_pts: number | null
+          error: string | null
+          event_ticker: string | null
+          id: string
+          kalshi_order_id: string | null
+          kelly_multiplier: number | null
+          market_yes_price: number | null
+          model_prob: number | null
+          outcome: string | null
+          pnl_usd: number | null
+          raw: Json | null
+          settled_yes_price: number | null
+          side: string
+          spot_at_entry: number | null
+          stake_usd: number
+          status: string
+          strike: number | null
+          ticker: string
+          user_id: string
+        }
+        Insert: {
+          bankroll_usd?: number | null
+          close_time?: string | null
+          contracts?: number
+          created_at?: string
+          edge_pts?: number | null
+          error?: string | null
+          event_ticker?: string | null
+          id?: string
+          kalshi_order_id?: string | null
+          kelly_multiplier?: number | null
+          market_yes_price?: number | null
+          model_prob?: number | null
+          outcome?: string | null
+          pnl_usd?: number | null
+          raw?: Json | null
+          settled_yes_price?: number | null
+          side: string
+          spot_at_entry?: number | null
+          stake_usd?: number
+          status?: string
+          strike?: number | null
+          ticker: string
+          user_id: string
+        }
+        Update: {
+          bankroll_usd?: number | null
+          close_time?: string | null
+          contracts?: number
+          created_at?: string
+          edge_pts?: number | null
+          error?: string | null
+          event_ticker?: string | null
+          id?: string
+          kalshi_order_id?: string | null
+          kelly_multiplier?: number | null
+          market_yes_price?: number | null
+          model_prob?: number | null
+          outcome?: string | null
+          pnl_usd?: number | null
+          raw?: Json | null
+          settled_yes_price?: number | null
+          side?: string
+          spot_at_entry?: number | null
+          stake_usd?: number
+          status?: string
+          strike?: number | null
+          ticker?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
