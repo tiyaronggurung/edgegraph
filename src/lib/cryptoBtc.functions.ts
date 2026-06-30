@@ -2,6 +2,7 @@
 // Model = lognormal diffusion CONDITIONED on intra-window realized price action.
 // Optional override: POST market context to CRYPTO_MODEL_URL and use returned {prob}.
 import { createServerFn } from "@tanstack/react-start";
+import { computeGapAnalysis, computeRequiredEdgePts, evaluateGate } from "./cryptoBtcGate";
 
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
 const COINBASE = "https://api.exchange.coinbase.com";
@@ -697,89 +698,24 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         // Time/vol safety margin — how many σ from strike (locked side).
         const sigDist = sigmaDistance(spot, strike, sigmaEff, minsRemaining);
 
-        // ── STEP 5 · Edge gate ────────────────────────────────────────────
+        // ── STEP 5 · Edge gate (extracted to cryptoBtcGate.ts for unit-test coverage) ──
         const bucketFit = calibState?.buckets.find(b => b.bucket === cal.bucket);
-        const tBase = 3;
-        // Worse calibration Brier → require more edge. Brier 0.20 = neutral.
-        const tCalib = bucketFit && bucketFit.n >= 30
-          ? Math.max(0, Math.min(4, (bucketFit.brier - 0.20) * 30))
-          : 0.5; // cold start: small penalty until we have data
-        // Time-to-close: MMs sharpest in the final minute.
-        const tTime = secondsToClose < 60 ? 2 : secondsToClose < 300 ? 1 : 0;
-        // Wide book = stale prices; demand more edge.
-        const sp = micro?.bookSpreadBps ?? 0;
-        const tSpread = sp > 10 ? 2 : sp > 5 ? 1 : 0;
-        // Regime filter: extreme funding or basis squeeze = unstable, require more.
-        const fundAbs = Math.abs(micro?.fundingRate ?? 0) / 0.00005; // z-ish
-        const basisAbs = Math.abs(micro?.basisBps ?? 0) / 5;
-        const tRegime = (fundAbs > 2 || basisAbs > 2) ? 1.5 : 0;
-        // Step 6 · Whale-flow regime: strong aligned whale flow LOWERS bar,
-        // contradictory whale flow RAISES it. |imbalance| > 0.6 = strong.
-        const wImb = micro?.whaleImbalance1m ?? 0;
-        const sideSign = side === "YES" ? 1 : -1;
-        let tWhale = 0;
-        if (Math.abs(wImb) > 0.6 && (micro?.whaleBuyUsd1m ?? 0) + (micro?.whaleSellUsd1m ?? 0) > 500_000) {
-          tWhale = Math.sign(wImb) === sideSign ? -1.0 : 1.5;
-        }
-        const requiredEdgePts = Math.max(1.5, tBase + tCalib + tTime + tSpread + tRegime + tWhale);
+        const { requiredEdgePts, parts: edgeParts } = computeRequiredEdgePts({
+          side, secondsToClose, micro,
+          calibBrier: bucketFit ? bucketFit.brier : null,
+          calibN: bucketFit ? bucketFit.n : 0,
+        });
+        const tBase = edgeParts.base;
+        const tCalib = edgeParts.calib;
+        const tTime = edgeParts.time;
+        const tSpread = edgeParts.spread;
+        const tRegime = edgeParts.regime;
+        const tWhale = edgeParts.whale;
 
-        // ── Gap analysis: anchor every verdict in strike↔spot geometry ──
-        // Locked side WINS at close iff: YES → finalSpot ≥ strike, NO → finalSpot ≤ strike.
-        // "needsToMoveUsd" = signed $ spot must travel from NOW to barely win at close (0 if already winning side).
-        const sideWantsAbove = side === "YES";
-        const currentlyWinning = sideWantsAbove ? (spot >= strike) : (spot <= strike);
-        const needsToMoveUsd = currentlyWinning ? 0 : (sideWantsAbove ? (strike - spot) : (strike - spot));
-        // 1σ remaining-window move in $ (sigmaEff is per-minute σ in % terms)
-        const expectedMoveUsd = (sigmaEff / 100) * Math.sqrt(Math.max(secondsToClose, 1) / 60) * spot;
-        const gapInSigmas = expectedMoveUsd > 0 ? Math.abs(needsToMoveUsd) / expectedMoveUsd : 99;
-        const momentumBlend = ((micro?.cvdRatio ?? 0) + (micro?.ofi ?? 0)) / 2;
-        const momentumSign: -1 | 0 | 1 = momentumBlend > 0.05 ? 1 : momentumBlend < -0.05 ? -1 : 0;
-        // Momentum "helps" the locked side if it pushes spot in the winning direction.
-        // YES wants spot up (or at least not down). NO wants spot down.
-        const momentumAlignsWithSide = momentumSign === 0
-          ? true
-          : (sideWantsAbove ? momentumSign > 0 : momentumSign < 0);
-        const gapVerdict = currentlyWinning
-          ? `spot ${sideWantsAbove ? "above" : "below"} strike by $${Math.abs(spot - strike).toFixed(0)} — ${side} defends · ${expectedMoveUsd.toFixed(0)}$/σ remaining · momentum ${momentumBlend >= 0 ? "+" : ""}${momentumBlend.toFixed(2)} ${momentumAlignsWithSide ? "holds" : "threatens"}`
-          : `spot must move ${sideWantsAbove ? "+" : "−"}$${Math.abs(needsToMoveUsd).toFixed(0)} in ${secondsToClose}s (${gapInSigmas.toFixed(2)}σ) · momentum ${momentumBlend >= 0 ? "+" : ""}${momentumBlend.toFixed(2)} ${momentumAlignsWithSide ? "helps" : "fights"} ${side}`;
-        const gapAnalysis = {
-          gapUsd: spot - strike,
-          gapPct: ((spot - strike) / spot) * 100,
-          needsToMoveUsd,
-          needsDirection: (currentlyWinning ? "hold" : (sideWantsAbove ? "up" : "down")) as "up" | "down" | "hold",
-          expectedMoveUsd,
-          gapInSigmas: currentlyWinning ? 0 : gapInSigmas,
-          momentumSign,
-          momentumAlignsWithSide,
-          verdict: gapVerdict,
-        };
-
-        let gateAction: "BET" | "PASS" = "PASS";
-        let gateReason = "";
-        // Pin-risk tightens as the clock runs: 0.5σ floor with >3min, 1.0σ inside 3min,
-        // 1.5σ inside 90s. Final minute is structurally a coin flip — Kalshi sets ATM
-        // strikes at t-15m specifically to maximize this; our edge cannot survive it.
-        const pinRiskFloor = secondsToClose <= 90 ? 1.5 : secondsToClose <= 180 ? 1.0 : 0.5;
-        if (secondsToClose <= 30) {
-          gateReason = "too close to expiry (<30s) — slippage risk";
-        } else if (yesPrice <= 0.02 || yesPrice >= 0.98) {
-          gateReason = "price pinned (≤2¢ or ≥98¢) — no room for edge";
-        } else if (sigDist < pinRiskFloor && secondsToClose > 60) {
-          gateReason = `coin-flip zone — strike only ${sigDist.toFixed(2)}σ from spot (floor ${pinRiskFloor.toFixed(1)}σ at ${secondsToClose}s)`;
-        } else if (!currentlyWinning && gapInSigmas > 1.0 && !momentumAlignsWithSide) {
-          // Spot must traverse >1σ to win AND momentum is pushing the wrong way → structural loss.
-          gateReason = `traversal block — ${side} needs ${gapInSigmas.toFixed(2)}σ move but momentum fights`;
-        } else if (!currentlyWinning && gapInSigmas > 1.5) {
-          // Even with neutral/aligned momentum, >1.5σ of required traversal is a low-probability shot.
-          gateReason = `gap too wide — ${side} needs ${gapInSigmas.toFixed(2)}σ traversal in ${secondsToClose}s`;
-        } else if (edgeAbs < requiredEdgePts) {
-          gateReason = `edge ${edgeAbs.toFixed(1)}pts < required ${requiredEdgePts.toFixed(1)}pts`;
-        } else if (kelly <= 0) {
-          gateReason = "Kelly fraction ≤ 0";
-        } else {
-          gateAction = "BET";
-          gateReason = `edge ${edgeAbs.toFixed(1)}pts ≥ required ${requiredEdgePts.toFixed(1)}pts · safety ${sigDist.toFixed(2)}σ · ${gapVerdict}`;
-        }
+        const gapAnalysis = computeGapAnalysis({ spot, strike, side, sigmaEff, secondsToClose, micro });
+        const { gateAction, gateReason } = evaluateGate({
+          side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap: gapAnalysis,
+        });
 
         markets.push({
           ticker: m.ticker,
