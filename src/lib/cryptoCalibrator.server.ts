@@ -26,9 +26,15 @@ export interface CalibratorState {
   globalHitRate: number;
   globalBrier: number;
   buckets: BucketFit[];
+  // Global Platt fit across ALL settled rows — used as a fallback when a
+  // per-bucket fit hasn't reached MIN_SAMPLES yet. Activates at GLOBAL_MIN_N
+  // so we get calibration benefit on cold start instead of waiting for 400+
+  // rows across all four buckets.
+  global: { a: number; b: number; n: number; active: boolean };
 }
 
-const MIN_SAMPLES = 100;       // min per-bucket before Platt is applied
+const MIN_SAMPLES = 30;        // per-bucket threshold (was 100)
+const GLOBAL_MIN_N = 20;       // global fallback activates at 20 settled rows
 const TTL_MS = 5 * 60_000;
 const MAX_ROWS = 5000;
 
