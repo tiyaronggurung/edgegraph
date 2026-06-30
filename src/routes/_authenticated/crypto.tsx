@@ -446,31 +446,55 @@ function CryptoPage() {
       </div>
 
       {data?.micro && (
-        <div className="border border-border rounded-lg bg-card p-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Perp funding (8h)</div>
-            <div className={`font-mono text-sm ${data.micro.fundingRate >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {(data.micro.fundingRate * 100).toFixed(4)}% <span className="text-[10px] text-muted-foreground">({data.micro.fundingAnnualBps >= 0 ? "+" : ""}{data.micro.fundingAnnualBps.toFixed(0)}bps APR)</span>
+        <div className="border border-border rounded-lg bg-card p-3 space-y-2">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Microstructure signals (Binance BTC perp)</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Funding (8h)</div>
+              <div className={`font-mono text-sm ${data.micro.fundingRate >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {(data.micro.fundingRate * 100).toFixed(4)}%
+              </div>
+              <div className="text-[10px] text-muted-foreground">{data.micro.fundingAnnualBps >= 0 ? "+" : ""}{data.micro.fundingAnnualBps.toFixed(0)}bps APR</div>
             </div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">OI Δ 5m</div>
-            <div className={`font-mono text-sm ${data.micro.oiDelta5mPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {data.micro.oiDelta5mPct >= 0 ? "+" : ""}{data.micro.oiDelta5mPct.toFixed(2)}%
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">OI Δ 5m</div>
+              <div className={`font-mono text-sm ${data.micro.oiDelta5mPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {data.micro.oiDelta5mPct >= 0 ? "+" : ""}{data.micro.oiDelta5mPct.toFixed(2)}%
+              </div>
+              <div className="text-[10px] text-muted-foreground">${(data.micro.oiNotional / 1e9).toFixed(2)}B OI</div>
             </div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Spot–perp basis</div>
-            <div className={`font-mono text-sm ${data.micro.basisBps >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {data.micro.basisBps >= 0 ? "+" : ""}{data.micro.basisBps.toFixed(2)}bps
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Basis</div>
+              <div className={`font-mono text-sm ${data.micro.basisBps >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {data.micro.basisBps >= 0 ? "+" : ""}{data.micro.basisBps.toFixed(2)}bps
+              </div>
+              <div className="text-[10px] text-muted-foreground">perp vs spot</div>
             </div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Perp OI</div>
-            <div className="font-mono text-sm">${(data.micro.oiNotional / 1e9).toFixed(2)}B</div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Taker CVD 60s</div>
+              <div className={`font-mono text-sm ${data.micro.cvdRatio >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {data.micro.cvdRatio >= 0 ? "+" : ""}{(data.micro.cvdRatio * 100).toFixed(1)}%
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                buy ${(data.micro.cvdBuyUsd / 1e6).toFixed(1)}M / sell ${(data.micro.cvdSellUsd / 1e6).toFixed(1)}M
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Book imbalance</div>
+              <div className={`font-mono text-sm ${data.micro.ofi >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {data.micro.ofi >= 0 ? "+" : ""}{(data.micro.ofi * 100).toFixed(1)}%
+              </div>
+              <div className="text-[10px] text-muted-foreground">top 10 levels</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Spread</div>
+              <div className="font-mono text-sm">{data.micro.bookSpreadBps.toFixed(2)}bps</div>
+              <div className="text-[10px] text-muted-foreground">best bid/ask</div>
+            </div>
           </div>
         </div>
       )}
+
 
 
       {q.isLoading && <div className="border border-border rounded-lg bg-card p-6 text-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Loading…</div>}
