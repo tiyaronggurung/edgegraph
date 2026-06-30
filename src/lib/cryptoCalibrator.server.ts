@@ -49,9 +49,21 @@ function bucketOf(secondsToClose: number): BucketFit["bucket"] {
   return "ge600";
 }
 
-interface Sample { p: number; y: 0 | 1; bucket: BucketFit["bucket"] }
+interface Sample { p: number; y: 0 | 1; bucket: BucketFit["bucket"]; w: number }
 
-// Fit Platt by Newton-Raphson on (a, b). 30 iters is plenty.
+// Recency half-life: a settled row from 7 days ago counts half as much as a
+// row settled right now. Keeps the calibrator responsive when market regime
+// shifts (e.g. vol regime changes) without throwing away old data entirely.
+const RECENCY_HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function recencyWeight(settledAt: string | null): number {
+  if (!settledAt) return 1;
+  const age = Date.now() - new Date(settledAt).getTime();
+  if (!Number.isFinite(age) || age < 0) return 1;
+  return Math.pow(0.5, age / RECENCY_HALF_LIFE_MS);
+}
+
+// Fit Platt by weighted Newton-Raphson on (a, b). 30 iters is plenty.
 function fitPlatt(samples: Sample[]): { a: number; b: number } {
   if (samples.length === 0) return { a: 1, b: 0 };
   let a = 1, b = 0;
@@ -61,8 +73,8 @@ function fitPlatt(samples: Sample[]): { a: number; b: number } {
       const x = logit(s.p);
       const z = a * x + b;
       const p = sigmoid(z);
-      const w = p * (1 - p);
-      const e = p - s.y;
+      const w = p * (1 - p) * s.w;
+      const e = (p - s.y) * s.w;
       g0 += e * x; g1 += e;
       h00 += w * x * x; h01 += w * x; h11 += w;
     }
@@ -75,7 +87,6 @@ function fitPlatt(samples: Sample[]): { a: number; b: number } {
     a -= da; b -= db;
     if (Math.abs(da) + Math.abs(db) < 1e-6) break;
   }
-  // Guard against pathological fits — keep a sane.
   if (!Number.isFinite(a) || !Number.isFinite(b)) return { a: 1, b: 0 };
   a = Math.max(0.2, Math.min(3, a));
   b = Math.max(-2, Math.min(2, b));
@@ -89,7 +100,7 @@ export async function getCalibrator(): Promise<CalibratorState> {
 
   const { data, error } = await supabaseAdmin
     .from("btc_model_predictions")
-    .select("model_prob, was_correct, side, snapshot_seconds_to_close")
+    .select("model_prob, was_correct, side, snapshot_seconds_to_close, settled_at")
     .not("was_correct", "is", null)
     .order("settled_at", { ascending: false })
     .limit(MAX_ROWS);
@@ -115,7 +126,11 @@ export async function getCalibrator(): Promise<CalibratorState> {
     const side = (r.side as string) === "YES" ? "YES" : "NO";
     // YES outcome iff (side==YES & correct) OR (side==NO & !correct)
     const yes: 0 | 1 = (side === "YES" ? correct : !correct) ? 1 : 0;
-    samples.push({ p, y: yes, bucket: bucketOf(Number(r.snapshot_seconds_to_close ?? 0)) });
+    samples.push({
+      p, y: yes,
+      bucket: bucketOf(Number(r.snapshot_seconds_to_close ?? 0)),
+      w: recencyWeight(r.settled_at as string | null),
+    });
   }
 
   const bucketKeys: BucketFit["bucket"][] = ["lt60", "60_300", "300_600", "ge600"];

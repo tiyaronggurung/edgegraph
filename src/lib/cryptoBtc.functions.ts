@@ -121,6 +121,15 @@ interface BtcMarketsResult {
   micro: BtcMicro | null;
   options: BtcOptions | null;
   calibration: BtcCalibSummary | null;
+  regime: {
+    regime: string;
+    sigmaMult: number;
+    driftBiasPerMin: number;
+    confidence: number;
+    reason: string;
+    source: string;
+    asOf: string;
+  } | null;
 }
 
 
@@ -244,30 +253,35 @@ function studentTCdf(x: number, df: number): number {
   return x >= 0 ? 1 - half : half;
 }
 
-function minuteSigma(candles: BtcCandle[]): number {
-  if (candles.length < 5) return 0.0008;
+function minuteSigmaPair(candles: BtcCandle[]): { shortSigma: number; longSigma: number } {
+  if (candles.length < 5) return { shortSigma: 0.0008, longSigma: 0.0008 };
   const rets: number[] = [];
   for (let i = 1; i < candles.length; i++) {
     const r = Math.log(candles[i].c / candles[i - 1].c);
     if (Number.isFinite(r)) rets.push(r);
   }
-  if (!rets.length) return 0.0008;
+  if (!rets.length) return { shortSigma: 0.0008, longSigma: 0.0008 };
   const m = rets.reduce((a, b) => a + b, 0) / rets.length;
   const v = rets.reduce((a, b) => a + (b - m) ** 2, 0) / Math.max(1, rets.length - 1);
   const longSigma = Math.max(1e-6, Math.sqrt(v));
-  // Short-window σ (last 5 candles) — catches regime expansion. When BTC
-  // breaks out of chop, long-window σ lags by 30+ minutes; using max(short,long)
-  // widens the diffusion in real time so we stop pinning near-cert NOs into
-  // breakout candles.
   const tail = rets.slice(-5);
   if (tail.length >= 3) {
     const mt = tail.reduce((a, b) => a + b, 0) / tail.length;
     const vt = tail.reduce((a, b) => a + (b - mt) ** 2, 0) / Math.max(1, tail.length - 1);
     const shortSigma = Math.max(1e-6, Math.sqrt(vt));
-    return Math.max(longSigma, shortSigma);
+    return { shortSigma, longSigma };
   }
-  return longSigma;
+  return { shortSigma: longSigma, longSigma };
 }
+
+function minuteSigma(candles: BtcCandle[]): number {
+  // Short-window σ (last 5 candles) catches regime expansion. When BTC breaks
+  // out of chop, long-window σ lags 30+ minutes; max(short,long) widens the
+  // diffusion in real time so we stop pinning near-cert NOs into breakout candles.
+  const { shortSigma, longSigma } = minuteSigmaPair(candles);
+  return Math.max(longSigma, shortSigma);
+}
+
 
 // Per-minute drift from the recent slope of log-returns. Captures intra-window
 // trend (e.g. BTC ramping into expiry) that mean-zero diffusion ignores.
@@ -681,8 +695,9 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
     const candleSpot = recent.length ? recent[recent.length - 1].c : 0;
     // (a) Consolidated multi-venue spot (Coinbase + Binance + Kraken median).
     const spot = await fetchConsolidatedSpot(candleSpot);
-    const sigma = minuteSigma(recent);
-    const drift = minuteDrift(recent);
+    const { shortSigma, longSigma } = minuteSigmaPair(recent);
+    const sigmaRaw = Math.max(shortSigma, longSigma);
+    const driftRaw = minuteDrift(recent);
     const now = Date.now();
     const hasExternal = !!process.env.CRYPTO_MODEL_URL;
 
@@ -702,6 +717,26 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         }
       })(),
     ]);
+
+    // (g) AI regime classifier (5-min cached). Returns σ multiplier + drift bias
+    // applied to every market for this tick — captures macro context (chop vs
+    // breakout vs squeeze) that pure stats can't see.
+    const regimeState = await (async () => {
+      try {
+        const { getRegime } = await import("./cryptoRegime.server");
+        return await getRegime({
+          spot, sigmaShort: shortSigma, sigmaLong: longSigma, drift: driftRaw,
+          micro, options, recentCandles: recent,
+        });
+      } catch (e) {
+        console.warn("regime classifier failed:", e);
+        return null;
+      }
+    })();
+
+    // Apply regime knobs to σ and drift before they feed the diffusion model.
+    const sigma = sigmaRaw * (regimeState?.sigmaMult ?? 1);
+    const drift = Math.max(-0.005, Math.min(0.005, driftRaw + (regimeState?.driftBiasPerMin ?? 0)));
     const applyCalib = await (async () => {
       try {
         const { applyCalibration } = await import("./cryptoCalibrator.server");
@@ -891,6 +926,15 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           brier: b.brier, a: b.a, b: b.b, active: b.active,
         })),
         global: calibState.global,
+      } : null,
+      regime: regimeState ? {
+        regime: regimeState.regime,
+        sigmaMult: regimeState.sigmaMult,
+        driftBiasPerMin: regimeState.driftBiasPerMin,
+        confidence: regimeState.confidence,
+        reason: regimeState.reason,
+        source: regimeState.source,
+        asOf: regimeState.asOf,
       } : null,
     };
   },
