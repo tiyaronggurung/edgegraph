@@ -829,6 +829,14 @@ function AutoTradePanel() {
             {liveBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
             {liveBusy ? "Placing…" : "Run LIVE auto-trade"}
           </button>
+          <button
+            onClick={runForce}
+            disabled={forceBusy || liveBusy}
+            className="text-xs font-semibold px-3 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 disabled:opacity-50 flex items-center gap-1.5"
+            title="Force ONE live order on the model's strongest pick — bypasses entry gates, daily caps still apply"
+          >
+            {forceBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+            {forceBusy ? "Forcing…" : "Force 1 trade (best pick)"}
         </div>
       </div>
 
