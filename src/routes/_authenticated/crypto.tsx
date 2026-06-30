@@ -129,7 +129,7 @@ function MarketRow({
 
       <div className="flex flex-col items-end gap-1 min-w-[220px]">
         <div className="flex items-center gap-2">
-          <div className={`px-2 py-0.5 text-[11px] uppercase tracking-wider border rounded ${sideColor}`}>Model: {m.side}</div>
+          <div className={`px-2 py-0.5 text-[11px] uppercase tracking-wider border rounded ${sideColor}`}>Model: {dirLabel(m.side)}</div>
           <div className={`px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider border rounded ${
             m.gateAction === "BET"
               ? "bg-[color:var(--color-primary)]/20 text-[color:var(--color-primary)] border-[color:var(--color-primary)]/60"
