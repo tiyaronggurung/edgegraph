@@ -125,10 +125,19 @@ function MarketRow({
         <span className="text-[10px] text-muted-foreground">BTC 60m · dashed = strike</span>
       </div>
 
-      <div className="flex flex-col items-end gap-1 min-w-[200px]">
-        <div className={`px-2 py-0.5 text-[11px] uppercase tracking-wider border rounded ${sideColor}`}>Model: bet {m.side}</div>
-        <div className="text-sm">Model YES prob <span className="font-bold">{(m.modelYesProb*100).toFixed(1)}%</span></div>
-        <div className="text-[10px] text-muted-foreground">
+      <div className="flex flex-col items-end gap-1 min-w-[220px]">
+        <div className="flex items-center gap-2">
+          <div className={`px-2 py-0.5 text-[11px] uppercase tracking-wider border rounded ${sideColor}`}>Model: {m.side}</div>
+          <div className={`px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider border rounded ${
+            m.gateAction === "BET"
+              ? "bg-[color:var(--color-primary)]/20 text-[color:var(--color-primary)] border-[color:var(--color-primary)]/60"
+              : "bg-muted/30 text-muted-foreground border-border"
+          }`}>
+            {m.gateAction === "BET" ? "✓ BET" : "✕ PASS"}
+          </div>
+        </div>
+        <div className="text-sm">Model YES <span className="font-bold">{(m.modelYesProb*100).toFixed(1)}%</span> vs mkt {(m.yesPrice*100).toFixed(0)}¢</div>
+        <div className="text-[10px] text-muted-foreground text-right">
           base {(m.modelBaseProb*100).toFixed(1)}% {m.microAdjPts >= 0 ? "+" : ""}{m.microAdjPts.toFixed(2)}pts micro
           {m.optionsImpliedProb !== null && (
             <> · opt {(m.optionsImpliedProb*100).toFixed(1)}% <span className={m.optionsBlendPts >= 0 ? "text-emerald-400" : "text-red-400"}>({m.optionsBlendPts >= 0 ? "+" : ""}{m.optionsBlendPts.toFixed(2)}pts)</span></>
@@ -137,9 +146,17 @@ function MarketRow({
             <> · <span className={m.calibAdjPts >= 0 ? "text-emerald-400" : "text-red-400"}>calib {m.calibAdjPts >= 0 ? "+" : ""}{m.calibAdjPts.toFixed(2)}pts</span></>
           )}
         </div>
-        <div className="text-xs">Edge <span className={confColor+" font-semibold"}>{m.edgePts>=0?"+":""}{m.edgePts.toFixed(1)} pts</span> <span className={"ml-1 "+confColor}>[{conf}]</span></div>
-        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{m.modelSource === "external" ? "your ML model" : "diffusion + microstructure"}</div>
+        <div className="text-xs">Edge <span className={confColor+" font-semibold"}>{m.edgePts>=0?"+":""}{m.edgePts.toFixed(1)}pts</span> / req <span className="font-mono">{m.requiredEdgePts.toFixed(1)}pts</span> <span className={"ml-1 "+confColor}>[{conf}]</span></div>
+        <div className="text-[10px] text-muted-foreground text-right">
+          thr: {m.thresholdParts.base.toFixed(1)}b
+          {m.thresholdParts.calib > 0 && <> +{m.thresholdParts.calib.toFixed(1)}cal</>}
+          {m.thresholdParts.time > 0 && <> +{m.thresholdParts.time.toFixed(1)}t</>}
+          {m.thresholdParts.spread > 0 && <> +{m.thresholdParts.spread.toFixed(1)}spr</>}
+          {m.thresholdParts.regime > 0 && <> +{m.thresholdParts.regime.toFixed(1)}reg</>}
+        </div>
+        <div className={`text-[10px] text-right ${m.gateAction === "BET" ? "text-emerald-400" : "text-muted-foreground"}`}>{m.gateReason}</div>
       </div>
+
 
       <div className="flex flex-col items-stretch gap-1 min-w-[160px]">
         <div className="text-xs text-right text-muted-foreground">Suggested stake</div>
