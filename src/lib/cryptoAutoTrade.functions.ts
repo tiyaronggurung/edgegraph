@@ -117,22 +117,55 @@ export const runAutoTrade = createServerFn({ method: "POST" })
     const result = await getBtcMarkets();
     const skipReasons: string[] = [];
 
+    // ── Equity-momentum overlay (SPY/QQQ/ES/NQ leading indicator) ──
+    // Strong opposite move blocks; otherwise adjust the per-candidate effective edge.
+    // YES = UP (risk_on aligned), NO = DOWN (risk_off aligned).
+    const { computeEquitySignal } = await import("./equityMomentum.functions");
+    let equity: Awaited<ReturnType<typeof computeEquitySignal>> | null = null;
+    try {
+      equity = await computeEquitySignal();
+      skipReasons.push(`equity: ${equity.regime}/${equity.strength} score=${equity.score.toFixed(3)}% adj=${equity.btcImpact.edgeAdjustPts}pt`);
+    } catch (e: any) {
+      skipReasons.push(`equity: signal unavailable (${e?.message?.slice(0, 60) ?? "err"})`);
+    }
+
     const minSigma = isLive ? LIVE_MIN_SIGMA_DISTANCE : MIN_SIGMA_DISTANCE_PAPER;
     const minSeconds = isLive ? LIVE_MIN_SECONDS_TO_CLOSE : 90;
     const minEdgePts = isLive ? LIVE_MIN_EDGE_PTS : 0;
 
     const candidates = result.markets
-      .filter(m => {
+      .map(m => {
+        // Equity-aware effective edge: + if equity direction aligns with side, - if opposite.
+        const adj = equity?.btcImpact.edgeAdjustPts ?? 0;
+        const aligned = m.side === "YES" ? adj : -adj;
+        return { m, effectiveEdge: m.edgeAbs + aligned, equityAdj: aligned };
+      })
+      .filter(({ m, effectiveEdge, equityAdj }) => {
         if (m.gateAction !== "BET") { skipReasons.push(`${m.ticker}: gate ${m.gateAction}`); return false; }
         if (m.sigmaDistance < minSigma) { skipReasons.push(`${m.ticker}: sigDist ${m.sigmaDistance.toFixed(2)}σ < ${minSigma}σ`); return false; }
         if (!m.gapAnalysis.momentumAlignsWithSide) { skipReasons.push(`${m.ticker}: momentum fights ${m.side}`); return false; }
         if (m.secondsToClose < minSeconds) { skipReasons.push(`${m.ticker}: ${m.secondsToClose}s < ${minSeconds}s`); return false; }
-        if (m.edgeAbs < minEdgePts) { skipReasons.push(`${m.ticker}: edge ${m.edgeAbs.toFixed(1)}pts < ${minEdgePts}pts`); return false; }
+        // Equity block: strong opposite-direction equity move vetoes the trade.
+        if (equity) {
+          if (equity.btcImpact.wouldBlock === "block_up" && m.side === "YES") {
+            skipReasons.push(`${m.ticker}: blocked by equity risk_off (strong)`);
+            return false;
+          }
+          if (equity.btcImpact.wouldBlock === "block_down" && m.side === "NO") {
+            skipReasons.push(`${m.ticker}: blocked by equity risk_on (strong)`);
+            return false;
+          }
+        }
+        if (effectiveEdge < minEdgePts) {
+          skipReasons.push(`${m.ticker}: edge ${m.edgeAbs.toFixed(1)}${equityAdj >= 0 ? "+" : ""}${equityAdj}=${effectiveEdge.toFixed(1)}pts < ${minEdgePts}pts`);
+          return false;
+        }
         if (recentTickers.has(m.ticker)) { skipReasons.push(`${m.ticker}: traded in last 24h`); return false; }
         return true;
       })
-      .sort((a, b) => (b.edgeAbs - b.requiredEdgePts) - (a.edgeAbs - a.requiredEdgePts))
-      .slice(0, data.maxOrders);
+      .sort((a, b) => (b.effectiveEdge - b.m.requiredEdgePts) - (a.effectiveEdge - a.m.requiredEdgePts))
+      .slice(0, data.maxOrders)
+      .map(c => c.m);
 
     const placed: AutoTradeOrderRow[] = [];
     for (const m of candidates) {
