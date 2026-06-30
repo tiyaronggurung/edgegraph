@@ -24,8 +24,8 @@ const LIVE_MAX_STAKE_USD_PER_ORDER = 20;
 const LIVE_MIN_SIGMA_DISTANCE = 1.25;
 const LIVE_MIN_EDGE_PTS = 5;
 const LIVE_MIN_SECONDS_TO_CLOSE = 120;
-const LIVE_DAILY_ORDER_CAP = 10;
-const LIVE_DAILY_LOSS_CAP_USD = 60; // realized loss in last 24h that halts new orders
+const LIVE_DAILY_ORDER_CAP = 40;
+const LIVE_DAILY_LOSS_CAP_USD = 80; // realized loss in last 24h that halts new orders
 const LIVE_CONFIRM_TOKEN = "I_UNDERSTAND_LIVE";
 
 export interface AutoTradeOrderRow {

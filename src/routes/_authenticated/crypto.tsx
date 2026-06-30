@@ -743,35 +743,56 @@ function AutoTradePanel() {
     }
   }
 
-  async function runForce() {
-    const ok = window.confirm(
-      "FORCE one LIVE order on Kalshi at current price?\n\n" +
-      "Picks the model's strongest |edge| market (UP or DOWN) and places\n" +
-      "ONE $20 order at the current Kalshi quote.\n\n" +
-      "BYPASSED gates: edge≥5pts, σ≥1.25, ≥120s, momentum, equity overlay,\n" +
-      "24h-per-ticker dedupe.\n\n" +
-      "STILL enforced: kill switch, key health, daily 10-order / -$60 caps,\n" +
-      "and auto-exit (TP +70% / SL -50% / edge-decay 2¢).\n\n" +
-      "Click OK to proceed.",
-    );
-    if (!ok) return;
+  async function runForce(opts?: { silent?: boolean }) {
+    const silent = opts?.silent === true;
+    if (!silent) {
+      const ok = window.confirm(
+        "FORCE LIVE orders on Kalshi at current price?\n\n" +
+        "Picks the model's top |edge| markets (UP or DOWN) and places\n" +
+        "up to 2 × $20 orders at current Kalshi quotes.\n\n" +
+        "BYPASSED: edge/σ/momentum/equity/24h-dedupe gates.\n" +
+        "ENFORCED: kill switch, key health, 40 orders / -$80 in 24h,\n" +
+        "auto-exit (TP +70% / SL -50% / edge-decay 2¢).\n\n" +
+        "Click OK to proceed.",
+      );
+      if (!ok) return;
+    }
     setForceBusy(true);
     try {
-      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 20, maxOrders: 1, force: true } });
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 20, maxOrders: 2, force: true } });
       if (res.placed > 0) {
-        const o = res.orders[0];
-        toast.success(`Forced ${o.side === "YES" ? "UP" : "DOWN"} on ${o.ticker} @ ${o.limit_cents}¢ × ${o.contracts}`);
-      } else {
+        toast.success(`Forced ${res.placed} order${res.placed === 1 ? "" : "s"}: ${res.orders.map(o => `${o.side === "YES" ? "UP" : "DOWN"} ${o.ticker} @ ${o.limit_cents}¢`).join(", ")}`);
+      } else if (!silent) {
         toast.error("Force order not placed", { description: res.skipReasons.slice(0, 3).join(" · ") || "No tradeable market." });
       }
       qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
       qc.invalidateQueries({ queryKey: ["crypto-trades"] });
     } catch (e: any) {
-      toast.error("Force order failed", { description: e?.message ?? String(e) });
+      if (!silent) toast.error("Force order failed", { description: e?.message ?? String(e) });
     } finally {
       setForceBusy(false);
     }
   }
+
+  // Auto-loop: every 60s, fire force-buy on top model picks. Daily caps still apply.
+  const [autoLoop, setAutoLoop] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoLoop") === "on";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("crypto.autoLoop", autoLoop ? "on" : "off");
+    }
+  }, [autoLoop]);
+  useEffect(() => {
+    if (!autoLoop) return;
+    let cancelled = false;
+    const tick = async () => { if (!cancelled) await runForce({ silent: true }); };
+    tick();
+    const h = setInterval(tick, 60_000);
+    return () => { cancelled = true; clearInterval(h); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLoop]);
 
   return (
     <div className="border border-border rounded-lg bg-card">
@@ -784,10 +805,10 @@ function AutoTradePanel() {
             </span>
           </h2>
           <p className="text-[11px] text-muted-foreground">
-            $20×3/click · entry edge≥5pts, σ≥1.25, ≥120s · auto-exit TP +70% / SL -50% / edge-decay 2¢ · halt -$60/24h
+            $20×3/click · entry edge≥5pts, σ≥1.25, ≥120s · auto-exit TP +70% / SL -50% / edge-decay 2¢ · halt 40 orders or -$80/24h
           </p>
           <p className="text-[10px] text-muted-foreground mt-0.5">
-            Live 24h: {liveCount24h}/10 orders · realized <span className={liveRealized24h >= 0 ? "text-emerald-400" : "text-red-400"}>{liveRealized24h >= 0 ? "+" : ""}${liveRealized24h.toFixed(2)}</span>
+            Live 24h: {liveCount24h}/40 orders · realized <span className={liveRealized24h >= 0 ? "text-emerald-400" : "text-red-400"}>{liveRealized24h >= 0 ? "+" : ""}${liveRealized24h.toFixed(2)}</span>
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -830,13 +851,21 @@ function AutoTradePanel() {
             {liveBusy ? "Placing…" : "Run LIVE auto-trade"}
           </button>
           <button
-            onClick={runForce}
+            onClick={() => setAutoLoop(v => !v)}
+            className={`text-xs font-semibold px-3 py-1.5 rounded border flex items-center gap-1.5 ${autoLoop ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+            title="Auto-loop: every 60s, force-buy top model picks (up to 2 × $20). Daily caps still apply."
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${autoLoop ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground"}`} />
+            {autoLoop ? "Auto-loop ON (60s)" : "Auto-loop OFF"}
+          </button>
+          <button
+            onClick={() => runForce()}
             disabled={forceBusy || liveBusy}
             className="text-xs font-semibold px-3 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 disabled:opacity-50 flex items-center gap-1.5"
-            title="Force ONE live order on the model's strongest pick — bypasses entry gates, daily caps still apply"
+            title="Force up to 2 live orders on the model's top picks — bypasses entry gates, daily caps still apply"
           >
             {forceBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
-            {forceBusy ? "Forcing…" : "Force 1 trade (best pick)"}
+            {forceBusy ? "Forcing…" : "Force trade (top picks)"}
           </button>
         </div>
       </div>
