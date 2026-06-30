@@ -1,20 +1,32 @@
-// Auto-trade harness: paper mode by default.
-// Picks up to N model picks (gateAction === "BET") per session, with stricter
-// safety than the regular gate (sigDist ≥ 1σ AND momentumAlignsWithSide=true),
-// and logs them to auto_trade_orders. Live mode (real Kalshi orders) is gated
-// behind explicit mode='live' input — the default is always paper.
-//
-// All identity & writes go through requireSupabaseAuth so RLS scopes rows to
-// the calling user. Hard-coded session caps prevent runaway exposure even if
-// upstream validation is bypassed.
+// Auto-trade harness: paper mode + LIVE mode with strict guardrails.
+// Live mode places real Kalshi RSA-PSS-signed orders. Multiple hard limits
+// protect against runaway exposure even if a client bypasses validation:
+//   - env KALSHI_LIVE_ENABLED must equal "true" (kill switch, no redeploy)
+//   - caller must pass confirm === "I_UNDERSTAND_LIVE"
+//   - key health pre-check (RSA-PSS test sign) before any order
+//   - stricter signal thresholds than paper (edge, sigma, time-to-close)
+//   - per-order stake cap, per-session order cap, 24h order + loss caps
+// All identity & writes go through requireSupabaseAuth so RLS scopes rows
+// to the calling user.
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getBtcMarkets } from "./cryptoBtc.functions";
 
-const MAX_ORDERS_PER_SESSION = 5;
-const MAX_STAKE_USD_PER_ORDER = 10;
-const MIN_SIGMA_DISTANCE_AUTOTRADE = 1.0; // stricter than the manual gate's pin-risk floor
+// ── Paper rails (kept for backwards-compat with the existing paper UI) ──
+const MAX_ORDERS_PER_SESSION_PAPER = 5;
+const MAX_STAKE_USD_PER_ORDER_PAPER = 10;
+const MIN_SIGMA_DISTANCE_PAPER = 1.0;
+
+// ── Live rails (stricter — real money) ──
+const LIVE_MAX_ORDERS_PER_SESSION = 3;
+const LIVE_MAX_STAKE_USD_PER_ORDER = 20;
+const LIVE_MIN_SIGMA_DISTANCE = 1.25;
+const LIVE_MIN_EDGE_PTS = 5;
+const LIVE_MIN_SECONDS_TO_CLOSE = 120;
+const LIVE_DAILY_ORDER_CAP = 10;
+const LIVE_DAILY_LOSS_CAP_USD = 60; // realized loss in last 24h that halts new orders
+const LIVE_CONFIRM_TOKEN = "I_UNDERSTAND_LIVE";
 
 export interface AutoTradeOrderRow {
   id: string;
@@ -46,23 +58,54 @@ export interface AutoTradeRunResult {
 
 export const runAutoTrade = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { mode?: "paper" | "live"; maxOrders?: number; stakeUsd?: number } | undefined) => ({
-    mode: data?.mode === "live" ? "live" : "paper",
-    maxOrders: Math.min(MAX_ORDERS_PER_SESSION, Math.max(1, data?.maxOrders ?? 5)),
-    stakeUsd: Math.min(MAX_STAKE_USD_PER_ORDER, Math.max(1, data?.stakeUsd ?? 10)),
-  }))
+  .inputValidator((data: { mode?: "paper" | "live"; maxOrders?: number; stakeUsd?: number; confirm?: string } | undefined) => {
+    const mode = data?.mode === "live" ? "live" : "paper";
+    const sessionCap = mode === "live" ? LIVE_MAX_ORDERS_PER_SESSION : MAX_ORDERS_PER_SESSION_PAPER;
+    const stakeCap = mode === "live" ? LIVE_MAX_STAKE_USD_PER_ORDER : MAX_STAKE_USD_PER_ORDER_PAPER;
+    return {
+      mode,
+      confirm: data?.confirm ?? "",
+      maxOrders: Math.min(sessionCap, Math.max(1, data?.maxOrders ?? sessionCap)),
+      stakeUsd: Math.min(stakeCap, Math.max(1, data?.stakeUsd ?? stakeCap)),
+    };
+  })
   .handler(async ({ data, context }): Promise<AutoTradeRunResult> => {
     const { supabase, userId } = context;
     const sessionId = crypto.randomUUID();
+    const isLive = data.mode === "live";
 
-    // Live mode: hard-block in this version. We ship paper-only first; once
-    // 5 paper cycles settle clean, flip this branch to call placeKalshiOrder.
-    if (data.mode === "live") {
-      throw new Error("Live mode disabled — paper-trade only until first 5 paper orders settle cleanly.");
+    // ── Live-mode preflight: kill switch + explicit confirm + key health ──
+    if (isLive) {
+      if (process.env.KALSHI_LIVE_ENABLED !== "true") {
+        throw new Error("Live trading is disabled. Set KALSHI_LIVE_ENABLED=true to enable.");
+      }
+      if (data.confirm !== LIVE_CONFIRM_TOKEN) {
+        throw new Error(`Live trading requires confirm="${LIVE_CONFIRM_TOKEN}".`);
+      }
+      const { getValidatedKalshiKey } = await import("./cryptoTrades.functions");
+      try {
+        await getValidatedKalshiKey();
+      } catch (e: any) {
+        throw new Error(`Kalshi key precheck failed: ${e?.message ?? String(e)}`);
+      }
+
+      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: liveRecent } = await supabase
+        .from("auto_trade_orders")
+        .select("pnl_usd")
+        .eq("user_id", userId)
+        .eq("mode", "live")
+        .gte("created_at", dayAgo);
+      const liveCount24h = (liveRecent ?? []).length;
+      if (liveCount24h >= LIVE_DAILY_ORDER_CAP) {
+        throw new Error(`Daily live order cap reached (${LIVE_DAILY_ORDER_CAP} in last 24h).`);
+      }
+      const realized24h = (liveRecent ?? []).reduce((s: number, r: { pnl_usd: number | null }) => s + (Number(r.pnl_usd) || 0), 0);
+      if (realized24h <= -LIVE_DAILY_LOSS_CAP_USD) {
+        throw new Error(`Daily live loss cap reached (realized $${realized24h.toFixed(2)} ≤ -$${LIVE_DAILY_LOSS_CAP_USD}).`);
+      }
     }
 
-    // De-dupe: never reissue orders for tickers we've already auto-traded
-    // in the last 24h, regardless of session.
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: recentRows } = await supabase
       .from("auto_trade_orders")
@@ -74,18 +117,17 @@ export const runAutoTrade = createServerFn({ method: "POST" })
     const result = await getBtcMarkets();
     const skipReasons: string[] = [];
 
-    // Stricter eligibility than the manual BET gate:
-    //  - gateAction === "BET" (passes pin-risk + traversal + edge)
-    //  - sigma distance ≥ 1.0σ (extra safety for autopilot)
-    //  - gap momentum aligned with the picked side
-    //  - secondsToClose ≥ 90 (room to fill)
-    //  - not already traded in last 24h
+    const minSigma = isLive ? LIVE_MIN_SIGMA_DISTANCE : MIN_SIGMA_DISTANCE_PAPER;
+    const minSeconds = isLive ? LIVE_MIN_SECONDS_TO_CLOSE : 90;
+    const minEdgePts = isLive ? LIVE_MIN_EDGE_PTS : 0;
+
     const candidates = result.markets
       .filter(m => {
         if (m.gateAction !== "BET") { skipReasons.push(`${m.ticker}: gate ${m.gateAction}`); return false; }
-        if (m.sigmaDistance < MIN_SIGMA_DISTANCE_AUTOTRADE) { skipReasons.push(`${m.ticker}: sigDist ${m.sigmaDistance.toFixed(2)}σ < 1.0σ`); return false; }
+        if (m.sigmaDistance < minSigma) { skipReasons.push(`${m.ticker}: sigDist ${m.sigmaDistance.toFixed(2)}σ < ${minSigma}σ`); return false; }
         if (!m.gapAnalysis.momentumAlignsWithSide) { skipReasons.push(`${m.ticker}: momentum fights ${m.side}`); return false; }
-        if (m.secondsToClose < 90) { skipReasons.push(`${m.ticker}: ${m.secondsToClose}s too tight`); return false; }
+        if (m.secondsToClose < minSeconds) { skipReasons.push(`${m.ticker}: ${m.secondsToClose}s < ${minSeconds}s`); return false; }
+        if (m.edgeAbs < minEdgePts) { skipReasons.push(`${m.ticker}: edge ${m.edgeAbs.toFixed(1)}pts < ${minEdgePts}pts`); return false; }
         if (recentTickers.has(m.ticker)) { skipReasons.push(`${m.ticker}: traded in last 24h`); return false; }
         return true;
       })
@@ -94,19 +136,43 @@ export const runAutoTrade = createServerFn({ method: "POST" })
 
     const placed: AutoTradeOrderRow[] = [];
     for (const m of candidates) {
-      // Limit price: cross spread to fill (BET-side ask). Cap at 99¢.
       const limitCents = Math.max(1, Math.min(99, Math.round(
         (m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
       )));
       const contracts = Math.max(1, Math.floor((data.stakeUsd * 100) / limitCents));
       const stakeActual = (contracts * limitCents) / 100;
 
+      let kalshiOrderId: string | null = null;
+      if (isLive) {
+        try {
+          const { submitKalshiBuy } = await import("./cryptoTrades.functions");
+          const out = await submitKalshiBuy(supabase, userId, {
+            ticker: m.ticker,
+            eventTicker: m.eventTicker ?? undefined,
+            side: m.side,
+            contracts,
+            limitPriceCents: limitCents,
+            strike: m.strike,
+            spot: m.spot,
+            modelProb: m.modelYesProb,
+            marketYesPrice: m.yesPrice,
+            edgePts: m.edgePts,
+            stakeUsd: stakeActual,
+            closeTime: m.closeTime ?? undefined,
+          });
+          kalshiOrderId = out.orderId;
+        } catch (e: any) {
+          skipReasons.push(`${m.ticker}: kalshi order failed — ${e?.message ?? String(e)}`);
+          continue;
+        }
+      }
+
       const { data: row, error } = await supabase
         .from("auto_trade_orders")
         .insert({
           user_id: userId,
           session_id: sessionId,
-          mode: "paper",
+          mode: isLive ? "live" : "paper",
           ticker: m.ticker,
           event_ticker: m.eventTicker,
           side: m.side,
@@ -123,6 +189,7 @@ export const runAutoTrade = createServerFn({ method: "POST" })
           seconds_to_close: m.secondsToClose,
           close_time: m.closeTime ?? new Date(Date.now() + m.secondsToClose * 1000).toISOString(),
           status: "placed",
+          kalshi_order_id: kalshiOrderId,
         })
         .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at")
         .single();
@@ -132,7 +199,7 @@ export const runAutoTrade = createServerFn({ method: "POST" })
     }
 
     return {
-      sessionId, mode: "paper",
+      sessionId, mode: data.mode,
       attempted: candidates.length,
       placed: placed.length,
       skipped: skipReasons.length,
