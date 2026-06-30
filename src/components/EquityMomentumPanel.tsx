@@ -41,12 +41,12 @@ export function EquityMomentumPanel() {
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
             <Activity className="h-3.5 w-3.5" />
             Equity momentum · leading indicator
-            <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
-              SIGNAL ONLY
+            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              WIRED INTO AUTO-TRADE
             </span>
           </h2>
           <p className="text-[11px] text-muted-foreground">
-            SPY/QQQ 1-min candles often lead BTC by 10–30s. Displayed for verification — not yet wired into auto-trade.
+            SPY/QQQ 1-min candles lead BTC. Strong opposite move blocks the trade; mild moves shift effective edge ±1pt, strong moves ±3pt.
           </p>
         </div>
         {d && (
