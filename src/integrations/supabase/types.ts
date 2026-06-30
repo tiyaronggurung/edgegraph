@@ -175,6 +175,66 @@ export type Database = {
           },
         ]
       }
+      btc_model_predictions: {
+        Row: {
+          close_time: string
+          created_at: string
+          edge_pts: number
+          event_ticker: string | null
+          id: string
+          market_yes_price: number
+          model_prob: number
+          outcome: string | null
+          settle_price: number | null
+          settled_at: string | null
+          side: string
+          snapshot_seconds_to_close: number
+          spot_at_snapshot: number
+          strike: number
+          ticker: string
+          updated_at: string
+          was_correct: boolean | null
+        }
+        Insert: {
+          close_time: string
+          created_at?: string
+          edge_pts: number
+          event_ticker?: string | null
+          id?: string
+          market_yes_price: number
+          model_prob: number
+          outcome?: string | null
+          settle_price?: number | null
+          settled_at?: string | null
+          side: string
+          snapshot_seconds_to_close: number
+          spot_at_snapshot: number
+          strike: number
+          ticker: string
+          updated_at?: string
+          was_correct?: boolean | null
+        }
+        Update: {
+          close_time?: string
+          created_at?: string
+          edge_pts?: number
+          event_ticker?: string | null
+          id?: string
+          market_yes_price?: number
+          model_prob?: number
+          outcome?: string | null
+          settle_price?: number | null
+          settled_at?: string | null
+          side?: string
+          snapshot_seconds_to_close?: number
+          spot_at_snapshot?: number
+          strike?: number
+          ticker?: string
+          updated_at?: string
+          was_correct?: boolean | null
+        }
+        Relationships: []
+      }
       crypto_trades: {
         Row: {
           bankroll_usd: number | null

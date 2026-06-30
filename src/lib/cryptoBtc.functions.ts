@@ -252,6 +252,34 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
 
     markets.sort((a, b) => a.secondsToClose - b.secondsToClose);
 
+    // Track every model call (regardless of user bets) and settle past ones.
+    // Best-effort: never throws, never blocks the response. Dynamic import so
+    // the server-only module never enters the client graph.
+    void (async () => {
+      try {
+        const { snapshotPrediction, settleDuePredictions } = await import("./cryptoPredictions.server");
+        await Promise.all(
+          markets
+            .filter(m => m.closeTime && m.secondsToClose > 0)
+            .map(m => snapshotPrediction({
+              ticker: m.ticker,
+              eventTicker: m.eventTicker,
+              strike: m.strike,
+              side: m.side,
+              modelProb: m.modelYesProb,
+              marketYesPrice: m.yesPrice,
+              edgePts: m.edgePts,
+              spot: m.spot,
+              closeTime: m.closeTime as string,
+              secondsToClose: m.secondsToClose,
+            })),
+        );
+        await settleDuePredictions();
+      } catch (e) {
+        console.warn("prediction tracking failed:", e);
+      }
+    })();
+
     return {
       spot,
       asOf: new Date().toISOString(),
