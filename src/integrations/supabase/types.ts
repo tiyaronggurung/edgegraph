@@ -101,6 +101,93 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_trade_orders: {
+        Row: {
+          close_time: string
+          contracts: number
+          created_at: string
+          edge_pts: number
+          error_message: string | null
+          event_ticker: string | null
+          gap_in_sigmas: number
+          id: string
+          kalshi_order_id: string | null
+          limit_cents: number
+          market_yes_price: number
+          mode: string
+          model_prob: number
+          pnl_usd: number | null
+          seconds_to_close: number
+          session_id: string
+          settle_price: number | null
+          settled_at: string | null
+          side: string
+          sigma_distance: number
+          spot_at_entry: number
+          stake_usd: number
+          status: string
+          strike: number
+          ticker: string
+          user_id: string
+        }
+        Insert: {
+          close_time: string
+          contracts: number
+          created_at?: string
+          edge_pts: number
+          error_message?: string | null
+          event_ticker?: string | null
+          gap_in_sigmas: number
+          id?: string
+          kalshi_order_id?: string | null
+          limit_cents: number
+          market_yes_price: number
+          mode?: string
+          model_prob: number
+          pnl_usd?: number | null
+          seconds_to_close: number
+          session_id: string
+          settle_price?: number | null
+          settled_at?: string | null
+          side: string
+          sigma_distance: number
+          spot_at_entry: number
+          stake_usd: number
+          status?: string
+          strike: number
+          ticker: string
+          user_id: string
+        }
+        Update: {
+          close_time?: string
+          contracts?: number
+          created_at?: string
+          edge_pts?: number
+          error_message?: string | null
+          event_ticker?: string | null
+          gap_in_sigmas?: number
+          id?: string
+          kalshi_order_id?: string | null
+          limit_cents?: number
+          market_yes_price?: number
+          mode?: string
+          model_prob?: number
+          pnl_usd?: number | null
+          seconds_to_close?: number
+          session_id?: string
+          settle_price?: number | null
+          settled_at?: string | null
+          side?: string
+          sigma_distance?: number
+          spot_at_entry?: number
+          stake_usd?: number
+          status?: string
+          strike?: number
+          ticker?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bets: {
         Row: {
           analysis_id: string | null

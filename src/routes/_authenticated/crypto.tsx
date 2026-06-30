@@ -6,6 +6,7 @@ import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCi
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats } from "@/lib/cryptoPredictions.functions";
+import { runAutoTrade, listAutoTradeOrders, settleAutoTradeOrders, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { toast } from "sonner";
 
@@ -590,6 +591,114 @@ function ModelAccuracyPanel() {
   );
 }
 
+function AutoTradePanel() {
+  const qc = useQueryClient();
+  const runFn = useServerFn(runAutoTrade);
+  const listFn = useServerFn(listAutoTradeOrders);
+  const settleFn = useServerFn(settleAutoTradeOrders);
+
+  const list = useQuery({
+    queryKey: ["auto-trade-orders"],
+    queryFn: () => listFn(),
+    refetchInterval: 30_000,
+  });
+
+  // Opportunistic settle: every 60s, settle any closed paper orders.
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try { await settleFn(); if (!cancelled) qc.invalidateQueries({ queryKey: ["auto-trade-orders"] }); } catch { /* ignore */ }
+    };
+    tick();
+    const h = setInterval(tick, 60_000);
+    return () => { cancelled = true; clearInterval(h); };
+  }, [settleFn, qc]);
+
+  const run = useMutation({
+    mutationFn: () => runFn({ data: { mode: "paper", maxOrders: 5, stakeUsd: 10 } }),
+    onSuccess: (r) => {
+      toast.success(`Auto-trade: ${r.placed} paper orders placed (${r.skipped} skipped)`);
+      qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const orders = list.data?.orders ?? [];
+  const totals = list.data?.totals;
+
+  return (
+    <div className="border border-border rounded-lg bg-card">
+      <div className="px-4 py-2 border-b border-border flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h2 className="text-sm uppercase tracking-wider text-muted-foreground">Auto-trade · paper mode</h2>
+          <p className="text-[11px] text-muted-foreground">Up to 5 picks at $10 each. Stricter than manual: ≥1.0σ safety AND momentum aligned. No real money until paper cycle proves clean.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {totals && (
+            <div className="text-xs font-mono text-muted-foreground">
+              {totals.placed} total · <span className="text-emerald-400">{totals.wins}W</span> / <span className="text-red-400">{totals.losses}L</span> · PnL <span className={totals.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}>{totals.pnlUsd >= 0 ? "+" : ""}${totals.pnlUsd.toFixed(2)}</span>
+            </div>
+          )}
+          <button
+            disabled={run.isPending}
+            onClick={() => run.mutate()}
+            className="text-xs uppercase tracking-wider px-3 py-1.5 border border-[color:var(--color-primary)] rounded text-[color:var(--color-primary)] hover:bg-[color:var(--color-primary)]/10 disabled:opacity-30 flex items-center gap-1"
+          >
+            {run.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+            Run 5 × $10 (paper)
+          </button>
+        </div>
+      </div>
+      {run.data && run.data.skipReasons.length > 0 && (
+        <div className="px-4 py-2 border-b border-border bg-amber-500/5 text-[10px] text-amber-400 font-mono">
+          Last run skipped: {run.data.skipReasons.slice(0, 5).join(" · ")}{run.data.skipReasons.length > 5 ? ` (+${run.data.skipReasons.length - 5} more)` : ""}
+        </div>
+      )}
+      {orders.length === 0 ? (
+        <div className="p-6 text-center text-sm text-muted-foreground">No paper orders yet. Click "Run 5 × $10" to start.</div>
+      ) : (
+        <div className="max-h-[360px] overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-card border-b border-border">
+              <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
+                <th className="px-3 py-2">Placed</th>
+                <th className="px-3 py-2">Ticker</th>
+                <th className="px-3 py-2">Side</th>
+                <th className="px-3 py-2 text-right">Stake</th>
+                <th className="px-3 py-2 text-right">Limit</th>
+                <th className="px-3 py-2 text-right">Edge</th>
+                <th className="px-3 py-2 text-right">Safety</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2 text-right">PnL</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((o: AutoTradeOrderRow) => {
+                const statusColor = o.status === "settled_win" ? "text-emerald-400" : o.status === "settled_loss" ? "text-red-400" : o.status === "placed" ? "text-amber-400" : "text-muted-foreground";
+                return (
+                  <tr key={o.id} className="border-b border-border/40 hover:bg-muted/20">
+                    <td className="px-3 py-1.5 font-mono text-muted-foreground">{fmtTime(o.created_at)}</td>
+                    <td className="px-3 py-1.5 font-mono">{o.ticker}</td>
+                    <td className={"px-3 py-1.5 font-semibold " + (o.side === "YES" ? "text-emerald-400" : "text-red-400")}>{dirLabel(o.side)}</td>
+                    <td className="px-3 py-1.5 text-right font-mono">${Number(o.stake_usd).toFixed(2)}</td>
+                    <td className="px-3 py-1.5 text-right font-mono">{o.limit_cents}¢ × {o.contracts}</td>
+                    <td className="px-3 py-1.5 text-right font-mono">{Number(o.edge_pts) >= 0 ? "+" : ""}{Number(o.edge_pts).toFixed(1)}pts</td>
+                    <td className="px-3 py-1.5 text-right font-mono">{Number(o.sigma_distance).toFixed(2)}σ</td>
+                    <td className={"px-3 py-1.5 " + statusColor}>{o.status.replace("settled_", "")}</td>
+                    <td className={"px-3 py-1.5 text-right font-mono " + (o.pnl_usd === null ? "text-muted-foreground" : Number(o.pnl_usd) >= 0 ? "text-emerald-400" : "text-red-400")}>
+                      {o.pnl_usd === null ? "—" : `${Number(o.pnl_usd) >= 0 ? "+" : ""}$${Number(o.pnl_usd).toFixed(2)}`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CryptoPage() {
   const qc = useQueryClient();
   const marketsFn = useServerFn(getBtcMarkets);
@@ -835,6 +944,8 @@ function CryptoPage() {
           </div>
 
           <ModelAccuracyPanel />
+
+          <AutoTradePanel />
 
           <div>
             <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Trade log</h2>
