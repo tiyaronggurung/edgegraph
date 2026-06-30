@@ -644,6 +644,15 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
       modelSource: hasExternal ? "external" : "intra-window-diffusion",
       micro,
       options,
+      calibration: calibState ? {
+        totalSettled: calibState.totalSettled,
+        globalHitRate: calibState.globalHitRate,
+        globalBrier: calibState.globalBrier,
+        buckets: calibState.buckets.map(b => ({
+          bucket: b.bucket, n: b.n, hitRate: b.hitRate, meanProb: b.meanProb,
+          brier: b.brier, a: b.a, b: b.b, active: b.active,
+        })),
+      } : null,
     };
   },
 );
