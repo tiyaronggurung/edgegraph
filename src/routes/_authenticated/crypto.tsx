@@ -240,6 +240,95 @@ function TradeLog() {
   );
 }
 
+function ModelAccuracyPanel() {
+  const fn = useServerFn(getPredictionStats);
+  const q = useQuery({ queryKey: ["btc-pred-stats"], queryFn: () => fn(), refetchInterval: 60_000 });
+  const s = q.data;
+
+  const pct = (n: number) => (n * 100).toFixed(1) + "%";
+  const Cell = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
+    <div className="px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-lg font-bold font-mono">{value}</div>
+      {sub && <div className="text-[10px] text-muted-foreground">{sub}</div>}
+    </div>
+  );
+
+  return (
+    <div className="border border-border rounded-lg bg-card">
+      <div className="px-4 py-2 border-b border-border flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-wider text-muted-foreground">Model accuracy (all predictions — bet or not)</h2>
+        {q.isFetching && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+      </div>
+      {!s ? (
+        <div className="p-6 text-center text-sm text-muted-foreground">
+          {q.isLoading ? "Loading…" : "No predictions tracked yet. Refresh the page in a few minutes."}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-border">
+            <Cell label="Tracked (7d)" value={String(s.total)} sub={`${s.settled} settled`} />
+            <Cell label="Correct (7d)" value={`${s.correct} / ${s.settled}`} />
+            <Cell
+              label="Win rate (7d)"
+              value={s.settled ? pct(s.winRate) : "—"}
+              sub={s.settled ? (s.winRate >= 0.5 ? "above coin flip" : "below coin flip") : ""}
+            />
+            <Cell
+              label="Win rate (24h)"
+              value={s.byWindow.last24h.settled ? pct(s.byWindow.last24h.winRate) : "—"}
+              sub={`${s.byWindow.last24h.correct}/${s.byWindow.last24h.settled}`}
+            />
+            <Cell
+              label="Awaiting settle"
+              value={String(s.total - s.settled)}
+              sub="close time passed but BTC price pending"
+            />
+          </div>
+          {s.recent.length > 0 && (
+            <div className="border-t border-border overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/30 text-muted-foreground uppercase tracking-wider">
+                  <tr>
+                    <th className="text-left p-2">Closed</th>
+                    <th className="text-left p-2">Ticker</th>
+                    <th className="text-left p-2">Model pick</th>
+                    <th className="text-right p-2">Strike</th>
+                    <th className="text-right p-2">Model%</th>
+                    <th className="text-right p-2">Market¢</th>
+                    <th className="text-right p-2">Edge</th>
+                    <th className="text-right p-2">Settle</th>
+                    <th className="text-center p-2">Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {s.recent.map((r) => (
+                    <tr key={r.ticker} className="border-t border-border">
+                      <td className="p-2">{new Date(r.closeTime).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
+                      <td className="p-2 font-mono">{r.ticker}</td>
+                      <td className="p-2"><span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>{r.side}</span></td>
+                      <td className="p-2 text-right">{fmt$(r.strike)}</td>
+                      <td className="p-2 text-right">{(r.modelProb * 100).toFixed(1)}%</td>
+                      <td className="p-2 text-right">{(r.marketYesPrice * 100).toFixed(0)}</td>
+                      <td className="p-2 text-right">{r.edgePts >= 0 ? "+" : ""}{r.edgePts.toFixed(1)}</td>
+                      <td className="p-2 text-right">{r.settlePrice != null ? fmt$(r.settlePrice) : "—"}</td>
+                      <td className="p-2 text-center">
+                        {r.wasCorrect === true && <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>}
+                        {r.wasCorrect === false && <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>}
+                        {r.wasCorrect === null && <span className="text-muted-foreground">pending</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function CryptoPage() {
   const qc = useQueryClient();
   const marketsFn = useServerFn(getBtcMarkets);
