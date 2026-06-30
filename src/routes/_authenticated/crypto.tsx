@@ -194,7 +194,7 @@ function TopPick({ markets }: { markets: BtcMarket[] }) {
         <span className="text-xs uppercase tracking-wider text-[color:var(--color-primary)]">Model Top Pick</span>
       </div>
       <div className="text-lg font-bold">
-        Bet <span className="text-[color:var(--color-primary)]">{pick.side}</span> · strike {fmt$(pick.strike)} · closes {fmtTime(pick.closeTime)}
+        Bet BTC goes <span className="text-[color:var(--color-primary)]">{dirLabel(pick.side)}</span> from strike {fmt$(pick.strike)} · closes {fmtTime(pick.closeTime)}
       </div>
       <div className="text-sm text-muted-foreground mt-1">
         Spot {fmt$(pick.spot)} · Model {(pick.modelYesProb*100).toFixed(1)}% vs market {(pick.yesPrice*100).toFixed(0)}¢ · edge {pick.edgePts>=0?"+":""}{pick.edgePts.toFixed(1)}pts
