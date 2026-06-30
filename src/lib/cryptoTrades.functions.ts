@@ -25,8 +25,18 @@ const PlaceOrderSchema = z.object({
 
 async function signKalshi(method: string, path: string): Promise<Record<string, string>> {
   const keyId = process.env.KALSHI_API_KEY_ID;
-  const pem = process.env.KALSHI_PRIVATE_KEY_PEM;
-  if (!keyId || !pem) throw new Error("Kalshi credentials not configured");
+  const rawPem = process.env.KALSHI_PRIVATE_KEY_PEM;
+  if (!keyId || !rawPem) throw new Error("Kalshi credentials not configured");
+  // Normalize PEM: convert literal "\n" to real newlines, and if the body has
+  // no line breaks at all, reflow it into a proper PEM block.
+  let pem = rawPem.replace(/\\n/g, "\n").replace(/\r/g, "").trim();
+  const headerMatch = pem.match(/-----BEGIN ([A-Z0-9 ]+)-----([\s\S]*?)-----END \1-----/);
+  if (headerMatch && !headerMatch[2].includes("\n")) {
+    const label = headerMatch[1];
+    const body = headerMatch[2].replace(/\s+/g, "");
+    const wrapped = body.match(/.{1,64}/g)?.join("\n") ?? body;
+    pem = `-----BEGIN ${label}-----\n${wrapped}\n-----END ${label}-----\n`;
+  }
   const { createSign, createPrivateKey, constants } = await import("node:crypto");
   const ts = Date.now().toString();
   const msg = `${ts}${method}${path}`;
