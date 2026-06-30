@@ -1,5 +1,7 @@
 // Cron-triggered auto-trade hook. Public endpoint; pg_cron calls every minute.
-// For each user, places at most 1 paper bet per call ($10, ≥1σ + momentum)
+// For each user, places at most 1 paper bet per call ($50 paper stake).
+// Primary path uses live markets; if Kalshi rate-limits, fall back to the
+// latest stored model prediction so late paper entries still fire.
 // up to a lifetime cap of 5 orders, then only settles. No auth header needed
 // (this prefix bypasses published-site auth — we still validate apikey).
 import { createFileRoute } from "@tanstack/react-router";
@@ -8,6 +10,32 @@ import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
 const LIFETIME_CAP = 5;
 const STAKE_USD = 50;
 const MIN_SIGMA = 1.0;
+const MIN_SECONDS_TO_CLOSE = 10;
+const FALLBACK_MAX_AGE_MS = 5 * 60 * 1000;
+const FALLBACK_MIN_EDGE_PTS = 3;
+
+type AutoTradeCandidate = {
+  source: "live" | "stored_prediction";
+  ticker: string;
+  eventTicker: string | null;
+  side: "YES" | "NO";
+  strike: number;
+  spot: number;
+  modelYesProb: number;
+  yesPrice: number;
+  edgePts: number;
+  edgeAbs: number;
+  sigmaDistance: number;
+  gapInSigmas: number;
+  secondsToClose: number;
+  closeTime: string;
+  limitCents: number;
+};
+
+function toLimitCents(side: "YES" | "NO", yesPrice: number, yesAsk?: number, noAsk?: number) {
+  const price = side === "YES" ? (yesAsk || yesPrice) : (noAsk || (1 - yesPrice));
+  return Math.max(1, Math.min(99, Math.round(price * 100)));
+}
 
 export const Route = createFileRoute("/api/public/hooks/auto-trade")({
   server: {
@@ -21,13 +49,95 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        // 1) Fetch market snapshot once (shared across users). Tolerate Kalshi 429s.
-        let markets;
+        // 1) Fetch live market snapshot once (shared across users). If Kalshi
+        // rate-limits, continue with stored predictions instead of skipping.
+        let liveCandidates: AutoTradeCandidate[] = [];
+        let marketFetchError: string | undefined;
         try {
-          markets = await getBtcMarkets();
+          const markets = await getBtcMarkets();
+          liveCandidates = markets.markets
+            .filter(m =>
+              m.gateAction === "BET" &&
+              m.sigmaDistance >= MIN_SIGMA &&
+              m.gapAnalysis.momentumAlignsWithSide &&
+              m.secondsToClose >= MIN_SECONDS_TO_CLOSE
+            )
+            .map(m => ({
+              source: "live" as const,
+              ticker: m.ticker,
+              eventTicker: m.eventTicker,
+              side: m.side,
+              strike: m.strike,
+              spot: m.spot,
+              modelYesProb: m.modelYesProb,
+              yesPrice: m.yesPrice,
+              edgePts: m.edgePts,
+              edgeAbs: m.edgeAbs,
+              sigmaDistance: m.sigmaDistance,
+              gapInSigmas: m.gapAnalysis.gapInSigmas,
+              secondsToClose: m.secondsToClose,
+              closeTime: m.closeTime ?? new Date(Date.now() + m.secondsToClose * 1000).toISOString(),
+              limitCents: toLimitCents(m.side, m.yesPrice, m.yesAsk, m.noAsk),
+            }));
         } catch (e) {
-          return Response.json({ ok: false, skipped: "markets fetch failed", error: String(e) }, { status: 200 });
+          marketFetchError = String(e);
         }
+
+        const nowMs = Date.now();
+        const { data: storedRows } = await supabaseAdmin
+          .from("btc_model_predictions")
+          .select("ticker, event_ticker, strike, side, model_prob, market_yes_price, edge_pts, spot_at_snapshot, close_time, snapshot_seconds_to_close, updated_at")
+          .is("outcome", null)
+          .gte("close_time", new Date(nowMs + MIN_SECONDS_TO_CLOSE * 1000).toISOString())
+          .gte("updated_at", new Date(nowMs - FALLBACK_MAX_AGE_MS).toISOString())
+          .order("edge_pts", { ascending: false })
+          .limit(20);
+
+        const storedCandidates: AutoTradeCandidate[] = ((storedRows ?? []) as Array<{
+          ticker: string;
+          event_ticker: string | null;
+          strike: number;
+          side: "YES" | "NO";
+          model_prob: number;
+          market_yes_price: number;
+          edge_pts: number;
+          spot_at_snapshot: number;
+          close_time: string;
+          snapshot_seconds_to_close: number;
+        }>)
+          .map(row => {
+            const yesPrice = Number(row.market_yes_price);
+            const secondsToClose = Math.max(0, Math.ceil((new Date(row.close_time).getTime() - nowMs) / 1000));
+            const edgePts = Number(row.edge_pts);
+            return {
+              source: "stored_prediction" as const,
+              ticker: row.ticker,
+              eventTicker: row.event_ticker,
+              side: row.side,
+              strike: Number(row.strike),
+              spot: Number(row.spot_at_snapshot),
+              modelYesProb: Number(row.model_prob),
+              yesPrice,
+              edgePts,
+              edgeAbs: Math.abs(edgePts),
+              sigmaDistance: MIN_SIGMA,
+              gapInSigmas: 0,
+              secondsToClose,
+              closeTime: row.close_time,
+              limitCents: toLimitCents(row.side, yesPrice),
+            };
+          })
+          .filter(m =>
+            m.edgePts >= FALLBACK_MIN_EDGE_PTS &&
+            m.secondsToClose >= MIN_SECONDS_TO_CLOSE &&
+            Number.isFinite(m.limitCents) &&
+            Number.isFinite(m.modelYesProb) &&
+            Number.isFinite(m.yesPrice)
+          );
+
+        const candidates = [...liveCandidates, ...storedCandidates]
+          .filter((candidate, index, all) => all.findIndex(other => other.ticker === candidate.ticker) === index)
+          .sort((a, b) => b.edgeAbs - a.edgeAbs);
 
         // 2) Iterate every profile and (a) settle (b) place if under cap.
         const { data: profiles } = await supabaseAdmin
@@ -103,28 +213,20 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
             .gte("created_at", since);
           const recentTickers = new Set((recentRows ?? []).map((r: { ticker: string }) => r.ticker));
 
-          // ---- Pick best eligible market: BET + ≥1σ + momentum aligned + ≥90s ----
-          const candidate = markets.markets
-            .filter(m =>
-              m.gateAction === "BET" &&
-              m.sigmaDistance >= MIN_SIGMA &&
-              m.gapAnalysis.momentumAlignsWithSide &&
-              m.secondsToClose >= 90 &&
-              !recentTickers.has(m.ticker)
-            )
-            .sort((a, b) => (b.edgeAbs - b.requiredEdgePts) - (a.edgeAbs - a.requiredEdgePts))[0];
+          // ---- Pick best eligible market/prediction; allow aggressive paper entries down to T-10s ----
+          const candidate = candidates.find(m => !recentTickers.has(m.ticker));
 
           if (!candidate) {
-            reason = "no eligible market";
+            reason = marketFetchError
+              ? `no eligible market; live fetch failed: ${marketFetchError}`
+              : "no eligible market";
             perUser.push({ userId, placed, settled, reason });
             totalSettled += settled;
             continue;
           }
 
           const m = candidate;
-          const limitCents = Math.max(1, Math.min(99, Math.round(
-            (m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
-          )));
+          const limitCents = m.limitCents;
           const contracts = Math.max(1, Math.floor((STAKE_USD * 100) / limitCents));
           const stakeActual = (contracts * limitCents) / 100;
 
@@ -146,9 +248,9 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
               market_yes_price: m.yesPrice,
               edge_pts: m.edgePts,
               sigma_distance: m.sigmaDistance,
-              gap_in_sigmas: m.gapAnalysis.gapInSigmas,
+              gap_in_sigmas: m.gapInSigmas,
               seconds_to_close: m.secondsToClose,
-              close_time: m.closeTime ?? new Date(Date.now() + m.secondsToClose * 1000).toISOString(),
+              close_time: m.closeTime,
               status: "placed",
             });
           if (insertErr) {
