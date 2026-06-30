@@ -72,6 +72,13 @@ export interface BtcMarket {
 }
 
 
+export interface BtcCalibSummary {
+  totalSettled: number;
+  globalHitRate: number;
+  globalBrier: number;
+  buckets: Array<{ bucket: string; n: number; hitRate: number; meanProb: number; brier: number; a: number; b: number; active: boolean }>;
+}
+
 interface BtcMarketsResult {
   spot: number;
   asOf: string;
@@ -80,6 +87,7 @@ interface BtcMarketsResult {
   modelSource: "external" | "intra-window-diffusion";
   micro: BtcMicro | null;
   options: BtcOptions | null;
+  calibration: BtcCalibSummary | null;
 }
 
 
