@@ -61,6 +61,9 @@ export interface BtcMarket {
   microAdjPts: number;       // points added by microstructure features
   optionsImpliedProb: number | null; // Deribit Black-Scholes prob (null if unavailable)
   optionsBlendPts: number;   // pts contributed by options blend
+  calibAdjPts: number;       // pts from self-learning Platt calibration
+  calibBucket: string;
+  calibActive: boolean;
   edgePts: number;
   side: "YES" | "NO";
   edgeAbs: number;
@@ -68,6 +71,13 @@ export interface BtcMarket {
   secondsToClose: number;
 }
 
+
+export interface BtcCalibSummary {
+  totalSettled: number;
+  globalHitRate: number;
+  globalBrier: number;
+  buckets: Array<{ bucket: string; n: number; hitRate: number; meanProb: number; brier: number; a: number; b: number; active: boolean }>;
+}
 
 interface BtcMarketsResult {
   spot: number;
@@ -77,6 +87,7 @@ interface BtcMarketsResult {
   modelSource: "external" | "intra-window-diffusion";
   micro: BtcMicro | null;
   options: BtcOptions | null;
+  calibration: BtcCalibSummary | null;
 }
 
 
@@ -493,10 +504,26 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
 
     // (d) Microstructure features — funding, OI delta, basis, CVD, OFI.
     // (e) Deribit options-implied IV + 25Δ skew (Phase 1 · Step 3).
-    const [micro, options] = await Promise.all([
+    // (f) Self-learning Platt calibration from settled predictions (Step 4).
+    const [micro, options, calibState] = await Promise.all([
       fetchBinanceMicro(spot),
       fetchDeribitOptions(),
+      (async () => {
+        try {
+          const { getCalibrator } = await import("./cryptoCalibrator.server");
+          return await getCalibrator();
+        } catch (e) {
+          console.warn("calibrator load failed:", e);
+          return null;
+        }
+      })(),
     ]);
+    const applyCalib = await (async () => {
+      try {
+        const { applyCalibration } = await import("./cryptoCalibrator.server");
+        return applyCalibration;
+      } catch { return null; }
+    })();
 
     const events = (evJson.events ?? []) as any[];
     const markets: BtcMarket[] = [];
@@ -535,6 +562,10 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         const adj = microAdjustment(pBase, micro, secondsToClose);
         let p = adj.p;
 
+        // (f) Self-learning Platt calibration (per time-to-close bucket).
+        const cal = applyCalib ? applyCalib(p, secondsToClose, calibState) : { p, deltaPts: 0, bucket: "ge600", active: false };
+        p = cal.p;
+
         // (c) Shrink toward market in the final 2 minutes.
         if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining);
 
@@ -564,6 +595,9 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           microAdjPts: adj.deltaPts,
           optionsImpliedProb: pOpt,
           optionsBlendPts,
+          calibAdjPts: cal.deltaPts,
+          calibBucket: cal.bucket,
+          calibActive: cal.active,
           modelSource: source,
           edgePts, side, edgeAbs,
           kellyFraction: kelly,
@@ -610,6 +644,15 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
       modelSource: hasExternal ? "external" : "intra-window-diffusion",
       micro,
       options,
+      calibration: calibState ? {
+        totalSettled: calibState.totalSettled,
+        globalHitRate: calibState.globalHitRate,
+        globalBrier: calibState.globalBrier,
+        buckets: calibState.buckets.map(b => ({
+          bucket: b.bucket, n: b.n, hitRate: b.hitRate, meanProb: b.meanProb,
+          brier: b.brier, a: b.a, b: b.b, active: b.active,
+        })),
+      } : null,
     };
   },
 );

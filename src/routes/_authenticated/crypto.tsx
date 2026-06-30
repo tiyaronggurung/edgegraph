@@ -133,6 +133,9 @@ function MarketRow({
           {m.optionsImpliedProb !== null && (
             <> · opt {(m.optionsImpliedProb*100).toFixed(1)}% <span className={m.optionsBlendPts >= 0 ? "text-emerald-400" : "text-red-400"}>({m.optionsBlendPts >= 0 ? "+" : ""}{m.optionsBlendPts.toFixed(2)}pts)</span></>
           )}
+          {m.calibActive && (
+            <> · <span className={m.calibAdjPts >= 0 ? "text-emerald-400" : "text-red-400"}>calib {m.calibAdjPts >= 0 ? "+" : ""}{m.calibAdjPts.toFixed(2)}pts</span></>
+          )}
         </div>
         <div className="text-xs">Edge <span className={confColor+" font-semibold"}>{m.edgePts>=0?"+":""}{m.edgePts.toFixed(1)} pts</span> <span className={"ml-1 "+confColor}>[{conf}]</span></div>
         <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{m.modelSource === "external" ? "your ML model" : "diffusion + microstructure"}</div>
@@ -532,6 +535,39 @@ function CryptoPage() {
               <div className="font-mono text-sm">{(data.options.yearsToExpiry * 365).toFixed(2)}d</div>
               <div className="text-[10px] text-muted-foreground">{data.options.sampleCount} strikes</div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {data?.calibration && (
+        <div className="border border-border rounded-lg bg-card p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Self-learning calibration · {data.calibration.totalSettled} settled rows
+            </div>
+            <div className="text-[10px] text-muted-foreground">
+              hit rate <span className="font-mono">{(data.calibration.globalHitRate * 100).toFixed(1)}%</span>
+              {" · "}Brier <span className="font-mono">{data.calibration.globalBrier.toFixed(4)}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            {data.calibration.buckets.map(b => (
+              <div key={b.bucket} className={`border rounded p-2 ${b.active ? "border-emerald-500/40" : "border-border"}`}>
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{b.bucket.replace("_", "–")}s</div>
+                  <div className={`text-[9px] uppercase tracking-wider ${b.active ? "text-emerald-400" : "text-muted-foreground"}`}>
+                    {b.active ? "LIVE" : "warmup"}
+                  </div>
+                </div>
+                <div className="font-mono text-sm">n={b.n} · hit {(b.hitRate * 100).toFixed(1)}%</div>
+                <div className="text-[10px] text-muted-foreground">
+                  pred {(b.meanProb * 100).toFixed(1)}% · Brier {b.brier.toFixed(3)}
+                </div>
+                <div className="text-[10px] text-muted-foreground font-mono">
+                  Platt a={b.a.toFixed(2)} b={b.b.toFixed(2)}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
