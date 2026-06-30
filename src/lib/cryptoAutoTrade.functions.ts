@@ -59,7 +59,7 @@ export interface AutoTradeRunResult {
 export const runAutoTrade = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { mode?: "paper" | "live"; maxOrders?: number; stakeUsd?: number; confirm?: string } | undefined) => {
-    const mode = data?.mode === "live" ? "live" : "paper";
+    const mode: "paper" | "live" = data?.mode === "live" ? "live" : "paper";
     const sessionCap = mode === "live" ? LIVE_MAX_ORDERS_PER_SESSION : MAX_ORDERS_PER_SESSION_PAPER;
     const stakeCap = mode === "live" ? LIVE_MAX_STAKE_USD_PER_ORDER : MAX_STAKE_USD_PER_ORDER_PAPER;
     return {
