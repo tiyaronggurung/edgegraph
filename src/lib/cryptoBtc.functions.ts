@@ -491,8 +491,12 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
     const now = Date.now();
     const hasExternal = !!process.env.CRYPTO_MODEL_URL;
 
-    // (d) Microstructure features — funding, OI delta, spot–perp basis.
-    const micro = await fetchBinanceMicro(spot);
+    // (d) Microstructure features — funding, OI delta, basis, CVD, OFI.
+    // (e) Deribit options-implied IV + 25Δ skew (Phase 1 · Step 3).
+    const [micro, options] = await Promise.all([
+      fetchBinanceMicro(spot),
+      fetchDeribitOptions(),
+    ]);
 
     const events = (evJson.events ?? []) as any[];
     const markets: BtcMarket[] = [];
@@ -511,7 +515,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         const windowOpen = priceAt(recent, Math.floor(openMs / 1000)) || spot;
         const realizedMoveBps = windowOpen > 0 ? ((spot - windowOpen) / windowOpen) * 10000 : 0;
 
-        let pBase = spot > 0 && strike > 0
+        let pDiffusion = spot > 0 && strike > 0
           ? probAboveCond(spot, strike, sigma, minsRemaining)
           : 0.5;
         let source: BtcMarket["modelSource"] = "intra-window-diffusion";
@@ -520,9 +524,14 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           ticker: m.ticker, strike, spot, windowOpen,
           minutesRemaining: minsRemaining, yesPrice,
         });
-        if (ext !== null) { pBase = ext; source = "external"; }
+        if (ext !== null) { pDiffusion = ext; source = "external"; }
 
-        // (d) Apply microstructure logistic adjustment on top of base prob.
+        // (e) Blend in Deribit options-implied prob (50/50 when available).
+        const pOpt = optionsImpliedProb(spot, strike, options, secondsToClose);
+        const pBase = pOpt !== null ? 0.5 * pDiffusion + 0.5 * pOpt : pDiffusion;
+        const optionsBlendPts = pOpt !== null ? (pBase - pDiffusion) * 100 : 0;
+
+        // (d) Apply microstructure logistic adjustment on top of blended base prob.
         const adj = microAdjustment(pBase, micro, secondsToClose);
         let p = adj.p;
 
@@ -553,6 +562,8 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           modelYesProb: p,
           modelBaseProb: pBase,
           microAdjPts: adj.deltaPts,
+          optionsImpliedProb: pOpt,
+          optionsBlendPts,
           modelSource: source,
           edgePts, side, edgeAbs,
           kellyFraction: kelly,
