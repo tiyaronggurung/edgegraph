@@ -62,6 +62,29 @@ async function fetchBtcCandles(): Promise<BtcCandle[]> {
   return rows.map(([t, l, h, o, c, v]) => ({ t, o, h, l, c, v })).sort((a, b) => a.t - b.t);
 }
 
+// BRTI-style consolidated spot: median of Coinbase, Binance, Kraken mids.
+// Closes the basis gap with Kalshi's settlement index.
+async function fetchConsolidatedSpot(fallback: number): Promise<number> {
+  const sources = await Promise.allSettled([
+    fetch("https://api.exchange.coinbase.com/products/BTC-USD/ticker", { headers: { "User-Agent": "edgegraph/1.0" } })
+      .then(r => r.json()).then((j: any) => Number(j.price)),
+    fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT")
+      .then(r => r.json()).then((j: any) => Number(j.price)),
+    fetch("https://api.kraken.com/0/public/Ticker?pair=XBTUSD")
+      .then(r => r.json()).then((j: any) => {
+        const k = Object.values(j.result ?? {})[0] as any;
+        return Number(k?.c?.[0]);
+      }),
+  ]);
+  const vals = sources
+    .map(s => s.status === "fulfilled" ? s.value : NaN)
+    .filter(v => Number.isFinite(v) && v > 0)
+    .sort((a, b) => a - b);
+  if (!vals.length) return fallback;
+  const mid = Math.floor(vals.length / 2);
+  return vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
+}
+
 function normCdf(x: number): number {
   const sign = x < 0 ? -1 : 1;
   const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
