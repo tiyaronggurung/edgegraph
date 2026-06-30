@@ -727,6 +727,15 @@ function AutoTradePanel() {
             {testBusy ? "Testing…" : "Test Kalshi connection"}
           </button>
           <button
+            onClick={runDiagnostics}
+            disabled={diagBusy}
+            className="text-xs font-semibold px-3 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 disabled:opacity-50 flex items-center gap-1.5"
+            title="Step-by-step auth diagnostics: env, PEM, RSA-PSS sign, signed GET /portfolio/balance, clock skew"
+          >
+            {diagBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+            {diagBusy ? "Diagnosing…" : "Diagnose auth"}
+          </button>
+          <button
             onClick={runLive}
             disabled={liveBusy}
             className="text-xs font-semibold px-3 py-1.5 rounded border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-50 flex items-center gap-1.5"
@@ -737,6 +746,45 @@ function AutoTradePanel() {
           </button>
         </div>
       </div>
+
+      {diagOpen && (
+        <div className="border-b border-border bg-muted/10 px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Kalshi auth diagnostics</div>
+            <button onClick={() => setDiagOpen(false)} className="text-[11px] text-muted-foreground hover:text-foreground">close</button>
+          </div>
+          {diagBusy && !diag && <div className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Running 5 checks…</div>}
+          {diag && (
+            <div className="space-y-2">
+              <ol className="space-y-1.5">
+                {diag.steps.map((s, i) => (
+                  <li key={i} className="text-xs">
+                    <div className="flex items-start gap-2">
+                      <span className={`mt-0.5 inline-block h-4 w-4 rounded-full text-[10px] leading-4 text-center font-bold ${s.ok ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
+                        {s.ok ? "✓" : "✗"}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className={s.ok ? "text-foreground" : "text-red-400 font-medium"}>{s.name}</div>
+                        {s.detail && <div className="text-[11px] text-muted-foreground font-mono break-all whitespace-pre-wrap">{s.detail}</div>}
+                        {s.data && (
+                          <details className="mt-1">
+                            <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground">raw data</summary>
+                            <pre className="text-[10px] text-muted-foreground bg-background/50 p-2 rounded mt-1 overflow-x-auto">{JSON.stringify(s.data, null, 2)}</pre>
+                          </details>
+                        )}
+                      </div>
+                    </li>
+                  </ol>
+                ))}
+              </ol>
+              <div className={`text-[11px] p-2 rounded border ${diag.ok ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-300" : "border-red-500/30 bg-red-500/5 text-red-300"}`}>
+                <span className="font-semibold">Verdict:</span> {diag.summary}
+              </div>
+              <div className="text-[10px] text-muted-foreground">Server time at check: {diag.serverTimeIso}</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {liveOrders.length === 0 ? (
         <div className="p-6 text-center text-sm text-muted-foreground">No live auto-trades placed yet. Test the Kalshi connection before running a real-money auto-trade.</div>
