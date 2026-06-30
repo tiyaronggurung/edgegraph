@@ -55,7 +55,7 @@ type ValidatedKalshiKey = {
 let cachedKey: ValidatedKalshiKey | null = null;
 let cachedKeyFingerprint: string | null = null;
 
-async function getValidatedKalshiKey(): Promise<ValidatedKalshiKey> {
+export async function getValidatedKalshiKey(): Promise<ValidatedKalshiKey> {
   const rawPem = process.env.KALSHI_PRIVATE_KEY_PEM;
   if (!rawPem) throw new Error("KALSHI_PRIVATE_KEY_PEM is not configured");
 
