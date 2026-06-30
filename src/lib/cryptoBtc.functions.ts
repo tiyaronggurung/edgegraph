@@ -16,7 +16,13 @@ export interface BtcMicro {
   oiNotional: number;        // perp open interest USD
   oiDelta5mPct: number;      // % change in OI over last ~5 min
   basisBps: number;          // (perp - spot) / spot * 10000
+  cvdRatio: number;          // (buyVol - sellVol) / totalVol over last ~60s (-1..1)
+  cvdBuyUsd: number;         // taker buy USD notional in window
+  cvdSellUsd: number;        // taker sell USD notional in window
+  ofi: number;               // (bidSize - askSize) / (bidSize + askSize) top 10 levels (-1..1)
+  bookSpreadBps: number;     // best ask vs best bid in bps
 }
+
 
 export interface BtcMarket {
   ticker: string;
@@ -210,31 +216,36 @@ async function fetchExternalProb(ctx: {
   } catch { return null; }
 }
 
-// ── PHASE 1 · STEP 1 ────────────────────────────────────────────────────────
+// ── PHASE 1 · STEP 1 + 2 ────────────────────────────────────────────────────
 // Microstructure signals from Binance USDT-perp:
-//  · funding rate  — directional crowding tax
-//  · OI 5-min delta — fresh leverage building or unwinding
-//  · spot–perp basis — pressure / liquidation proxy
-// Cached 20s to stay friendly with public endpoints.
+//   Step 1: funding · OI 5m delta · spot–perp basis
+//   Step 2: taker buy/sell CVD (last ~60s) · order-book imbalance (top 10)
+// Cached 15s. All endpoints public, no auth.
 let _microCache: { at: number; data: BtcMicro | null } | null = null;
-const MICRO_TTL_MS = 20_000;
+const MICRO_TTL_MS = 15_000;
 
 async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
   if (_microCache && Date.now() - _microCache.at < MICRO_TTL_MS) return _microCache.data;
   try {
-    const [fundingRes, oiRes, oiHistRes, perpRes] = await Promise.all([
+    const sinceMs = Date.now() - 60_000; // last 60s of taker flow
+    const [fundingRes, oiRes, oiHistRes, perpRes, tradesRes, depthRes] = await Promise.all([
       fetch("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT"),
       fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT"),
       fetch("https://fapi.binance.com/futures/data/openInterestHist?symbol=BTCUSDT&period=5m&limit=2"),
       fetch("https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT"),
+      fetch(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&startTime=${sinceMs}&limit=1000`),
+      fetch("https://fapi.binance.com/fapi/v1/depth?symbol=BTCUSDT&limit=20"),
     ]);
     if (!fundingRes.ok || !oiRes.ok || !perpRes.ok) throw new Error("micro http");
+
     const funding: any = await fundingRes.json();
     const oi: any = await oiRes.json();
     const perp: any = await perpRes.json();
     const hist: any[] = oiHistRes.ok ? await oiHistRes.json() : [];
+    const trades: any[] = tradesRes.ok ? await tradesRes.json() : [];
+    const depth: any = depthRes.ok ? await depthRes.json() : { bids: [], asks: [] };
 
-    const fundingRate = Number(funding.lastFundingRate ?? 0); // per 8h
+    const fundingRate = Number(funding.lastFundingRate ?? 0);
     const perpPrice = Number(perp.price ?? 0);
     const oiContracts = Number(oi.openInterest ?? 0);
     const oiNotional = oiContracts * perpPrice;
@@ -247,12 +258,45 @@ async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
       if (prev > 0) oiDelta5mPct = ((curr - prev) / prev) * 100;
     }
 
+    // Taker CVD over the window. `m=true` means buyer is the market maker,
+    // so the trade was a SELL aggression; `m=false` means BUY aggression.
+    let cvdBuyUsd = 0, cvdSellUsd = 0;
+    for (const t of trades) {
+      const price = Number(t.p);
+      const qty = Number(t.q);
+      if (!Number.isFinite(price) || !Number.isFinite(qty)) continue;
+      const usd = price * qty;
+      if (t.m) cvdSellUsd += usd;
+      else cvdBuyUsd += usd;
+    }
+    const totalUsd = cvdBuyUsd + cvdSellUsd;
+    const cvdRatio = totalUsd > 0 ? (cvdBuyUsd - cvdSellUsd) / totalUsd : 0;
+
+    // Order-book imbalance: sum sizes for top 10 levels each side.
+    const bids: [string, string][] = depth.bids ?? [];
+    const asks: [string, string][] = depth.asks ?? [];
+    const sumSize = (rows: [string, string][]) =>
+      rows.slice(0, 10).reduce((s, [, q]) => s + Number(q || 0), 0);
+    const bidSize = sumSize(bids);
+    const askSize = sumSize(asks);
+    const ofi = bidSize + askSize > 0 ? (bidSize - askSize) / (bidSize + askSize) : 0;
+
+    const bestBid = Number(bids[0]?.[0] ?? 0);
+    const bestAsk = Number(asks[0]?.[0] ?? 0);
+    const mid = (bestBid + bestAsk) / 2;
+    const bookSpreadBps = mid > 0 ? ((bestAsk - bestBid) / mid) * 10000 : 0;
+
     const data: BtcMicro = {
       fundingRate,
       fundingAnnualBps: fundingRate * 3 * 365 * 10000,
       oiNotional,
       oiDelta5mPct,
       basisBps,
+      cvdRatio,
+      cvdBuyUsd,
+      cvdSellUsd,
+      ofi,
+      bookSpreadBps,
     };
     _microCache = { at: Date.now(), data };
     return data;
@@ -265,23 +309,31 @@ async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
 // Logistic adjustment: shift YES probability by a small bounded amount when
 // microstructure signals lean one way. Bullish bias ⇒ raise YES prob.
 //
-// Conservative, hand-tuned coefficients. Bounded at ±4 points so a single
-// noisy signal cannot flip a call by itself.
+// Conservative, hand-tuned coefficients. Bounded at ±6 points so no single
+// noisy signal can flip a call by itself.
 function microAdjustment(p: number, m: BtcMicro | null, secondsToClose: number): { p: number; deltaPts: number } {
   if (!m || secondsToClose <= 30 || p <= 0 || p >= 1) return { p, deltaPts: 0 };
 
   // z-style: positive = bullish for next 15m, negative = bearish.
   // Funding > +0.01% / 8h = crowded longs (bearish lean — paying to be long).
-  const fundingZ = -Math.max(-3, Math.min(3, m.fundingRate / 0.00005));   // ±3 around ±2.5bps/8h
-  // OI rising while basis positive = fresh longs piling in (bullish short term, can revert).
-  // OI rising while basis negative = fresh shorts (bearish short term).
+  const fundingZ = -Math.max(-3, Math.min(3, m.fundingRate / 0.00005));
+  // OI rising in same direction as basis = fresh leverage piling in (short-term trend follow).
   const oiZ = Math.max(-2, Math.min(2, m.oiDelta5mPct / 0.5)) * Math.sign(m.basisBps || 1);
   // Basis blowout: |basis| > 5bps suggests imbalance; sign = direction of pressure.
   const basisZ = Math.max(-2, Math.min(2, m.basisBps / 5));
+  // Taker CVD: aggressive flow leads spot on minute horizon. Linear in ratio.
+  const cvdZ = Math.max(-2, Math.min(2, m.cvdRatio * 4)); // ratio 0.5 → z=2
+  // Order-book imbalance: classic OFI alpha.
+  const ofiZ = Math.max(-2, Math.min(2, m.ofi * 3));
 
-  const score = 0.35 * fundingZ + 0.25 * oiZ + 0.40 * basisZ; // ~±2.5 typical
-  // Convert score → logit shift, scale down hard, cap at ±0.18 logit (≈ ±4 prob points near 0.5).
-  const logitShift = Math.max(-0.18, Math.min(0.18, score * 0.05));
+  const score =
+    0.25 * fundingZ +
+    0.15 * oiZ +
+    0.25 * basisZ +
+    0.20 * cvdZ +
+    0.15 * ofiZ;
+  // Convert score → logit shift, cap at ±0.27 logit (≈ ±6 prob points near 0.5).
+  const logitShift = Math.max(-0.27, Math.min(0.27, score * 0.07));
   const eps = 1e-6;
   const logit = Math.log(Math.max(eps, p) / Math.max(eps, 1 - p));
   const pNew = 1 / (1 + Math.exp(-(logit + logitShift)));
