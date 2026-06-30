@@ -6,7 +6,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
 
 const LIFETIME_CAP = 5;
-const STAKE_USD = 10;
+const STAKE_USD = 50;
 const MIN_SIGMA = 1.0;
 
 export const Route = createFileRoute("/api/public/hooks/auto-trade")({
