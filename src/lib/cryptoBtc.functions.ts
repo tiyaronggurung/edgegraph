@@ -927,6 +927,15 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         })),
         global: calibState.global,
       } : null,
+      regime: regimeState ? {
+        regime: regimeState.regime,
+        sigmaMult: regimeState.sigmaMult,
+        driftBiasPerMin: regimeState.driftBiasPerMin,
+        confidence: regimeState.confidence,
+        reason: regimeState.reason,
+        source: regimeState.source,
+        asOf: regimeState.asOf,
+      } : null,
     };
   },
 );
