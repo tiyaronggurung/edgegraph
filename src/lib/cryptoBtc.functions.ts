@@ -10,6 +10,14 @@ export interface BtcCandle {
   t: number; o: number; h: number; l: number; c: number; v: number;
 }
 
+export interface BtcMicro {
+  fundingRate: number;       // 8h funding rate (fraction, e.g. 0.0001 = +1bp / 8h)
+  fundingAnnualBps: number;  // annualized basis-points
+  oiNotional: number;        // perp open interest USD
+  oiDelta5mPct: number;      // % change in OI over last ~5 min
+  basisBps: number;          // (perp - spot) / spot * 10000
+}
+
 export interface BtcMarket {
   ticker: string;
   eventTicker: string;
@@ -31,13 +39,16 @@ export interface BtcMarket {
   windowOpenPrice: number;   // BTC price at strike-window open
   realizedMoveBps: number;   // (spot - open)/open * 10000
   modelYesProb: number;
+  modelBaseProb: number;     // diffusion-only prob (before micro adjustment)
   modelSource: "external" | "intra-window-diffusion";
+  microAdjPts: number;       // points added by microstructure features
   edgePts: number;
   side: "YES" | "NO";
   edgeAbs: number;
   kellyFraction: number;     // quarter-Kelly bankroll fraction (display only)
   secondsToClose: number;
 }
+
 
 interface BtcMarketsResult {
   spot: number;
