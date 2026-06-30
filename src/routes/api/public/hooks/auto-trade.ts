@@ -248,7 +248,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
               market_yes_price: m.yesPrice,
               edge_pts: m.edgePts,
               sigma_distance: m.sigmaDistance,
-              gap_in_sigmas: m.gapAnalysis.gapInSigmas,
+              gap_in_sigmas: m.gapInSigmas,
               seconds_to_close: m.secondsToClose,
               close_time: m.closeTime,
               status: "placed",
