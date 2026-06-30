@@ -355,6 +355,127 @@ function microAdjustment(p: number, m: BtcMicro | null, secondsToClose: number):
 }
 
 
+// ── PHASE 1 · STEP 3 ────────────────────────────────────────────────────────
+// Deribit options-implied prob + 25Δ skew. Pulls nearest BTC expiry, extracts
+// ATM IV and 25-delta wings, then prices P(S_T >= K) via Black–Scholes with a
+// small skew-induced drift. Blended 50/50 with diffusion when available.
+// Cached 60s.
+let _optionsCache: { at: number; data: BtcOptions | null } | null = null;
+const OPTIONS_TTL_MS = 60_000;
+
+interface DeribitBookRow {
+  instrument_name: string;
+  mark_iv?: number;          // % (e.g. 55 = 0.55)
+  underlying_price?: number;
+  mid_price?: number;
+}
+
+async function fetchDeribitOptions(): Promise<BtcOptions | null> {
+  if (_optionsCache && Date.now() - _optionsCache.at < OPTIONS_TTL_MS) return _optionsCache.data;
+  try {
+    const res = await fetch(
+      "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option",
+      { headers: { Accept: "application/json" } },
+    );
+    if (!res.ok) throw new Error(`deribit ${res.status}`);
+    const json: any = await res.json();
+    const rows: DeribitBookRow[] = json.result ?? [];
+    if (!rows.length) throw new Error("deribit empty");
+
+    // Parse: BTC-30JUN26-65000-C
+    type Parsed = { expiryMs: number; strike: number; type: "C" | "P"; iv: number; underlying: number };
+    const parsed: Parsed[] = [];
+    for (const r of rows) {
+      const parts = r.instrument_name.split("-");
+      if (parts.length !== 4) continue;
+      const [, dateStr, strikeStr, cp] = parts;
+      const expiryMs = parseDeribitDate(dateStr);
+      const strike = Number(strikeStr);
+      const iv = Number(r.mark_iv);
+      const underlying = Number(r.underlying_price);
+      if (!Number.isFinite(expiryMs) || !Number.isFinite(strike) || !Number.isFinite(iv) || iv <= 0) continue;
+      if (cp !== "C" && cp !== "P") continue;
+      parsed.push({ expiryMs, strike, type: cp, iv: iv / 100, underlying });
+    }
+    if (!parsed.length) throw new Error("deribit parse empty");
+
+    // Pick nearest expiry strictly in the future (≥ 1h to skip stale).
+    const now = Date.now();
+    const expiries = Array.from(new Set(parsed.map(p => p.expiryMs))).filter(t => t - now > 3600_000).sort((a, b) => a - b);
+    if (!expiries.length) throw new Error("no future expiry");
+    const expiryMs = expiries[0];
+    const slice = parsed.filter(p => p.expiryMs === expiryMs);
+    const underlying = slice.find(p => Number.isFinite(p.underlying) && p.underlying > 0)?.underlying ?? 0;
+    if (!underlying) throw new Error("no underlying");
+    const yearsToExpiry = (expiryMs - now) / (365 * 24 * 3600 * 1000);
+
+    // ATM IV: average call+put IV at strike nearest to underlying.
+    const nearestStrike = slice.reduce((best, p) =>
+      Math.abs(p.strike - underlying) < Math.abs(best - underlying) ? p.strike : best,
+      slice[0].strike,
+    );
+    const atmRows = slice.filter(p => p.strike === nearestStrike);
+    const atmIv = atmRows.reduce((s, p) => s + p.iv, 0) / atmRows.length;
+
+    // 25Δ approximation: target moneyness ln(K/S) ≈ ±0.674 * IV * sqrt(T).
+    const z = 0.674;
+    const targetUp = underlying * Math.exp(z * atmIv * Math.sqrt(Math.max(yearsToExpiry, 1 / 365)));
+    const targetDn = underlying * Math.exp(-z * atmIv * Math.sqrt(Math.max(yearsToExpiry, 1 / 365)));
+    const calls = slice.filter(p => p.type === "C");
+    const puts = slice.filter(p => p.type === "P");
+    const ivCall25 = nearestIv(calls, targetUp) ?? atmIv;
+    const ivPut25 = nearestIv(puts, targetDn) ?? atmIv;
+    const skew25 = atmIv > 0 ? (ivPut25 - ivCall25) / atmIv : 0;
+
+    const data: BtcOptions = {
+      expiryMs, yearsToExpiry, underlying, atmIv, skew25, ivPut25, ivCall25,
+      sampleCount: slice.length,
+    };
+    _optionsCache = { at: Date.now(), data };
+    return data;
+  } catch {
+    _optionsCache = { at: Date.now(), data: null };
+    return null;
+  }
+}
+
+function nearestIv(rows: { strike: number; iv: number }[], target: number): number | null {
+  if (!rows.length) return null;
+  let best = rows[0];
+  for (const r of rows) if (Math.abs(r.strike - target) < Math.abs(best.strike - target)) best = r;
+  return best.iv;
+}
+
+function parseDeribitDate(s: string): number {
+  // e.g. "30JUN26" → 30 Jun 2026 08:00 UTC (Deribit expiries settle 08:00 UTC).
+  const m = s.match(/^(\d{1,2})([A-Z]{3})(\d{2})$/);
+  if (!m) return NaN;
+  const day = Number(m[1]);
+  const mon = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"].indexOf(m[2]);
+  if (mon < 0) return NaN;
+  const year = 2000 + Number(m[3]);
+  return Date.UTC(year, mon, day, 8, 0, 0);
+}
+
+// Black–Scholes risk-neutral P(S_T >= K) with skew-induced drift.
+// For 15-min Kalshi window: use Deribit ATM IV (annualized) as sigma, and
+// nudge mu by the 25Δ skew so put-heavy markets push prob down on upside.
+function optionsImpliedProb(
+  spot: number, strike: number, opts: BtcOptions | null, secondsToClose: number,
+): number | null {
+  if (!opts || spot <= 0 || strike <= 0 || secondsToClose <= 0) return null;
+  const T = secondsToClose / (365 * 24 * 3600); // years
+  const sigma = opts.atmIv * Math.sqrt(T);
+  if (sigma <= 0) return spot >= strike ? 1 : 0;
+  // Skew → small directional drift. Cap |skew25| at 0.15 (15%) influence.
+  const skew = Math.max(-0.15, Math.min(0.15, opts.skew25));
+  const mu = -skew * opts.atmIv * Math.sqrt(T) * 0.5; // bullish drift if puts > calls? No — skew>0 means downside fear, so mu<0. Sign flipped intentionally: bearish skew should LOWER P(up). Recheck: skew>0 → mu=-0.5*positive=negative → reduces P(S_T>K). Correct.
+  const d = (Math.log(strike / spot) - mu + 0.5 * sigma * sigma) / sigma;
+  return 1 - normCdf(d);
+}
+
+
+
 export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
   async (): Promise<BtcMarketsResult> => {
     const [evJson, candles] = await Promise.all([
