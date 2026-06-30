@@ -230,6 +230,43 @@ export const checkKalshiConfigured = createServerFn({ method: "GET" })
     externalModel: !!process.env.CRYPTO_MODEL_URL,
   }));
 
+// Health probe: confirms KALSHI_PRIVATE_KEY_PEM parses and RSA-PSS signing
+// works end-to-end. Safe to expose result to authenticated users — returns
+// only key metadata (type, modulus bits), never the key itself.
+export const checkKalshiKeyHealth = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const hasKeyId = !!process.env.KALSHI_API_KEY_ID;
+    const hasPem = !!process.env.KALSHI_PRIVATE_KEY_PEM;
+    if (!hasPem) {
+      return {
+        ok: false,
+        hasKeyId,
+        hasPem: false,
+        error: "KALSHI_PRIVATE_KEY_PEM is not configured",
+      };
+    }
+    try {
+      const { key } = await getValidatedKalshiKey();
+      const details = key.asymmetricKeyDetails ?? {};
+      return {
+        ok: true,
+        hasKeyId,
+        hasPem: true,
+        keyType: key.asymmetricKeyType ?? null,
+        modulusBits: (details as { modulusLength?: number }).modulusLength ?? null,
+        signAlgorithm: "RSA-PSS (SHA-256, salt=digest)",
+      };
+    } catch (e: any) {
+      return {
+        ok: false,
+        hasKeyId,
+        hasPem: true,
+        error: e?.message ?? String(e),
+      };
+    }
+  });
+
 // ── STEP 7 · Position Manager ──────────────────────────────────────────────
 // Close an existing open position by selling our side back to Kalshi at a
 // limit price. Realized P&L = (exitCents − entryCents) / 100 × contracts.
