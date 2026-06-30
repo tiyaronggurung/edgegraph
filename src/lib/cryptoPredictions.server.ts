@@ -49,6 +49,10 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
       .maybeSingle();
 
     if (!existing) {
+      // Skip "noise" rows where both model and market agree on a near-certain
+      // outcome — these have |edge| < 1pt and pollute the hit-rate denominator
+      // without representing any real signal.
+      if (Math.abs(input.edgePts) < 1) return;
       // First snapshot: store the model's pick (side) — this is LOCKED for the
       // life of the market, even if model prob drifts across 50% later.
       await supabaseAdmin.from("btc_model_predictions").insert({
