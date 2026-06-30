@@ -121,6 +121,15 @@ interface BtcMarketsResult {
   micro: BtcMicro | null;
   options: BtcOptions | null;
   calibration: BtcCalibSummary | null;
+  regime: {
+    regime: string;
+    sigmaMult: number;
+    driftBiasPerMin: number;
+    confidence: number;
+    reason: string;
+    source: string;
+    asOf: string;
+  } | null;
 }
 
 
