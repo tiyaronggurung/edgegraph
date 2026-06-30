@@ -699,6 +699,7 @@ function AutoTradePanel() {
   );
 }
 
+function CryptoPage() {
   const qc = useQueryClient();
   const marketsFn = useServerFn(getBtcMarkets);
   const cfgFn = useServerFn(checkKalshiConfigured);
