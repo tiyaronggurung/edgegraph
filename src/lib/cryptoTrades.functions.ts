@@ -442,7 +442,7 @@ export const diagnoseKalshiAuth = createServerFn({ method: "GET" })
     // 6) Summary — pinpoint the 401 cause
     let summary = "All checks passed.";
     if (httpStatus === 401) {
-      summary = "Kalshi returned 401 UNAUTHORIZED with valid signed headers. Most common causes: (a) KALSHI_API_KEY_ID belongs to a different environment (demo vs prod — this app targets api.kalshi.com prod), (b) the private key PEM does not match this API key ID, (c) the API key was revoked or expired in your Kalshi account. Verify the key ID + PEM pair on kalshi.com → Profile → API Keys.";
+      summary = "Kalshi returned 401 UNAUTHORIZED with valid signed headers. Most common causes: (a) KALSHI_API_KEY_ID belongs to a different environment (demo vs prod — this app targets trading-api.kalshi.com prod), (b) the private key PEM does not match this API key ID, (c) the API key was revoked or expired in your Kalshi account. Verify the key ID + PEM pair on kalshi.com → Profile → API Keys.";
     } else if (httpStatus === 403) {
       summary = "Kalshi returned 403 FORBIDDEN. Key authenticated but lacks permission for /portfolio/balance — check API key scopes.";
     } else if (httpStatus >= 500) {
