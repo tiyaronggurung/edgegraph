@@ -138,16 +138,16 @@ export const runAutoTrade = createServerFn({ method: "POST" })
     if (data.force) {
       // Force mode: bypass entry gates (edge/sigma/momentum/time/dedupe/equity-block).
       // Daily caps, kill switch, confirm token, and key health still apply (checked above).
-      // Pick the single market with the strongest model conviction (largest |edge|),
+      // Pick the top N markets by strongest model conviction (largest |edge|),
       // restricted to markets with a tradeable side and >0s to close.
       const top = result.markets
         .filter(m => m.secondsToClose > 0 && (m.yesAsk > 0 || m.noAsk > 0))
         .sort((a, b) => b.edgeAbs - a.edgeAbs)
-        .slice(0, Math.max(1, Math.min(data.maxOrders, 1)));
+        .slice(0, Math.max(1, data.maxOrders));
       if (top.length === 0) {
         skipReasons.push("force: no tradeable market with valid quotes");
       } else {
-        skipReasons.push(`force: picked ${top[0].ticker} ${top[0].side} edge=${top[0].edgeAbs.toFixed(1)}pts (gates bypassed)`);
+        skipReasons.push(`force: picked ${top.length} market(s): ${top.map(t => `${t.ticker} ${t.side} edge=${t.edgeAbs.toFixed(1)}pts`).join("; ")} (gates bypassed)`);
       }
       candidates = top;
     } else {
