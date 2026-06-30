@@ -355,7 +355,7 @@ function ModelAccuracyPanel() {
                     <tr key={r.ticker} className="border-t border-border">
                       <td className="p-2">{new Date(r.closeTime).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
                       <td className="p-2 font-mono">{r.ticker}</td>
-                      <td className="p-2"><span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>{r.side}</span></td>
+                      <td className="p-2"><span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(r.side)}</span></td>
                       <td className="p-2 text-right">{fmt$(r.strike)}</td>
                       <td className="p-2 text-right">{(r.modelProb * 100).toFixed(1)}%</td>
                       <td className="p-2 text-right">{(r.marketYesPrice * 100).toFixed(0)}</td>
