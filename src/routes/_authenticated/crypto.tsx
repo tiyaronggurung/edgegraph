@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, useEffect } from "react";
 import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle, ArrowUp, ArrowDown } from "lucide-react";
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
-import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder } from "@/lib/cryptoTrades.functions";
+import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats } from "@/lib/cryptoPredictions.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { toast } from "sonner";
@@ -290,8 +290,34 @@ function computeExitSignal(trade: any, market: BtcMarket | undefined): OpenPosSi
 function OpenPositions({ markets }: { markets: BtcMarket[] }) {
   const listFn = useServerFn(listMyCryptoTrades);
   const sellFn = useServerFn(sellKalshiOrder);
+  const settleFn = useServerFn(settleExpiredTrades);
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["crypto-trades"], queryFn: () => listFn(), refetchInterval: 10_000 });
+
+  // Auto-settle: 10s after a position's close_time, fetch the resolved market
+  // from Kalshi and stamp WIN/LOSS + realized P&L on the trade row.
+  useEffect(() => {
+    let stopped = false;
+    const tick = async () => {
+      try {
+        const res: any = await settleFn({});
+        if (!stopped && res?.settled > 0) {
+          for (const r of res.results ?? []) {
+            toast[r.outcome === "WIN" ? "success" : "error"](
+              `${r.outcome}: ${r.pnl >= 0 ? "+" : ""}$${Number(r.pnl).toFixed(2)} (settled @ ${r.settleCents}¢)`,
+              { duration: 8000 },
+            );
+          }
+          qc.invalidateQueries({ queryKey: ["crypto-trades"] });
+          qc.invalidateQueries({ queryKey: ["btc-pred-stats"] });
+        }
+      } catch { /* swallow — next tick retries */ }
+    };
+    tick();
+    const id = setInterval(tick, 10_000);
+    return () => { stopped = true; clearInterval(id); };
+  }, [settleFn, qc]);
+
   const sell = useMutation({
     mutationFn: (vars: { tradeId: string; limitPriceCents: number }) => sellFn({ data: vars }),
     onSuccess: (res: any) => {
@@ -442,11 +468,15 @@ function TradeLog() {
               <td className="p-2 text-right">{fmt$(Number(t.stake_usd || 0))}</td>
               <td className="p-2">
                 {t.status === "submitted" && <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />submitted</span>}
+                {t.status === "settled" && (Number(t.pnl_usd ?? 0) >= 0
+                  ? <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">WIN</span>
+                  : <span className="inline-flex items-center gap-1 text-red-400 font-bold">LOSS</span>)}
+                {t.status === "closed" && <span className="text-yellow-400">closed</span>}
                 {t.status === "error" && <span className="inline-flex items-center gap-1 text-red-400" title={t.error}><XCircle className="h-3 w-3" />error</span>}
                 {t.status === "pending" && <span className="text-yellow-400">pending</span>}
-                {t.status !== "submitted" && t.status !== "error" && t.status !== "pending" && <span>{t.status}</span>}
+                {!["submitted","settled","closed","error","pending"].includes(t.status) && <span>{t.status}</span>}
               </td>
-              <td className="p-2 text-right">{t.pnl_usd != null ? fmt$(Number(t.pnl_usd)) : "—"}</td>
+              <td className="p-2 text-right">{t.pnl_usd != null ? <span className={Number(t.pnl_usd) >= 0 ? "text-emerald-400" : "text-red-400"}>{Number(t.pnl_usd) >= 0 ? "+" : ""}{fmt$(Number(t.pnl_usd))}</span> : "—"}</td>
             </tr>
           ))}
         </tbody>
