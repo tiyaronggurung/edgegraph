@@ -836,6 +836,8 @@ function CryptoPage() {
 
           <ModelAccuracyPanel />
 
+          <AutoTradePanel />
+
           <div>
             <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Trade log</h2>
             <TradeLog />
