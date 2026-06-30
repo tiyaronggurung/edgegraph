@@ -396,9 +396,9 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
       // Place a Kalshi sell at the current bid (most likely to fill).
       const sellLimitCents = Math.max(1, Math.min(99, markCents));
       try {
-        const { _signKalshiAuto } = await import("./cryptoTrades.functions");
+        const { signKalshi } = await import("./cryptoTrades.functions");
         const path = "/portfolio/orders";
-        const headers = await _signKalshiAuto("POST", path);
+        const headers = await signKalshi("POST", path);
         const body = {
           ticker: r.ticker,
           action: "sell",
