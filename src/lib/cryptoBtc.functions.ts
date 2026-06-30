@@ -61,6 +61,9 @@ export interface BtcMarket {
   microAdjPts: number;       // points added by microstructure features
   optionsImpliedProb: number | null; // Deribit Black-Scholes prob (null if unavailable)
   optionsBlendPts: number;   // pts contributed by options blend
+  calibAdjPts: number;       // pts from self-learning Platt calibration
+  calibBucket: string;
+  calibActive: boolean;
   edgePts: number;
   side: "YES" | "NO";
   edgeAbs: number;
