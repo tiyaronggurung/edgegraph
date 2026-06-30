@@ -267,7 +267,7 @@ function TradeLog() {
             <tr key={t.id} className="border-t border-border">
               <td className="p-2">{new Date(t.created_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })}</td>
               <td className="p-2 font-mono">{t.ticker}</td>
-              <td className="p-2"><span className={t.side === "YES" ? "text-emerald-400" : "text-red-400"}>{t.side}</span></td>
+              <td className="p-2"><span className={t.side === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(t.side)}</span></td>
               <td className="p-2 text-right">{t.strike ? fmt$(Number(t.strike)) : "—"}</td>
               <td className="p-2 text-right">{t.spot_at_entry ? fmt$(Number(t.spot_at_entry)) : "—"}</td>
               <td className="p-2 text-right">{t.model_prob != null ? (Number(t.model_prob)*100).toFixed(1) + "%" : "—"}</td>
