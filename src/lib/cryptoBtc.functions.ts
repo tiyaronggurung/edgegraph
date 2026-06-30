@@ -742,7 +742,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         const realizedMoveBps = windowOpen > 0 ? ((spot - windowOpen) / windowOpen) * 10000 : 0;
 
         let pDiffusion = spot > 0 && strike > 0
-          ? probAboveCond(spot, strike, sigmaEff, minsRemaining)
+          ? probAboveCond(spot, strike, sigmaEff, minsRemaining, drift)
           : 0.5;
         let source: BtcMarket["modelSource"] = "intra-window-diffusion";
 
