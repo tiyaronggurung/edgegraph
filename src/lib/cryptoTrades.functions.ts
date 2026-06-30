@@ -135,79 +135,88 @@ async function signKalshi(method: string, path: string): Promise<Record<string, 
   };
 }
 
+// Internal helper used by both placeKalshiOrder (manual click) and the
+// live auto-trade path. Same RSA-PSS signing, same crypto_trades logging.
+export async function submitKalshiBuy(
+  supabase: any,
+  userId: string,
+  data: z.infer<typeof PlaceOrderSchema>,
+): Promise<{ ok: true; tradeId: string; orderId: string | null; response: any }> {
+  const path = "/portfolio/orders";
+
+  const { data: trade, error: insErr } = await supabase
+    .from("crypto_trades")
+    .insert({
+      user_id: userId,
+      ticker: data.ticker,
+      event_ticker: data.eventTicker ?? null,
+      side: data.side,
+      strike: data.strike ?? null,
+      spot_at_entry: data.spot ?? null,
+      model_prob: data.modelProb ?? null,
+      market_yes_price: data.marketYesPrice ?? null,
+      edge_pts: data.edgePts ?? null,
+      contracts: data.contracts,
+      stake_usd: data.stakeUsd ?? (data.contracts * data.limitPriceCents) / 100,
+      bankroll_usd: data.bankrollUsd ?? null,
+      kelly_multiplier: data.kellyMultiplier ?? null,
+      close_time: data.closeTime ?? null,
+      status: "pending",
+    })
+    .select("id")
+    .single();
+  if (insErr) throw new Error(insErr.message);
+
+  let headers: Record<string, string>;
+  try {
+    headers = await signKalshi("POST", path);
+  } catch (e: any) {
+    await supabase.from("crypto_trades").update({
+      status: "error", error: e?.message ?? "sign failed",
+    }).eq("id", trade.id);
+    throw e;
+  }
+
+  const body = {
+    ticker: data.ticker,
+    action: "buy",
+    side: data.side === "YES" ? "yes" : "no",
+    type: "limit",
+    count: data.contracts,
+    yes_price: data.side === "YES" ? data.limitPriceCents : undefined,
+    no_price: data.side === "NO" ? data.limitPriceCents : undefined,
+    client_order_id: trade.id,
+  };
+
+  const res = await fetch(`${KALSHI_BASE}${path}`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  const json: any = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json?.error?.message ?? json?.message ?? `Kalshi ${res.status}`;
+    await supabase.from("crypto_trades").update({
+      status: "error", error: msg, raw: json,
+    }).eq("id", trade.id);
+    throw new Error(msg);
+  }
+
+  const orderId = json?.order?.order_id ?? json?.order_id ?? null;
+  await supabase.from("crypto_trades").update({
+    status: "submitted", kalshi_order_id: orderId, raw: json,
+  }).eq("id", trade.id);
+
+  return { ok: true, tradeId: trade.id, orderId, response: json };
+}
+
 export const placeKalshiOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => PlaceOrderSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const path = "/portfolio/orders";
-
-    // Pre-insert pending row so failures are recorded too.
-    const { data: trade, error: insErr } = await supabase
-      .from("crypto_trades")
-      .insert({
-        user_id: userId,
-        ticker: data.ticker,
-        event_ticker: data.eventTicker ?? null,
-        side: data.side,
-        strike: data.strike ?? null,
-        spot_at_entry: data.spot ?? null,
-        model_prob: data.modelProb ?? null,
-        market_yes_price: data.marketYesPrice ?? null,
-        edge_pts: data.edgePts ?? null,
-        contracts: data.contracts,
-        stake_usd: data.stakeUsd ?? (data.contracts * data.limitPriceCents) / 100,
-        bankroll_usd: data.bankrollUsd ?? null,
-        kelly_multiplier: data.kellyMultiplier ?? null,
-        close_time: data.closeTime ?? null,
-        status: "pending",
-      })
-      .select("id")
-      .single();
-    if (insErr) throw new Error(insErr.message);
-
-    let headers: Record<string, string>;
-    try {
-      headers = await signKalshi("POST", path);
-    } catch (e: any) {
-      await supabase.from("crypto_trades").update({
-        status: "error", error: e?.message ?? "sign failed",
-      }).eq("id", trade.id);
-      throw e;
-    }
-
-    const body = {
-      ticker: data.ticker,
-      action: "buy",
-      side: data.side === "YES" ? "yes" : "no",
-      type: "limit",
-      count: data.contracts,
-      yes_price: data.side === "YES" ? data.limitPriceCents : undefined,
-      no_price: data.side === "NO" ? data.limitPriceCents : undefined,
-      client_order_id: trade.id,
-    };
-
-    const res = await fetch(`${KALSHI_BASE}${path}`, {
-      method: "POST",
-      headers: { ...headers, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(body),
-    });
-    const json: any = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const msg = json?.error?.message ?? json?.message ?? `Kalshi ${res.status}`;
-      await supabase.from("crypto_trades").update({
-        status: "error", error: msg, raw: json,
-      }).eq("id", trade.id);
-      throw new Error(msg);
-    }
-
-    const orderId = json?.order?.order_id ?? json?.order_id ?? null;
-    await supabase.from("crypto_trades").update({
-      status: "submitted", kalshi_order_id: orderId, raw: json,
-    }).eq("id", trade.id);
-
-    return { ok: true, tradeId: trade.id, orderId, response: json };
+    return submitKalshiBuy(context.supabase, context.userId, data);
   });
+
 
 export const listMyCryptoTrades = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
