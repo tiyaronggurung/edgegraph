@@ -266,13 +266,16 @@ const MICRO_TTL_MS = 15_000;
 async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
   if (_microCache && Date.now() - _microCache.at < MICRO_TTL_MS) return _microCache.data;
   try {
-    const sinceMs = Date.now() - 60_000; // last 60s of taker flow
-    const [fundingRes, oiRes, oiHistRes, perpRes, tradesRes, depthRes] = await Promise.all([
+    const nowMs = Date.now();
+    const since60s = nowMs - 60_000;
+    const since5m = nowMs - 5 * 60_000;
+    const [fundingRes, oiRes, oiHistRes, perpRes, tradesRes, trades5mRes, depthRes] = await Promise.all([
       fetch("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT"),
       fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT"),
       fetch("https://fapi.binance.com/futures/data/openInterestHist?symbol=BTCUSDT&period=5m&limit=2"),
       fetch("https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT"),
-      fetch(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&startTime=${sinceMs}&limit=1000`),
+      fetch(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&startTime=${since60s}&limit=1000`),
+      fetch(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&startTime=${since5m}&limit=1000`),
       fetch("https://fapi.binance.com/fapi/v1/depth?symbol=BTCUSDT&limit=20"),
     ]);
     if (!fundingRes.ok || !oiRes.ok || !perpRes.ok) throw new Error("micro http");
@@ -282,6 +285,7 @@ async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
     const perp: any = await perpRes.json();
     const hist: any[] = oiHistRes.ok ? await oiHistRes.json() : [];
     const trades: any[] = tradesRes.ok ? await tradesRes.json() : [];
+    const trades5m: any[] = trades5mRes.ok ? await trades5mRes.json() : [];
     const depth: any = depthRes.ok ? await depthRes.json() : { bids: [], asks: [] };
 
     const fundingRate = Number(funding.lastFundingRate ?? 0);
@@ -300,6 +304,8 @@ async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
     // Taker CVD over the window. `m=true` means buyer is the market maker,
     // so the trade was a SELL aggression; `m=false` means BUY aggression.
     let cvdBuyUsd = 0, cvdSellUsd = 0;
+    let whaleBuy1m = 0, whaleSell1m = 0;
+    const WHALE_USD = 250_000;
     for (const t of trades) {
       const price = Number(t.p);
       const qty = Number(t.q);
@@ -307,9 +313,29 @@ async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
       const usd = price * qty;
       if (t.m) cvdSellUsd += usd;
       else cvdBuyUsd += usd;
+      if (usd >= WHALE_USD) {
+        if (t.m) whaleSell1m += usd; else whaleBuy1m += usd;
+      }
     }
     const totalUsd = cvdBuyUsd + cvdSellUsd;
     const cvdRatio = totalUsd > 0 ? (cvdBuyUsd - cvdSellUsd) / totalUsd : 0;
+    const whaleTot1m = whaleBuy1m + whaleSell1m;
+    const whaleImbalance1m = whaleTot1m > 0 ? (whaleBuy1m - whaleSell1m) / whaleTot1m : 0;
+
+    // 5-minute whale aggregation from the wider aggTrades window.
+    let whaleBuy5m = 0, whaleSell5m = 0, whaleCount5m = 0;
+    for (const t of trades5m) {
+      const price = Number(t.p);
+      const qty = Number(t.q);
+      if (!Number.isFinite(price) || !Number.isFinite(qty)) continue;
+      const usd = price * qty;
+      if (usd >= WHALE_USD) {
+        whaleCount5m++;
+        if (t.m) whaleSell5m += usd; else whaleBuy5m += usd;
+      }
+    }
+    const whaleTot5m = whaleBuy5m + whaleSell5m;
+    const whaleImbalance5m = whaleTot5m > 0 ? (whaleBuy5m - whaleSell5m) / whaleTot5m : 0;
 
     // Order-book imbalance: sum sizes for top 10 levels each side.
     const bids: [string, string][] = depth.bids ?? [];
@@ -336,6 +362,13 @@ async function fetchBinanceMicro(spot: number): Promise<BtcMicro | null> {
       cvdSellUsd,
       ofi,
       bookSpreadBps,
+      whaleBuyUsd1m: whaleBuy1m,
+      whaleSellUsd1m: whaleSell1m,
+      whaleImbalance1m,
+      whaleBuyUsd5m: whaleBuy5m,
+      whaleSellUsd5m: whaleSell5m,
+      whaleImbalance5m,
+      whaleCount5m,
     };
     _microCache = { at: Date.now(), data };
     return data;
