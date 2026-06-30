@@ -562,6 +562,10 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         const adj = microAdjustment(pBase, micro, secondsToClose);
         let p = adj.p;
 
+        // (f) Self-learning Platt calibration (per time-to-close bucket).
+        const cal = applyCalib ? applyCalib(p, secondsToClose, calibState) : { p, deltaPts: 0, bucket: "ge600", active: false };
+        p = cal.p;
+
         // (c) Shrink toward market in the final 2 minutes.
         if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining);
 
@@ -591,6 +595,9 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           microAdjPts: adj.deltaPts,
           optionsImpliedProb: pOpt,
           optionsBlendPts,
+          calibAdjPts: cal.deltaPts,
+          calibBucket: cal.bucket,
+          calibActive: cal.active,
           modelSource: source,
           edgePts, side, edgeAbs,
           kellyFraction: kelly,
