@@ -782,6 +782,7 @@ function CryptoPage() {
       {data && (
         <>
           <TopPick markets={data.markets} />
+          <OpenPositions markets={data.markets} />
           <div className="space-y-2">
             {data.markets.length === 0 && <div className="border border-border rounded-lg bg-card p-6 text-center text-sm text-muted-foreground">No open BTC 15-min markets right now.</div>}
             {data.markets.map(m => <MarketRow key={m.ticker} m={m} candles={data.candles} sizing={sizing} onPlace={setPending} live={live} />)}
