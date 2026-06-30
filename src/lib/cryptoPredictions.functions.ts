@@ -1,19 +1,9 @@
-// Server-fn wrapper for prediction-tracking helpers. Handler bodies are stripped
-// from client bundles; the .server import stays server-only.
+// Server-fn wrapper for prediction stats. Handler body is stripped from
+// client bundle; the .server import stays server-only.
 import { createServerFn } from "@tanstack/react-start";
-import type { SnapshotInput, PredictionStatsResult } from "./cryptoPredictions.server";
+import type { PredictionStatsResult } from "./cryptoPredictions.server";
 
-export type { SnapshotInput, PredictionStatsResult };
-
-export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
-  const { snapshotPrediction: fn } = await import("./cryptoPredictions.server");
-  return fn(input);
-}
-
-export async function settleDuePredictions(): Promise<{ settled: number }> {
-  const { settleDuePredictions: fn } = await import("./cryptoPredictions.server");
-  return fn();
-}
+export type { PredictionStatsResult };
 
 export const getPredictionStats = createServerFn({ method: "GET" }).handler(
   async (): Promise<PredictionStatsResult> => {
