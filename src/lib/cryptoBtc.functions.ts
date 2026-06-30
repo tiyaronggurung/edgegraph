@@ -217,6 +217,9 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
         });
         if (ext !== null) { p = ext; source = "external"; }
 
+        // (c) Shrink toward market in the final 2 minutes.
+        if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining);
+
         const edgePts = (p - yesPrice) * 100;
         const side: "YES" | "NO" = edgePts >= 0 ? "YES" : "NO";
         const edgeAbs = Math.abs(edgePts);
