@@ -597,7 +597,26 @@ function AutoTradePanel() {
   const listFn = useServerFn(listAutoTradeOrders);
   const settleFn = useServerFn(settleAutoTradeOrders);
   const runFn = useServerFn(runAutoTrade);
+  const balanceFn = useServerFn(checkKalshiBalance);
   const [liveBusy, setLiveBusy] = useState(false);
+  const [testBusy, setTestBusy] = useState(false);
+
+  async function testKalshi() {
+    setTestBusy(true);
+    try {
+      const r = await balanceFn();
+      if (r.ok) {
+        const bal = r.balanceCents != null ? `$${(r.balanceCents / 100).toFixed(2)}` : "—";
+        toast.success("Kalshi connection OK", { description: `Balance: ${bal}` });
+      } else {
+        toast.error("Kalshi connection failed", { description: `${r.status ? `[${r.status}] ` : ""}${r.error ?? "unknown"}` });
+      }
+    } catch (e: any) {
+      toast.error("Pre-flight failed", { description: e?.message ?? String(e) });
+    } finally {
+      setTestBusy(false);
+    }
+  }
 
   const list = useQuery({
     queryKey: ["auto-trade-orders"],
