@@ -219,7 +219,7 @@ function ConfirmModal({
         </div>
         <div className="space-y-1 text-sm mb-4">
           <div><span className="text-muted-foreground">Market:</span> <code className="text-xs">{market.ticker}</code></div>
-          <div><span className="text-muted-foreground">Side:</span> <span className="font-bold">{market.side}</span> @ <span className="font-bold">{sug.limitCents}¢</span> limit</div>
+          <div><span className="text-muted-foreground">Direction:</span> <span className="font-bold">{dirLabel(market.side)}</span> ({market.side}) @ <span className="font-bold">{sug.limitCents}¢</span> limit</div>
           <div><span className="text-muted-foreground">Contracts:</span> <span className="font-bold">{sug.contracts}</span></div>
           <div><span className="text-muted-foreground">Max risk:</span> <span className="font-bold">{fmt$(sug.stakeUsd)}</span> ({((sug.stakeUsd/sizing.bankroll)*100).toFixed(2)}% of bankroll)</div>
           <div><span className="text-muted-foreground">Edge:</span> {market.edgePts>=0?"+":""}{market.edgePts.toFixed(1)} pts</div>
