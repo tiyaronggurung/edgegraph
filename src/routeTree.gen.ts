@@ -30,6 +30,7 @@ import { Route as AuthenticatedAnalyzeRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
 import { Route as ApiPublicSendDailyDigestsRouteImport } from './routes/api/public/send-daily-digests'
+import { Route as ApiHealthKalshiRouteImport } from './routes/api/health/kalshi'
 import { Route as AuthenticatedAnalysisIdRouteImport } from './routes/_authenticated/analysis.$id'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
@@ -146,6 +147,11 @@ const ApiPublicSendDailyDigestsRoute =
     path: '/api/public/send-daily-digests',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiHealthKalshiRoute = ApiHealthKalshiRouteImport.update({
+  id: '/api/health/kalshi',
+  path: '/api/health/kalshi',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAnalysisIdRoute = AuthenticatedAnalysisIdRouteImport.update({
   id: '/analysis/$id',
   path: '/analysis/$id',
@@ -213,6 +219,7 @@ export interface FileRoutesByFullPath {
   '/strategies': typeof AuthenticatedStrategiesRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/analysis/$id': typeof AuthenticatedAnalysisIdRoute
+  '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
@@ -243,6 +250,7 @@ export interface FileRoutesByTo {
   '/strategies': typeof AuthenticatedStrategiesRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/analysis/$id': typeof AuthenticatedAnalysisIdRoute
+  '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
@@ -275,6 +283,7 @@ export interface FileRoutesById {
   '/_authenticated/strategies': typeof AuthenticatedStrategiesRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/_authenticated/analysis/$id': typeof AuthenticatedAnalysisIdRoute
+  '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
@@ -307,6 +316,7 @@ export interface FileRouteTypes {
     | '/strategies'
     | '/email/unsubscribe'
     | '/analysis/$id'
+    | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
     | '/api/public/hooks/auto-trade'
@@ -337,6 +347,7 @@ export interface FileRouteTypes {
     | '/strategies'
     | '/email/unsubscribe'
     | '/analysis/$id'
+    | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
     | '/api/public/hooks/auto-trade'
@@ -368,6 +379,7 @@ export interface FileRouteTypes {
     | '/_authenticated/strategies'
     | '/email/unsubscribe'
     | '/_authenticated/analysis/$id'
+    | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
     | '/api/public/hooks/auto-trade'
@@ -387,6 +399,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   UnsubscribeRoute: typeof UnsubscribeRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
+  ApiHealthKalshiRoute: typeof ApiHealthKalshiRoute
   ApiPublicSendDailyDigestsRoute: typeof ApiPublicSendDailyDigestsRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
   ApiPublicHooksAutoTradeRoute: typeof ApiPublicHooksAutoTradeRoute
@@ -547,6 +560,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSendDailyDigestsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/health/kalshi': {
+      id: '/api/health/kalshi'
+      path: '/api/health/kalshi'
+      fullPath: '/api/health/kalshi'
+      preLoaderRoute: typeof ApiHealthKalshiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/analysis/$id': {
       id: '/_authenticated/analysis/$id'
       path: '/analysis/$id'
@@ -650,6 +670,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   UnsubscribeRoute: UnsubscribeRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
+  ApiHealthKalshiRoute: ApiHealthKalshiRoute,
   ApiPublicSendDailyDigestsRoute: ApiPublicSendDailyDigestsRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
   ApiPublicHooksAutoTradeRoute: ApiPublicHooksAutoTradeRoute,
