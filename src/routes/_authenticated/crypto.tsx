@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, useEffect } from "react";
 import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle, ArrowUp, ArrowDown } from "lucide-react";
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
-import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades } from "@/lib/cryptoTrades.functions";
+import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades, checkKalshiBalance } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats } from "@/lib/cryptoPredictions.functions";
 import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
@@ -597,7 +597,26 @@ function AutoTradePanel() {
   const listFn = useServerFn(listAutoTradeOrders);
   const settleFn = useServerFn(settleAutoTradeOrders);
   const runFn = useServerFn(runAutoTrade);
+  const balanceFn = useServerFn(checkKalshiBalance);
   const [liveBusy, setLiveBusy] = useState(false);
+  const [testBusy, setTestBusy] = useState(false);
+
+  async function testKalshi() {
+    setTestBusy(true);
+    try {
+      const r = await balanceFn();
+      if (r.ok) {
+        const bal = r.balanceCents != null ? `$${(r.balanceCents / 100).toFixed(2)}` : "—";
+        toast.success("Kalshi connection OK", { description: `Balance: ${bal}` });
+      } else {
+        toast.error("Kalshi connection failed", { description: `${r.status ? `[${r.status}] ` : ""}${r.error ?? "unknown"}` });
+      }
+    } catch (e: any) {
+      toast.error("Pre-flight failed", { description: e?.message ?? String(e) });
+    } finally {
+      setTestBusy(false);
+    }
+  }
 
   const list = useQuery({
     queryKey: ["auto-trade-orders"],
@@ -678,6 +697,15 @@ function AutoTradePanel() {
               {totals.placed} placed · <span className="text-emerald-400">{totals.wins}W</span> / <span className="text-red-400">{totals.losses}L</span> · PnL <span className={totals.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}>{totals.pnlUsd >= 0 ? "+" : ""}${totals.pnlUsd.toFixed(2)}</span>
             </div>
           )}
+          <button
+            onClick={testKalshi}
+            disabled={testBusy}
+            className="text-xs font-semibold px-3 py-1.5 rounded border border-border bg-muted/30 hover:bg-muted/50 disabled:opacity-50 flex items-center gap-1.5"
+            title="Read-only: signs a request to Kalshi /portfolio/balance to verify credentials"
+          >
+            {testBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+            {testBusy ? "Testing…" : "Test Kalshi connection"}
+          </button>
           <button
             onClick={runLive}
             disabled={liveBusy}

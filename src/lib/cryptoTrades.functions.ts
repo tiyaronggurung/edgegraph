@@ -276,6 +276,33 @@ export const checkKalshiKeyHealth = createServerFn({ method: "GET" })
     }
   });
 
+// End-to-end pre-flight: signs and calls Kalshi /portfolio/balance with the
+// stored credentials. Returns balance in cents on success, or the raw error
+// from Kalshi on failure. Read-only — never places an order.
+export const checkKalshiBalance = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async (): Promise<{ ok: boolean; balanceCents?: number; payoutCents?: number; error?: string; status?: number }> => {
+    try {
+      const path = "/portfolio/balance";
+      const headers = await signKalshi("GET", path);
+      const res = await fetch(`${KALSHI_BASE}${path}`, { method: "GET", headers });
+      const text = await res.text();
+      let json: any = null;
+      try { json = JSON.parse(text); } catch { /* keep raw text */ }
+      if (!res.ok) {
+        return { ok: false, status: res.status, error: (json?.error?.message || json?.message || text || `HTTP ${res.status}`).slice(0, 240) };
+      }
+      // Kalshi returns { balance, payout } in cents
+      return {
+        ok: true,
+        balanceCents: typeof json?.balance === "number" ? json.balance : undefined,
+        payoutCents: typeof json?.payout === "number" ? json.payout : undefined,
+      };
+    } catch (e: any) {
+      return { ok: false, error: (e?.message ?? String(e)).slice(0, 240) };
+    }
+  });
+
 // ── STEP 7 · Position Manager ──────────────────────────────────────────────
 // Close an existing open position by selling our side back to Kalshi at a
 // limit price. Realized P&L = (exitCents − entryCents) / 100 × contracts.
