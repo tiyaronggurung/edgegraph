@@ -538,41 +538,47 @@ function ModelAccuracyPanel() {
             />
           </div>
           {s.recent.length > 0 && (
-            <div className="border-t border-border overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-muted/30 text-muted-foreground uppercase tracking-wider">
-                  <tr>
-                    <th className="text-left p-2">Closed</th>
-                    <th className="text-left p-2">Ticker</th>
-                    <th className="text-left p-2">Model pick</th>
-                    <th className="text-right p-2">Strike</th>
-                    <th className="text-right p-2">Model%</th>
-                    <th className="text-right p-2">Market¢</th>
-                    <th className="text-right p-2">Edge</th>
-                    <th className="text-right p-2">Settle</th>
-                    <th className="text-center p-2">Result</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {s.recent.map((r) => (
-                    <tr key={r.ticker} className="border-t border-border">
-                      <td className="p-2">{new Date(r.closeTime).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
-                      <td className="p-2 font-mono">{r.ticker}</td>
-                      <td className="p-2"><span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(r.side)}</span></td>
-                      <td className="p-2 text-right">{fmt$(r.strike)}</td>
-                      <td className="p-2 text-right">{(r.modelProb * 100).toFixed(1)}%</td>
-                      <td className="p-2 text-right">{(r.marketYesPrice * 100).toFixed(0)}</td>
-                      <td className="p-2 text-right">{r.edgePts >= 0 ? "+" : ""}{r.edgePts.toFixed(1)}</td>
-                      <td className="p-2 text-right">{r.settlePrice != null ? fmt$(r.settlePrice) : "—"}</td>
-                      <td className="p-2 text-center">
-                        {r.wasCorrect === true && <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>}
-                        {r.wasCorrect === false && <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>}
-                        {r.wasCorrect === null && <span className="text-muted-foreground">pending</span>}
-                      </td>
+            <div className="border-t border-border">
+              <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/10 flex items-center justify-between">
+                <span>Recent predictions · {s.recent.length} entries</span>
+                <span>scroll for more ↓</span>
+              </div>
+              <div className="max-h-[420px] overflow-y-auto overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/30 text-muted-foreground uppercase tracking-wider sticky top-0 z-10">
+                    <tr>
+                      <th className="text-left p-2">Closed</th>
+                      <th className="text-left p-2">Ticker</th>
+                      <th className="text-left p-2">Model pick</th>
+                      <th className="text-right p-2">Strike</th>
+                      <th className="text-right p-2">Model%</th>
+                      <th className="text-right p-2">Market¢</th>
+                      <th className="text-right p-2">Edge</th>
+                      <th className="text-right p-2">Settle</th>
+                      <th className="text-center p-2">Result</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {s.recent.map((r) => (
+                      <tr key={r.ticker} className="border-t border-border">
+                        <td className="p-2">{new Date(r.closeTime).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
+                        <td className="p-2 font-mono">{r.ticker}</td>
+                        <td className="p-2"><span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(r.side)}</span></td>
+                        <td className="p-2 text-right">{fmt$(r.strike)}</td>
+                        <td className="p-2 text-right">{(r.modelProb * 100).toFixed(1)}%</td>
+                        <td className="p-2 text-right">{(r.marketYesPrice * 100).toFixed(0)}</td>
+                        <td className="p-2 text-right">{r.edgePts >= 0 ? "+" : ""}{r.edgePts.toFixed(1)}</td>
+                        <td className="p-2 text-right">{r.settlePrice != null ? fmt$(r.settlePrice) : "—"}</td>
+                        <td className="p-2 text-center">
+                          {r.wasCorrect === true && <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>}
+                          {r.wasCorrect === false && <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>}
+                          {r.wasCorrect === null && <span className="text-muted-foreground">pending</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>
