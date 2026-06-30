@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured } from "@/lib/cryptoTrades.functions";
+import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/crypto")({
@@ -57,12 +58,14 @@ function suggestedStake(m: BtcMarket, s: SizingState): { contracts: number; stak
 }
 
 function MarketRow({
-  m, candles, sizing, onPlace,
+  m, candles, sizing, onPlace, liveSpot,
 }: {
   m: BtcMarket; candles: BtcCandle[]; sizing: SizingState;
   onPlace: (m: BtcMarket) => void;
+  liveSpot: number | null;
 }) {
-  const above = m.spot >= m.strike;
+  const spot = liveSpot ?? m.spot;
+  const above = spot >= m.strike;
   const conf = m.edgeAbs >= 10 ? "HIGH" : m.edgeAbs >= 5 ? "MED" : "LOW";
   const confColor = conf === "HIGH" ? "text-emerald-400" : conf === "MED" ? "text-yellow-400" : "text-muted-foreground";
   const sideColor = m.side === "YES"
@@ -83,7 +86,8 @@ function MarketRow({
         <div className="text-base font-semibold">
           Strike <span className="text-[color:var(--color-primary)]">{fmt$(m.strike)}</span>
           <span className="mx-2 text-muted-foreground">·</span>
-          Spot <span className={above ? "text-emerald-400" : "text-red-400"}>{fmt$(m.spot)}</span>
+          Spot <span className={above ? "text-emerald-400" : "text-red-400"}>{fmt$(spot)}</span>
+          {liveSpot != null && <span className="ml-1 text-[9px] text-emerald-400 uppercase tracking-wider">live</span>}
           <span className="mx-2 text-muted-foreground">·</span>
           <span className="text-xs text-muted-foreground">closes {fmtTime(m.closeTime)} ({fmtCountdown(m.secondsToClose)})</span>
         </div>
@@ -248,6 +252,7 @@ function CryptoPage() {
   const [kellyMult, setKellyMult] = useState(0.25);
   const sizing: SizingState = { bankroll, kellyMult };
   const [pending, setPending] = useState<BtcMarket | null>(null);
+  const live = useBinanceBtcSpot();
 
   const place = useMutation({
     mutationFn: async (m: BtcMarket) => {
@@ -309,7 +314,11 @@ function CryptoPage() {
         </label>
         <div className="space-y-1">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">BTC spot · Markets · Updated</div>
-          <div className="text-sm font-mono">{data ? fmt$(data.spot) : "—"} · {data?.markets.length ?? 0} · {data ? fmtTime(data.asOf) : "—"}</div>
+          <div className="text-sm font-mono">
+            {live.price != null ? fmt$(live.price) : data ? fmt$(data.spot) : "—"}
+            {live.connected && <span className="ml-1 text-[9px] text-emerald-400 uppercase tracking-wider">live</span>}
+            {" · "}{data?.markets.length ?? 0} · {data ? fmtTime(data.asOf) : "—"}
+          </div>
         </div>
       </div>
 
@@ -321,7 +330,7 @@ function CryptoPage() {
           <TopPick markets={data.markets} />
           <div className="space-y-2">
             {data.markets.length === 0 && <div className="border border-border rounded-lg bg-card p-6 text-center text-sm text-muted-foreground">No open BTC 15-min markets right now.</div>}
-            {data.markets.map(m => <MarketRow key={m.ticker} m={m} candles={data.candles} sizing={sizing} onPlace={setPending} />)}
+            {data.markets.map(m => <MarketRow key={m.ticker} m={m} candles={data.candles} sizing={sizing} onPlace={setPending} liveSpot={live.price} />)}
           </div>
 
           <div>
