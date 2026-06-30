@@ -636,12 +636,17 @@ function AutoTradePanel() {
   }, [settleFn, qc]);
 
   const orders = list.data?.orders ?? [];
-  const totals = list.data?.totals;
-  const placed = totals?.placed ?? 0;
-  const cap = 5;
-  const remaining = Math.max(0, cap - placed);
-
   const liveOrders = orders.filter(o => o.mode === "live");
+  const liveTotals = liveOrders.reduce(
+    (acc, o) => {
+      acc.placed += 1;
+      if (o.status === "settled_win") acc.wins += 1;
+      if (o.status === "settled_loss") acc.losses += 1;
+      acc.pnlUsd += Number(o.pnl_usd) || 0;
+      return acc;
+    },
+    { placed: 0, wins: 0, losses: 0, pnlUsd: 0 },
+  );
   const liveCount24h = liveOrders.filter(o => Date.now() - new Date(o.created_at).getTime() < 24 * 60 * 60 * 1000).length;
   const liveRealized24h = liveOrders
     .filter(o => Date.now() - new Date(o.created_at).getTime() < 24 * 60 * 60 * 1000)
@@ -679,24 +684,22 @@ function AutoTradePanel() {
       <div className="px-4 py-2 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            Auto-trade · paper + live
+            Live Kalshi auto-trade
             <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> AUTO
             </span>
           </h2>
           <p className="text-[11px] text-muted-foreground">
-            $10 paper bet via cron each new 15-min strike (stops after {cap}, {remaining} left). Live: click button — $20×3 max/session, halt at -$60/24h.
+            Manual real-money testing only — $20×3 max/session, edge overlay required, halt at -$60/24h.
           </p>
           <p className="text-[10px] text-muted-foreground mt-0.5">
             Live 24h: {liveCount24h}/10 orders · realized <span className={liveRealized24h >= 0 ? "text-emerald-400" : "text-red-400"}>{liveRealized24h >= 0 ? "+" : ""}${liveRealized24h.toFixed(2)}</span>
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          {totals && (
-            <div className="text-xs font-mono text-muted-foreground">
-              {totals.placed} placed · <span className="text-emerald-400">{totals.wins}W</span> / <span className="text-red-400">{totals.losses}L</span> · PnL <span className={totals.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}>{totals.pnlUsd >= 0 ? "+" : ""}${totals.pnlUsd.toFixed(2)}</span>
-            </div>
-          )}
+          <div className="text-xs font-mono text-muted-foreground">
+            {liveTotals.placed} live placed · <span className="text-emerald-400">{liveTotals.wins}W</span> / <span className="text-red-400">{liveTotals.losses}L</span> · PnL <span className={liveTotals.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}>{liveTotals.pnlUsd >= 0 ? "+" : ""}${liveTotals.pnlUsd.toFixed(2)}</span>
+          </div>
           <button
             onClick={testKalshi}
             disabled={testBusy}
@@ -718,8 +721,8 @@ function AutoTradePanel() {
         </div>
       </div>
 
-      {orders.length === 0 ? (
-        <div className="p-6 text-center text-sm text-muted-foreground">Waiting for the next eligible strike window. The cron will place a bet automatically.</div>
+      {liveOrders.length === 0 ? (
+        <div className="p-6 text-center text-sm text-muted-foreground">No live auto-trades placed yet. Test the Kalshi connection before running a real-money auto-trade.</div>
       ) : (
         <div className="max-h-[360px] overflow-y-auto">
           <table className="w-full text-xs">
@@ -737,7 +740,7 @@ function AutoTradePanel() {
               </tr>
             </thead>
             <tbody>
-              {orders.map((o: AutoTradeOrderRow) => {
+              {liveOrders.map((o: AutoTradeOrderRow) => {
                 const statusColor = o.status === "settled_win" ? "text-emerald-400" : o.status === "settled_loss" ? "text-red-400" : o.status === "placed" ? "text-amber-400" : "text-muted-foreground";
                 return (
                   <tr key={o.id} className="border-b border-border/40 hover:bg-muted/20">
