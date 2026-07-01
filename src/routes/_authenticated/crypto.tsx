@@ -27,6 +27,12 @@ const fmtTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString([
 const fmtCountdown = (s: number) => s <= 0 ? "closed" : `${Math.floor(s/60)}m ${(s%60).toString().padStart(2,"0")}s`;
 // Kalshi BTC 15m: YES = price closes ABOVE strike, NO = at/below. Show "UP" / "DOWN" to users.
 const dirLabel = (side: string) => side === "YES" ? "UP" : "DOWN";
+// Kalshi ¢ → American odds (favorites negative, dogs positive).
+const centsToAmerican = (c: number): string => {
+  const p = Math.max(0.01, Math.min(0.99, c / 100));
+  if (p >= 0.5) return `-${Math.round((p / (1 - p)) * 100)}`;
+  return `+${Math.round(((1 - p) / p) * 100)}`;
+};
 
 function Sparkline({ candles, strike }: { candles: BtcCandle[]; strike?: number }) {
   if (!candles.length) return <div className="h-12 text-xs text-muted-foreground">no data</div>;
