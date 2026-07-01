@@ -822,9 +822,45 @@ function AutoTradePanel() {
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            Live 24h: {liveCount24h}/40 orders · realized <span className={liveRealized24h >= 0 ? "text-emerald-400" : "text-red-400"}>{liveRealized24h >= 0 ? "+" : ""}${liveRealized24h.toFixed(2)}</span>
+          </p>
+          {skipReport.data && skipReport.data.totalSettled > 0 && (
+            <div className="mt-1.5 rounded border border-border/60 bg-muted/10 px-2 py-1.5 text-[10px]">
+              <div className="font-mono text-muted-foreground">
+                <span className="font-semibold text-foreground">Skip counterfactual (7d):</span>{" "}
+                {skipReport.data.totalSettled} settled ·{" "}
+                <span className="text-emerald-400">{skipReport.data.wouldHaveWon}W</span> /{" "}
+                <span className="text-red-400">{skipReport.data.wouldHaveLost}L</span> ·{" "}
+                would-have PnL{" "}
+                <span className={skipReport.data.wouldHavePnlUsd >= 0 ? "text-red-400" : "text-emerald-400"} title={skipReport.data.wouldHavePnlUsd >= 0 ? "Gates too tight — missed profits" : "Gates saving money — skipped losers"}>
+                  {skipReport.data.wouldHavePnlUsd >= 0 ? "+" : ""}${skipReport.data.wouldHavePnlUsd.toFixed(2)}
+                </span>
+              </div>
+              {skipReport.data.byReason.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-muted-foreground">
+                  {skipReport.data.byReason.slice(0, 6).map(b => (
+                    <span key={b.reason} title={`${(b.winRate*100).toFixed(0)}% would-have-win · pnl ${b.pnl>=0?"+":""}$${b.pnl.toFixed(2)}`}>
+                      <span className="text-foreground">{b.reason}</span>: {b.count}× ({(b.winRate*100).toFixed(0)}%)
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="text-xs font-mono text-muted-foreground">
             {liveTotals.placed} live placed · <span className="text-emerald-400">{liveTotals.wins}W</span> / <span className="text-red-400">{liveTotals.losses}L</span> · PnL <span className={liveTotals.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}>{liveTotals.pnlUsd >= 0 ? "+" : ""}${liveTotals.pnlUsd.toFixed(2)}</span>
           </div>
+          <button
+            onClick={() => { setSoundOn(s => !s); if (!soundOn) playOrderPlaced(); }}
+            className="text-xs font-semibold p-1.5 rounded border border-border bg-muted/30 hover:bg-muted/50 flex items-center"
+            title={soundOn ? "Order sounds on — click to mute" : "Order sounds muted — click to enable"}
+            aria-label={soundOn ? "Mute order sounds" : "Unmute order sounds"}
+          >
+            {soundOn ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5 text-muted-foreground" />}
+          </button>
           <button
             onClick={() => { setSoundOn(s => !s); if (!soundOn) playOrderPlaced(); }}
             className="text-xs font-semibold p-1.5 rounded border border-border bg-muted/30 hover:bg-muted/50 flex items-center"
