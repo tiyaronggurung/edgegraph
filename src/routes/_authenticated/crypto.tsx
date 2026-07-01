@@ -1191,6 +1191,19 @@ function AutoTradePanel() {
             </button>
           )}
           {autoMart && <MartingaleCountdown windowMs={WINDOW_MS} />}
+          <ChartVerdictBadge compact />
+          {autoMart && (
+            <button
+              onClick={() => setChartGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${chartGate ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={chartGate
+                ? `Chart gate ON: skip fire when |score-50| < ${CHART_GATE_MIN_SKEW} (chop). Current: ${chartVerdict.ready ? chartVerdict.score.toFixed(0) : "…"}`
+                : "Chart gate OFF: fire every window regardless of chart bias"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${chartGate ? "bg-cyan-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {chartGate ? "Chart gate ON" : "Chart gate OFF"}
+            </button>
+          )}
           <button
             onClick={() => runForce()}
             disabled={forceBusy || liveBusy}
