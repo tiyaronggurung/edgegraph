@@ -20,12 +20,12 @@ const MIN_SIGMA_DISTANCE_PAPER = 1.0;
 
 // ── Live rails (stricter — real money) ──
 const LIVE_MAX_ORDERS_PER_SESSION = 3;
-const LIVE_MAX_STAKE_USD_PER_ORDER = 20;
+const LIVE_MAX_STAKE_USD_PER_ORDER = 150;
 const LIVE_MIN_SIGMA_DISTANCE = 1.25;
 const LIVE_MIN_EDGE_PTS = 5;
 const LIVE_MIN_SECONDS_TO_CLOSE = 120;
 const LIVE_DAILY_ORDER_CAP = 40;
-const LIVE_DAILY_LOSS_CAP_USD = 80; // realized loss in last 24h that halts new orders
+const LIVE_DAILY_LOSS_CAP_USD = 250; // realized loss in last 24h that halts new orders (50% of $500 bankroll)
 const LIVE_CONFIRM_TOKEN = "I_UNDERSTAND_LIVE";
 // ── Additional model rails (added: EV gate, cooldown, per-symbol cap, sizing, decay) ──
 const LIVE_MIN_EV_MARGIN = 0.03;          // #1 EV: (model_prob - ask_price) must beat fees+slippage

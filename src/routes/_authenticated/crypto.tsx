@@ -824,7 +824,7 @@ function AutoTradePanel() {
     if (!ok) return;
     setLiveBusy(true);
     try {
-      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 20, maxOrders: 3 } });
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 150, maxOrders: 3 } });
       if (res.placed > 0) {
         toast.success(`Placed ${res.placed} live order${res.placed === 1 ? "" : "s"} on Kalshi.`);
       } else {
@@ -855,7 +855,7 @@ function AutoTradePanel() {
     }
     setForceBusy(true);
     try {
-      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 20, maxOrders: 2, force: true } });
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 150, maxOrders: 2, force: true } });
       if (res.placed > 0) {
         toast.success(`Forced ${res.placed} order${res.placed === 1 ? "" : "s"}: ${res.orders.map(o => `${o.side === "YES" ? "UP" : "DOWN"} ${o.ticker} @ ${o.limit_cents}¢`).join(", ")}`);
       } else if (!silent) {
@@ -1705,7 +1705,7 @@ function CryptoPage() {
   const q = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 10_000, staleTime: 5_000 });
   const cfg = useQuery({ queryKey: ["kalshi-cfg"], queryFn: () => cfgFn(), staleTime: 60_000 });
 
-  const [bankroll, setBankroll] = useState(1000);
+  const [bankroll, setBankroll] = useState(500);
   const [kellyMult, setKellyMult] = useState(0.25);
   const sizing: SizingState = { bankroll, kellyMult };
   const [pending, setPending] = useState<BtcMarket | null>(null);
