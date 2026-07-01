@@ -6,7 +6,8 @@ import { useTrendlineAnalysis } from "@/hooks/useTrendlineAnalysis";
 import { useCandleMomentum } from "@/hooks/useCandleMomentum";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { diagnoseRecentMisses, listRecentMisses } from "@/lib/cryptoMisses.functions";
+import { diagnoseRecentMisses, listRecentMisses, studyMissesWithAI, getLatestStudy } from "@/lib/cryptoMisses.functions";
+import { useEffect } from "react";
 
 export const Route = createFileRoute("/_authenticated/chart")({
   head: () => ({
@@ -44,6 +45,25 @@ function ChartPage() {
     mutationFn: () => diagnoseFn(),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["crypto-misses"] }),
   });
+
+  // AI study loop — analyze misses and propose improvements.
+  const studyFn = useServerFn(studyMissesWithAI);
+  const latestStudyFn = useServerFn(getLatestStudy);
+  const studyQ = useQuery({
+    queryKey: ["crypto-latest-study"],
+    queryFn: () => latestStudyFn(),
+    refetchInterval: 60_000,
+  });
+  const runStudy = useMutation({
+    mutationFn: () => studyFn(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["crypto-latest-study"] }),
+  });
+  // Auto-run when the server flags enough new misses have accumulated.
+  useEffect(() => {
+    if (studyQ.data?.needsRun && !runStudy.isPending) {
+      runStudy.mutate();
+    }
+  }, [studyQ.data?.needsRun]);
 
   const scale = useMemo(() => {
     const c = a.candles;
@@ -281,7 +301,85 @@ function ChartPage() {
         )}
       </div>
 
+      {/* AI Study of misses */}
+      <div className="border border-border rounded-lg bg-card p-4">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">AI model study</div>
+            <div className="text-sm font-bold">
+              What the model is getting wrong — proposed fixes
+              {studyQ.data?.newMissesSinceStudy != null && studyQ.data.newMissesSinceStudy > 0 && (
+                <span className="ml-2 text-[10px] text-amber-300 font-mono">+{studyQ.data.newMissesSinceStudy} new misses</span>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => runStudy.mutate()}
+            disabled={runStudy.isPending}
+            className="text-[11px] px-2 py-1 rounded border border-border hover:border-cyan-500/50 hover:text-cyan-300 disabled:opacity-50"
+          >
+            {runStudy.isPending ? "Studying…" : "Study with AI"}
+          </button>
+        </div>
+        {runStudy.isError && (
+          <div className="text-xs text-rose-300 border border-rose-500/40 bg-rose-500/10 rounded p-2 mb-2">
+            {(runStudy.error as Error)?.message ?? "Study failed"}
+          </div>
+        )}
+        {!studyQ.data?.study ? (
+          <div className="text-xs text-muted-foreground">
+            {runStudy.isPending
+              ? "AI analyzing recent misses…"
+              : "No study yet. Runs automatically after 5 new wrong predictions, or click 'Study with AI'."}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="text-[11px] text-muted-foreground font-mono">
+              Analyzed {studyQ.data.study.misses_analyzed} misses vs {studyQ.data.study.wins_analyzed} wins ·
+              {" "}{new Date(studyQ.data.study.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+              {" "}· {studyQ.data.study.model}
+            </div>
+            <div className="text-sm leading-relaxed">{studyQ.data.study.summary}</div>
+            {studyQ.data.study.dominant_failures.length > 0 && (
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Dominant failure modes</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {studyQ.data.study.dominant_failures.map((f, i) => (
+                    <span key={i} className="text-[11px] font-mono px-2 py-0.5 rounded border border-rose-500/40 bg-rose-500/10 text-rose-300">{f}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {studyQ.data.study.recommendations.length > 0 && (
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Recommendations</div>
+                <div className="space-y-2">
+                  {studyQ.data.study.recommendations.map((r, i) => (
+                    <div key={i} className={`border rounded p-2.5 text-xs ${r.priority === "high" ? "border-rose-500/40 bg-rose-500/5" : r.priority === "medium" ? "border-amber-500/40 bg-amber-500/5" : "border-border bg-background/40"}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded ${r.priority === "high" ? "bg-rose-500/20 text-rose-300" : r.priority === "medium" ? "bg-amber-500/20 text-amber-300" : "bg-muted text-muted-foreground"}`}>{r.priority}</span>
+                        <span className="font-mono text-foreground">{r.gate}</span>
+                      </div>
+                      <div className="text-muted-foreground mb-1">
+                        <span className="text-muted-foreground">now: </span><span className="font-mono text-foreground">{r.currentSetting}</span>
+                        <span className="mx-1.5">→</span>
+                        <span className="text-muted-foreground">try: </span><span className="font-mono text-emerald-300">{r.suggested}</span>
+                      </div>
+                      <div className="leading-snug">{r.rationale}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="text-[10px] text-muted-foreground italic">
+              These are suggestions for you to review — nothing is auto-applied to gates or thresholds.
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="text-[11px] text-muted-foreground border border-border rounded-lg p-3 leading-relaxed">
+
 
         <strong className="text-foreground">How it works:</strong> Trendlines fit a least-squares line through the last 2–3 swing highs
         (<span className="text-orange-400">resistance</span>) and swing lows (<span className="text-cyan-400">support</span>) over the last 30 min.

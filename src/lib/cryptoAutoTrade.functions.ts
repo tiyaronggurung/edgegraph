@@ -364,6 +364,22 @@ export const runAutoTrade = createServerFn({ method: "POST" })
             edgePts: m.edgePts,
             stakeUsd: stakeActual,
             closeTime: m.closeTime ?? undefined,
+            inputsSnapshot: {
+              source: "auto_trade",
+              sigmaDistance: m.sigmaDistance,
+              gateAction: m.gateAction,
+              momentumAlignsWithSide: m.gapAnalysis?.momentumAlignsWithSide,
+              effectiveEdgePts: m.edgePts,
+              convictionMult,
+              minSigma,
+              minEdgePts,
+              equityAdjust: equity?.btcImpact?.edgeAdjustPts ?? null,
+              equityBlock: equity?.btcImpact?.wouldBlock ?? null,
+              yesAsk: m.yesAsk ?? null,
+              noAsk: m.noAsk ?? null,
+              secondsToClose: m.secondsToClose,
+              firedAt: new Date().toISOString(),
+            },
           });
           kalshiOrderId = out.orderId;
           // IOC 0-fill: nothing was bought — don't create a phantom position.

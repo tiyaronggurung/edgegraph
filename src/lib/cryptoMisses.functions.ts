@@ -151,3 +151,241 @@ export const listRecentMisses = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return { misses: (data ?? []) as MissRow[] };
   });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LLM study of wrong predictions.
+// Auto-triggered every N new misses (see AUTO_STUDY_THRESHOLD). Reads recent
+// misses + a small sample of wins for contrast, sends to Gemini via Lovable
+// AI Gateway, stores structured recommendations + summary. UI shows the
+// latest study; user reviews and manually applies gate/threshold changes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AUTO_STUDY_THRESHOLD = 5;
+const STUDY_MODEL = "google/gemini-3-flash-preview";
+
+export interface StudyRecommendation {
+  gate: string;
+  currentSetting: string;
+  suggested: string;
+  rationale: string;
+  priority: "high" | "medium" | "low";
+}
+
+export interface StudyRow {
+  id: string;
+  misses_analyzed: number;
+  wins_analyzed: number;
+  model: string;
+  summary: string;
+  dominant_failures: string[];
+  recommendations: StudyRecommendation[];
+  created_at: string;
+}
+
+function stripSnapshot(s: any): any {
+  if (!s || typeof s !== "object") return s;
+  // Trim to fields we actually reason about; skip raw kalshi blobs.
+  const keys = [
+    "source", "verdictScore", "candleForecast", "candleGuidance",
+    "trendline", "regime", "sigmaDistance", "gateAction",
+    "momentumAlignsWithSide", "convictionMult", "edgePts",
+    "modelYesProb", "marketYesPrice", "equityAdjust", "equityBlock",
+    "spot", "strike",
+  ];
+  const out: Record<string, unknown> = {};
+  for (const k of keys) if (k in s) out[k] = s[k];
+  return out;
+}
+
+async function callLovableAi(prompt: string): Promise<any> {
+  const key = process.env.LOVABLE_API_KEY;
+  if (!key) throw new Error("LOVABLE_API_KEY is not configured");
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model: STUDY_MODEL,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a quantitative trading coach. Analyze failed BTC 15-min Kalshi predictions and return strict JSON only (no prose, no markdown fences). " +
+            "Identify the most common failure modes across the sample and propose specific, safe, testable changes to gates and thresholds. " +
+            "Never recommend disabling risk caps. Never invent gates that were not present in the input.",
+        },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    }),
+  });
+  if (res.status === 429) throw new Error("AI rate limited — try again shortly");
+  if (res.status === 402) throw new Error("AI credits exhausted — top up in Settings → Plans");
+  if (!res.ok) throw new Error(`AI gateway ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const j: any = await res.json();
+  const content = j?.choices?.[0]?.message?.content;
+  if (!content) throw new Error("AI returned no content");
+  try {
+    return JSON.parse(content);
+  } catch {
+    // Try to salvage — sometimes models wrap in fences despite response_format
+    const m = content.match(/\{[\s\S]*\}/);
+    if (m) return JSON.parse(m[0]);
+    throw new Error("AI returned non-JSON: " + content.slice(0, 200));
+  }
+}
+
+export const studyMissesWithAI = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ ran: boolean; studyId?: string; reason?: string }> => {
+    const { supabase, userId } = context;
+
+    // Load recent misses.
+    const { data: misses, error: mErr } = await supabase
+      .from("crypto_trade_misses")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (mErr) throw new Error(mErr.message);
+    if (!misses?.length) return { ran: false, reason: "no misses yet" };
+    if (misses.length < 3) return { ran: false, reason: "need at least 3 misses to study" };
+
+    // Load recent wins for contrast.
+    const { data: wins } = await supabase
+      .from("crypto_trades")
+      .select("id, ticker, side, spot_at_entry, strike, pnl_usd, chart_verdict_score, edge_pts, inputs_snapshot, raw")
+      .eq("user_id", userId)
+      .eq("status", "settled")
+      .gt("pnl_usd", 0)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    const missesSlim = misses.map((m: any) => ({
+      ticker: m.ticker,
+      predicted: m.predicted_dir,
+      actual: m.actual_dir,
+      spot: m.spot_at_entry,
+      settle: m.settle_price,
+      strike: m.strike,
+      pnl: m.pnl_usd,
+      tags: m.reason_tags,
+      inputs: stripSnapshot(m.inputs_snapshot),
+    }));
+    const winsSlim = (wins ?? []).map((w: any) => ({
+      ticker: w.ticker,
+      side: w.side,
+      spot: w.spot_at_entry,
+      strike: w.strike,
+      pnl: w.pnl_usd,
+      verdict: w.chart_verdict_score,
+      edge: w.edge_pts,
+      inputs: stripSnapshot(w.inputs_snapshot),
+    }));
+
+    const prompt = `Analyze these BTC 15-min Kalshi predictions and return JSON with this exact shape:
+{
+  "summary": "2-4 sentence overview of what went wrong across the misses",
+  "dominant_failures": ["short label 1", "short label 2", ...],
+  "recommendations": [
+    {
+      "gate": "name of gate or threshold (must be one referenced in the inputs, e.g. candleGate, trendlineGate, sigmaDistance, edgePts, verdictScore)",
+      "currentSetting": "what it looks like now based on the data",
+      "suggested": "concrete change (e.g. 'enable candleGate', 'raise minSigma from 1.5 to 2.0', 'skip trades with verdictScore < 60')",
+      "rationale": "why this would have helped, with reference to the miss data",
+      "priority": "high" | "medium" | "low"
+    }
+  ]
+}
+
+MISSES (${missesSlim.length}):
+${JSON.stringify(missesSlim)}
+
+RECENT WINS FOR CONTRAST (${winsSlim.length}):
+${JSON.stringify(winsSlim)}
+
+Return ONLY the JSON object.`;
+
+    const parsed = await callLovableAi(prompt);
+    const summary = typeof parsed.summary === "string" ? parsed.summary : "No summary returned.";
+    const dominant = Array.isArray(parsed.dominant_failures) ? parsed.dominant_failures.slice(0, 10) : [];
+    const recs = Array.isArray(parsed.recommendations) ? parsed.recommendations.slice(0, 10) : [];
+
+    const { data: inserted, error: insErr } = await supabase
+      .from("crypto_model_studies")
+      .insert({
+        user_id: userId,
+        misses_analyzed: missesSlim.length,
+        wins_analyzed: winsSlim.length,
+        miss_id_watermark: misses[0].id,
+        model: STUDY_MODEL,
+        summary,
+        dominant_failures: dominant,
+        recommendations: recs,
+        raw: parsed,
+      })
+      .select("id")
+      .single();
+    if (insErr) throw new Error(insErr.message);
+    return { ran: true, studyId: inserted!.id };
+  });
+
+export const getLatestStudy = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ study: StudyRow | null; needsRun: boolean; newMissesSinceStudy: number }> => {
+    const { supabase, userId } = context;
+    const { data: latest } = await supabase
+      .from("crypto_model_studies")
+      .select("id, misses_analyzed, wins_analyzed, model, summary, dominant_failures, recommendations, created_at, miss_id_watermark")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Count how many misses were created after the watermark
+    let newSince = 0;
+    if (latest?.miss_id_watermark) {
+      const { data: wm } = await supabase
+        .from("crypto_trade_misses")
+        .select("created_at")
+        .eq("id", latest.miss_id_watermark)
+        .maybeSingle();
+      if (wm?.created_at) {
+        const { count } = await supabase
+          .from("crypto_trade_misses")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .gt("created_at", wm.created_at);
+        newSince = count ?? 0;
+      }
+    } else {
+      const { count } = await supabase
+        .from("crypto_trade_misses")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId);
+      newSince = count ?? 0;
+    }
+
+    const study: StudyRow | null = latest
+      ? {
+          id: latest.id,
+          misses_analyzed: latest.misses_analyzed,
+          wins_analyzed: latest.wins_analyzed,
+          model: latest.model,
+          summary: latest.summary,
+          dominant_failures: (latest.dominant_failures as unknown as string[]) ?? [],
+          recommendations: (latest.recommendations as unknown as StudyRecommendation[]) ?? [],
+          created_at: latest.created_at,
+        }
+      : null;
+
+    return {
+      study,
+      needsRun: newSince >= AUTO_STUDY_THRESHOLD,
+      newMissesSinceStudy: newSince,
+    };
+  });
+
