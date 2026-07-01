@@ -1240,6 +1240,28 @@ function AutoTradePanel() {
         }
       }
 
+      // Optional Trendline+Fib gate — skip fires that oppose bias or fire
+      // during a neutral wedge.
+      if (trendGate) {
+        const t = trendAnalysis;
+        if (!t.ready) return;
+        const cv = chartVerdict;
+        const side: "up" | "down" = (calibrate ? calShift.adjustedScore : cv.score) >= 50 ? "up" : "down";
+        if (t.bias === "neutral") {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Trendline gate: window skipped — neutral (${t.reason})`);
+          return;
+        }
+        const trendSide: "up" | "down" = t.bias === "bull" ? "up" : "down";
+        if (trendSide !== side) {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Trendline gate: window skipped — chart wants ${side.toUpperCase()} but trendlines say ${t.bias.toUpperCase()} (${t.reason})`);
+          return;
+        }
+      }
+
+
+
 
 
       inFlight = true;
