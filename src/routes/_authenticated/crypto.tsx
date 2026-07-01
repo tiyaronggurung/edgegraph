@@ -1274,8 +1274,22 @@ function AutoTradePanel() {
       }
 
 
-
-
+      // Optional Candle Momentum gate — if a big red or big green is forecast
+      // for the current forming 1m candle, don't take a fresh 15m position:
+      //   big_red   => sell/protect (skip so we don't buy into a dump)
+      //   big_green => hold (existing entry is fine; skip fresh window)
+      if (candleGate && candleMomentum.ready) {
+        if (candleMomentum.forecast === "big_red") {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Candle gate: SELL signal — big red forming (${candleMomentum.forecastReason}, ${candleMomentum.forecastConfidence}%)`);
+          return;
+        }
+        if (candleMomentum.forecast === "big_green") {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Candle gate: HOLD — big green forming (${candleMomentum.forecastReason}, ${candleMomentum.forecastConfidence}%)`);
+          return;
+        }
+      }
 
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
