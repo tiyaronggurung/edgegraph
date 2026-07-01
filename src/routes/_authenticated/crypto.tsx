@@ -1354,6 +1354,33 @@ function AutoTradePanel() {
               {roundGate ? "Round gate ON" : "Round gate OFF"}
             </button>
           )}
+          {autoMart && (
+            <button
+              onClick={() => setHtfGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${htfGate ? "border-sky-500/50 bg-sky-500/15 text-sky-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={htfGate
+                ? `HTF gate ON: fire only when 5m EMA20/50 trend agrees with chart side. Current: ${chartVerdict.htfReady ? chartVerdict.htfTrend.toUpperCase() : "…"}`
+                : "HTF gate OFF: fire regardless of higher-timeframe trend"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${htfGate ? "bg-sky-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {htfGate ? "HTF gate ON" : "HTF gate OFF"}
+            </button>
+          )}
+          {autoMart && (
+            <button
+              onClick={() => setEthGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${ethGate ? "border-fuchsia-500/50 bg-fuchsia-500/15 text-fuchsia-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={ethGate
+                ? `ETH gate ON: skip when BTC/ETH diverge (>0.1% opposite signs). Current: ${chartVerdict.ethReason}`
+                : "ETH gate OFF: ignore ETH cross-check"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${ethGate ? "bg-fuchsia-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {ethGate ? "ETH gate ON" : "ETH gate OFF"}
+            </button>
+          )}
+
+
+
 
 
 
