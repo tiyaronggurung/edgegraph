@@ -6,7 +6,7 @@ import { useTrendlineAnalysis } from "@/hooks/useTrendlineAnalysis";
 import { useCandleMomentum } from "@/hooks/useCandleMomentum";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { diagnoseRecentMisses, listRecentMisses, studyMissesWithAI, getLatestStudy } from "@/lib/cryptoMisses.functions";
+import { diagnoseRecentMisses, listRecentMisses, studyMissesWithAI, getLatestStudy, setRecommendationFeedback } from "@/lib/cryptoMisses.functions";
 import { useEffect } from "react";
 
 export const Route = createFileRoute("/_authenticated/chart")({
@@ -64,6 +64,15 @@ function ChartPage() {
       runStudy.mutate();
     }
   }, [studyQ.data?.needsRun]);
+
+  // Recommendation feedback (👍 / 👎).
+  const feedbackFn = useServerFn(setRecommendationFeedback);
+  const feedbackMut = useMutation({
+    mutationFn: (v: { studyId: string; recIndex: number; vote: "up" | "down" | null; recGate?: string; recSuggested?: string }) =>
+      feedbackFn({ data: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["crypto-latest-study"] }),
+  });
+
 
   const scale = useMemo(() => {
     const c = a.candles;
@@ -354,11 +363,41 @@ function ChartPage() {
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Recommendations</div>
                 <div className="space-y-2">
-                  {studyQ.data.study.recommendations.map((r, i) => (
+                  {studyQ.data.study.recommendations.map((r, i) => {
+                    const vote = studyQ.data.study!.feedback?.[i];
+                    const studyId = studyQ.data.study!.id;
+                    const cast = (next: "up" | "down") => {
+                      feedbackMut.mutate({
+                        studyId,
+                        recIndex: i,
+                        vote: vote === next ? null : next,
+                        recGate: r.gate,
+                        recSuggested: r.suggested,
+                      });
+                    };
+                    return (
                     <div key={i} className={`border rounded p-2.5 text-xs ${r.priority === "high" ? "border-rose-500/40 bg-rose-500/5" : r.priority === "medium" ? "border-amber-500/40 bg-amber-500/5" : "border-border bg-background/40"}`}>
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded ${r.priority === "high" ? "bg-rose-500/20 text-rose-300" : r.priority === "medium" ? "bg-amber-500/20 text-amber-300" : "bg-muted text-muted-foreground"}`}>{r.priority}</span>
                         <span className="font-mono text-foreground">{r.gate}</span>
+                        <div className="ml-auto flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => cast("up")}
+                            disabled={feedbackMut.isPending}
+                            aria-label="Helpful"
+                            title="Helpful — feed into next study"
+                            className={`text-xs px-1.5 py-0.5 rounded border transition ${vote === "up" ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-200" : "border-border text-muted-foreground hover:text-emerald-300 hover:border-emerald-500/40"}`}
+                          >👍</button>
+                          <button
+                            type="button"
+                            onClick={() => cast("down")}
+                            disabled={feedbackMut.isPending}
+                            aria-label="Not helpful"
+                            title="Not helpful — avoid similar advice next study"
+                            className={`text-xs px-1.5 py-0.5 rounded border transition ${vote === "down" ? "border-rose-400/60 bg-rose-500/20 text-rose-200" : "border-border text-muted-foreground hover:text-rose-300 hover:border-rose-500/40"}`}
+                          >👎</button>
+                        </div>
                       </div>
                       <div className="text-muted-foreground mb-1">
                         <span className="text-muted-foreground">now: </span><span className="font-mono text-foreground">{r.currentSetting}</span>
@@ -367,7 +406,9 @@ function ChartPage() {
                       </div>
                       <div className="leading-snug">{r.rationale}</div>
                     </div>
-                  ))}
+                    );
+                  })}
+
                 </div>
               </div>
             )}

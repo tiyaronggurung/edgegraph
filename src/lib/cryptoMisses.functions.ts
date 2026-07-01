@@ -180,7 +180,15 @@ export interface StudyRow {
   dominant_failures: string[];
   recommendations: StudyRecommendation[];
   created_at: string;
+  feedback?: Record<number, "up" | "down">;
 }
+
+export interface StudyFeedbackRow {
+  study_id: string;
+  rec_index: number;
+  vote: "up" | "down";
+}
+
 
 function stripSnapshot(s: any): any {
   if (!s || typeof s !== "object") return s;
@@ -264,6 +272,29 @@ export const studyMissesWithAI = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(20);
 
+    // Load prior recommendation feedback so the model learns what helped.
+    const { data: priorStudies } = await supabase
+      .from("crypto_model_studies")
+      .select("id, recommendations, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    const priorIds = (priorStudies ?? []).map((s: any) => s.id);
+    const { data: priorFeedback } = priorIds.length
+      ? await supabase
+          .from("crypto_study_feedback")
+          .select("study_id, rec_index, vote, rec_gate, rec_suggested, note")
+          .eq("user_id", userId)
+          .in("study_id", priorIds)
+      : { data: [] as any[] };
+    const feedbackDigest = (priorFeedback ?? []).map((f: any) => ({
+      vote: f.vote,
+      gate: f.rec_gate,
+      suggested: f.rec_suggested,
+      note: f.note ?? null,
+    }));
+
+
     const missesSlim = misses.map((m: any) => ({
       ticker: m.ticker,
       predicted: m.predicted_dir,
@@ -307,7 +338,11 @@ ${JSON.stringify(missesSlim)}
 RECENT WINS FOR CONTRAST (${winsSlim.length}):
 ${JSON.stringify(winsSlim)}
 
+PRIOR RECOMMENDATION FEEDBACK FROM THE USER (${feedbackDigest.length}) — vote "up" means the recommendation was helpful, "down" means it was not. Favor patterns similar to the up-voted ones and avoid repeating the substance of down-voted ones:
+${JSON.stringify(feedbackDigest)}
+
 Return ONLY the JSON object.`;
+
 
     const parsed = await callLovableAi(prompt);
     const summary = typeof parsed.summary === "string" ? parsed.summary : "No summary returned.";
@@ -369,6 +404,16 @@ export const getLatestStudy = createServerFn({ method: "GET" })
       newSince = count ?? 0;
     }
 
+    let feedback: Record<number, "up" | "down"> = {};
+    if (latest) {
+      const { data: fb } = await supabase
+        .from("crypto_study_feedback")
+        .select("rec_index, vote")
+        .eq("user_id", userId)
+        .eq("study_id", latest.id);
+      for (const r of (fb ?? []) as any[]) feedback[r.rec_index] = r.vote;
+    }
+
     const study: StudyRow | null = latest
       ? {
           id: latest.id,
@@ -379,6 +424,7 @@ export const getLatestStudy = createServerFn({ method: "GET" })
           dominant_failures: (latest.dominant_failures as unknown as string[]) ?? [],
           recommendations: (latest.recommendations as unknown as StudyRecommendation[]) ?? [],
           created_at: latest.created_at,
+          feedback,
         }
       : null;
 
@@ -388,4 +434,38 @@ export const getLatestStudy = createServerFn({ method: "GET" })
       newMissesSinceStudy: newSince,
     };
   });
+
+export const setRecommendationFeedback = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { studyId: string; recIndex: number; vote: "up" | "down" | null; recGate?: string; recSuggested?: string; note?: string }) => data)
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { supabase, userId } = context;
+    if (data.vote === null) {
+      const { error } = await supabase
+        .from("crypto_study_feedback")
+        .delete()
+        .eq("user_id", userId)
+        .eq("study_id", data.studyId)
+        .eq("rec_index", data.recIndex);
+      if (error) throw new Error(error.message);
+      return { ok: true };
+    }
+    const { error } = await supabase
+      .from("crypto_study_feedback")
+      .upsert(
+        {
+          user_id: userId,
+          study_id: data.studyId,
+          rec_index: data.recIndex,
+          rec_gate: data.recGate ?? null,
+          rec_suggested: data.recSuggested ?? null,
+          vote: data.vote,
+          note: data.note ?? null,
+        },
+        { onConflict: "user_id,study_id,rec_index" },
+      );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 
