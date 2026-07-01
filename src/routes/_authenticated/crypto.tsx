@@ -838,6 +838,10 @@ function AutoTradePanel() {
     if (typeof window === "undefined") return 0;
     return Number(window.localStorage.getItem("crypto.autoMart.losses")) || 0;
   });
+  const [martWins, setMartWins] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    return Number(window.localStorage.getItem("crypto.autoMart.wins")) || 0;
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
