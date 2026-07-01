@@ -750,8 +750,8 @@ function AutoTradePanel() {
         "FORCE LIVE orders on Kalshi at current price?\n\n" +
         "Picks the model's top |edge| markets (UP or DOWN) and places\n" +
         "up to 2 × $20 orders at current Kalshi quotes.\n\n" +
-        "BYPASSED: edge/σ/momentum/equity/24h-dedupe gates.\n" +
-        "ENFORCED: kill switch, key health, 40 orders / -$80 in 24h,\n" +
+        "BYPASSED: edge/σ/momentum/equity/24h-dedupe/loss-cap gates.\n" +
+        "ENFORCED: kill switch, key health, 40 orders in 24h,\n" +
         "auto-exit (TP +70% / SL -50% / edge-decay 2¢).\n\n" +
         "Click OK to proceed.",
       );
@@ -774,7 +774,7 @@ function AutoTradePanel() {
     }
   }
 
-  // Auto-loop: every 60s, fire force-buy on top model picks. Daily caps still apply.
+  // Auto-loop: every 60s, fire force-buy on top model picks. Order cap still applies.
   const [autoLoop, setAutoLoop] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("crypto.autoLoop") === "on";
@@ -853,7 +853,7 @@ function AutoTradePanel() {
           <button
             onClick={() => setAutoLoop(v => !v)}
             className={`text-xs font-semibold px-3 py-1.5 rounded border flex items-center gap-1.5 ${autoLoop ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
-            title="Auto-loop: every 60s, force-buy top model picks (up to 2 × $20). Daily caps still apply."
+            title="Auto-loop: every 60s, force-buy top model picks (up to 2 × $20). The 40-order cap still applies."
           >
             <span className={`h-1.5 w-1.5 rounded-full ${autoLoop ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground"}`} />
             {autoLoop ? "Auto-loop ON (60s)" : "Auto-loop OFF"}
@@ -862,7 +862,7 @@ function AutoTradePanel() {
             onClick={() => runForce()}
             disabled={forceBusy || liveBusy}
             className="text-xs font-semibold px-3 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 disabled:opacity-50 flex items-center gap-1.5"
-            title="Force up to 2 live orders on the model's top picks — bypasses entry gates, daily caps still apply"
+            title="Force up to 2 live orders on the model's top picks — bypasses entry gates and the loss cap; 40-order cap still applies"
           >
             {forceBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
             {forceBusy ? "Forcing…" : "Force trade (top picks)"}
