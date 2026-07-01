@@ -1219,7 +1219,8 @@ function AutoTradePanel() {
         const cv = chartVerdict;
         if (!cv.ready) return;
         const side: "up" | "down" = (calibrate ? calShift.adjustedScore : cv.score) >= 50 ? "up" : "down";
-        const check = shouldSkipForMagnet(live.price ?? 0, side, btcTicks.ticks);
+        const lastPrice = btcTicks.ticks.length ? btcTicks.ticks[btcTicks.ticks.length - 1].p : 0;
+        const check = shouldSkipForMagnet(lastPrice, side, btcTicks.ticks);
         if (check.skip) {
           window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
           toast.info(`Magnet gate: window skipped — ${check.reason}`);
