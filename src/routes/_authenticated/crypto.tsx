@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, useEffect, useRef } from "react";
@@ -19,6 +19,7 @@ import { useMarketRegime } from "@/hooks/useMarketRegime";
 import { useCoinbaseBtcSpot } from "@/hooks/useCoinbaseBtcSpot";
 import { useBinanceBtcTicks } from "@/hooks/useBinanceBtcTicks";
 import { shouldSkipForMagnet } from "@/lib/roundLevelGate";
+import { useTrendlineAnalysis } from "@/hooks/useTrendlineAnalysis";
 import { computeKalshiSentiment } from "@/lib/kalshiSentiment";
 
 import { toast } from "sonner";
@@ -964,6 +965,17 @@ function AutoTradePanel() {
     window.localStorage.setItem("crypto.autoMart.magnetGate", magnetGate ? "on" : "off");
   }, [magnetGate]);
   const btcTicks = useBinanceBtcTicks();
+
+  // Trendline gate — skip fires that oppose the trendline+fib bias.
+  const [trendGate, setTrendGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.trendGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.trendGate", trendGate ? "on" : "off");
+  }, [trendGate]);
+  const trendAnalysis = useTrendlineAnalysis();
   const chartVerdict = useChartVerdict({
     regime: regimeOn ? marketRegime.regime : "mixed",
     coinbase: cbFeed ? { price: coinbase.price, connected: coinbase.connected } : undefined,
@@ -1228,6 +1240,28 @@ function AutoTradePanel() {
         }
       }
 
+      // Optional Trendline+Fib gate — skip fires that oppose bias or fire
+      // during a neutral wedge.
+      if (trendGate) {
+        const t = trendAnalysis;
+        if (!t.ready) return;
+        const cv = chartVerdict;
+        const side: "up" | "down" = (calibrate ? calShift.adjustedScore : cv.score) >= 50 ? "up" : "down";
+        if (t.bias === "neutral") {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Trendline gate: window skipped — neutral (${t.reason})`);
+          return;
+        }
+        const trendSide: "up" | "down" = t.bias === "bull" ? "up" : "down";
+        if (trendSide !== side) {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Trendline gate: window skipped — chart wants ${side.toUpperCase()} but trendlines say ${t.bias.toUpperCase()} (${t.reason})`);
+          return;
+        }
+      }
+
+
+
 
 
       inFlight = true;
@@ -1246,7 +1280,7 @@ function AutoTradePanel() {
     const h = setInterval(tick, 5_000);
     return () => { cancelled = true; clearInterval(h); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment, roundGate, htfGate, ethGate, calibrate, calShift, magnetGate, btcTicks]);
+  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment, roundGate, htfGate, ethGate, calibrate, calShift, magnetGate, btcTicks, trendGate, trendAnalysis]);
 
 
 
@@ -1449,6 +1483,25 @@ function AutoTradePanel() {
               {magnetGate ? "Magnet ON" : "Magnet OFF"}
             </button>
           )}
+          {autoMart && (
+            <button
+              onClick={() => setTrendGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${trendGate ? "border-orange-500/50 bg-orange-500/15 text-orange-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={trendGate
+                ? `Trendline gate ON: skip fires that oppose the trendline+fib bias. Current: ${trendAnalysis.ready ? trendAnalysis.bias.toUpperCase() + " · " + trendAnalysis.reason : "warming up"}`
+                : "Trendline gate OFF: fire regardless of trendline analysis"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${trendGate ? "bg-orange-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {trendGate ? `Trend ${trendAnalysis.ready ? trendAnalysis.bias.toUpperCase() : "…"}` : "Trend OFF"}
+            </button>
+          )}
+          <Link
+            to="/chart"
+            className="text-[10px] font-semibold px-2 py-1.5 rounded border border-border bg-muted/30 hover:bg-muted/50 flex items-center gap-1"
+            title="Open full trendline & Fibonacci chart"
+          >
+            <ExternalLink className="h-3 w-3" /> Chart
+          </Link>
           {autoMart && (
             <button
               onClick={() => setSentimentGate(v => !v)}
