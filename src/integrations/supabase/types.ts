@@ -486,6 +486,65 @@ export type Database = {
         }
         Relationships: []
       }
+      crypto_trade_misses: {
+        Row: {
+          actual_dir: string
+          created_at: string
+          diagnosed_reason: string
+          id: string
+          inputs_snapshot: Json | null
+          pnl_usd: number | null
+          predicted_dir: string
+          reason_tags: string[]
+          settle_price: number | null
+          spot_at_entry: number | null
+          strike: number | null
+          ticker: string
+          trade_id: string
+          user_id: string
+        }
+        Insert: {
+          actual_dir: string
+          created_at?: string
+          diagnosed_reason: string
+          id?: string
+          inputs_snapshot?: Json | null
+          pnl_usd?: number | null
+          predicted_dir: string
+          reason_tags?: string[]
+          settle_price?: number | null
+          spot_at_entry?: number | null
+          strike?: number | null
+          ticker: string
+          trade_id: string
+          user_id: string
+        }
+        Update: {
+          actual_dir?: string
+          created_at?: string
+          diagnosed_reason?: string
+          id?: string
+          inputs_snapshot?: Json | null
+          pnl_usd?: number | null
+          predicted_dir?: string
+          reason_tags?: string[]
+          settle_price?: number | null
+          spot_at_entry?: number | null
+          strike?: number | null
+          ticker?: string
+          trade_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crypto_trade_misses_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: true
+            referencedRelation: "crypto_trades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crypto_trades: {
         Row: {
           bankroll_usd: number | null
@@ -497,6 +556,7 @@ export type Database = {
           error: string | null
           event_ticker: string | null
           id: string
+          inputs_snapshot: Json | null
           kalshi_order_id: string | null
           kelly_multiplier: number | null
           market_yes_price: number | null
@@ -523,6 +583,7 @@ export type Database = {
           error?: string | null
           event_ticker?: string | null
           id?: string
+          inputs_snapshot?: Json | null
           kalshi_order_id?: string | null
           kelly_multiplier?: number | null
           market_yes_price?: number | null
@@ -549,6 +610,7 @@ export type Database = {
           error?: string | null
           event_ticker?: string | null
           id?: string
+          inputs_snapshot?: Json | null
           kalshi_order_id?: string | null
           kelly_multiplier?: number | null
           market_yes_price?: number | null

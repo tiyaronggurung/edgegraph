@@ -4,6 +4,9 @@ import { ArrowLeft, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useBinanceBtcTicks } from "@/hooks/useBinanceBtcTicks";
 import { useTrendlineAnalysis } from "@/hooks/useTrendlineAnalysis";
 import { useCandleMomentum } from "@/hooks/useCandleMomentum";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { diagnoseRecentMisses, listRecentMisses } from "@/lib/cryptoMisses.functions";
 
 export const Route = createFileRoute("/_authenticated/chart")({
   head: () => ({
@@ -27,6 +30,20 @@ function ChartPage() {
   const [showFib, setShowFib] = useState(true);
   const [showLines, setShowLines] = useState(true);
   const cm = useCandleMomentum();
+
+  // Auto-backtest wrong predictions: refresh diagnoses periodically + list misses.
+  const diagnoseFn = useServerFn(diagnoseRecentMisses);
+  const listFn = useServerFn(listRecentMisses);
+  const qc = useQueryClient();
+  const missesQ = useQuery({
+    queryKey: ["crypto-misses"],
+    queryFn: () => listFn(),
+    refetchInterval: 30_000,
+  });
+  const diag = useMutation({
+    mutationFn: () => diagnoseFn(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["crypto-misses"] }),
+  });
 
   const scale = useMemo(() => {
     const c = a.candles;
@@ -214,7 +231,58 @@ function ChartPage() {
         )}
       </div>
 
+
+      {/* Auto-backtest: wrong predictions */}
+      <div className="border border-border rounded-lg bg-card p-4">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Auto-backtest</div>
+            <div className="text-sm font-bold">Wrong predictions & diagnosed reasons</div>
+          </div>
+          <button
+            onClick={() => diag.mutate()}
+            disabled={diag.isPending}
+            className="text-[11px] px-2 py-1 rounded border border-border hover:border-cyan-500/50 hover:text-cyan-300 disabled:opacity-50"
+          >
+            {diag.isPending ? "Diagnosing…" : "Diagnose new misses"}
+          </button>
+        </div>
+        {missesQ.isLoading ? (
+          <div className="text-xs text-muted-foreground">Loading…</div>
+        ) : !missesQ.data?.misses.length ? (
+          <div className="text-xs text-muted-foreground">No wrong predictions logged yet. Click "Diagnose new misses" after some settled losses to backtest them.</div>
+        ) : (
+          <div className="space-y-2 max-h-[420px] overflow-y-auto">
+            {missesQ.data.misses.map(m => (
+              <div key={m.id} className="border border-border/60 rounded p-2.5 bg-background/40 text-xs">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+                  <div className="flex items-center gap-2 font-mono">
+                    <span className="text-muted-foreground">{new Date(m.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                    <span className="text-foreground">{m.ticker}</span>
+                    <span className={`px-1.5 py-0.5 rounded border ${m.predicted_dir === "UP" ? "border-emerald-500/40 text-emerald-300" : "border-rose-500/40 text-rose-300"}`}>pred {m.predicted_dir}</span>
+                    <span className="text-muted-foreground">→</span>
+                    <span className={`px-1.5 py-0.5 rounded border ${m.actual_dir === "UP" ? "border-emerald-500/40 text-emerald-300" : m.actual_dir === "DOWN" ? "border-rose-500/40 text-rose-300" : "border-border text-muted-foreground"}`}>actual {m.actual_dir}</span>
+                  </div>
+                  {m.pnl_usd != null && (
+                    <span className="font-mono text-rose-300">${Number(m.pnl_usd).toFixed(2)}</span>
+                  )}
+                </div>
+                <div className="text-muted-foreground leading-snug">{m.diagnosed_reason}</div>
+                {m.reason_tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {m.reason_tags.map(t => (
+                      <span key={t} className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300">{t}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="text-[11px] text-muted-foreground border border-border rounded-lg p-3 leading-relaxed">
+
         <strong className="text-foreground">How it works:</strong> Trendlines fit a least-squares line through the last 2–3 swing highs
         (<span className="text-orange-400">resistance</span>) and swing lows (<span className="text-cyan-400">support</span>) over the last 30 min.
         Fibonacci retracement is drawn between the most recent dominant swing high and low. Bias fires <span className="text-emerald-400">bull</span>
