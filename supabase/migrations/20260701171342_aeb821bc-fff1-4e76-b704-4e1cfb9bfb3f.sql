@@ -1,0 +1,1 @@
+ALTER TABLE public.crypto_trades ADD COLUMN IF NOT EXISTS chart_verdict_score numeric;

@@ -1,119 +1,86 @@
-# Subscription & Pricing System — Plan
 
-You said "Stripe-ready structure, but do not break existing app logic." I'm reading that as: **build the entire pricing UI, plan config, limits enforcement, and gating now — but stop short of wiring real Stripe checkout.** When you're ready to take payments, we'll enable Stripe payments in one extra step and connect the upgrade buttons to it.
+# 15-min BTC model — accuracy upgrade plan
 
-If you actually want live Stripe checkout in this same pass, tell me and I'll add the enable step at the front.
+Goal: boost hit rate on 15-min predictions **without touching** buy/ladder/manual-close/martingale/hard-cap paths. Everything below is additive and defaults **OFF** (opt-in via toolbar toggles + `localStorage`), same pattern as the existing chart/HTF/ETH gates.
 
----
-
-## What I will build
-
-### 1. Plan config (single source of truth)
-New file `src/lib/plans/config.ts` — exports `PLANS` with the three tiers, monthly/annual prices, 20% annual discount, and a typed feature matrix:
-- `alertsPerMonth`, `verdictsPerMonth` (numbers, `Infinity` = unlimited)
-- `liveGamesLimit` (3 / all / all)
-- `historyDays` (7 / Infinity / Infinity)
-- `sports` (NBA only / 5 sports / all)
-- `patternLibrary` ('view' / 'full' / 'full+alerts')
-- `kelly` ('half' / 'full' / 'full+custom')
-- `savedStrategies` (1 / 10 / Infinity)
-- Booleans: `clvTracking`, `clvAdvanced`, `steamDetection`, `sharpMoneyTracker`, `dailyReport`, `weeklyReport`, `priorityDelivery`, `customAlertBuilder`, `vipCommunity`, `earlyAccess`
-
-### 2. Database (schema only, no Stripe webhook yet)
-New migration adds to `profiles`:
-- `subscription_tier text default 'free'` ('free' | 'pro' | 'vip')
-- `subscription_status text default 'inactive'` ('active' | 'inactive' | 'past_due' | 'canceled')
-- `billing_interval text` ('month' | 'year' | null)
-- `current_period_end timestamptz`
-- `stripe_customer_id text` (nullable, populated later)
-- `stripe_subscription_id text` (nullable, populated later)
-
-New table `usage_counters`:
-- `user_id`, `period_start date` (first of month), `alerts_sent int`, `verdicts_used int`
-- Unique on (user_id, period_start); RLS: own row only
-
-### 3. Plan helper hook
-New `src/hooks/usePlan.ts`:
-- Reads `profiles.subscription_tier` + current month's `usage_counters`
-- Returns `{ plan, features, usage, can: { sendAlert(), useVerdict(), accessSport(s), saveStrategy(count), ... }, remaining: { alerts, verdicts } }`
-- Pure read; never mutates
-
-### 4. Server functions for counters
-New `src/lib/usage.functions.ts` with `createServerFn` handlers:
-- `incrementAlert()` — atomic upsert + check, throws `LIMIT_REACHED` if over
-- `incrementVerdict()` — same pattern
-- Both protected by `requireSupabaseAuth`
-
-### 5. Pricing page
-New route `src/routes/pricing.tsx`:
-- 3 cards (Free / Pro / VIP Sharp), Pro flagged "Most Popular"
-- Monthly/Annual toggle, annual shows "Save 20%" badge + per-month effective price
-- VIP styled with premium accent (gradient border, sharp dark surface, refined typography) using existing semantic tokens — no new hex codes
-- Mobile: stack vertically, sticky toggle
-- CTA buttons:
-  - Current plan → disabled "Current plan"
-  - Free → "Get started" (no-op / sign-up)
-  - Pro/VIP → "Upgrade" — calls `startCheckout(tier, interval)` stub that currently just shows a toast "Stripe checkout coming soon"; ready to swap for real Stripe call later
-- Full comparison table below cards (all features × 3 tiers)
-
-### 6. Gating + upgrade prompts (additive only)
-New reusable `<UpgradePrompt>` dialog component + `useUpgradePrompt()` hook.
-
-Wired into these existing flows **without changing their happy-path logic**:
-- **BET alert email** (`VerdictCard.tsx` new useEffect): before `sendTransactionalEmail`, call `incrementAlert()`. On `LIMIT_REACHED` → skip send, show upgrade prompt. Existing verdict_log insert + UI untouched.
-- **AI verdict request** (find the call site in analyze flow): wrap with `incrementVerdict()`. On limit → upgrade prompt, no API call.
-- **Live games list**: free users see top 3 + a locked-card row "Upgrade to see all X games"
-- **Strategies save**: button disabled with tooltip past limit
-- **Pattern library filters**: filters disabled with overlay for free
-- **History page**: free users see last 7 days + "Upgrade for full history"
-- **CLV page**: free users see paywall card
-
-### 7. Account/settings — current plan widget
-Add a small "Current Plan" card to `/dashboard` or settings showing tier + usage bars + "Manage subscription" link to `/pricing`.
-
-### 8. Public guest flows
-**Untouched.** Pricing page is public (anyone can view), but no changes to join/status/booking flows. (Your repo doesn't appear to have those, but I'll grep to confirm before touching anything adjacent.)
+Ship in 4 phases. You approve each phase before I move to the next.
 
 ---
 
-## What I will NOT do in this pass
-- Enable Stripe payments / call `enable_stripe_payments`
-- Create real checkout sessions or webhooks
-- Modify the working live betting, verdict generation, pattern performance, or CLV page logic (only wrapping with gates)
-- Touch the email infrastructure (already working)
-- Add any new colors outside `src/styles.css` tokens
+## Phase 1 — Rolling calibration (safest, highest ROI)
 
-When you're ready for live billing, the follow-up is small: enable Stripe payments, create the 4 prices (Pro monthly/annual, VIP monthly/annual), wire `startCheckout()` to a server function, add the webhook to update `profiles.subscription_tier`.
+**What:** compute score→win% mapping from the last N=200 settled trades, apply as a threshold shift.
 
----
+**Where:**
+- New: `src/lib/rollingCalibration.functions.ts` — server fn that reads recent trades, buckets by chart-verdict score (0–100 in 10-wide bins), returns `{ binWinRate, shift, sampleSize }`.
+- Consumed on `/crypto` via `useQuery` (5-min stale). A `Calibration` badge shows current shift (e.g. `+3 pts, N=187`).
+- Chart verdict's final score gets `+ shift` before comparison to the fire threshold. Shift is clamped to ±8 pts so it can't do anything dramatic.
 
-## Files touched
+**Toggle:** `Calibrate` (default OFF). When OFF, behavior is identical to today.
 
-**Created:**
-- `src/lib/plans/config.ts`
-- `src/hooks/usePlan.ts`
-- `src/lib/usage.functions.ts`
-- `src/routes/pricing.tsx`
-- `src/components/pricing/PricingCard.tsx`
-- `src/components/pricing/ComparisonTable.tsx`
-- `src/components/pricing/BillingToggle.tsx`
-- `src/components/upgrade/UpgradePrompt.tsx`
-- `src/hooks/useUpgradePrompt.ts`
-- `src/components/dashboard/PlanWidget.tsx`
-- Migration: `subscription_*` columns + `usage_counters` table
-
-**Edited (surgically — gates added around existing code, nothing replaced):**
-- `src/components/edge/VerdictCard.tsx` (gate the new bet-alert email only)
-- The AI verdict request call site
-- Live games list, strategies, patterns, history, CLV pages — each gets a gate wrapper, no logic changes
+**Risk:** near zero — pure post-processing.
 
 ---
 
-## Questions before I start
+## Phase 2 — Regime detector + dynamic verdict weights
 
-1. **Stripe right now, or stub for later?** (I'm assuming stub.)
-2. **Annual price display** — "$23.99/mo billed annually ($287.88/yr)" style ok? Pro annual = $239.90/yr (20% off $299.88), VIP annual = $575.90/yr.
-3. **Free tier auth** — should the 5-alert limit apply per calendar month or per rolling 30 days? I'm assuming **calendar month** (resets 1st of each month) — simpler and clearer to users.
-4. **Existing users** — everyone gets `subscription_tier='free'` by default. Want me to set you (`dipeshtamu95@gmail.com`) to `vip` for testing?
+**What:** classify last 30 min as `trend` / `chop` / `mixed` from ATR + range vs. straight-line move, then reweight `useChartVerdict`.
 
-Reply with answers + "go" and I'll build it.
+**Rules:**
+- `trend`: VWAP 25%, RSI 5%, Flow 15%, Trend 20%, Wick 5%, Futures 20%, Liq 10%
+- `chop`: VWAP 15%, RSI 20%, Flow 10%, Trend 5%, Wick 20%, Futures 10%, Liq 20%
+- `mixed`: current static weights (baseline)
+
+**Where:**
+- New: `src/hooks/useMarketRegime.ts` — derives regime from existing tick buffer, exposes `{ regime, atrPct, straightness }`.
+- Edit: `useChartVerdict.ts` — accept optional `regime` arg; switch weight table.
+- Verdict badge tooltip shows the active regime.
+
+**Toggle:** `Regime` (default OFF). OFF = static weights (today).
+
+**Risk:** moderate — changes score composition. Off by default; you can A/B by flipping toggle.
+
+---
+
+## Phase 3 — Coinbase second BTC feed (Binance/Coinbase lead-lag)
+
+**What:** subscribe to `wss://ws-feed.exchange.coinbase.com` (BTC-USD ticker/matches). Free, no auth, no CORS issue for WS.
+
+**Adds two signals:**
+- `leadLagBps` — Coinbase-Binance mid diff. |diff| > 2 bps and expanding = active flow imbalance.
+- `whichLeads` — which venue ticked first on the last 3 significant moves. Used as a small tie-breaker.
+
+**Where:**
+- New: `src/hooks/useCoinbaseBtcSpot.ts` — WS + reconnect logic mirroring `useBinanceBtcSpot.ts`.
+- Feeds into `useChartVerdict` as a **±3 pt bump** to the Flow component only. Not a hard gate.
+
+**Toggle:** `CB Feed` (default OFF).
+
+**Risk:** low — WS-only, small score contribution, no auth needed.
+
+---
+
+## Phase 4 — Round-number magnet gate (already in memory)
+
+**What:** when spot is within `X bps` (default 5 bps ≈ $5 at $100k) of a $50 or $100 level, require a **confirmed break** (3 consecutive 15s closes on the far side) before firing against the level.
+
+**Where:**
+- New: `src/lib/roundLevelGate.ts` — pure fn: `shouldSkipForMagnet(price, side, tickBuffer)`.
+- Called in `/crypto` gate chain right after `htfGate`.
+
+**Toggle:** `Magnet` (default OFF).
+
+**Risk:** low — skip-only gate, never forces a trade.
+
+---
+
+## What I will NOT touch
+- Order placement, ladders, martingale sizing
+- Manual close, 35% hard cap, 70%-down rule
+- Kalshi ATM sentiment gate (already there, unchanged)
+- Existing default-OFF gates (chart/HTF/ETH)
+
+## Rollout
+Each phase ships behind its own toggle, verified in preview against live BTC before moving to the next. If any phase feels wrong you flip it off — zero regression risk vs. current behavior.
+
+**Confirm and I'll start Phase 1.** Or tell me to reorder / drop a phase.

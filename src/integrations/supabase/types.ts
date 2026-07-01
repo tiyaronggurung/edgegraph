@@ -489,6 +489,7 @@ export type Database = {
       crypto_trades: {
         Row: {
           bankroll_usd: number | null
+          chart_verdict_score: number | null
           close_time: string | null
           contracts: number
           created_at: string
@@ -514,6 +515,7 @@ export type Database = {
         }
         Insert: {
           bankroll_usd?: number | null
+          chart_verdict_score?: number | null
           close_time?: string | null
           contracts?: number
           created_at?: string
@@ -539,6 +541,7 @@ export type Database = {
         }
         Update: {
           bankroll_usd?: number | null
+          chart_verdict_score?: number | null
           close_time?: string | null
           contracts?: number
           created_at?: string

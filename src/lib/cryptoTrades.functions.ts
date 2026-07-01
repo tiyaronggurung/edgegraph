@@ -21,6 +21,7 @@ const PlaceOrderSchema = z.object({
   bankrollUsd: z.number().min(0).optional(),
   kellyMultiplier: z.number().min(0).max(1).optional(),
   closeTime: z.string().optional(),
+  chartVerdictScore: z.number().min(0).max(100).optional(),
 });
 
 function normalizeKalshiPem(raw: string): string {
@@ -164,6 +165,7 @@ export async function submitKalshiBuy(
       bankroll_usd: data.bankrollUsd ?? null,
       kelly_multiplier: data.kellyMultiplier ?? null,
       close_time: data.closeTime ?? null,
+      chart_verdict_score: data.chartVerdictScore ?? null,
       status: "pending",
     })
     .select("id")

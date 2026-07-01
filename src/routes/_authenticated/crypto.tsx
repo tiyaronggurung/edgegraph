@@ -14,6 +14,11 @@ import { EquityMomentumPanel } from "@/components/EquityMomentumPanel";
 import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
 import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
+import { useCalibrationShift } from "@/hooks/useCalibrationShift";
+import { useMarketRegime } from "@/hooks/useMarketRegime";
+import { useCoinbaseBtcSpot } from "@/hooks/useCoinbaseBtcSpot";
+import { useBinanceBtcTicks } from "@/hooks/useBinanceBtcTicks";
+import { shouldSkipForMagnet } from "@/lib/roundLevelGate";
 import { computeKalshiSentiment } from "@/lib/kalshiSentiment";
 
 import { toast } from "sonner";
@@ -927,7 +932,55 @@ function AutoTradePanel() {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("crypto.autoMart.chartGate", chartGate ? "on" : "off");
   }, [chartGate]);
-  const chartVerdict = useChartVerdict();
+  // Opt-in regime detector (Phase 2). When ON, chart-verdict weights swap
+  // based on last-30-min tape (trend / chop / mixed). OFF = static baseline.
+  const [regimeOn, setRegimeOn] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.regime") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.regime", regimeOn ? "on" : "off");
+  }, [regimeOn]);
+  const marketRegime = useMarketRegime();
+  // Opt-in Coinbase second feed (Phase 3). When ON, small ±3 pt flow nudge
+  // from Coinbase-Binance mid divergence. OFF = single-venue baseline.
+  const [cbFeed, setCbFeed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.cbFeed") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.cbFeed", cbFeed ? "on" : "off");
+  }, [cbFeed]);
+  const coinbase = useCoinbaseBtcSpot();
+  // Phase 4 — Round-number magnet gate (proximity + confirmed break).
+  const [magnetGate, setMagnetGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.magnetGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.magnetGate", magnetGate ? "on" : "off");
+  }, [magnetGate]);
+  const btcTicks = useBinanceBtcTicks();
+  const chartVerdict = useChartVerdict({
+    regime: regimeOn ? marketRegime.regime : "mixed",
+    coinbase: cbFeed ? { price: coinbase.price, connected: coinbase.connected } : undefined,
+  });
+
+  // Opt-in rolling calibration (Phase 1 of accuracy plan). When ON, shifts the
+  // live verdict score by up to ±8 pts based on which score bin has been most
+  // profitable in the last 200 settled trades. OFF = identical behavior.
+  const [calibrate, setCalibrate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.calibrate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.calibrate", calibrate ? "on" : "off");
+  }, [calibrate]);
+  const calShift = useCalibrationShift(chartVerdict.score, calibrate);
 
   // Opt-in Kalshi-sentiment gate: skip windows where ATM YES sits in the chop
   // belt (48–52¢). Uses market consensus instead of Binance ticks.
@@ -1092,11 +1145,13 @@ function AutoTradePanel() {
           // Not enough ticks yet — hold, retry next tick (don't burn the window).
           return;
         }
-        const skew = Math.abs(cv.score - 50);
+        const effectiveScore = calibrate ? calShift.adjustedScore : cv.score;
+        const skew = Math.abs(effectiveScore - 50);
         if (skew < CHART_GATE_MIN_SKEW) {
           // Chop → skip this window entirely (burn it so we don't retry-fire mid-window).
           window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
-          toast.info(`Chart gate: window skipped — chop (score ${cv.score.toFixed(0)}, skew ${skew.toFixed(0)} < ${CHART_GATE_MIN_SKEW})`);
+          const calNote = calibrate && calShift.ready ? ` [cal ${calShift.shift >= 0 ? "+" : ""}${calShift.shift.toFixed(1)}]` : "";
+          toast.info(`Chart gate: window skipped — chop (score ${effectiveScore.toFixed(0)}${calNote}, skew ${skew.toFixed(0)} < ${CHART_GATE_MIN_SKEW})`);
           return;
         }
       }
@@ -1158,6 +1213,22 @@ function AutoTradePanel() {
         }
       }
 
+      // Optional round-number magnet gate (Phase 4) — skip when spot is glued
+      // to a $50/$100 level and the break hasn't confirmed on our side.
+      if (magnetGate) {
+        const cv = chartVerdict;
+        if (!cv.ready) return;
+        const side: "up" | "down" = (calibrate ? calShift.adjustedScore : cv.score) >= 50 ? "up" : "down";
+        const lastPrice = btcTicks.ticks.length ? btcTicks.ticks[btcTicks.ticks.length - 1].p : 0;
+        const check = shouldSkipForMagnet(lastPrice, side, btcTicks.ticks);
+        if (check.skip) {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Magnet gate: window skipped — ${check.reason}`);
+          return;
+        }
+      }
+
+
 
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
@@ -1175,7 +1246,7 @@ function AutoTradePanel() {
     const h = setInterval(tick, 5_000);
     return () => { cancelled = true; clearInterval(h); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment, roundGate, htfGate, ethGate]);
+  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment, roundGate, htfGate, ethGate, calibrate, calShift, magnetGate, btcTicks]);
 
 
 
@@ -1328,6 +1399,54 @@ function AutoTradePanel() {
             >
               <span className={`h-1.5 w-1.5 rounded-full ${chartGate ? "bg-cyan-400 animate-pulse" : "bg-muted-foreground"}`} />
               {chartGate ? "Chart gate ON" : "Chart gate OFF"}
+            </button>
+          )}
+          {autoMart && (
+            <button
+              onClick={() => setCalibrate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${calibrate ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={calibrate
+                ? `Calibrate ON: shift live verdict by ±8 pts based on your last 200 settled trades. Current shift: ${calShift.ready ? (calShift.shift >= 0 ? "+" : "") + calShift.shift.toFixed(1) + " pts" : "warming up"} · ${calShift.note}`
+                : "Calibrate OFF: no adjustment to verdict score"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${calibrate ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {calibrate ? `Cal ${calShift.ready ? (calShift.shift >= 0 ? "+" : "") + calShift.shift.toFixed(1) : "…"}` : "Calibrate OFF"}
+            </button>
+          )}
+          {autoMart && (
+            <button
+              onClick={() => setRegimeOn(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${regimeOn ? "border-teal-500/50 bg-teal-500/15 text-teal-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={regimeOn
+                ? `Regime ON: dynamic verdict weights. Current: ${marketRegime.ready ? marketRegime.reason : "warming up"}`
+                : "Regime OFF: static verdict weights (baseline)"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${regimeOn ? "bg-teal-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {regimeOn ? `Regime ${marketRegime.ready ? marketRegime.regime.toUpperCase() : "…"}` : "Regime OFF"}
+            </button>
+          )}
+          {autoMart && (
+            <button
+              onClick={() => setCbFeed(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${cbFeed ? "border-blue-500/50 bg-blue-500/15 text-blue-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={cbFeed
+                ? `Coinbase feed ON: ±3 pt flow nudge on >2 bps Binance/Coinbase divergence. CB: ${coinbase.connected ? "$" + (coinbase.price?.toFixed(0) ?? "…") : "connecting…"}`
+                : "Coinbase feed OFF: single-venue (Binance) only"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${cbFeed && coinbase.connected ? "bg-blue-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {cbFeed ? `CB ${coinbase.connected ? "ON" : "…"}` : "CB Feed OFF"}
+            </button>
+          )}
+          {autoMart && (
+            <button
+              onClick={() => setMagnetGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${magnetGate ? "border-fuchsia-500/50 bg-fuchsia-500/15 text-fuchsia-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={magnetGate
+                ? `Magnet gate ON: skip fire when spot is within 5 bps of a $50/$100 level unless break confirmed by 3× 15s closes.`
+                : "Magnet gate OFF: fire regardless of round-level proximity"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${magnetGate ? "bg-fuchsia-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {magnetGate ? "Magnet ON" : "Magnet OFF"}
             </button>
           )}
           {autoMart && (
@@ -1499,6 +1618,15 @@ function CryptoPage() {
   const sizing: SizingState = { bankroll, kellyMult };
   const [pending, setPending] = useState<BtcMarket | null>(null);
   const live = useBinanceBtcSpot();
+  const cvForPlace = useChartVerdict();
+  const [calibrate, setCalibrate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.calibrate") === "on";
+  });
+  useEffect(() => {
+    window.localStorage.setItem("crypto.autoMart.calibrate", calibrate ? "on" : "off");
+  }, [calibrate]);
+  const calShiftForPlace = useCalibrationShift(cvForPlace.score, calibrate);
 
   // Auto-refetch the instant any strike window closes so the next 15-min strike appears immediately.
   useEffect(() => {
@@ -1520,6 +1648,7 @@ function CryptoPage() {
         marketYesPrice: m.yesPrice, edgePts: m.edgePts,
         stakeUsd: sug.stakeUsd, bankrollUsd: bankroll, kellyMultiplier: kellyMult,
         closeTime: m.closeTime ?? undefined,
+        chartVerdictScore: cvForPlace.ready ? cvForPlace.score : undefined,
       }});
     },
     onSuccess: (r) => { toast.success(`Order submitted · ${r.orderId ?? r.tradeId}`); setPending(null); qc.invalidateQueries({ queryKey: ["crypto-trades"] }); },
