@@ -212,13 +212,24 @@ export async function submitKalshiBuy(
   }
 
   const orderId = json?.order_id ?? json?.order?.order_id ?? null;
+  // IOC: read actual fill result. 0 fills = we own nothing.
+  const fillCount = Number(json?.order?.fill_count ?? json?.fill_count ?? 0) || 0;
+  const avgFillDollars = Number(json?.order?.average_fill_price ?? json?.average_fill_price ?? 0) || 0;
+  // Convert avg fill price (dollars, from YES perspective) into our cents-of-side entry price.
+  const filledCents = avgFillDollars > 0
+    ? (data.side === "YES"
+        ? Math.round(avgFillDollars * 100)
+        : Math.round(100 - avgFillDollars * 100))
+    : data.limitPriceCents;
   await supabase.from("crypto_trades").update({
-    status: "submitted", kalshi_order_id: orderId, raw: json,
+    status: fillCount > 0 ? "submitted" : "unfilled",
+    kalshi_order_id: orderId,
+    raw: json,
   }).eq("id", trade.id);
 
-
-  return { ok: true, tradeId: trade.id, orderId, response: json };
+  return { ok: true, tradeId: trade.id, orderId, fillCount, filledCents, response: json };
 }
+
 
 export const placeKalshiOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
