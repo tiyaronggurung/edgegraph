@@ -908,6 +908,18 @@ function AutoTradePanel() {
     if (typeof window === "undefined") return 0;
     return Number(window.localStorage.getItem("crypto.autoMart.wins")) || 0;
   });
+  // Opt-in chart gate: if ON, auto-mart skips windows where the chart is chop
+  // (|score - 50| < CHART_GATE_MIN_SKEW). Default OFF — never blocks unless user turns on.
+  const CHART_GATE_MIN_SKEW = 8;
+  const [chartGate, setChartGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.chartGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.chartGate", chartGate ? "on" : "off");
+  }, [chartGate]);
+  const chartVerdict = useChartVerdict();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
