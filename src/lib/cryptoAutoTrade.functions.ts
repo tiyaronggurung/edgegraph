@@ -719,15 +719,30 @@ export async function autoExitForUser(
     const adverseCents = entry - markCents;
     const sideProbNow = currentModelProbBySide.get(r.ticker);
 
-    let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | null = null;
-    if (sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
+    let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | "mart_hopeless" | "mart_hardcap" | null = null;
+    // Martingale-specific rules (only apply to martingale-tagged orders).
+    if (r.is_martingale === true) {
+      const stake = Number(r.stake_usd);
+      const lossFrac = stake > 0 ? -markPnl / stake : 0; // 0..1+
+      // Hard cap: any martingale trade down ≥70% → exit immediately.
+      if (lossFrac >= 0.70) {
+        exitReason = "mart_hardcap";
+        reasons.push(`${r.ticker}[mart]: HARD CAP — down ${(lossFrac * 100).toFixed(0)}% of $${stake} stake`);
+      }
+      // Hopeless: model side prob <15% AND already down ≥50%.
+      else if (sideProbNow !== undefined && sideProbNow < 0.15 && lossFrac >= 0.50) {
+        exitReason = "mart_hopeless";
+        reasons.push(`${r.ticker}[mart]: HOPELESS — model ${(sideProbNow * 100).toFixed(0)}% on ${r.side}, down ${(lossFrac * 100).toFixed(0)}%`);
+      }
+    }
+    if (!exitReason && sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
       exitReason = "flip";
       reasons.push(`${r.ticker}[${r.mode}]: flip — model now ${(sideProbNow * 100).toFixed(0)}% for ${r.side} (< ${LIVE_FLIP_PROB * 100}%)`);
     }
-    else if (netLock) exitReason = "net";
-    else if (markPnl >= tpThreshold) exitReason = "tp";
-    else if (markPnl <= slThreshold) exitReason = "sl";
-    else if (adverseCents >= LIVE_EDGE_DECAY_CENTS) exitReason = "edge";
+    else if (!exitReason && netLock) exitReason = "net";
+    else if (!exitReason && markPnl >= tpThreshold) exitReason = "tp";
+    else if (!exitReason && markPnl <= slThreshold) exitReason = "sl";
+    else if (!exitReason && adverseCents >= LIVE_EDGE_DECAY_CENTS) exitReason = "edge";
     if (!exitReason) continue;
 
     const { data: claimed } = await supabase
