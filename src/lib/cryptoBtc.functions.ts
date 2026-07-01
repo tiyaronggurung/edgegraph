@@ -873,6 +873,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           secondsToClose,
           sigmaDistance: sigDist,
           sigmaMinEffective: sigmaEff,
+          theoryYesProb: side === "YES" ? pBase : (1 - pBase),
           requiredEdgePts,
           gateAction,
           gateReason,
