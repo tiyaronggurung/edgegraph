@@ -344,6 +344,10 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       const stakeActual = (contracts * limitCents) / 100;
 
       let kalshiOrderId: string | null = null;
+      // Default to the intended size/price. If we actually go live, these get
+      // overwritten with the true IOC fill result before we insert the row.
+      let filledContracts = contracts;
+      let filledEntryCents = limitCents;
       if (isLive) {
         try {
           const { submitKalshiBuy } = await import("./cryptoTrades.functions");
@@ -362,11 +366,20 @@ export const runAutoTrade = createServerFn({ method: "POST" })
             closeTime: m.closeTime ?? undefined,
           });
           kalshiOrderId = out.orderId;
+          // IOC 0-fill: nothing was bought — don't create a phantom position.
+          if (!out.fillCount || out.fillCount <= 0) {
+            skipReasons.push(`${m.ticker}: IOC 0-fill @ ${limitCents}¢ — no position taken`);
+            continue;
+          }
+          filledContracts = out.fillCount;
+          filledEntryCents = out.filledCents || limitCents;
         } catch (e: any) {
           skipReasons.push(`${m.ticker}: kalshi order failed — ${e?.message ?? String(e)}`);
           continue;
         }
       }
+
+      const stakeFilled = (filledContracts * filledEntryCents) / 100;
 
       const { data: row, error } = await supabase
         .from("auto_trade_orders")
@@ -377,9 +390,9 @@ export const runAutoTrade = createServerFn({ method: "POST" })
           ticker: m.ticker,
           event_ticker: m.eventTicker,
           side: m.side,
-          stake_usd: stakeActual,
+          stake_usd: stakeFilled,
           limit_cents: limitCents,
-          contracts,
+          contracts: filledContracts,
           strike: m.strike,
           spot_at_entry: m.spot,
           model_prob: m.modelYesProb,
@@ -391,8 +404,8 @@ export const runAutoTrade = createServerFn({ method: "POST" })
           close_time: m.closeTime ?? new Date(Date.now() + m.secondsToClose * 1000).toISOString(),
           status: "placed",
           kalshi_order_id: kalshiOrderId,
-          entry_price_cents: limitCents,
-          contracts_remaining: contracts,
+          entry_price_cents: filledEntryCents,
+          contracts_remaining: filledContracts,
           partial_pnl_usd: 0,
           exit_ladder: DEFAULT_EXIT_LADDER as any,
           is_martingale: data.isMartingale,
@@ -403,6 +416,7 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       if (error) { skipReasons.push(`${m.ticker}: insert error ${error.message}`); continue; }
       if (row) placed.push(row as AutoTradeOrderRow);
     }
+
 
     return {
       sessionId, mode: data.mode,
