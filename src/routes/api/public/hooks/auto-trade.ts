@@ -147,9 +147,25 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
         let totalPlaced = 0, totalSettled = 0;
         const perUser: Array<{ userId: string; placed: number; settled: number; reason?: string }> = [];
 
+        // Lazy import — server-only exit engine.
+        const { autoExitForUser } = await import("@/lib/cryptoAutoTrade.functions");
+        let totalExited = 0;
+        const perUserExits: Array<{ userId: string; exited: number }> = [];
+
         for (const p of (profiles ?? []) as Array<{ id: string }>) {
           const userId = p.id;
           let placed = 0, settled = 0, reason: string | undefined;
+
+          // ---- Mid-trade auto-exit sweep (ladder / TP / SL / flip / edge / net-lock) ----
+          try {
+            const exitRes = await autoExitForUser(supabaseAdmin, userId);
+            totalExited += exitRes.exited;
+            if (exitRes.exited > 0) perUserExits.push({ userId, exited: exitRes.exited });
+          } catch (e) {
+            // Never block placement/settlement on exit errors.
+            console.error("auto-exit sweep failed", userId, e);
+          }
+
 
           // ---- Settle any due paper orders for this user ----
           const { data: due } = await supabaseAdmin
@@ -268,8 +284,10 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
           ok: true,
           totalPlaced,
           totalSettled,
+          totalExited,
           users: perUser.length,
           perUser: perUser.slice(0, 50),
+          perUserExits: perUserExits.slice(0, 50),
           ts: new Date().toISOString(),
         });
       },
