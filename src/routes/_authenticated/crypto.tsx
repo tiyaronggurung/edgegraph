@@ -855,7 +855,7 @@ function AutoTradePanel() {
     }
     setForceBusy(true);
     try {
-      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 20, maxOrders: 2, force: true } });
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 150, maxOrders: 2, force: true } });
       if (res.placed > 0) {
         toast.success(`Forced ${res.placed} order${res.placed === 1 ? "" : "s"}: ${res.orders.map(o => `${o.side === "YES" ? "UP" : "DOWN"} ${o.ticker} @ ${o.limit_cents}¢`).join(", ")}`);
       } else if (!silent) {
