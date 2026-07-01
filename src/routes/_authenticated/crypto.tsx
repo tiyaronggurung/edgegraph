@@ -1068,6 +1068,7 @@ function AutoTradePanel() {
             <span className={`h-1.5 w-1.5 rounded-full ${autoMart ? "bg-fuchsia-400 animate-pulse" : "bg-muted-foreground"}`} />
             {autoMart ? `Martingale ON · $${martStake}` : "Martingale OFF"}
             {autoMart && martLosses > 0 && <span className="text-[10px] text-red-300">L{martLosses}</span>}
+            {autoMart && martWins > 0 && <span className="text-[10px] text-emerald-300">W{martWins}</span>}
           </button>
           {autoMart && (
             <button
@@ -1075,6 +1076,7 @@ function AutoTradePanel() {
                 if (window.confirm("Reset Martingale stake back to $20?")) {
                   setMartStake(MART_BASE);
                   setMartLosses(0);
+                  setMartWins(0);
                   window.localStorage.removeItem("crypto.autoMart.lastOrderId");
                   toast.success("Martingale ladder reset to $20");
                 }
