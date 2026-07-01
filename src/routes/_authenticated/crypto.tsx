@@ -958,7 +958,7 @@ function AutoTradePanel() {
     const h = setInterval(tick, 5_000);
     return () => { cancelled = true; clearInterval(h); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMart, martStake]);
+  }, [autoMart, martStake, liveOrders]);
 
   return (
     <div className="border border-border rounded-lg bg-card">
