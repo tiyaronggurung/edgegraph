@@ -1485,6 +1485,25 @@ function AutoTradePanel() {
           )}
           {autoMart && (
             <button
+              onClick={() => setTrendGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${trendGate ? "border-orange-500/50 bg-orange-500/15 text-orange-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={trendGate
+                ? `Trendline gate ON: skip fires that oppose the trendline+fib bias. Current: ${trendAnalysis.ready ? trendAnalysis.bias.toUpperCase() + " · " + trendAnalysis.reason : "warming up"}`
+                : "Trendline gate OFF: fire regardless of trendline analysis"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${trendGate ? "bg-orange-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {trendGate ? `Trend ${trendAnalysis.ready ? trendAnalysis.bias.toUpperCase() : "…"}` : "Trend OFF"}
+            </button>
+          )}
+          <Link
+            to="/chart"
+            className="text-[10px] font-semibold px-2 py-1.5 rounded border border-border bg-muted/30 hover:bg-muted/50 flex items-center gap-1"
+            title="Open full trendline & Fibonacci chart"
+          >
+            <ExternalLink className="h-3 w-3" /> Chart
+          </Link>
+          {autoMart && (
+            <button
               onClick={() => setSentimentGate(v => !v)}
               className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${sentimentGate ? "border-violet-500/50 bg-violet-500/15 text-violet-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
               title={sentimentGate
