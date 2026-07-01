@@ -348,7 +348,12 @@ export const settleAutoTradeOrders = createServerFn({ method: "POST" })
 const LIVE_TP_FRAC = 0.70;
 const LIVE_SL_FRAC = 0.50;
 const LIVE_EDGE_DECAY_CENTS = 2;
+// Direction-flip: if the live model now gives our side < this prob, bail out
+// instead of riding a losing conviction into expiry. 0.45 = model has rotated
+// meaningfully against us (from >0.5 at entry).
+const LIVE_FLIP_PROB = 0.45;
 const KALSHI_PUBLIC_BASE = "https://api.elections.kalshi.com/trade-api/v2";
+
 
 export const autoExitLivePositions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
