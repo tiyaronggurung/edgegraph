@@ -143,7 +143,8 @@ export async function submitKalshiBuy(
   supabase: any,
   userId: string,
   data: z.infer<typeof PlaceOrderSchema>,
-): Promise<{ ok: true; tradeId: string; orderId: string | null; response: any }> {
+): Promise<{ ok: true; tradeId: string; orderId: string | null; fillCount: number; filledCents: number; response: any }> {
+
   const path = "/portfolio/events/orders";
 
   const { data: trade, error: insErr } = await supabase
