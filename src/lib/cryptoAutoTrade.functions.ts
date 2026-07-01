@@ -661,3 +661,100 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
     }
     return { exited, reasons: reasons.slice(0, 20) };
   });
+
+// ── #7 Counterfactual settle sweep ────────────────────────────────────────
+// For every skipped signal whose close_time has passed, look up the real BTC
+// close price and record whether the trade WOULD have won (and its would-be
+// PnL at a nominal $10 stake). This lets us tell whether the gates are too
+// tight (many "would_have_won" = losing edge) or well-calibrated.
+export const settleAutoTradeSkipLog = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ settled: number }> => {
+    const { supabase, userId } = context;
+    const { data: due } = await (supabase as any)
+      .from("auto_trade_skip_log")
+      .select("id, ticker, side, strike, ask_price, close_time")
+      .eq("user_id", userId)
+      .is("settled_at", null)
+      .lt("close_time", new Date().toISOString())
+      .limit(100);
+    const pending = (due ?? []) as Array<{ id: string; ticker: string; side: "YES" | "NO"; strike: number | null; ask_price: number | null; close_time: string }>;
+    if (!pending.length) return { settled: 0 };
+
+    const tickers = [...new Set(pending.map(o => o.ticker))];
+    const { data: closes } = await supabase
+      .from("btc_model_predictions")
+      .select("ticker, settle_price")
+      .in("ticker", tickers)
+      .not("settle_price", "is", null);
+    const priceByTicker = new Map<string, number>(
+      ((closes ?? []) as Array<{ ticker: string; settle_price: number | null }>)
+        .filter(c => c.settle_price !== null)
+        .map(c => [c.ticker, Number(c.settle_price)]),
+    );
+
+    const NOMINAL_STAKE = 10;
+    let settled = 0;
+    for (const o of pending) {
+      const px = priceByTicker.get(o.ticker);
+      if (px === undefined || o.strike == null || o.ask_price == null) continue;
+      const won = o.side === "YES" ? px >= Number(o.strike) : px < Number(o.strike);
+      const contracts = Math.max(1, Math.floor(NOMINAL_STAKE / Math.max(0.01, Number(o.ask_price))));
+      const wouldHavePnl = won
+        ? (1 - Number(o.ask_price)) * contracts
+        : -Number(o.ask_price) * contracts;
+      const { error } = await (supabase as any)
+        .from("auto_trade_skip_log")
+        .update({
+          would_have_won: won,
+          would_have_pnl: wouldHavePnl,
+          settle_price: px,
+          settled_at: new Date().toISOString(),
+        })
+        .eq("id", o.id);
+      if (!error) settled++;
+    }
+    return { settled };
+  });
+
+export interface SkipReport {
+  totalSettled: number;
+  wouldHaveWon: number;
+  wouldHaveLost: number;
+  wouldHavePnlUsd: number;
+  byReason: Array<{ reason: string; count: number; winRate: number; pnl: number }>;
+}
+
+export const getSkipReport = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<SkipReport> => {
+    const { supabase, userId } = context;
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: rows } = await (supabase as any)
+      .from("auto_trade_skip_log")
+      .select("skip_reason, would_have_won, would_have_pnl")
+      .eq("user_id", userId)
+      .gte("created_at", since)
+      .not("settled_at", "is", null);
+    const all = (rows ?? []) as Array<{ skip_reason: string; would_have_won: boolean | null; would_have_pnl: number | null }>;
+    const totalSettled = all.length;
+    const wins = all.filter(r => r.would_have_won === true).length;
+    const losses = all.filter(r => r.would_have_won === false).length;
+    const pnl = all.reduce((s, r) => s + (Number(r.would_have_pnl) || 0), 0);
+
+    const bucket = new Map<string, { count: number; wins: number; pnl: number }>();
+    for (const r of all) {
+      // Strip variable numbers so "EV 1.5¢..." and "EV 0.9¢..." bucket together
+      const key = r.skip_reason.split(/[\s(:]/)[0] || "other";
+      const b = bucket.get(key) ?? { count: 0, wins: 0, pnl: 0 };
+      b.count++;
+      if (r.would_have_won) b.wins++;
+      b.pnl += Number(r.would_have_pnl) || 0;
+      bucket.set(key, b);
+    }
+    const byReason = [...bucket.entries()]
+      .map(([reason, b]) => ({ reason, count: b.count, winRate: b.count > 0 ? b.wins / b.count : 0, pnl: b.pnl }))
+      .sort((a, b) => b.count - a.count);
+
+    return { totalSettled, wouldHaveWon: wins, wouldHaveLost: losses, wouldHavePnlUsd: pnl, byReason };
+  });
