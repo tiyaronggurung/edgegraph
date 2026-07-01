@@ -65,6 +65,15 @@ function ChartPage() {
     }
   }, [studyQ.data?.needsRun]);
 
+  // Recommendation feedback (👍 / 👎).
+  const feedbackFn = useServerFn(setRecommendationFeedback);
+  const feedbackMut = useMutation({
+    mutationFn: (v: { studyId: string; recIndex: number; vote: "up" | "down" | null; recGate?: string; recSuggested?: string }) =>
+      feedbackFn({ data: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["crypto-latest-study"] }),
+  });
+
+
   const scale = useMemo(() => {
     const c = a.candles;
     if (c.length < 2) return null;
