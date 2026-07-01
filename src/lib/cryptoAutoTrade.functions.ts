@@ -27,6 +27,16 @@ const LIVE_MIN_SECONDS_TO_CLOSE = 120;
 const LIVE_DAILY_ORDER_CAP = 40;
 const LIVE_DAILY_LOSS_CAP_USD = 80; // realized loss in last 24h that halts new orders
 const LIVE_CONFIRM_TOKEN = "I_UNDERSTAND_LIVE";
+// ── Additional model rails (added: EV gate, cooldown, per-symbol cap, sizing, decay) ──
+const LIVE_MIN_EV_MARGIN = 0.03;          // #1 EV: (model_prob - ask_price) must beat fees+slippage
+const LIVE_COOLDOWN_SEC = 90;             // #5 no re-entry on a ticker within N sec of a close
+const LIVE_PER_SYMBOL_LOSS_CAP_USD = 40;  // #6 per-symbol 24h loss cap → auto-pause that symbol
+const LIVE_LATE_TIGHTEN_SEC = 180;        // #2 tighten SL under this many seconds to expiry
+const LIVE_LATE_SL_FRAC = 0.25;           // #2 tighter SL fraction near expiry (vs LIVE_SL_FRAC)
+const LIVE_MAX_CONVICTION_MULT = 1.5;     // #3 sizing multiplier ceiling
+const LIVE_MIN_CONVICTION_MULT = 0.5;     // #3 sizing multiplier floor
+const LIVE_COINFLIP_BAND = 0.05;          // #4 |ask - 0.5| below this = coinflip zone
+const LIVE_COINFLIP_MIN_SIGMA = 1.5;      // #4 need this much sigma to trade coinflip prices
 
 export interface AutoTradeOrderRow {
   id: string;
@@ -138,6 +148,24 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       .gte("created_at", since);
     const recentTickers = new Set((recentRows ?? []).map((r: { ticker: string }) => r.ticker));
 
+    // ── #5 cooldown + #6 per-symbol loss cap (live only) ──
+    const cooldownTickers = new Set<string>();
+    const perSymbolPnl = new Map<string, number>();
+    if (isLive) {
+      const symSince = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const cooldownCutoff = new Date(Date.now() - LIVE_COOLDOWN_SEC * 1000).toISOString();
+      const { data: symRows } = await supabase
+        .from("auto_trade_orders")
+        .select("ticker, pnl_usd, settled_at")
+        .eq("user_id", userId)
+        .eq("mode", "live")
+        .gte("created_at", symSince);
+      for (const r of ((symRows ?? []) as Array<{ ticker: string; pnl_usd: number | null; settled_at: string | null }>)) {
+        perSymbolPnl.set(r.ticker, (perSymbolPnl.get(r.ticker) ?? 0) + (Number(r.pnl_usd) || 0));
+        if (r.settled_at && r.settled_at >= cooldownCutoff) cooldownTickers.add(r.ticker);
+      }
+    }
+
     const result = await getBtcMarkets();
     const skipReasons: string[] = [];
 
@@ -200,6 +228,32 @@ export const runAutoTrade = createServerFn({ method: "POST" })
             return false;
           }
           if (recentTickers.has(m.ticker)) { skipReasons.push(`${m.ticker}: traded in last 24h`); return false; }
+          // #5 cooldown: don't re-enter a symbol just after any recent close
+          if (isLive && cooldownTickers.has(m.ticker)) {
+            skipReasons.push(`${m.ticker}: cooldown (closed < ${LIVE_COOLDOWN_SEC}s ago)`);
+            return false;
+          }
+          // #6 per-symbol 24h loss cap
+          if (isLive) {
+            const symPnl = perSymbolPnl.get(m.ticker) ?? 0;
+            if (symPnl <= -LIVE_PER_SYMBOL_LOSS_CAP_USD) {
+              skipReasons.push(`${m.ticker}: symbol loss cap ($${symPnl.toFixed(2)} ≤ -$${LIVE_PER_SYMBOL_LOSS_CAP_USD})`);
+              return false;
+            }
+          }
+          // #1 EV gate: our probability must beat the ask by a real margin
+          const askDollarsFilter = m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice));
+          const ourProbFilter = m.side === "YES" ? m.modelYesProb : 1 - m.modelYesProb;
+          const evEdgeFilter = ourProbFilter - askDollarsFilter;
+          if (evEdgeFilter < LIVE_MIN_EV_MARGIN) {
+            skipReasons.push(`${m.ticker}: EV ${(evEdgeFilter * 100).toFixed(1)}¢ < ${LIVE_MIN_EV_MARGIN * 100}¢ (prob ${(ourProbFilter * 100).toFixed(0)}% vs ask ${(askDollarsFilter * 100).toFixed(0)}¢)`);
+            return false;
+          }
+          // #4 coinflip-price guard: if market prices this as near-50/50, require strong sigma
+          if (Math.abs(askDollarsFilter - 0.5) < LIVE_COINFLIP_BAND && m.sigmaDistance < LIVE_COINFLIP_MIN_SIGMA) {
+            skipReasons.push(`${m.ticker}: coinflip price ${(askDollarsFilter * 100).toFixed(0)}¢ needs ≥${LIVE_COINFLIP_MIN_SIGMA}σ (have ${m.sigmaDistance.toFixed(2)}σ)`);
+            return false;
+          }
           return true;
         })
         .sort((a, b) => (b.effectiveEdge - b.m.requiredEdgePts) - (a.effectiveEdge - a.m.requiredEdgePts))
@@ -241,7 +295,13 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       const limitCents = Math.max(1, Math.min(99, Math.round(
         (m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
       )));
-      const contracts = Math.max(1, Math.floor((data.stakeUsd * 100) / limitCents));
+      // #3 Conviction sizing: scale requested stake by sigma-based conviction, clamped.
+      // Force mode uses full stake (no sizing adjustment).
+      const convictionMult = data.force
+        ? 1
+        : Math.max(LIVE_MIN_CONVICTION_MULT, Math.min(LIVE_MAX_CONVICTION_MULT, m.sigmaDistance / 1.5));
+      const sizedStake = data.stakeUsd * convictionMult;
+      const contracts = Math.max(1, Math.floor((sizedStake * 100) / limitCents));
       const stakeActual = (contracts * limitCents) / 100;
 
       let kalshiOrderId: string | null = null;
@@ -479,7 +539,10 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
     for (const { r, markCents, markPnl } of marked) {
       const entryCents = r.limit_cents;
       const tpThreshold = LIVE_TP_FRAC * Number(r.stake_usd);
-      const slThreshold = -LIVE_SL_FRAC * Number(r.stake_usd);
+      // #2 Time-decay-aware SL: tighten stop as expiry approaches (theta protection).
+      const secondsLeft = Math.max(0, (Date.parse(r.close_time) - Date.now()) / 1000);
+      const slFrac = secondsLeft < LIVE_LATE_TIGHTEN_SEC ? LIVE_LATE_SL_FRAC : LIVE_SL_FRAC;
+      const slThreshold = -slFrac * Number(r.stake_usd);
       const adverseCents = entryCents - markCents;
       const sideProbNow = currentModelProbBySide.get(r.ticker);
 
