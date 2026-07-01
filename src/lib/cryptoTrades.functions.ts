@@ -167,6 +167,7 @@ export async function submitKalshiBuy(
       kelly_multiplier: data.kellyMultiplier ?? null,
       close_time: data.closeTime ?? null,
       chart_verdict_score: data.chartVerdictScore ?? null,
+      inputs_snapshot: data.inputsSnapshot ?? null,
       status: "pending",
     })
     .select("id")
