@@ -883,7 +883,8 @@ function AutoTradePanel() {
   const WINDOW_MS = 15 * 60 * 1000;
   // Paroli (anti-martingale) upsize: press winners only when the settled order
   // cleared a strong model gate. Resets on loss or after MART_PAROLI_MAX wins.
-  const MART_PAROLI_MULT = 1.5;
+  // Per-step multipliers: win#1 → 1.5x, win#2 → 1.0x (hold flat for safer 3rd bet).
+  const MART_PAROLI_STEPS = [1.5, 1.0];
   const MART_PAROLI_MAX = 3;
   const MART_PAROLI_MIN_SIGMA = 1.5;
   const MART_PAROLI_MIN_EDGE = 5;
@@ -943,7 +944,8 @@ function AutoTradePanel() {
           setMartWins(0);
           toast.success(`Paroli WIN #${nextWins} — streak cap, locking in & reset to $${MART_BASE}`);
         } else if (gatePassed) {
-          const nextStake = Math.min(Math.round(martStake * MART_PAROLI_MULT), MART_CAP);
+          const mult = MART_PAROLI_STEPS[martWins] ?? 1.0;
+          const nextStake = Math.min(Math.round(martStake * mult), MART_CAP);
           setMartStake(nextStake);
           setMartWins(nextWins);
           toast.success(`Paroli WIN #${nextWins} — pressing to $${nextStake} (σ ${sig.toFixed(2)} · edge ${edge.toFixed(1)}pt)`);
