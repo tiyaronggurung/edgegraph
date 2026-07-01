@@ -1231,6 +1231,7 @@ function AutoTradePanel() {
           )}
           {autoMart && <MartingaleCountdown windowMs={WINDOW_MS} />}
           <ChartVerdictBadge compact />
+          <KalshiSentimentBadge s={kalshiSentiment} compact />
           {autoMart && (
             <button
               onClick={() => setChartGate(v => !v)}
@@ -1243,6 +1244,19 @@ function AutoTradePanel() {
               {chartGate ? "Chart gate ON" : "Chart gate OFF"}
             </button>
           )}
+          {autoMart && (
+            <button
+              onClick={() => setSentimentGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${sentimentGate ? "border-violet-500/50 bg-violet-500/15 text-violet-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={sentimentGate
+                ? `Sentiment gate ON: skip fire when ATM YES ∈ 48–52¢ (market chop). Current: ${kalshiSentiment.ready && kalshiSentiment.atmYesPct != null ? kalshiSentiment.atmYesPct.toFixed(0) + "¢" : "…"}`
+                : "Sentiment gate OFF: fire every window regardless of Kalshi consensus"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${sentimentGate ? "bg-violet-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {sentimentGate ? "Sentiment gate ON" : "Sentiment gate OFF"}
+            </button>
+          )}
+
           <button
             onClick={() => runForce()}
             disabled={forceBusy || liveBusy}
