@@ -486,6 +486,48 @@ export type Database = {
         }
         Relationships: []
       }
+      crypto_model_studies: {
+        Row: {
+          created_at: string
+          dominant_failures: Json
+          id: string
+          miss_id_watermark: string | null
+          misses_analyzed: number
+          model: string
+          raw: Json | null
+          recommendations: Json
+          summary: string
+          user_id: string
+          wins_analyzed: number
+        }
+        Insert: {
+          created_at?: string
+          dominant_failures?: Json
+          id?: string
+          miss_id_watermark?: string | null
+          misses_analyzed?: number
+          model: string
+          raw?: Json | null
+          recommendations?: Json
+          summary: string
+          user_id: string
+          wins_analyzed?: number
+        }
+        Update: {
+          created_at?: string
+          dominant_failures?: Json
+          id?: string
+          miss_id_watermark?: string | null
+          misses_analyzed?: number
+          model?: string
+          raw?: Json | null
+          recommendations?: Json
+          summary?: string
+          user_id?: string
+          wins_analyzed?: number
+        }
+        Relationships: []
+      }
       crypto_trade_misses: {
         Row: {
           actual_dir: string
