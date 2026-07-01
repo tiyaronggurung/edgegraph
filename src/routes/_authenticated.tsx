@@ -11,7 +11,10 @@ function AuthLayout() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   useEffect(() => {
-    if (!loading && !user) nav({ to: "/login" });
+    if (!loading && !user) {
+      const here = window.location.pathname + window.location.search;
+      nav({ to: "/login", search: { redirect: here } });
+    }
   }, [user, loading, nav]);
 
   if (loading) {
