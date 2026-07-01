@@ -1,0 +1,2 @@
+ALTER TABLE public.auto_trade_orders ADD COLUMN IF NOT EXISTS is_martingale BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS auto_trade_orders_is_martingale_idx ON public.auto_trade_orders (is_martingale) WHERE is_martingale = true;
