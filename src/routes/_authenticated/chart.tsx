@@ -6,7 +6,8 @@ import { useTrendlineAnalysis } from "@/hooks/useTrendlineAnalysis";
 import { useCandleMomentum } from "@/hooks/useCandleMomentum";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { diagnoseRecentMisses, listRecentMisses } from "@/lib/cryptoMisses.functions";
+import { diagnoseRecentMisses, listRecentMisses, studyMissesWithAI, getLatestStudy } from "@/lib/cryptoMisses.functions";
+import { useEffect } from "react";
 
 export const Route = createFileRoute("/_authenticated/chart")({
   head: () => ({
