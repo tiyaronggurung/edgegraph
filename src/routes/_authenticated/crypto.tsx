@@ -1288,6 +1288,20 @@ function AutoTradePanel() {
               {sentimentGate ? "Sentiment gate ON" : "Sentiment gate OFF"}
             </button>
           )}
+          {autoMart && (
+            <button
+              onClick={() => setRoundGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${roundGate ? "border-amber-500/50 bg-amber-500/15 text-amber-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={roundGate
+                ? `Round-number gate ON: skip fire when ATM strike isn't a multiple of ${ROUND_STEP}. Current strike: ${kalshiSentiment.ready && kalshiSentiment.strike != null ? "$" + kalshiSentiment.strike.toFixed(0) : "…"}`
+                : `Round-number gate OFF: fire on any strike, including non-multiples of ${ROUND_STEP}`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${roundGate ? "bg-amber-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {roundGate ? "Round gate ON" : "Round gate OFF"}
+            </button>
+          )}
+
+
 
           <button
             onClick={() => runForce()}
