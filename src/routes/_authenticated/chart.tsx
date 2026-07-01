@@ -31,6 +31,20 @@ function ChartPage() {
   const [showLines, setShowLines] = useState(true);
   const cm = useCandleMomentum();
 
+  // Auto-backtest wrong predictions: refresh diagnoses periodically + list misses.
+  const diagnoseFn = useServerFn(diagnoseRecentMisses);
+  const listFn = useServerFn(listRecentMisses);
+  const qc = useQueryClient();
+  const missesQ = useQuery({
+    queryKey: ["crypto-misses"],
+    queryFn: () => listFn(),
+    refetchInterval: 30_000,
+  });
+  const diag = useMutation({
+    mutationFn: () => diagnoseFn(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["crypto-misses"] }),
+  });
+
   const scale = useMemo(() => {
     const c = a.candles;
     if (c.length < 2) return null;
