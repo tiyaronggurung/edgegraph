@@ -338,7 +338,11 @@ ${JSON.stringify(missesSlim)}
 RECENT WINS FOR CONTRAST (${winsSlim.length}):
 ${JSON.stringify(winsSlim)}
 
+PRIOR RECOMMENDATION FEEDBACK FROM THE USER (${feedbackDigest.length}) — vote "up" means the recommendation was helpful, "down" means it was not. Favor patterns similar to the up-voted ones and avoid repeating the substance of down-voted ones:
+${JSON.stringify(feedbackDigest)}
+
 Return ONLY the JSON object.`;
+
 
     const parsed = await callLovableAi(prompt);
     const summary = typeof parsed.summary === "string" ? parsed.summary : "No summary returned.";
