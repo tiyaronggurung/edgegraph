@@ -977,6 +977,18 @@ function AutoTradePanel() {
     window.localStorage.setItem("crypto.autoMart.trendGate", trendGate ? "on" : "off");
   }, [trendGate]);
   const trendAnalysis = useTrendlineAnalysis();
+
+  // Candle momentum gate — big-red forming = SELL (block longs / block window),
+  // big-green forming = HOLD (skip fresh entry, existing position is fine).
+  const [candleGate, setCandleGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.candleGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.candleGate", candleGate ? "on" : "off");
+  }, [candleGate]);
+  const candleMomentum = useCandleMomentum();
   const chartVerdict = useChartVerdict({
     regime: regimeOn ? marketRegime.regime : "mixed",
     coinbase: cbFeed ? { price: coinbase.price, connected: coinbase.connected } : undefined,
