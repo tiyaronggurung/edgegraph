@@ -25,6 +25,7 @@ import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/l
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCryptoRouteImport } from './routes/_authenticated/crypto'
+import { Route as AuthenticatedChartRouteImport } from './routes/_authenticated/chart'
 import { Route as AuthenticatedBacktestRouteImport } from './routes/_authenticated/backtest'
 import { Route as AuthenticatedAnalyzeRouteImport } from './routes/_authenticated/analyze'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
@@ -122,6 +123,11 @@ const AuthenticatedCryptoRoute = AuthenticatedCryptoRouteImport.update({
   path: '/crypto',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedChartRoute = AuthenticatedChartRouteImport.update({
+  id: '/chart',
+  path: '/chart',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedBacktestRoute = AuthenticatedBacktestRouteImport.update({
   id: '/backtest',
   path: '/backtest',
@@ -215,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/analyze': typeof AuthenticatedAnalyzeRoute
   '/backtest': typeof AuthenticatedBacktestRoute
+  '/chart': typeof AuthenticatedChartRoute
   '/crypto': typeof AuthenticatedCryptoRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
@@ -247,6 +254,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/analyze': typeof AuthenticatedAnalyzeRoute
   '/backtest': typeof AuthenticatedBacktestRoute
+  '/chart': typeof AuthenticatedChartRoute
   '/crypto': typeof AuthenticatedCryptoRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
@@ -281,6 +289,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/analyze': typeof AuthenticatedAnalyzeRoute
   '/_authenticated/backtest': typeof AuthenticatedBacktestRoute
+  '/_authenticated/chart': typeof AuthenticatedChartRoute
   '/_authenticated/crypto': typeof AuthenticatedCryptoRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
@@ -315,6 +324,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/analyze'
     | '/backtest'
+    | '/chart'
     | '/crypto'
     | '/dashboard'
     | '/history'
@@ -347,6 +357,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/analyze'
     | '/backtest'
+    | '/chart'
     | '/crypto'
     | '/dashboard'
     | '/history'
@@ -380,6 +391,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/analyze'
     | '/_authenticated/backtest'
+    | '/_authenticated/chart'
     | '/_authenticated/crypto'
     | '/_authenticated/dashboard'
     | '/_authenticated/history'
@@ -539,6 +551,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCryptoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/chart': {
+      id: '/_authenticated/chart'
+      path: '/chart'
+      fullPath: '/chart'
+      preLoaderRoute: typeof AuthenticatedChartRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/backtest': {
       id: '/_authenticated/backtest'
       path: '/backtest'
@@ -651,6 +670,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAnalyzeRoute: typeof AuthenticatedAnalyzeRoute
   AuthenticatedBacktestRoute: typeof AuthenticatedBacktestRoute
+  AuthenticatedChartRoute: typeof AuthenticatedChartRoute
   AuthenticatedCryptoRoute: typeof AuthenticatedCryptoRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
@@ -667,6 +687,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAnalyzeRoute: AuthenticatedAnalyzeRoute,
   AuthenticatedBacktestRoute: AuthenticatedBacktestRoute,
+  AuthenticatedChartRoute: AuthenticatedChartRoute,
   AuthenticatedCryptoRoute: AuthenticatedCryptoRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
