@@ -1090,6 +1090,21 @@ function AutoTradePanel() {
         }
       }
 
+      // Optional Round-number gate — skip windows where ATM strike isn't a
+      // multiple of 50. Round levels act as magnets/support-resistance.
+      if (roundGate) {
+        const s = kalshiSentiment;
+        if (!s.ready || s.strike == null) {
+          // No market data yet — hold, don't burn the window.
+          return;
+        }
+        if (Math.round(s.strike) % ROUND_STEP !== 0) {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Round-number gate: window skipped — ATM strike $${s.strike.toFixed(0)} not a multiple of ${ROUND_STEP}`);
+          return;
+        }
+      }
+
 
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
@@ -1107,7 +1122,8 @@ function AutoTradePanel() {
     const h = setInterval(tick, 5_000);
     return () => { cancelled = true; clearInterval(h); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment]);
+  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment, roundGate]);
+
 
   return (
     <div className="border border-border rounded-lg bg-card">
