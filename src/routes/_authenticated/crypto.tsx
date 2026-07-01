@@ -662,7 +662,14 @@ function AutoTradePanel() {
     tick();
     const h = setInterval(tick, 60_000);
     return () => { cancelled = true; clearInterval(h); };
-  }, [settleFn, autoExitFn, qc]);
+  }, [settleFn, autoExitFn, settleSkipFn, qc]);
+
+  // Counterfactual "would-have" report — shows whether gates saved us money.
+  const skipReport = useQuery({
+    queryKey: ["auto-trade-skip-report"],
+    queryFn: () => skipReportFn(),
+    refetchInterval: 120_000,
+  });
 
   const orders = list.data?.orders ?? [];
   const liveOrders = orders.filter(o => o.mode === "live");
