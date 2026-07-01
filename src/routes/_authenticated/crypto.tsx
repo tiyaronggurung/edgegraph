@@ -1440,6 +1440,10 @@ function CryptoPage() {
             {data.markets.map(m => <MarketRow key={m.ticker} m={m} candles={data.candles} sizing={sizing} onPlace={setPending} live={live} />)}
           </div>
 
+          <PricingStudyPanel markets={data.markets} />
+
+          <CalibrationReportPanel />
+
           <ModelAccuracyPanel />
 
           <EquityMomentumPanel />
