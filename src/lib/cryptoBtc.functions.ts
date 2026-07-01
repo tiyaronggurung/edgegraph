@@ -905,6 +905,8 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
               spot: m.spot,
               closeTime: m.closeTime as string,
               secondsToClose: m.secondsToClose,
+              sigmaMinEffective: m.sigmaMinEffective,
+              theoryYesProb: m.theoryYesProb,
             })),
         );
         await settleDuePredictions();
