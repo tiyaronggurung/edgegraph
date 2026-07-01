@@ -944,6 +944,22 @@ function AutoTradePanel() {
     [marketsQ.data],
   );
 
+  // Opt-in Round-number gate: skip windows where the ATM strike is NOT a
+  // multiple of 50. Round strikes (65000, 65050) act as magnets / S&R levels;
+  // non-round strikes (65024, 65037) are unreliable — spot drifts to the
+  // nearest round level. Default OFF.
+  const ROUND_STEP = 50;
+  const [roundGate, setRoundGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.roundGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.roundGate", roundGate ? "on" : "off");
+  }, [roundGate]);
+
+
+
 
   useEffect(() => {
     if (typeof window === "undefined") return;
