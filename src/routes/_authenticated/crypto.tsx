@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle, ArrowUp, ArrowDown, Volume2, VolumeX } from "lucide-react";
 import { playOrderPlaced, playOrderFilled } from "@/lib/orderSounds";
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
@@ -9,6 +9,7 @@ import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshi
 import { getPredictionStats, getCalibrationReport, type CalibrationRow } from "@/lib/cryptoPredictions.functions";
 import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, autoExitLivePositions, settleAutoTradeSkipLog, getSkipReport, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
+import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { EquityMomentumPanel } from "@/components/EquityMomentumPanel";
 import { toast } from "sonner";
 
@@ -257,7 +258,7 @@ function ConfirmModal({
 }
 
 interface OpenPosSignal {
-  action: "CASH_OUT_PROFIT" | "CASH_OUT_FLIP" | "STOP_LOSS" | "HOLD";
+  action: "CASH_OUT_PROFIT" | "CASH_OUT_FLIP" | "STOP_LOSS" | "STOP_LOSS_SPOT" | "HOLD";
   label: string;
   reason: string;
   exitEdgePts: number;       // (currentSidePrice − modelSideProb) × 100. Positive = market overpaying us.
@@ -267,7 +268,19 @@ interface OpenPosSignal {
   currentSideProb: number;
 }
 
-function computeExitSignal(trade: any, market: BtcMarket | undefined): OpenPosSignal | null {
+// Rule 1 — spot-crash threshold: BTC moves against our side by this %
+// over the last 3min ⇒ force an immediate exit even if the model still likes us.
+const SPOT_CRASH_PCT_3MIN = 0.25;
+// Rule 2 — no-flip lockout: with ≤180s to close AND we're on the ≥80% side,
+// suppress FLIP/STOP_LOSS "panic" exits — market almost never flips this late.
+const NO_FLIP_MAX_SECS = 180;
+const NO_FLIP_MIN_MARKET_PROB = 0.80;
+
+function computeExitSignal(
+  trade: any,
+  market: BtcMarket | undefined,
+  velocity?: { pctChange3min: number | null } | null,
+): OpenPosSignal | null {
   if (!market) return null;
   const contracts = Number(trade.contracts);
   const stake = Number(trade.stake_usd);
@@ -282,13 +295,29 @@ function computeExitSignal(trade: any, market: BtcMarket | undefined): OpenPosSi
   const exitCents = Math.max(1, Math.min(99, Math.round(currentSidePrice * 100)));
 
   // Decision logic:
+  //  • STOP_LOSS_SPOT : BTC spot moved against us ≥ threshold in last 3min (Rule 1)
   //  • CASH_OUT_PROFIT: market overpays vs model by ≥3pts AND we're up money
-  //  • CASH_OUT_FLIP : model now disagrees with our side (model side prob < 0.40) AND we're still up
-  //  • STOP_LOSS     : model strongly against (< 0.25) AND down ≥30% of stake
-  //  • HOLD          : otherwise
+  //  • CASH_OUT_FLIP  : model now disagrees with our side (model side prob < 0.40) AND we're still up
+  //  • STOP_LOSS      : model strongly against (< 0.25) AND down ≥30% of stake
+  //  • HOLD           : otherwise
   let action: OpenPosSignal["action"] = "HOLD";
   let label = "Hold";
   let reason = `Model still ${(modelSideProb * 100).toFixed(0)}% on ${trade.side === "YES" ? "UP" : "DOWN"}`;
+
+  // Rule 1 — spot crash exit (highest priority; overrides no-flip lockout).
+  const v3 = velocity?.pctChange3min;
+  if (v3 != null && Number.isFinite(v3)) {
+    const against = trade.side === "YES" ? -v3 : v3; // positive = moving against us
+    if (against >= SPOT_CRASH_PCT_3MIN) {
+      return {
+        action: "STOP_LOSS_SPOT",
+        label: "Exit — spot crash",
+        reason: `BTC ${v3 >= 0 ? "+" : ""}${v3.toFixed(2)}% in 3min vs ${trade.side === "YES" ? "UP" : "DOWN"} — exit ASAP`,
+        exitEdgePts, pnlUsd, pnlPct, exitCents, currentSideProb: modelSideProb,
+      };
+    }
+  }
+
   if (exitEdgePts >= 3 && pnlUsd > 0) {
     action = "CASH_OUT_PROFIT";
     label = "Cash out (profit)";
@@ -301,6 +330,19 @@ function computeExitSignal(trade: any, market: BtcMarket | undefined): OpenPosSi
     action = "STOP_LOSS";
     label = "Stop loss";
     reason = `Model only ${(modelSideProb*100).toFixed(0)}% — cap loss at $${pnlUsd.toFixed(2)}`;
+  }
+
+  // Rule 2 — no-flip lockout: if we're on the winning side (market ≥ 80%) with
+  // ≤3min left, override CASH_OUT_FLIP / STOP_LOSS back to HOLD. Market almost
+  // never flips from 80/20 in the final 3min. STOP_LOSS_SPOT already returned.
+  if (
+    market.secondsToClose <= NO_FLIP_MAX_SECS &&
+    currentSidePrice >= NO_FLIP_MIN_MARKET_PROB &&
+    (action === "CASH_OUT_FLIP" || action === "STOP_LOSS")
+  ) {
+    action = "HOLD";
+    label = "Hold (no-flip)";
+    reason = `${(currentSidePrice*100).toFixed(0)}¢ on our side w/ ${market.secondsToClose}s left — flip unlikely`;
   }
 
   return { action, label, reason, exitEdgePts, pnlUsd, pnlPct, exitCents, currentSideProb: modelSideProb };
@@ -346,6 +388,8 @@ function OpenPositions({ markets }: { markets: BtcMarket[] }) {
     onError: (e: any) => toast.error(`Close failed: ${e?.message ?? "unknown"}`),
   });
   const [confirm, setConfirm] = useState<{ trade: any; sig: OpenPosSignal } | null>(null);
+  const velocity = useBtcVelocity();
+  const autoExitedRef = useRef<Set<string>>(new Set());
 
   const open = useMemo(() => {
     const trades = (q.data?.trades ?? []) as any[];
@@ -353,13 +397,30 @@ function OpenPositions({ markets }: { markets: BtcMarket[] }) {
     const byTicker = new Map(markets.map(m => [m.ticker, m]));
     return trades
       .filter(t => t.status === "submitted" && t.close_time && new Date(t.close_time).getTime() > now)
-      .map(t => ({ trade: t, market: byTicker.get(t.ticker), sig: computeExitSignal(t, byTicker.get(t.ticker)) }))
+      .map(t => ({ trade: t, market: byTicker.get(t.ticker), sig: computeExitSignal(t, byTicker.get(t.ticker), velocity) }))
       .filter(x => x.sig !== null)
       .sort((a, b) => {
-        const rank = (s: OpenPosSignal | null) => s?.action === "STOP_LOSS" ? 0 : s?.action === "CASH_OUT_PROFIT" ? 1 : s?.action === "CASH_OUT_FLIP" ? 2 : 3;
+        const rank = (s: OpenPosSignal | null) =>
+          s?.action === "STOP_LOSS_SPOT" ? 0
+          : s?.action === "STOP_LOSS" ? 1
+          : s?.action === "CASH_OUT_PROFIT" ? 2
+          : s?.action === "CASH_OUT_FLIP" ? 3 : 4;
         return rank(a.sig) - rank(b.sig);
       });
-  }, [q.data, markets]);
+  }, [q.data, markets, velocity]);
+
+  // Rule 1 auto-exit: on STOP_LOSS_SPOT, fire market sell exactly once per trade.
+  useEffect(() => {
+    for (const { trade: t, sig } of open) {
+      if (sig?.action !== "STOP_LOSS_SPOT") continue;
+      if (autoExitedRef.current.has(t.id)) continue;
+      if (sell.isPending) continue;
+      autoExitedRef.current.add(t.id);
+      toast.error(`Auto-exit: spot crash on ${t.ticker}`, { description: sig.reason, duration: 10_000 });
+      sell.mutate({ tradeId: t.id, limitPriceCents: sig.exitCents });
+    }
+  }, [open, sell]);
+
 
   if (!open.length) return null;
 
@@ -373,7 +434,9 @@ function OpenPositions({ markets }: { markets: BtcMarket[] }) {
         {open.map(({ trade: t, market, sig }) => {
           if (!sig || !market) return null;
           const isExit = sig.action !== "HOLD";
-          const actionColor = sig.action === "STOP_LOSS"
+          const actionColor = sig.action === "STOP_LOSS_SPOT"
+            ? "border-red-600 bg-red-600/20 text-red-300 animate-pulse"
+            : sig.action === "STOP_LOSS"
             ? "border-red-500/60 bg-red-500/10 text-red-400"
             : sig.action === "CASH_OUT_PROFIT"
               ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400"
