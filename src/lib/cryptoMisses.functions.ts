@@ -376,8 +376,8 @@ export const getLatestStudy = createServerFn({ method: "GET" })
           wins_analyzed: latest.wins_analyzed,
           model: latest.model,
           summary: latest.summary,
-          dominant_failures: (latest.dominant_failures as string[]) ?? [],
-          recommendations: (latest.recommendations as StudyRecommendation[]) ?? [],
+          dominant_failures: (latest.dominant_failures as unknown as string[]) ?? [],
+          recommendations: (latest.recommendations as unknown as StudyRecommendation[]) ?? [],
           created_at: latest.created_at,
         }
       : null;
