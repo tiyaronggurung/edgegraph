@@ -50,6 +50,8 @@ export function useBtcVelocity(): BtcVelocity {
     return buf[buf.length - 1].p;
   };
 
+  // Reference `tick` so the memo/render updates each buffer push.
+  void tick;
   const p1 = findAt(60_000);
   const p3 = findAt(180_000);
 
@@ -59,7 +61,5 @@ export function useBtcVelocity(): BtcVelocity {
     pctChange3min: now != null && p3 != null && p3 > 0 ? (now / p3 - 1) * 100 : null,
     samples: buf.length,
     connected: spot.connected,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    ...(tick, {}),
   };
 }
