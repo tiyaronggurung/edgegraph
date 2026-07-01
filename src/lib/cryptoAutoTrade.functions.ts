@@ -410,20 +410,23 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
         .maybeSingle();
       if (claimErr || !claimed) { reasons.push(`${r.ticker}: claim lost`); continue; }
 
-      // Place a Kalshi sell at the current bid (most likely to fill).
+      // Place a Kalshi sell at the current bid (most likely to fill). Kalshi V2
+      // endpoint + IOC. YES holder sells via ask, NO holder via bid.
       const sellLimitCents = Math.max(1, Math.min(99, markCents));
       try {
         const { signKalshi } = await import("./cryptoTrades.functions");
-        const path = "/portfolio/orders";
+        const path = "/portfolio/events/orders";
         const headers = await signKalshi("POST", path);
+        const priceDollars = (r.side === "YES" ? sellLimitCents : 100 - sellLimitCents) / 100;
         const body = {
           ticker: r.ticker,
           action: "sell",
-          side: r.side === "YES" ? "yes" : "no",
+          side: r.side === "YES" ? "ask" : "bid",
           type: "limit",
-          count: r.contracts,
-          yes_price: r.side === "YES" ? sellLimitCents : undefined,
-          no_price: r.side === "NO" ? sellLimitCents : undefined,
+          count: String(r.contracts),
+          price: priceDollars.toFixed(4),
+          time_in_force: "immediate_or_cancel",
+          self_trade_prevention_type: "taker_at_cross",
           client_order_id: `auto-exit-${r.id}`.slice(0, 64),
         };
         const res = await fetch(`${KALSHI_PUBLIC_BASE}${path}`, {
@@ -439,19 +442,36 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
           reasons.push(`${r.ticker}: sell failed — ${msg}`);
           continue;
         }
-        const realizedPnl = ((sellLimitCents - entryCents) / 100) * r.contracts;
+
+        // Honor Kalshi's fill_count — IOC may return 0 fills. Only settle if
+        // something actually crossed; otherwise revert claim and let a later
+        // tick (or expiry settlement) handle the position.
+        const fillCount = Number(j?.order?.fill_count ?? j?.fill_count ?? 0);
+        const avgFillDollars = Number(j?.order?.average_fill_price ?? j?.average_fill_price ?? 0);
+        if (!Number.isFinite(fillCount) || fillCount <= 0) {
+          await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", r.id);
+          reasons.push(`${r.ticker}: sell 0-fill (IOC) @ ${sellLimitCents}¢ — reverted`);
+          continue;
+        }
+
+        // Use actual filled quantity + actual fill price for PnL (fall back to
+        // the limit if Kalshi omitted average_fill_price).
+        const filledCents = avgFillDollars > 0
+          ? Math.round(avgFillDollars * (r.side === "YES" ? 100 : -100) + (r.side === "YES" ? 0 : 100))
+          : sellLimitCents;
+        const realizedPnl = ((filledCents - entryCents) / 100) * fillCount;
         const newStatus = realizedPnl > 0 ? "settled_win" : "settled_loss";
         await supabase
           .from("auto_trade_orders")
           .update({
             status: newStatus,
-            settle_price: sellLimitCents / 100,
+            settle_price: filledCents / 100,
             pnl_usd: realizedPnl,
             settled_at: new Date().toISOString(),
           })
           .eq("id", r.id);
         exited++;
-        reasons.push(`${r.ticker}: ${exitReason} closed @ ${sellLimitCents}¢ (pnl $${realizedPnl.toFixed(2)})`);
+        reasons.push(`${r.ticker}: ${exitReason} closed ${fillCount}/${r.contracts} @ ${filledCents}¢ (pnl $${realizedPnl.toFixed(2)})`);
       } catch (e: any) {
         await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", r.id);
         reasons.push(`${r.ticker}: sell err ${e?.message ?? "x"}`);
