@@ -965,6 +965,17 @@ function AutoTradePanel() {
     window.localStorage.setItem("crypto.autoMart.magnetGate", magnetGate ? "on" : "off");
   }, [magnetGate]);
   const btcTicks = useBinanceBtcTicks();
+
+  // Trendline gate — skip fires that oppose the trendline+fib bias.
+  const [trendGate, setTrendGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.trendGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.trendGate", trendGate ? "on" : "off");
+  }, [trendGate]);
+  const trendAnalysis = useTrendlineAnalysis();
   const chartVerdict = useChartVerdict({
     regime: regimeOn ? marketRegime.regime : "mixed",
     coinbase: cbFeed ? { price: coinbase.price, connected: coinbase.connected } : undefined,
