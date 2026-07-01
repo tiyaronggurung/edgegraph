@@ -655,6 +655,7 @@ function AutoTradePanel() {
       try {
         await autoExitFn();
         await settleFn();
+        await settleSkipFn();
         if (!cancelled) qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
       } catch { /* ignore */ }
     };
