@@ -99,11 +99,19 @@ export const runAutoTrade = createServerFn({ method: "POST" })
         .gte("created_at", dayAgo);
       const liveCount24h = (liveRecent ?? []).length;
       if (liveCount24h >= LIVE_DAILY_ORDER_CAP) {
-        throw new Error(`Daily live order cap reached (${LIVE_DAILY_ORDER_CAP} in last 24h).`);
+        return {
+          sessionId, mode: data.mode, attempted: 0, placed: 0, skipped: 1,
+          skipReasons: [`Daily live order cap reached (${LIVE_DAILY_ORDER_CAP} in last 24h). Auto-trade paused.`],
+          orders: [],
+        };
       }
       const realized24h = (liveRecent ?? []).reduce((s: number, r: { pnl_usd: number | null }) => s + (Number(r.pnl_usd) || 0), 0);
       if (realized24h <= -LIVE_DAILY_LOSS_CAP_USD) {
-        throw new Error(`Daily live loss cap reached (realized $${realized24h.toFixed(2)} ≤ -$${LIVE_DAILY_LOSS_CAP_USD}).`);
+        return {
+          sessionId, mode: data.mode, attempted: 0, placed: 0, skipped: 1,
+          skipReasons: [`Daily live loss cap reached (realized $${realized24h.toFixed(2)} ≤ -$${LIVE_DAILY_LOSS_CAP_USD}). Auto-trade paused for 24h.`],
+          orders: [],
+        };
       }
     }
 
