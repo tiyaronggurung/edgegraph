@@ -395,7 +395,7 @@ export const runAutoTrade = createServerFn({ method: "POST" })
           partial_pnl_usd: 0,
           exit_ladder: DEFAULT_EXIT_LADDER as any,
         })
-        .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at")
+        .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
         .single();
 
       if (error) { skipReasons.push(`${m.ticker}: insert error ${error.message}`); continue; }
@@ -418,7 +418,7 @@ export const listAutoTradeOrders = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const { data: rows } = await supabase
       .from("auto_trade_orders")
-      .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at")
+      .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(100);
