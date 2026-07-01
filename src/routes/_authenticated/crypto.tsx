@@ -1087,6 +1087,7 @@ function AutoTradePanel() {
               reset
             </button>
           )}
+          {autoMart && <MartingaleCountdown windowMs={WINDOW_MS} />}
           <button
             onClick={() => runForce()}
             disabled={forceBusy || liveBusy}
