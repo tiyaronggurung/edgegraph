@@ -373,8 +373,10 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
     if (!rows.length) return { exited: 0, reasons: [] };
 
     let exited = 0;
+    // ── Pass 1: fetch quote + compute unrealized PnL for every open row ──
+    type Marked = { r: typeof rows[number]; markCents: number; markPnl: number };
+    const marked: Marked[] = [];
     for (const r of rows) {
-      // Pull current market quote (public endpoint, no auth needed).
       let yesBid = 0, yesAsk = 0;
       try {
         const res = await fetch(`${KALSHI_PUBLIC_BASE}/markets/${encodeURIComponent(r.ticker)}`, { headers: { Accept: "application/json" } });
@@ -391,22 +393,35 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
         reasons.push(`${r.ticker}: quote err ${e?.message ?? "x"}`);
         continue;
       }
-
-      // For YES position: we'd sell INTO the yes bid → mark = yes_bid.
-      // For NO  position: NO bid = 100 - yes_ask         → mark = 100 - yes_ask.
       const markCents = r.side === "YES" ? yesBid : 100 - yesAsk;
+      const markPnl = ((markCents - r.limit_cents) / 100) * r.contracts;
+      marked.push({ r, markCents, markPnl });
+    }
+
+    // ── Portfolio net-positive lock: if aggregate unrealized PnL across all
+    // open live positions is > 0, close ALL of them at current bid to bank
+    // the net win — even losers get closed to lock the batch profit. ──
+    const totalUnrealized = marked.reduce((s, x) => s + x.markPnl, 0);
+    const netLock = marked.length > 0 && totalUnrealized > 0;
+    if (netLock) {
+      reasons.push(`net_lock: aggregate +$${totalUnrealized.toFixed(2)} across ${marked.length} open — closing all`);
+    }
+
+    // ── Pass 2: per-row exit decision ──
+    for (const { r, markCents, markPnl } of marked) {
       const entryCents = r.limit_cents;
-      const markPnl = ((markCents - entryCents) / 100) * r.contracts;
       const tpThreshold = LIVE_TP_FRAC * Number(r.stake_usd);
       const slThreshold = -LIVE_SL_FRAC * Number(r.stake_usd);
-      const adverseCents = entryCents - markCents; // +ve = moved against us
+      const adverseCents = entryCents - markCents;
 
-      let exitReason: "tp" | "sl" | "edge" | null = null;
-      if (markPnl >= tpThreshold) exitReason = "tp";
+      let exitReason: "tp" | "sl" | "edge" | "net" | null = null;
+      if (netLock) exitReason = "net";
+      else if (markPnl >= tpThreshold) exitReason = "tp";
       else if (markPnl <= slThreshold) exitReason = "sl";
       else if (adverseCents >= LIVE_EDGE_DECAY_CENTS) exitReason = "edge";
 
       if (!exitReason) continue;
+
 
       // Race-safe claim: only one process closes this row.
       const { data: claimed, error: claimErr } = await supabase
