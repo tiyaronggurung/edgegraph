@@ -514,7 +514,7 @@ export const sellKalshiOrder = createServerFn({ method: "POST" })
     const json: any = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = json?.error?.message ?? json?.message ?? `Kalshi ${res.status}`;
-      throw new Error(msg);
+      return { ok: false as const, error: msg, status: res.status, response: json };
     }
 
     const entryCents = Math.round((Number(trade.stake_usd) / Number(trade.contracts)) * 100);
