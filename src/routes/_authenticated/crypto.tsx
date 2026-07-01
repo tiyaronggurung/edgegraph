@@ -1463,3 +1463,138 @@ function CryptoPage() {
     </div>
   );
 }
+
+function PricingStudyPanel({ markets }: { markets: BtcMarket[] }) {
+  const rows = markets
+    .filter(m => m.secondsToClose > 0 && m.yesPrice > 0 && m.yesPrice < 1)
+    .slice(0, 8);
+  if (rows.length === 0) return null;
+  return (
+    <div className="border border-border rounded-lg bg-card p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          Kalshi pricing study · theory vs market (per-side)
+        </div>
+        <div className="text-[10px] text-muted-foreground">
+          theory = diffusion + options blend (pre-adjust). mispricing = market − theory.
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs font-mono">
+          <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            <tr className="text-left">
+              <th className="py-1 pr-3">Market</th>
+              <th className="pr-3">Side</th>
+              <th className="pr-3 text-right">Δσ</th>
+              <th className="pr-3 text-right">Time</th>
+              <th className="pr-3 text-right">Theory</th>
+              <th className="pr-3 text-right">Market</th>
+              <th className="pr-3 text-right">Mispricing</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(m => {
+              const sideTheory = m.side === "YES" ? m.theoryYesProb : (1 - m.theoryYesProb);
+              const sideMarket = m.side === "YES" ? m.yesPrice : (1 - m.yesPrice);
+              const mispricePts = (sideMarket - sideTheory) * 100;
+              const color = Math.abs(mispricePts) < 2 ? "text-muted-foreground"
+                : mispricePts < 0 ? "text-emerald-400" : "text-amber-400";
+              return (
+                <tr key={m.ticker} className="border-t border-border/40">
+                  <td className="py-1 pr-3 text-foreground">${m.strike.toLocaleString()}</td>
+                  <td className="pr-3">{dirLabel(m.side)}</td>
+                  <td className="pr-3 text-right">{m.sigmaDistance.toFixed(2)}σ</td>
+                  <td className="pr-3 text-right">{fmtCountdown(m.secondsToClose)}</td>
+                  <td className="pr-3 text-right">{(sideTheory * 100).toFixed(1)}¢</td>
+                  <td className="pr-3 text-right">{(sideMarket * 100).toFixed(1)}¢</td>
+                  <td className={`pr-3 text-right ${color}`}>
+                    {mispricePts >= 0 ? "+" : ""}{mispricePts.toFixed(1)}pt
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="text-[10px] text-muted-foreground italic">
+        Negative mispricing = market underpricing our side (we can buy cheap). Positive = market overpricing.
+      </div>
+    </div>
+  );
+}
+
+function CalibrationReportPanel() {
+  const fn = useServerFn(getCalibrationReport);
+  const q = useQuery({
+    queryKey: ["btc-calibration-report"],
+    queryFn: () => fn(),
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+  const rows: CalibrationRow[] = q.data ?? [];
+  if (rows.length === 0) {
+    return (
+      <div className="border border-border rounded-lg bg-card p-3">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+          Calibration report · time × distance
+        </div>
+        <div className="text-xs text-muted-foreground">
+          No fitted buckets yet. Nightly cron (03:15 UTC) will populate this once settled predictions accumulate.
+        </div>
+      </div>
+    );
+  }
+  const timeOrder = ["30s","1m","2m","5m","10m","13m+"];
+  const sigmaOrder = ["0-0.5σ","0.5-1σ","1-2σ","2-3σ","3σ+","unknown"];
+  const sorted = [...rows].sort((a,b) =>
+    (timeOrder.indexOf(a.time_bucket) - timeOrder.indexOf(b.time_bucket)) ||
+    (sigmaOrder.indexOf(a.sigma_bucket) - sigmaOrder.indexOf(b.sigma_bucket))
+  );
+  return (
+    <div className="border border-border rounded-lg bg-card p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          Calibration report · actual vs model vs market · {rows.length} buckets
+        </div>
+        <div className="text-[10px] text-muted-foreground">
+          correction = actual ÷ avg-model (clamped 0.5–2.0)
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs font-mono">
+          <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            <tr className="text-left">
+              <th className="py-1 pr-3">Time</th>
+              <th className="pr-3">Δσ bucket</th>
+              <th className="pr-3 text-right">n</th>
+              <th className="pr-3 text-right">Actual</th>
+              <th className="pr-3 text-right">Model</th>
+              <th className="pr-3 text-right">Market</th>
+              <th className="pr-3 text-right">Theory</th>
+              <th className="pr-3 text-right">Correction</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map(r => {
+              const c = r.correction_factor;
+              const cColor = Math.abs(c - 1) < 0.1 ? "text-muted-foreground"
+                : c > 1 ? "text-emerald-400" : "text-amber-400";
+              return (
+                <tr key={`${r.time_bucket}-${r.sigma_bucket}`} className="border-t border-border/40">
+                  <td className="py-1 pr-3">{r.time_bucket}</td>
+                  <td className="pr-3">{r.sigma_bucket}</td>
+                  <td className="pr-3 text-right">{r.n_samples}</td>
+                  <td className="pr-3 text-right">{r.actual_rate != null ? (r.actual_rate * 100).toFixed(1) + "%" : "—"}</td>
+                  <td className="pr-3 text-right">{r.avg_model_prob != null ? (r.avg_model_prob * 100).toFixed(1) + "%" : "—"}</td>
+                  <td className="pr-3 text-right">{r.avg_market_prob != null ? (r.avg_market_prob * 100).toFixed(1) + "%" : "—"}</td>
+                  <td className="pr-3 text-right">{r.avg_theory_prob != null ? (r.avg_theory_prob * 100).toFixed(1) + "%" : "—"}</td>
+                  <td className={`pr-3 text-right ${cColor}`}>{c.toFixed(2)}×</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
