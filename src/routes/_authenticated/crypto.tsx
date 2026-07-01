@@ -1522,6 +1522,18 @@ function AutoTradePanel() {
               {trendGate ? `Trend ${trendAnalysis.ready ? trendAnalysis.bias.toUpperCase() : "…"}` : "Trend OFF"}
             </button>
           )}
+          {autoMart && (
+            <button
+              onClick={() => setCandleGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${candleGate ? "border-lime-500/50 bg-lime-500/15 text-lime-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={candleGate
+                ? `Candle gate ON: skip window if big-red (sell) or big-green (hold) forming. Current: ${candleMomentum.ready ? candleMomentum.forecast.replace("_", " ").toUpperCase() + " · " + candleMomentum.forecastReason : "warming up"}`
+                : "Candle gate OFF: fire regardless of forming candle strength"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${candleGate ? (candleMomentum.forecast === "big_red" ? "bg-rose-400 animate-pulse" : candleMomentum.forecast === "big_green" ? "bg-emerald-400 animate-pulse" : "bg-lime-400") : "bg-muted-foreground"}`} />
+              {candleGate ? `Candle ${candleMomentum.ready ? candleMomentum.forecast.replace("_", " ").toUpperCase() : "…"}` : "Candle OFF"}
+            </button>
+          )}
           <Link
             to="/chart"
             className="text-[10px] font-semibold px-2 py-1.5 rounded border border-border bg-muted/30 hover:bg-muted/50 flex items-center gap-1"
