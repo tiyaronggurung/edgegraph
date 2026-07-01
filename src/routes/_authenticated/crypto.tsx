@@ -851,7 +851,8 @@ function AutoTradePanel() {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("crypto.autoMart.stake", String(martStake));
     window.localStorage.setItem("crypto.autoMart.losses", String(martLosses));
-  }, [martStake, martLosses]);
+    window.localStorage.setItem("crypto.autoMart.wins", String(martWins));
+  }, [martStake, martLosses, martWins]);
 
   // Watch the last martingale order and adjust stake when it settles.
   useEffect(() => {
@@ -861,23 +862,48 @@ function AutoTradePanel() {
     const o = liveOrders.find(x => x.id === lastId);
     if (!o) return;
     if (o.status === "settled_win") {
-      if (martStake !== MART_BASE || martLosses !== 0) {
+      // Case A: recovering from a loss ladder → win locks in, reset everything.
+      if (martLosses > 0) {
         setMartStake(MART_BASE);
         setMartLosses(0);
-        toast.success(`Martingale WIN — stake reset to $${MART_BASE}`);
+        setMartWins(0);
+        toast.success(`Martingale WIN — loss ladder recovered, stake reset to $${MART_BASE}`);
+      } else {
+        // Case B: paroli upsize — press the winner ONLY if the settled order
+        // cleared the model gate AND we haven't hit the streak cap yet.
+        const sig = Number(o.sigma_distance ?? 0);
+        const edge = Math.abs(Number(o.edge_pts ?? 0));
+        const gatePassed = sig >= MART_PAROLI_MIN_SIGMA && edge >= MART_PAROLI_MIN_EDGE;
+        const nextWins = martWins + 1;
+        if (nextWins >= MART_PAROLI_MAX) {
+          setMartStake(MART_BASE);
+          setMartWins(0);
+          toast.success(`Paroli WIN #${nextWins} — streak cap, locking in & reset to $${MART_BASE}`);
+        } else if (gatePassed) {
+          const nextStake = Math.min(Math.round(martStake * MART_PAROLI_MULT), MART_CAP);
+          setMartStake(nextStake);
+          setMartWins(nextWins);
+          toast.success(`Paroli WIN #${nextWins} — pressing to $${nextStake} (σ ${sig.toFixed(2)} · edge ${edge.toFixed(1)}pt)`);
+        } else {
+          setMartStake(MART_BASE);
+          setMartWins(0);
+          toast.success(`Martingale WIN — weak signal (σ ${sig.toFixed(2)} · edge ${edge.toFixed(1)}pt), reset to $${MART_BASE}`);
+        }
       }
       window.localStorage.removeItem("crypto.autoMart.lastOrderId");
     } else if (o.status === "settled_loss") {
+      // Loss always breaks the paroli streak; loss-doubling ladder continues.
       const nextStake = Math.min(martStake * 2, MART_CAP);
       const nextLosses = martLosses + 1;
-      if (nextStake !== martStake) {
+      if (nextStake !== martStake || martWins !== 0) {
         setMartStake(nextStake);
         setMartLosses(nextLosses);
+        setMartWins(0);
         toast.error(`Martingale LOSS — next stake $${nextStake} (loss #${nextLosses})`);
       }
       window.localStorage.removeItem("crypto.autoMart.lastOrderId");
     }
-  }, [liveOrders, martStake, martLosses]);
+  }, [liveOrders, martStake, martLosses, martWins]);
 
   async function runMartingale(stakeUsd: number): Promise<string | null> {
     try {
