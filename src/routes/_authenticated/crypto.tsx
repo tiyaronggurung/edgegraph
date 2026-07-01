@@ -1439,6 +1439,18 @@ function AutoTradePanel() {
           )}
           {autoMart && (
             <button
+              onClick={() => setMagnetGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${magnetGate ? "border-fuchsia-500/50 bg-fuchsia-500/15 text-fuchsia-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={magnetGate
+                ? `Magnet gate ON: skip fire when spot is within 5 bps of a $50/$100 level unless break confirmed by 3× 15s closes.`
+                : "Magnet gate OFF: fire regardless of round-level proximity"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${magnetGate ? "bg-fuchsia-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {magnetGate ? "Magnet ON" : "Magnet OFF"}
+            </button>
+          )}
+          {autoMart && (
+            <button
               onClick={() => setSentimentGate(v => !v)}
               className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${sentimentGate ? "border-violet-500/50 bg-violet-500/15 text-violet-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
               title={sentimentGate
