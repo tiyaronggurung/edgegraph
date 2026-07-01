@@ -295,7 +295,13 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       const limitCents = Math.max(1, Math.min(99, Math.round(
         (m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
       )));
-      const contracts = Math.max(1, Math.floor((data.stakeUsd * 100) / limitCents));
+      // #3 Conviction sizing: scale requested stake by sigma-based conviction, clamped.
+      // Force mode uses full stake (no sizing adjustment).
+      const convictionMult = data.force
+        ? 1
+        : Math.max(LIVE_MIN_CONVICTION_MULT, Math.min(LIVE_MAX_CONVICTION_MULT, m.sigmaDistance / 1.5));
+      const sizedStake = data.stakeUsd * convictionMult;
+      const contracts = Math.max(1, Math.floor((sizedStake * 100) / limitCents));
       const stakeActual = (contracts * limitCents) / 100;
 
       let kalshiOrderId: string | null = null;
