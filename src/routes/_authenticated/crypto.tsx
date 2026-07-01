@@ -933,6 +933,15 @@ function AutoTradePanel() {
       const currentWindow = Math.floor(now / WINDOW_MS) * WINDOW_MS;
       const lastWindow = Number(window.localStorage.getItem("crypto.autoMart.lastWindowMs")) || 0;
       if (currentWindow === lastWindow) return;
+      // Wait until the previous martingale order has actually settled before
+      // firing the next window. This matches "buy the next 15m market once
+      // the one we have is closed."
+      const pendingId = window.localStorage.getItem("crypto.autoMart.lastOrderId");
+      if (pendingId) {
+        const prev = liveOrders.find(x => x.id === pendingId);
+        const settled = prev && (prev.status === "settled_win" || prev.status === "settled_loss");
+        if (prev && !settled) return; // still open — hold fire
+      }
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
       window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
@@ -949,7 +958,7 @@ function AutoTradePanel() {
     const h = setInterval(tick, 5_000);
     return () => { cancelled = true; clearInterval(h); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMart, martStake]);
+  }, [autoMart, martStake, liveOrders]);
 
   return (
     <div className="border border-border rounded-lg bg-card">
