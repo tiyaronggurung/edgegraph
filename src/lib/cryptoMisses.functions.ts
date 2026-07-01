@@ -19,7 +19,7 @@ export interface MissRow {
   pnl_usd: number | null;
   reason_tags: string[];
   diagnosed_reason: string;
-  inputs_snapshot: unknown;
+  inputs_snapshot: any;
   created_at: string;
 }
 
