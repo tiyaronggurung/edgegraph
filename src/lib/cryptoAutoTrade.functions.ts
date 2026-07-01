@@ -519,7 +519,7 @@ export async function autoExitForUser(
   const nowIso = new Date().toISOString();
   const { data: open } = await supabase
     .from("auto_trade_orders")
-    .select("id, ticker, side, mode, stake_usd, contracts, limit_cents, close_time, entry_price_cents, contracts_remaining, partial_pnl_usd, exit_ladder")
+    .select("id, ticker, side, mode, stake_usd, contracts, limit_cents, close_time, entry_price_cents, contracts_remaining, partial_pnl_usd, exit_ladder, is_martingale")
     .eq("user_id", userId)
     .in("mode", ["paper", "live"])
     .eq("status", "placed")
@@ -530,7 +530,7 @@ export async function autoExitForUser(
     id: string; ticker: string; side: "YES" | "NO"; mode: "paper" | "live";
     stake_usd: number; contracts: number; limit_cents: number; close_time: string;
     entry_price_cents: number | null; contracts_remaining: number | null;
-    partial_pnl_usd: number | null; exit_ladder: any;
+    partial_pnl_usd: number | null; exit_ladder: any; is_martingale: boolean | null;
   };
   const rows = (open ?? []) as Row[];
   if (!rows.length) return { exited: 0, reasons: [] };
