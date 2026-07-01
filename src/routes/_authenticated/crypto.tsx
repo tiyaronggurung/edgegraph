@@ -983,7 +983,12 @@ function AutoTradePanel() {
                     <td className="px-3 py-1.5 font-mono">{o.ticker}</td>
                     <td className={"px-3 py-1.5 font-semibold " + (o.side === "YES" ? "text-emerald-400" : "text-red-400")}>{dirLabel(o.side)}</td>
                     <td className="px-3 py-1.5 text-right font-mono">${Number(o.stake_usd).toFixed(2)}</td>
-                    <td className="px-3 py-1.5 text-right font-mono">{o.limit_cents}¢ × {o.contracts}</td>
+                    <td className="px-3 py-1.5 text-right font-mono" title={`Entry ${centsToAmerican(o.entry_price_cents ?? o.limit_cents)} American`}>
+                      {o.entry_price_cents ?? o.limit_cents}¢ × {o.contracts}
+                      {o.contracts_remaining != null && o.contracts_remaining !== o.contracts && (
+                        <div className="text-[9px] text-amber-400">rem {o.contracts_remaining} · banked ${Number(o.partial_pnl_usd ?? 0).toFixed(2)}</div>
+                      )}
+                    </td>
                     <td className="px-3 py-1.5 text-right font-mono">{Number(o.edge_pts) >= 0 ? "+" : ""}{Number(o.edge_pts).toFixed(1)}pts</td>
                     <td className="px-3 py-1.5 text-right font-mono">{Number(o.sigma_distance).toFixed(2)}σ</td>
                     <td className={"px-3 py-1.5 " + statusColor}>{o.status.replace("settled_", "")}</td>
