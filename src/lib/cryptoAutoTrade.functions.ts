@@ -202,6 +202,26 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       }
       candidates = top;
     } else {
+      // #7 counterfactual log: collect skipped candidates for post-hoc analysis
+      type SkipRow = {
+        user_id: string; ticker: string; side: "YES" | "NO"; skip_reason: string;
+        model_prob: number | null; ask_price: number | null; ev_edge: number | null;
+        sigma_distance: number | null; seconds_to_close: number | null;
+        strike: number | null; spot_at_skip: number | null; close_time: string | null;
+      };
+      const skipLog: SkipRow[] = [];
+      const logSkip = (m: typeof result.markets[number], reason: string) => {
+        const ask = m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice));
+        const prob = m.side === "YES" ? m.modelYesProb : 1 - m.modelYesProb;
+        skipLog.push({
+          user_id: userId, ticker: m.ticker, side: m.side, skip_reason: reason,
+          model_prob: prob, ask_price: ask, ev_edge: prob - ask,
+          sigma_distance: m.sigmaDistance, seconds_to_close: m.secondsToClose,
+          strike: m.strike, spot_at_skip: m.spot,
+          close_time: m.closeTime ?? new Date(Date.now() + m.secondsToClose * 1000).toISOString(),
+        });
+      };
+
       candidates = result.markets
         .map(m => {
           const adj = equity?.btcImpact.edgeAdjustPts ?? 0;
@@ -209,56 +229,56 @@ export const runAutoTrade = createServerFn({ method: "POST" })
           return { m, effectiveEdge: m.edgeAbs + aligned, equityAdj: aligned };
         })
         .filter(({ m, effectiveEdge, equityAdj }) => {
-          if (m.gateAction !== "BET") { skipReasons.push(`${m.ticker}: gate ${m.gateAction}`); return false; }
-          if (m.sigmaDistance < minSigma) { skipReasons.push(`${m.ticker}: sigDist ${m.sigmaDistance.toFixed(2)}σ < ${minSigma}σ`); return false; }
-          if (!m.gapAnalysis.momentumAlignsWithSide) { skipReasons.push(`${m.ticker}: momentum fights ${m.side}`); return false; }
-          if (m.secondsToClose < minSeconds) { skipReasons.push(`${m.ticker}: ${m.secondsToClose}s < ${minSeconds}s`); return false; }
+          if (m.gateAction !== "BET") { const r = `gate ${m.gateAction}`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
+          if (m.sigmaDistance < minSigma) { const r = `sigDist ${m.sigmaDistance.toFixed(2)}σ < ${minSigma}σ`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
+          if (!m.gapAnalysis.momentumAlignsWithSide) { const r = `momentum fights ${m.side}`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
+          if (m.secondsToClose < minSeconds) { const r = `${m.secondsToClose}s < ${minSeconds}s`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (equity) {
             if (equity.btcImpact.wouldBlock === "block_up" && m.side === "YES") {
-              skipReasons.push(`${m.ticker}: blocked by equity risk_off (strong)`);
-              return false;
+              const r = "blocked by equity risk_off (strong)"; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
             }
             if (equity.btcImpact.wouldBlock === "block_down" && m.side === "NO") {
-              skipReasons.push(`${m.ticker}: blocked by equity risk_on (strong)`);
-              return false;
+              const r = "blocked by equity risk_on (strong)"; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
             }
           }
           if (effectiveEdge < minEdgePts) {
-            skipReasons.push(`${m.ticker}: edge ${m.edgeAbs.toFixed(1)}${equityAdj >= 0 ? "+" : ""}${equityAdj}=${effectiveEdge.toFixed(1)}pts < ${minEdgePts}pts`);
-            return false;
+            const r = `edge ${m.edgeAbs.toFixed(1)}${equityAdj >= 0 ? "+" : ""}${equityAdj}=${effectiveEdge.toFixed(1)}pts < ${minEdgePts}pts`;
+            skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
           }
-          if (recentTickers.has(m.ticker)) { skipReasons.push(`${m.ticker}: traded in last 24h`); return false; }
-          // #5 cooldown: don't re-enter a symbol just after any recent close
+          if (recentTickers.has(m.ticker)) { const r = "traded in last 24h"; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (isLive && cooldownTickers.has(m.ticker)) {
-            skipReasons.push(`${m.ticker}: cooldown (closed < ${LIVE_COOLDOWN_SEC}s ago)`);
-            return false;
+            const r = `cooldown (closed < ${LIVE_COOLDOWN_SEC}s ago)`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
           }
-          // #6 per-symbol 24h loss cap
           if (isLive) {
             const symPnl = perSymbolPnl.get(m.ticker) ?? 0;
             if (symPnl <= -LIVE_PER_SYMBOL_LOSS_CAP_USD) {
-              skipReasons.push(`${m.ticker}: symbol loss cap ($${symPnl.toFixed(2)} ≤ -$${LIVE_PER_SYMBOL_LOSS_CAP_USD})`);
-              return false;
+              const r = `symbol loss cap ($${symPnl.toFixed(2)} ≤ -$${LIVE_PER_SYMBOL_LOSS_CAP_USD})`;
+              skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
             }
           }
-          // #1 EV gate: our probability must beat the ask by a real margin
           const askDollarsFilter = m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice));
           const ourProbFilter = m.side === "YES" ? m.modelYesProb : 1 - m.modelYesProb;
           const evEdgeFilter = ourProbFilter - askDollarsFilter;
           if (evEdgeFilter < LIVE_MIN_EV_MARGIN) {
-            skipReasons.push(`${m.ticker}: EV ${(evEdgeFilter * 100).toFixed(1)}¢ < ${LIVE_MIN_EV_MARGIN * 100}¢ (prob ${(ourProbFilter * 100).toFixed(0)}% vs ask ${(askDollarsFilter * 100).toFixed(0)}¢)`);
-            return false;
+            const r = `EV ${(evEdgeFilter * 100).toFixed(1)}¢ < ${LIVE_MIN_EV_MARGIN * 100}¢ (prob ${(ourProbFilter * 100).toFixed(0)}% vs ask ${(askDollarsFilter * 100).toFixed(0)}¢)`;
+            skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
           }
-          // #4 coinflip-price guard: if market prices this as near-50/50, require strong sigma
           if (Math.abs(askDollarsFilter - 0.5) < LIVE_COINFLIP_BAND && m.sigmaDistance < LIVE_COINFLIP_MIN_SIGMA) {
-            skipReasons.push(`${m.ticker}: coinflip price ${(askDollarsFilter * 100).toFixed(0)}¢ needs ≥${LIVE_COINFLIP_MIN_SIGMA}σ (have ${m.sigmaDistance.toFixed(2)}σ)`);
-            return false;
+            const r = `coinflip price ${(askDollarsFilter * 100).toFixed(0)}¢ needs ≥${LIVE_COINFLIP_MIN_SIGMA}σ (have ${m.sigmaDistance.toFixed(2)}σ)`;
+            skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
           }
           return true;
         })
         .sort((a, b) => (b.effectiveEdge - b.m.requiredEdgePts) - (a.effectiveEdge - a.m.requiredEdgePts))
         .slice(0, data.maxOrders)
         .map(c => c.m);
+
+      // Fire-and-forget insert; failure of the log must not block trading.
+      if (skipLog.length > 0) {
+        (async () => {
+          try { await (supabase as any).from("auto_trade_skip_log").insert(skipLog); } catch { /* noop */ }
+        })();
+      }
     }
 
     // Entry-side disagreement guard: right before submitting, re-pull the
@@ -640,4 +660,101 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
       }
     }
     return { exited, reasons: reasons.slice(0, 20) };
+  });
+
+// ── #7 Counterfactual settle sweep ────────────────────────────────────────
+// For every skipped signal whose close_time has passed, look up the real BTC
+// close price and record whether the trade WOULD have won (and its would-be
+// PnL at a nominal $10 stake). This lets us tell whether the gates are too
+// tight (many "would_have_won" = losing edge) or well-calibrated.
+export const settleAutoTradeSkipLog = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ settled: number }> => {
+    const { supabase, userId } = context;
+    const { data: due } = await (supabase as any)
+      .from("auto_trade_skip_log")
+      .select("id, ticker, side, strike, ask_price, close_time")
+      .eq("user_id", userId)
+      .is("settled_at", null)
+      .lt("close_time", new Date().toISOString())
+      .limit(100);
+    const pending = (due ?? []) as Array<{ id: string; ticker: string; side: "YES" | "NO"; strike: number | null; ask_price: number | null; close_time: string }>;
+    if (!pending.length) return { settled: 0 };
+
+    const tickers = [...new Set(pending.map(o => o.ticker))];
+    const { data: closes } = await supabase
+      .from("btc_model_predictions")
+      .select("ticker, settle_price")
+      .in("ticker", tickers)
+      .not("settle_price", "is", null);
+    const priceByTicker = new Map<string, number>(
+      ((closes ?? []) as Array<{ ticker: string; settle_price: number | null }>)
+        .filter(c => c.settle_price !== null)
+        .map(c => [c.ticker, Number(c.settle_price)]),
+    );
+
+    const NOMINAL_STAKE = 10;
+    let settled = 0;
+    for (const o of pending) {
+      const px = priceByTicker.get(o.ticker);
+      if (px === undefined || o.strike == null || o.ask_price == null) continue;
+      const won = o.side === "YES" ? px >= Number(o.strike) : px < Number(o.strike);
+      const contracts = Math.max(1, Math.floor(NOMINAL_STAKE / Math.max(0.01, Number(o.ask_price))));
+      const wouldHavePnl = won
+        ? (1 - Number(o.ask_price)) * contracts
+        : -Number(o.ask_price) * contracts;
+      const { error } = await (supabase as any)
+        .from("auto_trade_skip_log")
+        .update({
+          would_have_won: won,
+          would_have_pnl: wouldHavePnl,
+          settle_price: px,
+          settled_at: new Date().toISOString(),
+        })
+        .eq("id", o.id);
+      if (!error) settled++;
+    }
+    return { settled };
+  });
+
+export interface SkipReport {
+  totalSettled: number;
+  wouldHaveWon: number;
+  wouldHaveLost: number;
+  wouldHavePnlUsd: number;
+  byReason: Array<{ reason: string; count: number; winRate: number; pnl: number }>;
+}
+
+export const getSkipReport = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<SkipReport> => {
+    const { supabase, userId } = context;
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: rows } = await (supabase as any)
+      .from("auto_trade_skip_log")
+      .select("skip_reason, would_have_won, would_have_pnl")
+      .eq("user_id", userId)
+      .gte("created_at", since)
+      .not("settled_at", "is", null);
+    const all = (rows ?? []) as Array<{ skip_reason: string; would_have_won: boolean | null; would_have_pnl: number | null }>;
+    const totalSettled = all.length;
+    const wins = all.filter(r => r.would_have_won === true).length;
+    const losses = all.filter(r => r.would_have_won === false).length;
+    const pnl = all.reduce((s, r) => s + (Number(r.would_have_pnl) || 0), 0);
+
+    const bucket = new Map<string, { count: number; wins: number; pnl: number }>();
+    for (const r of all) {
+      // Strip variable numbers so "EV 1.5¢..." and "EV 0.9¢..." bucket together
+      const key = r.skip_reason.split(/[\s(:]/)[0] || "other";
+      const b = bucket.get(key) ?? { count: 0, wins: 0, pnl: 0 };
+      b.count++;
+      if (r.would_have_won) b.wins++;
+      b.pnl += Number(r.would_have_pnl) || 0;
+      bucket.set(key, b);
+    }
+    const byReason = [...bucket.entries()]
+      .map(([reason, b]) => ({ reason, count: b.count, winRate: b.count > 0 ? b.wins / b.count : 0, pnl: b.pnl }))
+      .sort((a, b) => b.count - a.count);
+
+    return { totalSettled, wouldHaveWon: wins, wouldHaveLost: losses, wouldHavePnlUsd: pnl, byReason };
   });

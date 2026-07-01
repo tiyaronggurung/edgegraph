@@ -217,6 +217,69 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_trade_skip_log: {
+        Row: {
+          ask_price: number | null
+          close_time: string | null
+          created_at: string
+          ev_edge: number | null
+          id: string
+          model_prob: number | null
+          seconds_to_close: number | null
+          settle_price: number | null
+          settled_at: string | null
+          side: string
+          sigma_distance: number | null
+          skip_reason: string
+          spot_at_skip: number | null
+          strike: number | null
+          ticker: string
+          user_id: string
+          would_have_pnl: number | null
+          would_have_won: boolean | null
+        }
+        Insert: {
+          ask_price?: number | null
+          close_time?: string | null
+          created_at?: string
+          ev_edge?: number | null
+          id?: string
+          model_prob?: number | null
+          seconds_to_close?: number | null
+          settle_price?: number | null
+          settled_at?: string | null
+          side: string
+          sigma_distance?: number | null
+          skip_reason: string
+          spot_at_skip?: number | null
+          strike?: number | null
+          ticker: string
+          user_id: string
+          would_have_pnl?: number | null
+          would_have_won?: boolean | null
+        }
+        Update: {
+          ask_price?: number | null
+          close_time?: string | null
+          created_at?: string
+          ev_edge?: number | null
+          id?: string
+          model_prob?: number | null
+          seconds_to_close?: number | null
+          settle_price?: number | null
+          settled_at?: string | null
+          side?: string
+          sigma_distance?: number | null
+          skip_reason?: string
+          spot_at_skip?: number | null
+          strike?: number | null
+          ticker?: string
+          user_id?: string
+          would_have_pnl?: number | null
+          would_have_won?: boolean | null
+        }
+        Relationships: []
+      }
       bets: {
         Row: {
           analysis_id: string | null
