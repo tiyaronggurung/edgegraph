@@ -12,7 +12,10 @@ import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { EquityMomentumPanel } from "@/components/EquityMomentumPanel";
 import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
+import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
+import { computeKalshiSentiment } from "@/lib/kalshiSentiment";
+
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/crypto")({
