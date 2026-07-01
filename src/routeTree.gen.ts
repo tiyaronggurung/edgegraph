@@ -37,6 +37,7 @@ import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/l
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
 import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
+import { Route as ApiPublicHooksBtcCalibrateRouteImport } from './routes/api/public/hooks/btc-calibrate'
 import { Route as ApiPublicHooksBackfillOutcomesRouteImport } from './routes/api/public/hooks/backfill-outcomes'
 import { Route as ApiPublicHooksAutoTradeRouteImport } from './routes/api/public/hooks/auto-trade'
 
@@ -187,6 +188,12 @@ const ApiPublicHooksCaptureClosingOddsRoute =
     path: '/api/public/hooks/capture-closing-odds',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksBtcCalibrateRoute =
+  ApiPublicHooksBtcCalibrateRouteImport.update({
+    id: '/api/public/hooks/btc-calibrate',
+    path: '/api/public/hooks/btc-calibrate',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksBackfillOutcomesRoute =
   ApiPublicHooksBackfillOutcomesRouteImport.update({
     id: '/api/public/hooks/backfill-outcomes',
@@ -224,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
+  '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -255,6 +263,7 @@ export interface FileRoutesByTo {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
+  '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -288,6 +297,7 @@ export interface FileRoutesById {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
+  '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -321,6 +331,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
+    | '/api/public/hooks/btc-calibrate'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/recompute-predictions'
     | '/lovable/email/queue/process'
@@ -352,6 +363,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
+    | '/api/public/hooks/btc-calibrate'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/recompute-predictions'
     | '/lovable/email/queue/process'
@@ -384,6 +396,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
+    | '/api/public/hooks/btc-calibrate'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/recompute-predictions'
     | '/lovable/email/queue/process'
@@ -404,6 +417,7 @@ export interface RootRouteChildren {
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
   ApiPublicHooksAutoTradeRoute: typeof ApiPublicHooksAutoTradeRoute
   ApiPublicHooksBackfillOutcomesRoute: typeof ApiPublicHooksBackfillOutcomesRoute
+  ApiPublicHooksBtcCalibrateRoute: typeof ApiPublicHooksBtcCalibrateRoute
   ApiPublicHooksCaptureClosingOddsRoute: typeof ApiPublicHooksCaptureClosingOddsRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
@@ -609,6 +623,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCaptureClosingOddsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/btc-calibrate': {
+      id: '/api/public/hooks/btc-calibrate'
+      path: '/api/public/hooks/btc-calibrate'
+      fullPath: '/api/public/hooks/btc-calibrate'
+      preLoaderRoute: typeof ApiPublicHooksBtcCalibrateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/backfill-outcomes': {
       id: '/api/public/hooks/backfill-outcomes'
       path: '/api/public/hooks/backfill-outcomes'
@@ -675,6 +696,7 @@ const rootRouteChildren: RootRouteChildren = {
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
   ApiPublicHooksAutoTradeRoute: ApiPublicHooksAutoTradeRoute,
   ApiPublicHooksBackfillOutcomesRoute: ApiPublicHooksBackfillOutcomesRoute,
+  ApiPublicHooksBtcCalibrateRoute: ApiPublicHooksBtcCalibrateRoute,
   ApiPublicHooksCaptureClosingOddsRoute: ApiPublicHooksCaptureClosingOddsRoute,
   ApiPublicHooksRecomputePredictionsRoute:
     ApiPublicHooksRecomputePredictionsRoute,

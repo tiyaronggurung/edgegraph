@@ -15,6 +15,17 @@ export interface SnapshotInput {
   spot: number;
   closeTime: string;
   secondsToClose: number;
+  sigmaMinEffective?: number;
+  theoryYesProb?: number;
+}
+
+export function timeBucketOf(secondsToClose: number): string {
+  if (secondsToClose <= 30) return "30s";
+  if (secondsToClose <= 60) return "1m";
+  if (secondsToClose <= 120) return "2m";
+  if (secondsToClose <= 300) return "5m";
+  if (secondsToClose <= 600) return "10m";
+  return "13m+";
 }
 
 async function priceAt(unixSec: number): Promise<number | null> {
@@ -66,6 +77,9 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         spot_at_snapshot: input.spot,
         close_time: input.closeTime,
         snapshot_seconds_to_close: input.secondsToClose,
+        sigma_at_snapshot: input.sigmaMinEffective ?? null,
+        theory_yes_prob: input.theoryYesProb ?? null,
+        time_bucket: timeBucketOf(input.secondsToClose),
       });
       return;
     }
@@ -79,6 +93,9 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         edge_pts: input.edgePts,
         spot_at_snapshot: input.spot,
         snapshot_seconds_to_close: input.secondsToClose,
+        sigma_at_snapshot: input.sigmaMinEffective ?? null,
+        theory_yes_prob: input.theoryYesProb ?? null,
+        time_bucket: timeBucketOf(input.secondsToClose),
       }).eq("id", existing.id);
     }
   } catch (e) {

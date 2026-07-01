@@ -84,6 +84,9 @@ export interface BtcMarket {
   // >2σ ≈ 97% safe on the locked side; <0.5σ ≈ coin flip. Drives exit signals.
   sigmaDistance: number;
   sigmaMinEffective: number; // realized + IV blended per-minute σ used by the model
+  // Pricing study: pure random-walk fair value (diffusion + options blend, BEFORE
+  // microstructure/calibration). Compare vs market YES ¢ to see Kalshi mispricing.
+  theoryYesProb: number;
   // ── PHASE 1 · STEP 5 — Edge gate ─────────────────────────────────────────
   requiredEdgePts: number;   // dynamic threshold edge must clear to BET
   gateAction: "BET" | "PASS";
@@ -870,6 +873,7 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
           secondsToClose,
           sigmaDistance: sigDist,
           sigmaMinEffective: sigmaEff,
+          theoryYesProb: pBase,
           requiredEdgePts,
           gateAction,
           gateReason,
@@ -901,6 +905,8 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
               spot: m.spot,
               closeTime: m.closeTime as string,
               secondsToClose: m.secondsToClose,
+              sigmaMinEffective: m.sigmaMinEffective,
+              theoryYesProb: m.theoryYesProb,
             })),
         );
         await settleDuePredictions();
