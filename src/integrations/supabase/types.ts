@@ -528,6 +528,53 @@ export type Database = {
         }
         Relationships: []
       }
+      crypto_study_feedback: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          rec_gate: string | null
+          rec_index: number
+          rec_suggested: string | null
+          study_id: string
+          updated_at: string
+          user_id: string
+          vote: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          rec_gate?: string | null
+          rec_index: number
+          rec_suggested?: string | null
+          study_id: string
+          updated_at?: string
+          user_id: string
+          vote: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          rec_gate?: string | null
+          rec_index?: number
+          rec_suggested?: string | null
+          study_id?: string
+          updated_at?: string
+          user_id?: string
+          vote?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crypto_study_feedback_study_id_fkey"
+            columns: ["study_id"]
+            isOneToOne: false
+            referencedRelation: "crypto_model_studies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crypto_trade_misses: {
         Row: {
           actual_dir: string
