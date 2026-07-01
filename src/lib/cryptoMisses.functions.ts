@@ -180,7 +180,15 @@ export interface StudyRow {
   dominant_failures: string[];
   recommendations: StudyRecommendation[];
   created_at: string;
+  feedback?: Record<number, "up" | "down">;
 }
+
+export interface StudyFeedbackRow {
+  study_id: string;
+  rec_index: number;
+  vote: "up" | "down";
+}
+
 
 function stripSnapshot(s: any): any {
   if (!s || typeof s !== "object") return s;
