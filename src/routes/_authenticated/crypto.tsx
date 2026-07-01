@@ -883,7 +883,8 @@ function AutoTradePanel() {
   const WINDOW_MS = 15 * 60 * 1000;
   // Paroli (anti-martingale) upsize: press winners only when the settled order
   // cleared a strong model gate. Resets on loss or after MART_PAROLI_MAX wins.
-  const MART_PAROLI_MULT = 1.5;
+  // Per-step multipliers: win#1 → 1.5x, win#2 → 1.0x (hold flat for safer 3rd bet).
+  const MART_PAROLI_STEPS = [1.5, 1.0];
   const MART_PAROLI_MAX = 3;
   const MART_PAROLI_MIN_SIGMA = 1.5;
   const MART_PAROLI_MIN_EDGE = 5;
