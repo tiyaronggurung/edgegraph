@@ -434,7 +434,9 @@ function OpenPositions({ markets }: { markets: BtcMarket[] }) {
         {open.map(({ trade: t, market, sig }) => {
           if (!sig || !market) return null;
           const isExit = sig.action !== "HOLD";
-          const actionColor = sig.action === "STOP_LOSS"
+          const actionColor = sig.action === "STOP_LOSS_SPOT"
+            ? "border-red-600 bg-red-600/20 text-red-300 animate-pulse"
+            : sig.action === "STOP_LOSS"
             ? "border-red-500/60 bg-red-500/10 text-red-400"
             : sig.action === "CASH_OUT_PROFIT"
               ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400"
