@@ -148,6 +148,24 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       .gte("created_at", since);
     const recentTickers = new Set((recentRows ?? []).map((r: { ticker: string }) => r.ticker));
 
+    // ── #5 cooldown + #6 per-symbol loss cap (live only) ──
+    const cooldownTickers = new Set<string>();
+    const perSymbolPnl = new Map<string, number>();
+    if (isLive) {
+      const symSince = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const cooldownCutoff = new Date(Date.now() - LIVE_COOLDOWN_SEC * 1000).toISOString();
+      const { data: symRows } = await supabase
+        .from("auto_trade_orders")
+        .select("ticker, pnl_usd, settled_at")
+        .eq("user_id", userId)
+        .eq("mode", "live")
+        .gte("created_at", symSince);
+      for (const r of ((symRows ?? []) as Array<{ ticker: string; pnl_usd: number | null; settled_at: string | null }>)) {
+        perSymbolPnl.set(r.ticker, (perSymbolPnl.get(r.ticker) ?? 0) + (Number(r.pnl_usd) || 0));
+        if (r.settled_at && r.settled_at >= cooldownCutoff) cooldownTickers.add(r.ticker);
+      }
+    }
+
     const result = await getBtcMarkets();
     const skipReasons: string[] = [];
 
