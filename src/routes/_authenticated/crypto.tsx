@@ -810,6 +810,111 @@ function AutoTradePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLoop]);
 
+  // ============================================================
+  // Auto-Martingale: fires ONCE per new 15m window (00/15/30/45).
+  // Live mode, model's UP/DOWN pick, no entry gates (force=true, 1 order).
+  // Stake ladder: $20 base, ×2 on loss (cap $320), reset to $20 on win.
+  // ============================================================
+  const MART_BASE = 20;
+  const MART_CAP = 320;
+  const WINDOW_MS = 15 * 60 * 1000;
+
+  const [autoMart, setAutoMart] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart") === "on";
+  });
+  const [martStake, setMartStake] = useState<number>(() => {
+    if (typeof window === "undefined") return MART_BASE;
+    const v = Number(window.localStorage.getItem("crypto.autoMart.stake"));
+    return Number.isFinite(v) && v >= MART_BASE ? v : MART_BASE;
+  });
+  const [martLosses, setMartLosses] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    return Number(window.localStorage.getItem("crypto.autoMart.losses")) || 0;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart", autoMart ? "on" : "off");
+  }, [autoMart]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.stake", String(martStake));
+    window.localStorage.setItem("crypto.autoMart.losses", String(martLosses));
+  }, [martStake, martLosses]);
+
+  // Watch the last martingale order and adjust stake when it settles.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const lastId = window.localStorage.getItem("crypto.autoMart.lastOrderId");
+    if (!lastId) return;
+    const o = liveOrders.find(x => x.id === lastId);
+    if (!o) return;
+    if (o.status === "settled_win") {
+      if (martStake !== MART_BASE || martLosses !== 0) {
+        setMartStake(MART_BASE);
+        setMartLosses(0);
+        toast.success(`Martingale WIN — stake reset to $${MART_BASE}`);
+      }
+      window.localStorage.removeItem("crypto.autoMart.lastOrderId");
+    } else if (o.status === "settled_loss") {
+      const nextStake = Math.min(martStake * 2, MART_CAP);
+      const nextLosses = martLosses + 1;
+      if (nextStake !== martStake) {
+        setMartStake(nextStake);
+        setMartLosses(nextLosses);
+        toast.error(`Martingale LOSS — next stake $${nextStake} (loss #${nextLosses})`);
+      }
+      window.localStorage.removeItem("crypto.autoMart.lastOrderId");
+    }
+  }, [liveOrders, martStake, martLosses]);
+
+  async function runMartingale(stakeUsd: number): Promise<string | null> {
+    try {
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd, maxOrders: 1, force: true } });
+      if (res.placed > 0 && res.orders?.[0]) {
+        const o = res.orders[0];
+        toast.success(`Martingale $${stakeUsd}: ${o.side === "YES" ? "UP" : "DOWN"} ${o.ticker} @ ${o.limit_cents}¢`);
+        qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
+        return o.id ?? null;
+      }
+      toast.info(`Martingale skipped: ${res.skipReasons.slice(0, 2).join(" · ") || "no tradeable market"}`);
+      return null;
+    } catch (e: any) {
+      toast.error("Martingale order failed", { description: e?.message ?? String(e) });
+      return null;
+    }
+  }
+
+  useEffect(() => {
+    if (!autoMart) return;
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    let inFlight = false;
+    const tick = async () => {
+      if (cancelled || inFlight) return;
+      const now = Date.now();
+      const currentWindow = Math.floor(now / WINDOW_MS) * WINDOW_MS;
+      const lastWindow = Number(window.localStorage.getItem("crypto.autoMart.lastWindowMs")) || 0;
+      if (currentWindow === lastWindow) return;
+      inFlight = true;
+      // Optimistically mark this window taken so we can't double-fire during the async call.
+      window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+      const orderId = await runMartingale(martStake);
+      if (orderId) {
+        window.localStorage.setItem("crypto.autoMart.lastOrderId", orderId);
+      } else {
+        // Retry next tick if placement was skipped/failed.
+        window.localStorage.removeItem("crypto.autoMart.lastWindowMs");
+      }
+      inFlight = false;
+    };
+    tick();
+    const h = setInterval(tick, 5_000);
+    return () => { cancelled = true; clearInterval(h); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoMart, martStake]);
+
   return (
     <div className="border border-border rounded-lg bg-card">
       <div className="px-4 py-2 border-b border-border flex items-center justify-between flex-wrap gap-2">
@@ -905,6 +1010,45 @@ function AutoTradePanel() {
             <span className={`h-1.5 w-1.5 rounded-full ${autoLoop ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground"}`} />
             {autoLoop ? "Auto-loop ON (60s)" : "Auto-loop OFF"}
           </button>
+          <button
+            onClick={() => {
+              if (!autoMart) {
+                const ok = window.confirm(
+                  "ENABLE AUTO-MARTINGALE (LIVE)?\n\n" +
+                  "• Fires ONCE per new 15m window (00/15/30/45)\n" +
+                  "• Takes model's UP/DOWN pick — no entry gates\n" +
+                  "• Ladder: $20 → $40 → $80 → $160 → $320 (cap)\n" +
+                  "• Reset to $20 on any WIN\n\n" +
+                  `Current stake: $${martStake} (loss streak: ${martLosses})\n\n` +
+                  "40 orders / 24h cap and auto-exit ladder still enforced.",
+                );
+                if (!ok) return;
+              }
+              setAutoMart(v => !v);
+            }}
+            className={`text-xs font-semibold px-3 py-1.5 rounded border flex items-center gap-1.5 ${autoMart ? "border-fuchsia-500/50 bg-fuchsia-500/15 text-fuchsia-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+            title="Auto-Martingale: once per 15m window, live, model direction, stake doubles on loss ($20→$40→$80→$160→$320), resets on win."
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${autoMart ? "bg-fuchsia-400 animate-pulse" : "bg-muted-foreground"}`} />
+            {autoMart ? `Martingale ON · $${martStake}` : "Martingale OFF"}
+            {autoMart && martLosses > 0 && <span className="text-[10px] text-red-300">L{martLosses}</span>}
+          </button>
+          {autoMart && (
+            <button
+              onClick={() => {
+                if (window.confirm("Reset Martingale stake back to $20?")) {
+                  setMartStake(MART_BASE);
+                  setMartLosses(0);
+                  window.localStorage.removeItem("crypto.autoMart.lastOrderId");
+                  toast.success("Martingale ladder reset to $20");
+                }
+              }}
+              className="text-[10px] font-semibold px-2 py-1.5 rounded border border-border bg-muted/30 hover:bg-muted/50"
+              title="Manually reset the doubling ladder back to base $20"
+            >
+              reset
+            </button>
+          )}
           <button
             onClick={() => runForce()}
             disabled={forceBusy || liveBusy}
