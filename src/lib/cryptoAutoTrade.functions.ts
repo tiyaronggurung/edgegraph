@@ -733,21 +733,27 @@ export async function autoExitForUser(
     const adverseCents = entry - markCents;
     const sideProbNow = currentModelProbBySide.get(r.ticker);
 
-    let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | "mart_hopeless" | "mart_hardcap" | null = null;
+    let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | "mart_hopeless" | "mart_hardcap" | "odds_flip" | null = null;
     // Martingale-specific rules (only apply to martingale-tagged orders).
     if (r.is_martingale === true) {
       const stake = Number(r.stake_usd);
       const lossFrac = stake > 0 ? -markPnl / stake : 0; // 0..1+
-      // Hard cap: any martingale trade down ≥70% → exit immediately.
-      if (lossFrac >= 0.70) {
+      // Hard cap: any martingale trade down ≥35% → exit immediately.
+      if (lossFrac >= 0.35) {
         exitReason = "mart_hardcap";
         reasons.push(`${r.ticker}[mart]: HARD CAP — down ${(lossFrac * 100).toFixed(0)}% of $${stake} stake`);
       }
-      // Hopeless: model side prob <15% AND already down ≥50%.
-      else if (sideProbNow !== undefined && sideProbNow < 0.15 && lossFrac >= 0.50) {
+      // Hopeless: model side prob <15% AND already down ≥25%.
+      else if (sideProbNow !== undefined && sideProbNow < 0.15 && lossFrac >= 0.25) {
         exitReason = "mart_hopeless";
         reasons.push(`${r.ticker}[mart]: HOPELESS — model ${(sideProbNow * 100).toFixed(0)}% on ${r.side}, down ${(lossFrac * 100).toFixed(0)}%`);
       }
+    }
+    // Kalshi-odds flip: the market itself moved ≥20¢ against our side vs entry
+    // (independent of our model). Strong crowd signal we picked the wrong side.
+    if (!exitReason && (entry - markCents) >= 20) {
+      exitReason = "odds_flip";
+      reasons.push(`${r.ticker}[${r.mode}]: ODDS FLIP — Kalshi ${r.side} ${markCents}¢ vs entry ${entry}¢ (−${entry - markCents}¢)`);
     }
     if (!exitReason && sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
       exitReason = "flip";
