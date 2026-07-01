@@ -77,6 +77,9 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         spot_at_snapshot: input.spot,
         close_time: input.closeTime,
         snapshot_seconds_to_close: input.secondsToClose,
+        sigma_at_snapshot: input.sigmaMinEffective ?? null,
+        theory_yes_prob: input.theoryYesProb ?? null,
+        time_bucket: timeBucketOf(input.secondsToClose),
       });
       return;
     }
@@ -90,6 +93,9 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         edge_pts: input.edgePts,
         spot_at_snapshot: input.spot,
         snapshot_seconds_to_close: input.secondsToClose,
+        sigma_at_snapshot: input.sigmaMinEffective ?? null,
+        theory_yes_prob: input.theoryYesProb ?? null,
+        time_bucket: timeBucketOf(input.secondsToClose),
       }).eq("id", existing.id);
     }
   } catch (e) {
