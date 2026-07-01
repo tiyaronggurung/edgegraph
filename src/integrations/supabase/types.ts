@@ -134,10 +134,13 @@ export type Database = {
         Row: {
           close_time: string
           contracts: number
+          contracts_remaining: number | null
           created_at: string
           edge_pts: number
+          entry_price_cents: number | null
           error_message: string | null
           event_ticker: string | null
+          exit_ladder: Json | null
           gap_in_sigmas: number
           id: string
           kalshi_order_id: string | null
@@ -145,6 +148,7 @@ export type Database = {
           market_yes_price: number
           mode: string
           model_prob: number
+          partial_pnl_usd: number
           pnl_usd: number | null
           seconds_to_close: number
           session_id: string
@@ -162,10 +166,13 @@ export type Database = {
         Insert: {
           close_time: string
           contracts: number
+          contracts_remaining?: number | null
           created_at?: string
           edge_pts: number
+          entry_price_cents?: number | null
           error_message?: string | null
           event_ticker?: string | null
+          exit_ladder?: Json | null
           gap_in_sigmas: number
           id?: string
           kalshi_order_id?: string | null
@@ -173,6 +180,7 @@ export type Database = {
           market_yes_price: number
           mode?: string
           model_prob: number
+          partial_pnl_usd?: number
           pnl_usd?: number | null
           seconds_to_close: number
           session_id: string
@@ -190,10 +198,13 @@ export type Database = {
         Update: {
           close_time?: string
           contracts?: number
+          contracts_remaining?: number | null
           created_at?: string
           edge_pts?: number
+          entry_price_cents?: number | null
           error_message?: string | null
           event_ticker?: string | null
+          exit_ladder?: Json | null
           gap_in_sigmas?: number
           id?: string
           kalshi_order_id?: string | null
@@ -201,6 +212,7 @@ export type Database = {
           market_yes_price?: number
           mode?: string
           model_prob?: number
+          partial_pnl_usd?: number
           pnl_usd?: number | null
           seconds_to_close?: number
           session_id?: string

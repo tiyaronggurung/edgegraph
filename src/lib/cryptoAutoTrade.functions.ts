@@ -38,6 +38,21 @@ const LIVE_MIN_CONVICTION_MULT = 0.5;     // #3 sizing multiplier floor
 const LIVE_COINFLIP_BAND = 0.05;          // #4 |ask - 0.5| below this = coinflip zone
 const LIVE_COINFLIP_MIN_SIGMA = 1.5;      // #4 need this much sigma to trade coinflip prices
 
+// ── Odds-ladder exit tiers (price deltas in Kalshi ¢) ──
+// Each order snapshots this at entry so changing defaults never affects live positions.
+// Priority order: stop-loss first (safety), then most-aggressive TP, then partial.
+export type ExitLadderTier = {
+  kind: "tp" | "sl";
+  priceDeltaCents: number;   // signed: +N = mark improved N¢, -N = mark dropped N¢
+  exitFraction: number;      // 0 < f ≤ 1, fraction of REMAINING contracts to close
+  label: string;
+};
+export const DEFAULT_EXIT_LADDER: ExitLadderTier[] = [
+  { kind: "sl", priceDeltaCents: -15, exitFraction: 1.0, label: "SL -15¢" },
+  { kind: "tp", priceDeltaCents: +12, exitFraction: 1.0, label: "TP +12¢" },
+  { kind: "tp", priceDeltaCents: +6,  exitFraction: 0.5, label: "Partial TP +6¢" },
+];
+
 export interface AutoTradeOrderRow {
   id: string;
   ticker: string;
@@ -54,6 +69,9 @@ export interface AutoTradeOrderRow {
   pnl_usd: number | null;
   settle_price: number | null;
   created_at: string;
+  entry_price_cents: number | null;
+  contracts_remaining: number | null;
+  partial_pnl_usd: number | null;
 }
 
 export interface AutoTradeRunResult {
@@ -372,8 +390,12 @@ export const runAutoTrade = createServerFn({ method: "POST" })
           close_time: m.closeTime ?? new Date(Date.now() + m.secondsToClose * 1000).toISOString(),
           status: "placed",
           kalshi_order_id: kalshiOrderId,
+          entry_price_cents: limitCents,
+          contracts_remaining: contracts,
+          partial_pnl_usd: 0,
+          exit_ladder: DEFAULT_EXIT_LADDER as any,
         })
-        .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at")
+        .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
         .single();
 
       if (error) { skipReasons.push(`${m.ticker}: insert error ${error.message}`); continue; }
@@ -396,7 +418,7 @@ export const listAutoTradeOrders = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const { data: rows } = await supabase
       .from("auto_trade_orders")
-      .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at")
+      .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -485,28 +507,29 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const reasons: string[] = [];
 
-    // Only act when live is enabled — safe no-op otherwise.
     if (process.env.KALSHI_LIVE_ENABLED !== "true") return { exited: 0, reasons: ["live_disabled"] };
 
     const nowIso = new Date().toISOString();
     const { data: open } = await supabase
       .from("auto_trade_orders")
-      .select("id, ticker, side, stake_usd, contracts, limit_cents, close_time")
+      .select("id, ticker, side, stake_usd, contracts, limit_cents, close_time, entry_price_cents, contracts_remaining, partial_pnl_usd, exit_ladder")
       .eq("user_id", userId)
       .eq("mode", "live")
       .eq("status", "placed")
       .gt("close_time", nowIso)
       .limit(20);
 
-    const rows = (open ?? []) as Array<{ id: string; ticker: string; side: "YES" | "NO"; stake_usd: number; contracts: number; limit_cents: number; close_time: string }>;
+    type Row = {
+      id: string; ticker: string; side: "YES" | "NO"; stake_usd: number;
+      contracts: number; limit_cents: number; close_time: string;
+      entry_price_cents: number | null; contracts_remaining: number | null;
+      partial_pnl_usd: number | null; exit_ladder: any;
+    };
+    const rows = (open ?? []) as Row[];
     if (!rows.length) return { exited: 0, reasons: [] };
 
-    let exited = 0;
-
-    // Fresh model read for every open ticker — this is what lets us bail on a
-    // position whose direction has flipped since entry. One shared call; we
-    // index by ticker below. Fail-open: if the read errors we keep legacy exits.
-    const currentModelProbBySide = new Map<string, number>(); // ticker -> prob for OUR side
+    // Fresh model read for flip detection.
+    const currentModelProbBySide = new Map<string, number>();
     try {
       const fresh = await getBtcMarkets();
       const byTicker = new Map(fresh.markets.map(m => [m.ticker, m]));
@@ -521,10 +544,59 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
       reasons.push(`model_read: ${e?.message?.slice(0, 60) ?? "err"} — flip exit disabled this tick`);
     }
 
-    // ── Pass 1: fetch quote + compute unrealized PnL for every open row ──
-    type Marked = { r: typeof rows[number]; markCents: number; markPnl: number };
+    // ── Shared Kalshi IOC sell helper. Returns fill info or null. ──
+    // Race-safe: caller must have already claimed the row (status=closing) OR
+    // pass `claim: false` when the row remains "placed" for further partial fills.
+    async function kalshiSell(r: Row, contractsToSell: number, sellCents: number, tag: string): Promise<{ fillCount: number; filledCents: number } | null> {
+      try {
+        const { signKalshi } = await import("./cryptoTrades.functions");
+        const path = "/portfolio/events/orders";
+        const headers = await signKalshi("POST", path);
+        const priceDollars = (r.side === "YES" ? sellCents : 100 - sellCents) / 100;
+        const body = {
+          ticker: r.ticker,
+          action: "sell",
+          side: r.side === "YES" ? "ask" : "bid",
+          type: "limit",
+          count: String(contractsToSell),
+          price: priceDollars.toFixed(4),
+          time_in_force: "immediate_or_cancel",
+          self_trade_prevention_type: "taker_at_cross",
+          client_order_id: `${tag}-${r.id}-${Date.now()}`.slice(0, 64),
+        };
+        const res = await fetch(`${KALSHI_PUBLIC_BASE}${path}`, {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(body),
+        });
+        const j: any = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          reasons.push(`${r.ticker}: sell failed — ${j?.error?.message ?? `http ${res.status}`}`);
+          return null;
+        }
+        const fillCount = Number(j?.order?.fill_count ?? j?.fill_count ?? 0);
+        const avgFillDollars = Number(j?.order?.average_fill_price ?? j?.average_fill_price ?? 0);
+        if (!Number.isFinite(fillCount) || fillCount <= 0) {
+          reasons.push(`${r.ticker}: sell 0-fill (IOC) @ ${sellCents}¢`);
+          return null;
+        }
+        const filledCents = avgFillDollars > 0
+          ? Math.round(avgFillDollars * (r.side === "YES" ? 100 : -100) + (r.side === "YES" ? 0 : 100))
+          : sellCents;
+        return { fillCount, filledCents };
+      } catch (e: any) {
+        reasons.push(`${r.ticker}: sell err ${e?.message ?? "x"}`);
+        return null;
+      }
+    }
+
+    // ── Pass 1: quote + mark every row (uses contracts_remaining when set) ──
+    type Marked = { r: Row; markCents: number; markPnl: number; remaining: number; entry: number };
     const marked: Marked[] = [];
     for (const r of rows) {
+      const remaining = r.contracts_remaining ?? r.contracts;
+      const entry = r.entry_price_cents ?? r.limit_cents;
+      if (remaining <= 0) continue;
       let yesBid = 0, yesAsk = 0;
       try {
         const res = await fetch(`${KALSHI_PUBLIC_BASE}/markets/${encodeURIComponent(r.ticker)}`, { headers: { Accept: "application/json" } });
@@ -542,33 +614,110 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
         continue;
       }
       const markCents = r.side === "YES" ? yesBid : 100 - yesAsk;
-      const markPnl = ((markCents - r.limit_cents) / 100) * r.contracts;
-      marked.push({ r, markCents, markPnl });
+      const markPnl = ((markCents - entry) / 100) * remaining;
+      marked.push({ r, markCents, markPnl, remaining, entry });
     }
 
-    // ── Portfolio net-positive lock: if aggregate unrealized PnL across all
-    // open live positions is > 0, close ALL of them at current bid to bank
-    // the net win — even losers get closed to lock the batch profit. ──
-    const totalUnrealized = marked.reduce((s, x) => s + x.markPnl, 0);
-    const netLock = marked.length > 0 && totalUnrealized > 0;
+    let exited = 0;
+    const handledIds = new Set<string>();
+
+    // ── Pass 1.5: Odds-ladder tiers (partial + full). Runs before legacy. ──
+    // Pick the tier that closes the most contracts this tick; SL takes priority
+    // when both SL and TP tiers happen to trigger simultaneously.
+    for (const mk of marked) {
+      const { r, markCents, entry, remaining } = mk;
+      const ladder = Array.isArray(r.exit_ladder) ? (r.exit_ladder as ExitLadderTier[]) : DEFAULT_EXIT_LADDER;
+      const delta = markCents - entry;
+
+      const triggered = ladder.filter(t => {
+        if (t.kind === "sl") return delta <= t.priceDeltaCents;
+        return delta >= t.priceDeltaCents;
+      });
+      if (triggered.length === 0) continue;
+
+      // Priority: any SL wins over any TP; within a kind, largest fraction wins.
+      triggered.sort((a, b) => {
+        if (a.kind !== b.kind) return a.kind === "sl" ? -1 : 1;
+        return b.exitFraction - a.exitFraction;
+      });
+      const tier = triggered[0];
+      const toSell = Math.max(1, Math.min(remaining, Math.floor(remaining * tier.exitFraction)));
+
+      // Race-safe claim.
+      const { data: claimed } = await supabase
+        .from("auto_trade_orders")
+        .update({ status: "closing" })
+        .eq("id", r.id)
+        .eq("status", "placed")
+        .select("id")
+        .maybeSingle();
+      if (!claimed) { reasons.push(`${r.ticker}: ladder claim lost`); continue; }
+
+      const sellCents = Math.max(1, Math.min(99, markCents));
+      const fill = await kalshiSell(r, toSell, sellCents, `ladder-${tier.kind}`);
+      if (!fill) {
+        await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", r.id);
+        continue;
+      }
+
+      const priorPartial = Number(r.partial_pnl_usd ?? 0);
+      const tierPnl = ((fill.filledCents - entry) / 100) * fill.fillCount;
+      const newPartial = priorPartial + tierPnl;
+      const newRemaining = Math.max(0, remaining - fill.fillCount);
+      const fullyClosed = newRemaining === 0;
+
+      if (fullyClosed) {
+        const totalPnl = newPartial;
+        await supabase
+          .from("auto_trade_orders")
+          .update({
+            status: totalPnl > 0 ? "settled_win" : "settled_loss",
+            settle_price: fill.filledCents / 100,
+            pnl_usd: totalPnl,
+            partial_pnl_usd: newPartial,
+            contracts_remaining: 0,
+            settled_at: new Date().toISOString(),
+          })
+          .eq("id", r.id);
+        exited++;
+        handledIds.add(r.id);
+        reasons.push(`${r.ticker}: ${tier.label} FULL close ${fill.fillCount}@${fill.filledCents}¢ · total pnl $${totalPnl.toFixed(2)}`);
+      } else {
+        // Partial: keep row "placed" so subsequent ticks can fire more tiers.
+        await supabase
+          .from("auto_trade_orders")
+          .update({
+            status: "placed",
+            partial_pnl_usd: newPartial,
+            contracts_remaining: newRemaining,
+          })
+          .eq("id", r.id);
+        handledIds.add(r.id);
+        reasons.push(`${r.ticker}: ${tier.label} partial ${fill.fillCount}/${remaining}@${fill.filledCents}¢ (rem ${newRemaining}, banked $${newPartial.toFixed(2)})`);
+        // Update marked so legacy net-lock math this tick sees the new remainder.
+        mk.remaining = newRemaining;
+        mk.markPnl = ((markCents - entry) / 100) * newRemaining;
+      }
+    }
+
+    // ── Pass 1.75: net-positive lock across REMAINING open positions ──
+    const stillOpen = marked.filter(m => !handledIds.has(m.r.id) && m.remaining > 0);
+    const totalUnrealized = stillOpen.reduce((s, x) => s + x.markPnl, 0);
+    const netLock = stillOpen.length > 0 && totalUnrealized > 0;
     if (netLock) {
-      reasons.push(`net_lock: aggregate +$${totalUnrealized.toFixed(2)} across ${marked.length} open — closing all`);
+      reasons.push(`net_lock: aggregate +$${totalUnrealized.toFixed(2)} across ${stillOpen.length} open — closing all`);
     }
 
-    // ── Pass 2: per-row exit decision ──
-    for (const { r, markCents, markPnl } of marked) {
-      const entryCents = r.limit_cents;
+    // ── Pass 2: legacy TP/SL/flip/edge exits on anything the ladder didn't handle ──
+    for (const { r, markCents, markPnl, remaining, entry } of stillOpen) {
       const tpThreshold = LIVE_TP_FRAC * Number(r.stake_usd);
-      // #2 Time-decay-aware SL: tighten stop as expiry approaches (theta protection).
       const secondsLeft = Math.max(0, (Date.parse(r.close_time) - Date.now()) / 1000);
       const slFrac = secondsLeft < LIVE_LATE_TIGHTEN_SEC ? LIVE_LATE_SL_FRAC : LIVE_SL_FRAC;
       const slThreshold = -slFrac * Number(r.stake_usd);
-      const adverseCents = entryCents - markCents;
+      const adverseCents = entry - markCents;
       const sideProbNow = currentModelProbBySide.get(r.ticker);
 
       let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | null = null;
-      // Flip has highest priority: model no longer supports our side. Cut the
-      // losing conviction even if the batch is net-positive on other rows.
       if (sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
         exitReason = "flip";
         reasons.push(`${r.ticker}: flip — model now ${(sideProbNow * 100).toFixed(0)}% for ${r.side} (< ${LIVE_FLIP_PROB * 100}%)`);
@@ -577,89 +726,50 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
       else if (markPnl >= tpThreshold) exitReason = "tp";
       else if (markPnl <= slThreshold) exitReason = "sl";
       else if (adverseCents >= LIVE_EDGE_DECAY_CENTS) exitReason = "edge";
-
       if (!exitReason) continue;
 
-
-
-      // Race-safe claim: only one process closes this row.
-      const { data: claimed, error: claimErr } = await supabase
+      const { data: claimed } = await supabase
         .from("auto_trade_orders")
         .update({ status: "closing" })
         .eq("id", r.id)
         .eq("status", "placed")
         .select("id")
         .maybeSingle();
-      if (claimErr || !claimed) { reasons.push(`${r.ticker}: claim lost`); continue; }
+      if (!claimed) { reasons.push(`${r.ticker}: claim lost`); continue; }
 
-      // Place a Kalshi sell at the current bid (most likely to fill). Kalshi V2
-      // endpoint + IOC. YES holder sells via ask, NO holder via bid.
-      const sellLimitCents = Math.max(1, Math.min(99, markCents));
-      try {
-        const { signKalshi } = await import("./cryptoTrades.functions");
-        const path = "/portfolio/events/orders";
-        const headers = await signKalshi("POST", path);
-        const priceDollars = (r.side === "YES" ? sellLimitCents : 100 - sellLimitCents) / 100;
-        const body = {
-          ticker: r.ticker,
-          action: "sell",
-          side: r.side === "YES" ? "ask" : "bid",
-          type: "limit",
-          count: String(r.contracts),
-          price: priceDollars.toFixed(4),
-          time_in_force: "immediate_or_cancel",
-          self_trade_prevention_type: "taker_at_cross",
-          client_order_id: `auto-exit-${r.id}`.slice(0, 64),
-        };
-        const res = await fetch(`${KALSHI_PUBLIC_BASE}${path}`, {
-          method: "POST",
-          headers: { ...headers, "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify(body),
-        });
-        const j: any = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          const msg = j?.error?.message ?? `http ${res.status}`;
-          // Revert claim so a later tick can retry (or expiry settles it).
-          await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", r.id);
-          reasons.push(`${r.ticker}: sell failed — ${msg}`);
-          continue;
-        }
-
-        // Honor Kalshi's fill_count — IOC may return 0 fills. Only settle if
-        // something actually crossed; otherwise revert claim and let a later
-        // tick (or expiry settlement) handle the position.
-        const fillCount = Number(j?.order?.fill_count ?? j?.fill_count ?? 0);
-        const avgFillDollars = Number(j?.order?.average_fill_price ?? j?.average_fill_price ?? 0);
-        if (!Number.isFinite(fillCount) || fillCount <= 0) {
-          await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", r.id);
-          reasons.push(`${r.ticker}: sell 0-fill (IOC) @ ${sellLimitCents}¢ — reverted`);
-          continue;
-        }
-
-        // Use actual filled quantity + actual fill price for PnL (fall back to
-        // the limit if Kalshi omitted average_fill_price).
-        const filledCents = avgFillDollars > 0
-          ? Math.round(avgFillDollars * (r.side === "YES" ? 100 : -100) + (r.side === "YES" ? 0 : 100))
-          : sellLimitCents;
-        const realizedPnl = ((filledCents - entryCents) / 100) * fillCount;
-        const newStatus = realizedPnl > 0 ? "settled_win" : "settled_loss";
-        await supabase
-          .from("auto_trade_orders")
-          .update({
-            status: newStatus,
-            settle_price: filledCents / 100,
-            pnl_usd: realizedPnl,
-            settled_at: new Date().toISOString(),
-          })
-          .eq("id", r.id);
-        exited++;
-        reasons.push(`${r.ticker}: ${exitReason} closed ${fillCount}/${r.contracts} @ ${filledCents}¢ (pnl $${realizedPnl.toFixed(2)})`);
-      } catch (e: any) {
+      const sellCents = Math.max(1, Math.min(99, markCents));
+      const fill = await kalshiSell(r, remaining, sellCents, `auto-exit-${exitReason}`);
+      if (!fill) {
         await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", r.id);
-        reasons.push(`${r.ticker}: sell err ${e?.message ?? "x"}`);
+        continue;
       }
+
+      const priorPartial = Number(r.partial_pnl_usd ?? 0);
+      const tailPnl = ((fill.filledCents - entry) / 100) * fill.fillCount;
+      const totalPnl = priorPartial + tailPnl;
+      const newRemaining = Math.max(0, remaining - fill.fillCount);
+      const fullyClosed = newRemaining === 0;
+
+      await supabase
+        .from("auto_trade_orders")
+        .update(fullyClosed ? {
+          status: totalPnl > 0 ? "settled_win" : "settled_loss",
+          settle_price: fill.filledCents / 100,
+          pnl_usd: totalPnl,
+          partial_pnl_usd: priorPartial + tailPnl,
+          contracts_remaining: 0,
+          settled_at: new Date().toISOString(),
+        } : {
+          status: "placed",
+          partial_pnl_usd: priorPartial + tailPnl,
+          contracts_remaining: newRemaining,
+        })
+        .eq("id", r.id);
+      if (fullyClosed) exited++;
+      reasons.push(`${r.ticker}: ${exitReason} ${fullyClosed ? "closed" : "partial"} ${fill.fillCount}/${remaining} @ ${fill.filledCents}¢ (pnl $${totalPnl.toFixed(2)})`);
     }
-    return { exited, reasons: reasons.slice(0, 20) };
+
+    return { exited, reasons: reasons.slice(0, 30) };
   });
 
 // ── #7 Counterfactual settle sweep ────────────────────────────────────────

@@ -27,6 +27,12 @@ const fmtTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString([
 const fmtCountdown = (s: number) => s <= 0 ? "closed" : `${Math.floor(s/60)}m ${(s%60).toString().padStart(2,"0")}s`;
 // Kalshi BTC 15m: YES = price closes ABOVE strike, NO = at/below. Show "UP" / "DOWN" to users.
 const dirLabel = (side: string) => side === "YES" ? "UP" : "DOWN";
+// Kalshi ¢ → American odds (favorites negative, dogs positive).
+const centsToAmerican = (c: number): string => {
+  const p = Math.max(0.01, Math.min(0.99, c / 100));
+  if (p >= 0.5) return `-${Math.round((p / (1 - p)) * 100)}`;
+  return `+${Math.round(((1 - p) / p) * 100)}`;
+};
 
 function Sparkline({ candles, strike }: { candles: BtcCandle[]; strike?: number }) {
   if (!candles.length) return <div className="h-12 text-xs text-muted-foreground">no data</div>;
@@ -815,7 +821,7 @@ function AutoTradePanel() {
             </span>
           </h2>
           <p className="text-[11px] text-muted-foreground">
-            $20×3/click · entry edge≥5pts, σ≥1.25, ≥120s · auto-exit TP +70% / SL -50% / edge-decay 2¢ · halt 40 orders or -$80/24h
+            $20×3/click · entry: EV≥3¢, edge≥5pts, σ≥1.25 · ladder: +6¢ →50%, +12¢ →100%, -15¢ →SL · fallbacks: TP+70%/SL-50%/flip/net-lock · halt 40 orders or -$80/24h
           </p>
           <p className="text-[10px] text-muted-foreground mt-0.5">
             Live 24h: {liveCount24h}/40 orders · realized <span className={liveRealized24h >= 0 ? "text-emerald-400" : "text-red-400"}>{liveRealized24h >= 0 ? "+" : ""}${liveRealized24h.toFixed(2)}</span>
@@ -977,7 +983,12 @@ function AutoTradePanel() {
                     <td className="px-3 py-1.5 font-mono">{o.ticker}</td>
                     <td className={"px-3 py-1.5 font-semibold " + (o.side === "YES" ? "text-emerald-400" : "text-red-400")}>{dirLabel(o.side)}</td>
                     <td className="px-3 py-1.5 text-right font-mono">${Number(o.stake_usd).toFixed(2)}</td>
-                    <td className="px-3 py-1.5 text-right font-mono">{o.limit_cents}¢ × {o.contracts}</td>
+                    <td className="px-3 py-1.5 text-right font-mono" title={`Entry ${centsToAmerican(o.entry_price_cents ?? o.limit_cents)} American`}>
+                      {o.entry_price_cents ?? o.limit_cents}¢ × {o.contracts}
+                      {o.contracts_remaining != null && o.contracts_remaining !== o.contracts && (
+                        <div className="text-[9px] text-amber-400">rem {o.contracts_remaining} · banked ${Number(o.partial_pnl_usd ?? 0).toFixed(2)}</div>
+                      )}
+                    </td>
                     <td className="px-3 py-1.5 text-right font-mono">{Number(o.edge_pts) >= 0 ? "+" : ""}{Number(o.edge_pts).toFixed(1)}pts</td>
                     <td className="px-3 py-1.5 text-right font-mono">{Number(o.sigma_distance).toFixed(2)}σ</td>
                     <td className={"px-3 py-1.5 " + statusColor}>{o.status.replace("settled_", "")}</td>
