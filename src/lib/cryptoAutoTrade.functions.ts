@@ -228,6 +228,32 @@ export const runAutoTrade = createServerFn({ method: "POST" })
             return false;
           }
           if (recentTickers.has(m.ticker)) { skipReasons.push(`${m.ticker}: traded in last 24h`); return false; }
+          // #5 cooldown: don't re-enter a symbol just after any recent close
+          if (isLive && cooldownTickers.has(m.ticker)) {
+            skipReasons.push(`${m.ticker}: cooldown (closed < ${LIVE_COOLDOWN_SEC}s ago)`);
+            return false;
+          }
+          // #6 per-symbol 24h loss cap
+          if (isLive) {
+            const symPnl = perSymbolPnl.get(m.ticker) ?? 0;
+            if (symPnl <= -LIVE_PER_SYMBOL_LOSS_CAP_USD) {
+              skipReasons.push(`${m.ticker}: symbol loss cap ($${symPnl.toFixed(2)} ≤ -$${LIVE_PER_SYMBOL_LOSS_CAP_USD})`);
+              return false;
+            }
+          }
+          // #1 EV gate: our probability must beat the ask by a real margin
+          const askDollarsFilter = m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice));
+          const ourProbFilter = m.side === "YES" ? m.modelYesProb : 1 - m.modelYesProb;
+          const evEdgeFilter = ourProbFilter - askDollarsFilter;
+          if (evEdgeFilter < LIVE_MIN_EV_MARGIN) {
+            skipReasons.push(`${m.ticker}: EV ${(evEdgeFilter * 100).toFixed(1)}¢ < ${LIVE_MIN_EV_MARGIN * 100}¢ (prob ${(ourProbFilter * 100).toFixed(0)}% vs ask ${(askDollarsFilter * 100).toFixed(0)}¢)`);
+            return false;
+          }
+          // #4 coinflip-price guard: if market prices this as near-50/50, require strong sigma
+          if (Math.abs(askDollarsFilter - 0.5) < LIVE_COINFLIP_BAND && m.sigmaDistance < LIVE_COINFLIP_MIN_SIGMA) {
+            skipReasons.push(`${m.ticker}: coinflip price ${(askDollarsFilter * 100).toFixed(0)}¢ needs ≥${LIVE_COINFLIP_MIN_SIGMA}σ (have ${m.sigmaDistance.toFixed(2)}σ)`);
+            return false;
+          }
           return true;
         })
         .sort((a, b) => (b.effectiveEdge - b.m.requiredEdgePts) - (a.effectiveEdge - a.m.requiredEdgePts))
