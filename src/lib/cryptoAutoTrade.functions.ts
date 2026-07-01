@@ -733,7 +733,7 @@ export async function autoExitForUser(
     const adverseCents = entry - markCents;
     const sideProbNow = currentModelProbBySide.get(r.ticker);
 
-    let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | "mart_hopeless" | "mart_hardcap" | "odds_flip" | null = null;
+    let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | "mart_hopeless" | "mart_hardcap" | "odds_flip" | "deep_combo" | null = null;
     // Martingale-specific rules (only apply to martingale-tagged orders).
     if (r.is_martingale === true) {
       const stake = Number(r.stake_usd);
@@ -749,6 +749,20 @@ export async function autoExitForUser(
         reasons.push(`${r.ticker}[mart]: HOPELESS — model ${(sideProbNow * 100).toFixed(0)}% on ${r.side}, down ${(lossFrac * 100).toFixed(0)}%`);
       }
     }
+    // Deep-drawdown combo: ANY order (mart or regular) that's down ≥70% AND
+    // both trend (model prob) and odds (Kalshi mark) are against us → sell.
+    // Backstop for cases where 35% hard cap / 50% SL didn't fill.
+    if (!exitReason) {
+      const stake = Number(r.stake_usd);
+      const lossFrac = stake > 0 ? -markPnl / stake : 0;
+      const trendAgainst = sideProbNow !== undefined && sideProbNow < 0.40;
+      const oddsAgainst = (entry - markCents) >= 10;
+      if (lossFrac >= 0.70 && trendAgainst && oddsAgainst) {
+        exitReason = "deep_combo";
+        reasons.push(`${r.ticker}[${r.mode}]: DEEP COMBO — down ${(lossFrac * 100).toFixed(0)}%, model ${((sideProbNow ?? 0) * 100).toFixed(0)}% for ${r.side}, Kalshi ${markCents}¢ vs entry ${entry}¢`);
+      }
+    }
+
     // Kalshi-odds flip: the market itself moved ≥20¢ against our side vs entry
     // (independent of our model). Strong crowd signal we picked the wrong side.
     if (!exitReason && (entry - markCents) >= 20) {
