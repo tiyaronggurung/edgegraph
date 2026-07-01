@@ -944,7 +944,8 @@ function AutoTradePanel() {
           setMartWins(0);
           toast.success(`Paroli WIN #${nextWins} — streak cap, locking in & reset to $${MART_BASE}`);
         } else if (gatePassed) {
-          const nextStake = Math.min(Math.round(martStake * MART_PAROLI_MULT), MART_CAP);
+          const mult = MART_PAROLI_STEPS[martWins] ?? 1.0;
+          const nextStake = Math.min(Math.round(martStake * mult), MART_CAP);
           setMartStake(nextStake);
           setMartWins(nextWins);
           toast.success(`Paroli WIN #${nextWins} — pressing to $${nextStake} (σ ${sig.toFixed(2)} · edge ${edge.toFixed(1)}pt)`);
