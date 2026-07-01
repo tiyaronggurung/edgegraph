@@ -134,7 +134,24 @@ function findSupportResistance(candles: Candle[], price: number): { support: num
 
 function clamp(n: number, lo: number, hi: number): number { return Math.max(lo, Math.min(hi, n)); }
 
-export function useChartVerdict(): ChartVerdict {
+// Weight tables per regime. Rows must sum to 1.0.
+// "mixed" is identical to the pre-regime static weights.
+const WEIGHTS = {
+  mixed: { vwap: 0.20, rsi: 0.15, flow: 0.15, trend: 0.15, wick: 0.10, futures: 0.15, liq: 0.10 },
+  trend: { vwap: 0.25, rsi: 0.05, flow: 0.15, trend: 0.20, wick: 0.05, futures: 0.20, liq: 0.10 },
+  chop:  { vwap: 0.15, rsi: 0.20, flow: 0.10, trend: 0.05, wick: 0.20, futures: 0.10, liq: 0.20 },
+} as const;
+export type VerdictRegime = keyof typeof WEIGHTS;
+
+export interface VerdictOptions {
+  regime?: VerdictRegime;
+  coinbase?: { price: number | null; connected: boolean };  // Phase 3 lead-lag
+}
+
+export function useChartVerdict(regimeOrOpts: VerdictRegime | VerdictOptions = "mixed"): ChartVerdict {
+  const opts: VerdictOptions = typeof regimeOrOpts === "string" ? { regime: regimeOrOpts } : regimeOrOpts;
+  const regime: VerdictRegime = opts.regime ?? "mixed";
+  const coinbase = opts.coinbase;
   const { ticks, connected, count } = useBinanceBtcTicks();
   const fut = useBinanceBtcFutures();
   const liq = useBinanceLiquidations();
@@ -290,21 +307,27 @@ export function useChartVerdict(): ChartVerdict {
     // Score components (each maps to 0..100 signed around 50).
     const s_vwap = vwapDeltaPct != null ? clamp(50 + vwapDeltaPct * 500, 0, 100) : 50;
     const s_rsi = rsiVal != null ? clamp(rsiVal, 0, 100) : 50;
-    const s_flow = buyRatio != null ? clamp(50 + (buyRatio - 0.5) * 200, 0, 100) : 50;
+    let s_flow = buyRatio != null ? clamp(50 + (buyRatio - 0.5) * 200, 0, 100) : 50;
+    // Phase 3 — Coinbase lead-lag: >2 bps divergence nudges flow ±3 pts.
+    if (coinbase?.connected && coinbase.price != null && Number.isFinite(coinbase.price)) {
+      const diffBps = ((coinbase.price - price) / price) * 10_000;
+      if (Math.abs(diffBps) > 2) s_flow = clamp(s_flow + Math.max(-3, Math.min(3, diffBps * 0.5)), 0, 100);
+    }
     const s_trend = clamp(20 + greenCount * 15, 0, 100);
     const s_wick = wickBias === "up" ? 75 : wickBias === "down" ? 25 : 50;
 
     const readyEnough = ticks.length > 50 && candles1m.length >= 5;
     if (!readyEnough) return { ...empty, ...emptyBase, connected, samples: count, vwap, vwapDeltaUsd, vwapDeltaPct, basisUsd, futuresBias, futuresReason, reason: `warming up — ${count} ticks, ${candles1m.length}/5 candles` };
 
+    const W = WEIGHTS[regime];
     let score = clamp(
-      s_vwap    * 0.20 +
-      s_rsi     * 0.15 +
-      s_flow    * 0.15 +
-      s_trend   * 0.15 +
-      s_wick    * 0.10 +
-      s_futures * 0.15 +
-      s_liq     * 0.10,
+      s_vwap    * W.vwap +
+      s_rsi     * W.rsi +
+      s_flow    * W.flow +
+      s_trend   * W.trend +
+      s_wick    * W.wick +
+      s_futures * W.futures +
+      s_liq     * W.liq,
       0, 100,
     );
 
@@ -404,5 +427,5 @@ export function useChartVerdict(): ChartVerdict {
       ethConnected: eth.connected, ethAgrees, ethReason,
     };
 
-  }, [ticks, connected, count, fut, liq, eth, btcVel]);
+  }, [ticks, connected, count, fut, liq, eth, btcVel, regime, coinbase?.price, coinbase?.connected]);
 }
