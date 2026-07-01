@@ -12,7 +12,10 @@ import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { EquityMomentumPanel } from "@/components/EquityMomentumPanel";
 import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
+import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
+import { computeKalshiSentiment } from "@/lib/kalshiSentiment";
+
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/crypto")({
@@ -674,6 +677,11 @@ function AutoTradePanel() {
   const runFn = useServerFn(runAutoTrade);
   const balanceFn = useServerFn(checkKalshiBalance);
   const diagFn = useServerFn(diagnoseKalshiAuth);
+  // Read the shared btc-markets cache populated by CryptoPage. React Query
+  // dedupes by key — no extra fetch, we just subscribe to updates.
+  const marketsFn = useServerFn(getBtcMarkets);
+  const marketsQ = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 10_000, staleTime: 5_000 });
+
   const [liveBusy, setLiveBusy] = useState(false);
   const [forceBusy, setForceBusy] = useState(false);
   const [testBusy, setTestBusy] = useState(false);
@@ -921,6 +929,22 @@ function AutoTradePanel() {
   }, [chartGate]);
   const chartVerdict = useChartVerdict();
 
+  // Opt-in Kalshi-sentiment gate: skip windows where ATM YES sits in the chop
+  // belt (48–52¢). Uses market consensus instead of Binance ticks.
+  const [sentimentGate, setSentimentGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.sentimentGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.sentimentGate", sentimentGate ? "on" : "off");
+  }, [sentimentGate]);
+  const kalshiSentiment = useMemo(
+    () => computeKalshiSentiment(marketsQ.data?.markets ?? []),
+    [marketsQ.data],
+  );
+
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("crypto.autoMart", autoMart ? "on" : "off");
@@ -1036,6 +1060,21 @@ function AutoTradePanel() {
           return;
         }
       }
+      // Optional Kalshi-sentiment gate — skip when market itself is chop (48–52¢).
+      if (sentimentGate) {
+        const s = kalshiSentiment;
+        if (!s.ready) {
+          // No market data yet — hold, don't burn the window.
+          return;
+        }
+        if (s.isChop) {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Sentiment gate: window skipped — ${s.reason}`);
+          return;
+        }
+      }
+
+
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
       window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
@@ -1052,7 +1091,7 @@ function AutoTradePanel() {
     const h = setInterval(tick, 5_000);
     return () => { cancelled = true; clearInterval(h); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict]);
+  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment]);
 
   return (
     <div className="border border-border rounded-lg bg-card">
@@ -1192,6 +1231,7 @@ function AutoTradePanel() {
           )}
           {autoMart && <MartingaleCountdown windowMs={WINDOW_MS} />}
           <ChartVerdictBadge compact />
+          <KalshiSentimentBadge s={kalshiSentiment} compact />
           {autoMart && (
             <button
               onClick={() => setChartGate(v => !v)}
@@ -1204,6 +1244,19 @@ function AutoTradePanel() {
               {chartGate ? "Chart gate ON" : "Chart gate OFF"}
             </button>
           )}
+          {autoMart && (
+            <button
+              onClick={() => setSentimentGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${sentimentGate ? "border-violet-500/50 bg-violet-500/15 text-violet-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={sentimentGate
+                ? `Sentiment gate ON: skip fire when ATM YES ∈ 48–52¢ (market chop). Current: ${kalshiSentiment.ready && kalshiSentiment.atmYesPct != null ? kalshiSentiment.atmYesPct.toFixed(0) + "¢" : "…"}`
+                : "Sentiment gate OFF: fire every window regardless of Kalshi consensus"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${sentimentGate ? "bg-violet-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {sentimentGate ? "Sentiment gate ON" : "Sentiment gate OFF"}
+            </button>
+          )}
+
           <button
             onClick={() => runForce()}
             disabled={forceBusy || liveBusy}
