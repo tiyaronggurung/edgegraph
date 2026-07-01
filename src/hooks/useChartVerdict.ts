@@ -161,7 +161,7 @@ export function useChartVerdict(): ChartVerdict {
     const readyEnough = ticks.length > 50 && candles1m.length >= 5;
     if (!readyEnough) return { ...empty, connected, samples: count, vwap, vwapDeltaUsd, vwapDeltaPct, reason: `warming up — ${count} ticks, ${candles1m.length}/5 candles` };
 
-    const score = clamp(
+    let score = clamp(
       s_vwap * 0.25 +
       s_rsi  * 0.20 +
       s_flow * 0.20 +
@@ -169,6 +169,43 @@ export function useChartVerdict(): ChartVerdict {
       s_wick * 0.15,
       0, 100,
     );
+
+    // ---- Guards (mean-reversion + streak) ------------------------------
+    // These penalize the score when the raw signal wants a direction the
+    // structure of the chart says is unlikely. Penalty shrinks the skew,
+    // pushing borderline setups into "chop" so the gate skips the window.
+    const guardNotes: string[] = [];
+
+    // 1) Support/Resistance belt proximity (~0.15% of spot).
+    const belt = price * 0.0015;
+    if (score > 50 && resistance != null && (resistance - price) <= belt && resistance > price) {
+      score -= 15;
+      guardNotes.push(`resist belt $${resistance.toFixed(0)} — cap likely`);
+    }
+    if (score < 50 && support != null && (price - support) <= belt && support < price) {
+      score += 15;
+      guardNotes.push(`support belt $${support.toFixed(0)} — bounce likely`);
+    }
+
+    // 2) Streak guard — no back-to-back 3rd candle without run confirmation.
+    if (candles1m.length >= 2) {
+      const c1 = candles1m[candles1m.length - 1];
+      const c2 = candles1m[candles1m.length - 2];
+      const twoGreen = c1.c >= c1.o && c2.c >= c2.o;
+      const twoRed   = c1.c <  c1.o && c2.c <  c2.o;
+      const bullConfirmed = (vwapDeltaPct ?? 0) > 0.10 && (rsiVal ?? 0) > 60 && (buyRatio ?? 0) > 0.60;
+      const bearConfirmed = (vwapDeltaPct ?? 0) < -0.10 && (rsiVal ?? 100) < 40 && (buyRatio ?? 1) < 0.40;
+      if (twoGreen && score > 50 && !bullConfirmed) {
+        score -= 20;
+        guardNotes.push("2 grn — no bull-run confirm, mean-revert risk");
+      }
+      if (twoRed && score < 50 && !bearConfirmed) {
+        score += 20;
+        guardNotes.push("2 red — no bear-run confirm, bounce risk");
+      }
+    }
+    score = clamp(score, 0, 100);
+    // --------------------------------------------------------------------
 
     const skew = score - 50;
     const bias: "up" | "down" | "flat" = Math.abs(skew) < 5 ? "flat" : skew > 0 ? "up" : "down";
@@ -184,6 +221,7 @@ export function useChartVerdict(): ChartVerdict {
     parts.push(`${greenCount}/5 grn`);
     if (wickBias !== "neutral") parts.push(`${wickBias === "up" ? "▼wick" : "▲wick"}`);
     if (support && resistance) parts.push(`S $${support.toFixed(0)} / R $${resistance.toFixed(0)}`);
+    if (guardNotes.length) parts.push(...guardNotes);
 
     return {
       ready: true, connected, samples: count,
@@ -194,5 +232,6 @@ export function useChartVerdict(): ChartVerdict {
       wickBias, support, resistance,
       reason: parts.join(" · "),
     };
+
   }, [ticks, connected, count]);
 }
