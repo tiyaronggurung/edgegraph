@@ -598,6 +598,8 @@ function AutoTradePanel() {
   const listFn = useServerFn(listAutoTradeOrders);
   const settleFn = useServerFn(settleAutoTradeOrders);
   const autoExitFn = useServerFn(autoExitLivePositions);
+  const settleSkipFn = useServerFn(settleAutoTradeSkipLog);
+  const skipReportFn = useServerFn(getSkipReport);
   const runFn = useServerFn(runAutoTrade);
   const balanceFn = useServerFn(checkKalshiBalance);
   const diagFn = useServerFn(diagnoseKalshiAuth);
