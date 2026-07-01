@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useBinanceBtcTicks } from "@/hooks/useBinanceBtcTicks";
 import { useTrendlineAnalysis } from "@/hooks/useTrendlineAnalysis";
+import { useCandleMomentum } from "@/hooks/useCandleMomentum";
 
 export const Route = createFileRoute("/_authenticated/chart")({
   head: () => ({
