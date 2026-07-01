@@ -1213,6 +1213,21 @@ function AutoTradePanel() {
         }
       }
 
+      // Optional round-number magnet gate (Phase 4) — skip when spot is glued
+      // to a $50/$100 level and the break hasn't confirmed on our side.
+      if (magnetGate) {
+        const cv = chartVerdict;
+        if (!cv.ready) return;
+        const side: "up" | "down" = (calibrate ? calShift.adjustedScore : cv.score) >= 50 ? "up" : "down";
+        const check = shouldSkipForMagnet(live.price ?? 0, side, btcTicks.ticks);
+        if (check.skip) {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Magnet gate: window skipped — ${check.reason}`);
+          return;
+        }
+      }
+
+
 
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
