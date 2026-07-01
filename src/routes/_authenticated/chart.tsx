@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useBinanceBtcTicks } from "@/hooks/useBinanceBtcTicks";
 import { useTrendlineAnalysis } from "@/hooks/useTrendlineAnalysis";
+import { useCandleMomentum } from "@/hooks/useCandleMomentum";
 
 export const Route = createFileRoute("/_authenticated/chart")({
   head: () => ({
@@ -25,6 +26,7 @@ function ChartPage() {
   const a = useTrendlineAnalysis();
   const [showFib, setShowFib] = useState(true);
   const [showLines, setShowLines] = useState(true);
+  const cm = useCandleMomentum();
 
   const scale = useMemo(() => {
     const c = a.candles;
@@ -90,6 +92,42 @@ function ChartPage() {
             <div><div className="text-[10px] text-muted-foreground">Resistance slope</div><div className={`font-mono ${a.resistanceLine.slopePerMin > 0 ? "text-emerald-300" : "text-rose-300"}`}>{a.resistanceLine.slopePerMin >= 0 ? "+" : ""}${a.resistanceLine.slopePerMin.toFixed(1)}/m</div></div>
           )}
         </div>
+      </div>
+
+      {/* Candle Momentum */}
+      <div className={`border rounded-lg p-3 ${cm.forecast === "big_red" ? "border-rose-500/50 bg-rose-500/10" : cm.forecast === "big_green" ? "border-emerald-500/50 bg-emerald-500/10" : "border-border bg-card"}`}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Candle momentum · forming 1m</div>
+            <div className={`text-lg font-bold uppercase tracking-wider ${cm.forecast === "big_red" ? "text-rose-400" : cm.forecast === "big_green" ? "text-emerald-400" : cm.forecast.endsWith("green") ? "text-emerald-300" : cm.forecast.endsWith("red") ? "text-rose-300" : "text-muted-foreground"}`}>
+              {cm.ready ? cm.forecast.replace("_", " ") : "warming up"}
+              {cm.ready && cm.guidance !== "neutral" && (
+                <span className={`ml-2 text-[11px] px-2 py-0.5 rounded border ${cm.guidance === "sell" ? "border-rose-500/50 bg-rose-500/15 text-rose-300" : "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"}`}>
+                  {cm.guidance === "sell" ? "SIGNAL: SELL" : "SIGNAL: HOLD"}
+                </span>
+              )}
+            </div>
+            <div className="text-[11px] text-muted-foreground">{cm.forecastReason}</div>
+          </div>
+          <div className="flex items-center gap-4 text-xs">
+            <div><div className="text-[10px] text-muted-foreground">Confidence</div><div className="font-mono">{cm.forecastConfidence}%</div></div>
+            <div><div className="text-[10px] text-muted-foreground">Proj. body</div><div className={`font-mono ${cm.forecastBody >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{cm.forecastBody >= 0 ? "+" : ""}${cm.forecastBody.toFixed(0)}</div></div>
+            <div><div className="text-[10px] text-muted-foreground">2σ threshold</div><div className="font-mono">${cm.bigThreshold.toFixed(0)}</div></div>
+            <div><div className="text-[10px] text-muted-foreground">σ body</div><div className="font-mono">${cm.sigmaBody.toFixed(0)}</div></div>
+          </div>
+        </div>
+        {cm.recentBig.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-border/50">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Recent big candles (5m)</div>
+            <div className="flex flex-wrap gap-1.5">
+              {cm.recentBig.slice().reverse().map(e => (
+                <span key={e.t} className={`text-[10px] font-mono px-2 py-0.5 rounded border ${e.side === "green" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border-rose-500/40 bg-rose-500/10 text-rose-300"}`}>
+                  {new Date(e.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {e.side === "green" ? "+" : "-"}${Math.abs(e.body).toFixed(0)} · {e.sigmaMult.toFixed(1)}σ
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Canvas */}

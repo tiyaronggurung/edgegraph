@@ -20,6 +20,7 @@ import { useCoinbaseBtcSpot } from "@/hooks/useCoinbaseBtcSpot";
 import { useBinanceBtcTicks } from "@/hooks/useBinanceBtcTicks";
 import { shouldSkipForMagnet } from "@/lib/roundLevelGate";
 import { useTrendlineAnalysis } from "@/hooks/useTrendlineAnalysis";
+import { useCandleMomentum } from "@/hooks/useCandleMomentum";
 import { computeKalshiSentiment } from "@/lib/kalshiSentiment";
 
 import { toast } from "sonner";
@@ -976,6 +977,18 @@ function AutoTradePanel() {
     window.localStorage.setItem("crypto.autoMart.trendGate", trendGate ? "on" : "off");
   }, [trendGate]);
   const trendAnalysis = useTrendlineAnalysis();
+
+  // Candle momentum gate — big-red forming = SELL (block longs / block window),
+  // big-green forming = HOLD (skip fresh entry, existing position is fine).
+  const [candleGate, setCandleGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.candleGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.candleGate", candleGate ? "on" : "off");
+  }, [candleGate]);
+  const candleMomentum = useCandleMomentum();
   const chartVerdict = useChartVerdict({
     regime: regimeOn ? marketRegime.regime : "mixed",
     coinbase: cbFeed ? { price: coinbase.price, connected: coinbase.connected } : undefined,
@@ -1261,8 +1274,22 @@ function AutoTradePanel() {
       }
 
 
-
-
+      // Optional Candle Momentum gate — if a big red or big green is forecast
+      // for the current forming 1m candle, don't take a fresh 15m position:
+      //   big_red   => sell/protect (skip so we don't buy into a dump)
+      //   big_green => hold (existing entry is fine; skip fresh window)
+      if (candleGate && candleMomentum.ready) {
+        if (candleMomentum.forecast === "big_red") {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Candle gate: SELL signal — big red forming (${candleMomentum.forecastReason}, ${candleMomentum.forecastConfidence}%)`);
+          return;
+        }
+        if (candleMomentum.forecast === "big_green") {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Candle gate: HOLD — big green forming (${candleMomentum.forecastReason}, ${candleMomentum.forecastConfidence}%)`);
+          return;
+        }
+      }
 
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
@@ -1280,7 +1307,7 @@ function AutoTradePanel() {
     const h = setInterval(tick, 5_000);
     return () => { cancelled = true; clearInterval(h); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment, roundGate, htfGate, ethGate, calibrate, calShift, magnetGate, btcTicks, trendGate, trendAnalysis]);
+  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment, roundGate, htfGate, ethGate, calibrate, calShift, magnetGate, btcTicks, trendGate, trendAnalysis, candleGate, candleMomentum]);
 
 
 
@@ -1493,6 +1520,18 @@ function AutoTradePanel() {
             >
               <span className={`h-1.5 w-1.5 rounded-full ${trendGate ? "bg-orange-400 animate-pulse" : "bg-muted-foreground"}`} />
               {trendGate ? `Trend ${trendAnalysis.ready ? trendAnalysis.bias.toUpperCase() : "…"}` : "Trend OFF"}
+            </button>
+          )}
+          {autoMart && (
+            <button
+              onClick={() => setCandleGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${candleGate ? "border-lime-500/50 bg-lime-500/15 text-lime-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={candleGate
+                ? `Candle gate ON: skip window if big-red (sell) or big-green (hold) forming. Current: ${candleMomentum.ready ? candleMomentum.forecast.replace("_", " ").toUpperCase() + " · " + candleMomentum.forecastReason : "warming up"}`
+                : "Candle gate OFF: fire regardless of forming candle strength"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${candleGate ? (candleMomentum.forecast === "big_red" ? "bg-rose-400 animate-pulse" : candleMomentum.forecast === "big_green" ? "bg-emerald-400 animate-pulse" : "bg-lime-400") : "bg-muted-foreground"}`} />
+              {candleGate ? `Candle ${candleMomentum.ready ? candleMomentum.forecast.replace("_", " ").toUpperCase() : "…"}` : "Candle OFF"}
             </button>
           )}
           <Link
