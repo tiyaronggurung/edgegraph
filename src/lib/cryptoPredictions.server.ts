@@ -15,6 +15,17 @@ export interface SnapshotInput {
   spot: number;
   closeTime: string;
   secondsToClose: number;
+  sigmaMinEffective?: number;
+  theoryYesProb?: number;
+}
+
+export function timeBucketOf(secondsToClose: number): string {
+  if (secondsToClose <= 30) return "30s";
+  if (secondsToClose <= 60) return "1m";
+  if (secondsToClose <= 120) return "2m";
+  if (secondsToClose <= 300) return "5m";
+  if (secondsToClose <= 600) return "10m";
+  return "13m+";
 }
 
 async function priceAt(unixSec: number): Promise<number | null> {
