@@ -69,6 +69,9 @@ export interface AutoTradeOrderRow {
   pnl_usd: number | null;
   settle_price: number | null;
   created_at: string;
+  entry_price_cents: number | null;
+  contracts_remaining: number | null;
+  partial_pnl_usd: number | null;
 }
 
 export interface AutoTradeRunResult {
