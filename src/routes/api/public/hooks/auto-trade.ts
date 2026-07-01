@@ -127,13 +127,19 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
               limitCents: toLimitCents(row.side, yesPrice),
             };
           })
-          .filter(m =>
-            m.edgePts >= FALLBACK_MIN_EDGE_PTS &&
-            m.secondsToClose >= MIN_SECONDS_TO_CLOSE &&
-            Number.isFinite(m.limitCents) &&
-            Number.isFinite(m.modelYesProb) &&
-            Number.isFinite(m.yesPrice)
-          );
+          .filter(m => {
+            // Model prob on OUR side (not YES prob). If we picked NO we want 1 - yesProb.
+            const sideProb = m.side === "YES" ? m.modelYesProb : 1 - m.modelYesProb;
+            return (
+              m.edgePts >= FALLBACK_MIN_EDGE_PTS &&
+              m.secondsToClose >= MIN_SECONDS_TO_CLOSE &&
+              Number.isFinite(m.limitCents) &&
+              Number.isFinite(m.modelYesProb) &&
+              Number.isFinite(m.yesPrice) &&
+              // Skip tail-lottery bets: model must give our side ≥25% chance.
+              sideProb >= 0.25
+            );
+          });
 
         const candidates = [...liveCandidates, ...storedCandidates]
           .filter((candidate, index, all) => all.findIndex(other => other.ticker === candidate.ticker) === index)
