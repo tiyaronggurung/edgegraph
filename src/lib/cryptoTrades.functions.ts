@@ -22,6 +22,7 @@ const PlaceOrderSchema = z.object({
   kellyMultiplier: z.number().min(0).max(1).optional(),
   closeTime: z.string().optional(),
   chartVerdictScore: z.number().min(0).max(100).optional(),
+  inputsSnapshot: z.record(z.string(), z.any()).optional(),
 });
 
 function normalizeKalshiPem(raw: string): string {
