@@ -46,6 +46,25 @@ function ChartPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["crypto-misses"] }),
   });
 
+  // AI study loop — analyze misses and propose improvements.
+  const studyFn = useServerFn(studyMissesWithAI);
+  const latestStudyFn = useServerFn(getLatestStudy);
+  const studyQ = useQuery({
+    queryKey: ["crypto-latest-study"],
+    queryFn: () => latestStudyFn(),
+    refetchInterval: 60_000,
+  });
+  const runStudy = useMutation({
+    mutationFn: () => studyFn(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["crypto-latest-study"] }),
+  });
+  // Auto-run when the server flags enough new misses have accumulated.
+  useEffect(() => {
+    if (studyQ.data?.needsRun && !runStudy.isPending) {
+      runStudy.mutate();
+    }
+  }, [studyQ.data?.needsRun]);
+
   const scale = useMemo(() => {
     const c = a.candles;
     if (c.length < 2) return null;
