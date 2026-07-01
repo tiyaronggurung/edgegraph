@@ -1399,6 +1399,18 @@ function AutoTradePanel() {
           )}
           {autoMart && (
             <button
+              onClick={() => setCbFeed(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${cbFeed ? "border-blue-500/50 bg-blue-500/15 text-blue-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={cbFeed
+                ? `Coinbase feed ON: ±3 pt flow nudge on >2 bps Binance/Coinbase divergence. CB: ${coinbase.connected ? "$" + (coinbase.price?.toFixed(0) ?? "…") : "connecting…"}`
+                : "Coinbase feed OFF: single-venue (Binance) only"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${cbFeed && coinbase.connected ? "bg-blue-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {cbFeed ? `CB ${coinbase.connected ? "ON" : "…"}` : "CB Feed OFF"}
+            </button>
+          )}
+          {autoMart && (
+            <button
               onClick={() => setSentimentGate(v => !v)}
               className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${sentimentGate ? "border-violet-500/50 bg-violet-500/15 text-violet-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
               title={sentimentGate
