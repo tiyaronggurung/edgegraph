@@ -369,6 +369,54 @@ export type Database = {
           },
         ]
       }
+      btc_calibration: {
+        Row: {
+          actual_rate: number | null
+          avg_market_prob: number | null
+          avg_model_prob: number | null
+          avg_theory_prob: number | null
+          correction_factor: number
+          created_at: string
+          id: string
+          last_fitted_at: string | null
+          n_correct: number
+          n_samples: number
+          sigma_bucket: string
+          time_bucket: string
+          updated_at: string
+        }
+        Insert: {
+          actual_rate?: number | null
+          avg_market_prob?: number | null
+          avg_model_prob?: number | null
+          avg_theory_prob?: number | null
+          correction_factor?: number
+          created_at?: string
+          id?: string
+          last_fitted_at?: string | null
+          n_correct?: number
+          n_samples?: number
+          sigma_bucket: string
+          time_bucket: string
+          updated_at?: string
+        }
+        Update: {
+          actual_rate?: number | null
+          avg_market_prob?: number | null
+          avg_model_prob?: number | null
+          avg_theory_prob?: number | null
+          correction_factor?: number
+          created_at?: string
+          id?: string
+          last_fitted_at?: string | null
+          n_correct?: number
+          n_samples?: number
+          sigma_bucket?: string
+          time_bucket?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       btc_model_predictions: {
         Row: {
           close_time: string
@@ -382,10 +430,13 @@ export type Database = {
           settle_price: number | null
           settled_at: string | null
           side: string
+          sigma_at_snapshot: number | null
           snapshot_seconds_to_close: number
           spot_at_snapshot: number
           strike: number
+          theory_yes_prob: number | null
           ticker: string
+          time_bucket: string | null
           updated_at: string
           was_correct: boolean | null
         }
@@ -401,10 +452,13 @@ export type Database = {
           settle_price?: number | null
           settled_at?: string | null
           side: string
+          sigma_at_snapshot?: number | null
           snapshot_seconds_to_close: number
           spot_at_snapshot: number
           strike: number
+          theory_yes_prob?: number | null
           ticker: string
+          time_bucket?: string | null
           updated_at?: string
           was_correct?: boolean | null
         }
@@ -420,10 +474,13 @@ export type Database = {
           settle_price?: number | null
           settled_at?: string | null
           side?: string
+          sigma_at_snapshot?: number | null
           snapshot_seconds_to_close?: number
           spot_at_snapshot?: number
           strike?: number
+          theory_yes_prob?: number | null
           ticker?: string
+          time_bucket?: string | null
           updated_at?: string
           was_correct?: boolean | null
         }
