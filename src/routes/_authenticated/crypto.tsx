@@ -954,6 +954,16 @@ function AutoTradePanel() {
     window.localStorage.setItem("crypto.autoMart.cbFeed", cbFeed ? "on" : "off");
   }, [cbFeed]);
   const coinbase = useCoinbaseBtcSpot();
+  // Phase 4 — Round-number magnet gate (proximity + confirmed break).
+  const [magnetGate, setMagnetGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.magnetGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.magnetGate", magnetGate ? "on" : "off");
+  }, [magnetGate]);
+  const btcTicks = useBinanceBtcTicks();
   const chartVerdict = useChartVerdict({
     regime: regimeOn ? marketRegime.regime : "mixed",
     coinbase: cbFeed ? { price: coinbase.price, connected: coinbase.connected } : undefined,
