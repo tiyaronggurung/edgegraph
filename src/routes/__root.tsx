@@ -118,9 +118,16 @@ function AuthCacheBridge() {
   const router = useRouter();
   const qc = useQueryClient();
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       router.invalidate();
       qc.invalidateQueries();
+      if (event === "SIGNED_IN" && typeof window !== "undefined") {
+        const stored = sessionStorage.getItem("post_login_redirect");
+        if (stored && stored.startsWith("/") && !stored.startsWith("//")) {
+          sessionStorage.removeItem("post_login_redirect");
+          router.navigate({ to: stored });
+        }
+      }
     });
     return () => subscription.unsubscribe();
   }, [router, qc]);
