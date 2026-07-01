@@ -26,6 +26,7 @@ function ChartPage() {
   const a = useTrendlineAnalysis();
   const [showFib, setShowFib] = useState(true);
   const [showLines, setShowLines] = useState(true);
+  const cm = useCandleMomentum();
 
   const scale = useMemo(() => {
     const c = a.candles;
