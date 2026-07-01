@@ -818,6 +818,12 @@ function AutoTradePanel() {
   const MART_BASE = 20;
   const MART_CAP = 320;
   const WINDOW_MS = 15 * 60 * 1000;
+  // Paroli (anti-martingale) upsize: press winners only when the settled order
+  // cleared a strong model gate. Resets on loss or after MART_PAROLI_MAX wins.
+  const MART_PAROLI_MULT = 1.5;
+  const MART_PAROLI_MAX = 3;
+  const MART_PAROLI_MIN_SIGMA = 1.5;
+  const MART_PAROLI_MIN_EDGE = 5;
 
   const [autoMart, setAutoMart] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -832,6 +838,10 @@ function AutoTradePanel() {
     if (typeof window === "undefined") return 0;
     return Number(window.localStorage.getItem("crypto.autoMart.losses")) || 0;
   });
+  const [martWins, setMartWins] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    return Number(window.localStorage.getItem("crypto.autoMart.wins")) || 0;
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -841,7 +851,8 @@ function AutoTradePanel() {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("crypto.autoMart.stake", String(martStake));
     window.localStorage.setItem("crypto.autoMart.losses", String(martLosses));
-  }, [martStake, martLosses]);
+    window.localStorage.setItem("crypto.autoMart.wins", String(martWins));
+  }, [martStake, martLosses, martWins]);
 
   // Watch the last martingale order and adjust stake when it settles.
   useEffect(() => {
@@ -851,23 +862,48 @@ function AutoTradePanel() {
     const o = liveOrders.find(x => x.id === lastId);
     if (!o) return;
     if (o.status === "settled_win") {
-      if (martStake !== MART_BASE || martLosses !== 0) {
+      // Case A: recovering from a loss ladder → win locks in, reset everything.
+      if (martLosses > 0) {
         setMartStake(MART_BASE);
         setMartLosses(0);
-        toast.success(`Martingale WIN — stake reset to $${MART_BASE}`);
+        setMartWins(0);
+        toast.success(`Martingale WIN — loss ladder recovered, stake reset to $${MART_BASE}`);
+      } else {
+        // Case B: paroli upsize — press the winner ONLY if the settled order
+        // cleared the model gate AND we haven't hit the streak cap yet.
+        const sig = Number(o.sigma_distance ?? 0);
+        const edge = Math.abs(Number(o.edge_pts ?? 0));
+        const gatePassed = sig >= MART_PAROLI_MIN_SIGMA && edge >= MART_PAROLI_MIN_EDGE;
+        const nextWins = martWins + 1;
+        if (nextWins >= MART_PAROLI_MAX) {
+          setMartStake(MART_BASE);
+          setMartWins(0);
+          toast.success(`Paroli WIN #${nextWins} — streak cap, locking in & reset to $${MART_BASE}`);
+        } else if (gatePassed) {
+          const nextStake = Math.min(Math.round(martStake * MART_PAROLI_MULT), MART_CAP);
+          setMartStake(nextStake);
+          setMartWins(nextWins);
+          toast.success(`Paroli WIN #${nextWins} — pressing to $${nextStake} (σ ${sig.toFixed(2)} · edge ${edge.toFixed(1)}pt)`);
+        } else {
+          setMartStake(MART_BASE);
+          setMartWins(0);
+          toast.success(`Martingale WIN — weak signal (σ ${sig.toFixed(2)} · edge ${edge.toFixed(1)}pt), reset to $${MART_BASE}`);
+        }
       }
       window.localStorage.removeItem("crypto.autoMart.lastOrderId");
     } else if (o.status === "settled_loss") {
+      // Loss always breaks the paroli streak; loss-doubling ladder continues.
       const nextStake = Math.min(martStake * 2, MART_CAP);
       const nextLosses = martLosses + 1;
-      if (nextStake !== martStake) {
+      if (nextStake !== martStake || martWins !== 0) {
         setMartStake(nextStake);
         setMartLosses(nextLosses);
+        setMartWins(0);
         toast.error(`Martingale LOSS — next stake $${nextStake} (loss #${nextLosses})`);
       }
       window.localStorage.removeItem("crypto.autoMart.lastOrderId");
     }
-  }, [liveOrders, martStake, martLosses]);
+  }, [liveOrders, martStake, martLosses, martWins]);
 
   async function runMartingale(stakeUsd: number): Promise<string | null> {
     try {
@@ -1032,6 +1068,7 @@ function AutoTradePanel() {
             <span className={`h-1.5 w-1.5 rounded-full ${autoMart ? "bg-fuchsia-400 animate-pulse" : "bg-muted-foreground"}`} />
             {autoMart ? `Martingale ON · $${martStake}` : "Martingale OFF"}
             {autoMart && martLosses > 0 && <span className="text-[10px] text-red-300">L{martLosses}</span>}
+            {autoMart && martWins > 0 && <span className="text-[10px] text-emerald-300">W{martWins}</span>}
           </button>
           {autoMart && (
             <button
@@ -1039,6 +1076,7 @@ function AutoTradePanel() {
                 if (window.confirm("Reset Martingale stake back to $20?")) {
                   setMartStake(MART_BASE);
                   setMartLosses(0);
+                  setMartWins(0);
                   window.localStorage.removeItem("crypto.autoMart.lastOrderId");
                   toast.success("Martingale ladder reset to $20");
                 }
