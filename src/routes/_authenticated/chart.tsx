@@ -4,6 +4,9 @@ import { ArrowLeft, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useBinanceBtcTicks } from "@/hooks/useBinanceBtcTicks";
 import { useTrendlineAnalysis } from "@/hooks/useTrendlineAnalysis";
 import { useCandleMomentum } from "@/hooks/useCandleMomentum";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { diagnoseRecentMisses, listRecentMisses } from "@/lib/cryptoMisses.functions";
 
 export const Route = createFileRoute("/_authenticated/chart")({
   head: () => ({
