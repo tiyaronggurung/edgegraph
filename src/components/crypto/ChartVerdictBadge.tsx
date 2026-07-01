@@ -13,17 +13,29 @@ export function ChartVerdictBadge({ compact = false }: { compact?: boolean }) {
     "border-border bg-muted/20 text-muted-foreground";
   const Icon = v.bias === "up" ? ArrowUp : v.bias === "down" ? ArrowDown : Minus;
 
+  const tip = v.ready
+    ? [
+        `Chart ${v.score.toFixed(0)}/100 · ${v.strength} ${v.bias}`,
+        v.reason,
+        v.markPrice != null ? `Futures: ${v.futuresReason}` : null,
+        v.liqConnected ? `Liq (60s): ${v.liqReason}` : null,
+        v.htfReady ? `HTF: ${v.htfReason}` : null,
+        v.ethConnected ? `ETH: ${v.ethReason}` : null,
+      ].filter(Boolean).join("\n")
+    : v.reason;
+
   if (compact) {
     return (
       <span
         className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border ${color}`}
-        title={v.ready ? `Chart ${v.score.toFixed(0)}/100 · ${v.strength} ${v.bias} · ${v.reason}` : v.reason}
+        title={tip}
       >
         <Icon className="h-2.5 w-2.5" />
         Chart {v.ready ? v.score.toFixed(0) : "…"}
       </span>
     );
   }
+
 
   return (
     <div className={`text-[11px] px-2 py-1.5 rounded border ${color} font-mono`} title={v.reason}>

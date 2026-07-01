@@ -958,6 +958,30 @@ function AutoTradePanel() {
     window.localStorage.setItem("crypto.autoMart.roundGate", roundGate ? "on" : "off");
   }, [roundGate]);
 
+  // Opt-in HTF (5m EMA20/50) trend gate — only fires when auto-mart's intended
+  // side agrees with the higher-timeframe trend. Default OFF.
+  const [htfGate, setHtfGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.htfGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.htfGate", htfGate ? "on" : "off");
+  }, [htfGate]);
+
+  // Opt-in ETH agreement gate — skip windows when BTC and ETH are moving
+  // in opposite directions (>0.1% each, opposite signs). Default OFF.
+  const [ethGate, setEthGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.ethGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.ethGate", ethGate ? "on" : "off");
+  }, [ethGate]);
+
+
+
 
 
 
@@ -1105,6 +1129,35 @@ function AutoTradePanel() {
         }
       }
 
+      // Optional HTF (5m EMA20/50) trend gate — skip when higher-timeframe
+      // trend is flat or opposes the chart verdict's implied side.
+      if (htfGate) {
+        const cv = chartVerdict;
+        if (!cv.htfReady || !cv.ready) return;
+        if (cv.htfTrend === "flat") {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`HTF gate: window skipped — ${cv.htfReason}`);
+          return;
+        }
+        // Direction the chart wants to bet (score>50 → up, <50 → down).
+        const chartSide: "up" | "down" = cv.score >= 50 ? "up" : "down";
+        if (chartSide !== cv.htfTrend) {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`HTF gate: window skipped — chart wants ${chartSide.toUpperCase()} but HTF is ${cv.htfTrend.toUpperCase()}`);
+          return;
+        }
+      }
+
+      // Optional ETH agreement gate — skip when BTC & ETH diverge.
+      if (ethGate) {
+        const cv = chartVerdict;
+        if (cv.ethAgrees === false) {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`ETH gate: window skipped — ${cv.ethReason}`);
+          return;
+        }
+      }
+
 
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
@@ -1122,7 +1175,8 @@ function AutoTradePanel() {
     const h = setInterval(tick, 5_000);
     return () => { cancelled = true; clearInterval(h); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment, roundGate]);
+  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment, roundGate, htfGate, ethGate]);
+
 
 
   return (
@@ -1300,6 +1354,33 @@ function AutoTradePanel() {
               {roundGate ? "Round gate ON" : "Round gate OFF"}
             </button>
           )}
+          {autoMart && (
+            <button
+              onClick={() => setHtfGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${htfGate ? "border-sky-500/50 bg-sky-500/15 text-sky-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={htfGate
+                ? `HTF gate ON: fire only when 5m EMA20/50 trend agrees with chart side. Current: ${chartVerdict.htfReady ? chartVerdict.htfTrend.toUpperCase() : "…"}`
+                : "HTF gate OFF: fire regardless of higher-timeframe trend"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${htfGate ? "bg-sky-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {htfGate ? "HTF gate ON" : "HTF gate OFF"}
+            </button>
+          )}
+          {autoMart && (
+            <button
+              onClick={() => setEthGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${ethGate ? "border-fuchsia-500/50 bg-fuchsia-500/15 text-fuchsia-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={ethGate
+                ? `ETH gate ON: skip when BTC/ETH diverge (>0.1% opposite signs). Current: ${chartVerdict.ethReason}`
+                : "ETH gate OFF: ignore ETH cross-check"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${ethGate ? "bg-fuchsia-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {ethGate ? "ETH gate ON" : "ETH gate OFF"}
+            </button>
+          )}
+
+
+
 
 
 
