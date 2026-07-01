@@ -20,6 +20,7 @@ import { useCoinbaseBtcSpot } from "@/hooks/useCoinbaseBtcSpot";
 import { useBinanceBtcTicks } from "@/hooks/useBinanceBtcTicks";
 import { shouldSkipForMagnet } from "@/lib/roundLevelGate";
 import { useTrendlineAnalysis } from "@/hooks/useTrendlineAnalysis";
+import { useCandleMomentum } from "@/hooks/useCandleMomentum";
 import { computeKalshiSentiment } from "@/lib/kalshiSentiment";
 
 import { toast } from "sonner";
