@@ -192,8 +192,37 @@ export const runAutoTrade = createServerFn({ method: "POST" })
         .map(c => c.m);
     }
 
+    // Entry-side disagreement guard: right before submitting, re-pull the
+    // model and skip any candidate whose side is no longer favored
+    // (prob for our side < LIVE_FLIP_PROB). Prevents entering into a market
+    // that flipped between filter and submit.
+    let freshProbBySide = new Map<string, number>();
+    if (!data.force && candidates.length > 0) {
+      try {
+        const fresh = await getBtcMarkets();
+        for (const fm of fresh.markets) {
+          const sideProb = fm.side === "YES" ? fm.modelYesProb : 1 - fm.modelYesProb;
+          freshProbBySide.set(`${fm.ticker}|${fm.side}`, sideProb);
+        }
+      } catch (e: any) {
+        skipReasons.push(`entry-recheck: unavailable (${e?.message?.slice(0, 60) ?? "err"}) — skipping guard`);
+        freshProbBySide = new Map();
+      }
+    }
+
     const placed: AutoTradeOrderRow[] = [];
     for (const m of candidates) {
+      if (!data.force && freshProbBySide.size > 0) {
+        const p = freshProbBySide.get(`${m.ticker}|${m.side}`);
+        if (p === undefined) {
+          skipReasons.push(`${m.ticker}: entry-recheck — ${m.side} no longer in fresh market list`);
+          continue;
+        }
+        if (p < LIVE_FLIP_PROB) {
+          skipReasons.push(`${m.ticker}: entry-recheck — model now ${(p * 100).toFixed(0)}% for ${m.side} (< ${LIVE_FLIP_PROB * 100}%)`);
+          continue;
+        }
+      }
       const limitCents = Math.max(1, Math.min(99, Math.round(
         (m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
       )));
