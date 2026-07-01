@@ -404,6 +404,16 @@ export const getLatestStudy = createServerFn({ method: "GET" })
       newSince = count ?? 0;
     }
 
+    let feedback: Record<number, "up" | "down"> = {};
+    if (latest) {
+      const { data: fb } = await supabase
+        .from("crypto_study_feedback")
+        .select("rec_index, vote")
+        .eq("user_id", userId)
+        .eq("study_id", latest.id);
+      for (const r of (fb ?? []) as any[]) feedback[r.rec_index] = r.vote;
+    }
+
     const study: StudyRow | null = latest
       ? {
           id: latest.id,
@@ -414,6 +424,7 @@ export const getLatestStudy = createServerFn({ method: "GET" })
           dominant_failures: (latest.dominant_failures as unknown as string[]) ?? [],
           recommendations: (latest.recommendations as unknown as StudyRecommendation[]) ?? [],
           created_at: latest.created_at,
+          feedback,
         }
       : null;
 
@@ -423,4 +434,38 @@ export const getLatestStudy = createServerFn({ method: "GET" })
       newMissesSinceStudy: newSince,
     };
   });
+
+export const setRecommendationFeedback = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { studyId: string; recIndex: number; vote: "up" | "down" | null; recGate?: string; recSuggested?: string; note?: string }) => data)
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { supabase, userId } = context;
+    if (data.vote === null) {
+      const { error } = await supabase
+        .from("crypto_study_feedback")
+        .delete()
+        .eq("user_id", userId)
+        .eq("study_id", data.studyId)
+        .eq("rec_index", data.recIndex);
+      if (error) throw new Error(error.message);
+      return { ok: true };
+    }
+    const { error } = await supabase
+      .from("crypto_study_feedback")
+      .upsert(
+        {
+          user_id: userId,
+          study_id: data.studyId,
+          rec_index: data.recIndex,
+          rec_gate: data.recGate ?? null,
+          rec_suggested: data.recSuggested ?? null,
+          vote: data.vote,
+          note: data.note ?? null,
+        },
+        { onConflict: "user_id,study_id,rec_index" },
+      );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 
