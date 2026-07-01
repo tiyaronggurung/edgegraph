@@ -387,6 +387,8 @@ function OpenPositions({ markets }: { markets: BtcMarket[] }) {
     onError: (e: any) => toast.error(`Close failed: ${e?.message ?? "unknown"}`),
   });
   const [confirm, setConfirm] = useState<{ trade: any; sig: OpenPosSignal } | null>(null);
+  const velocity = useBtcVelocity();
+  const autoExitedRef = useRef<Set<string>>(new Set());
 
   const open = useMemo(() => {
     const trades = (q.data?.trades ?? []) as any[];
@@ -394,13 +396,30 @@ function OpenPositions({ markets }: { markets: BtcMarket[] }) {
     const byTicker = new Map(markets.map(m => [m.ticker, m]));
     return trades
       .filter(t => t.status === "submitted" && t.close_time && new Date(t.close_time).getTime() > now)
-      .map(t => ({ trade: t, market: byTicker.get(t.ticker), sig: computeExitSignal(t, byTicker.get(t.ticker)) }))
+      .map(t => ({ trade: t, market: byTicker.get(t.ticker), sig: computeExitSignal(t, byTicker.get(t.ticker), velocity) }))
       .filter(x => x.sig !== null)
       .sort((a, b) => {
-        const rank = (s: OpenPosSignal | null) => s?.action === "STOP_LOSS" ? 0 : s?.action === "CASH_OUT_PROFIT" ? 1 : s?.action === "CASH_OUT_FLIP" ? 2 : 3;
+        const rank = (s: OpenPosSignal | null) =>
+          s?.action === "STOP_LOSS_SPOT" ? 0
+          : s?.action === "STOP_LOSS" ? 1
+          : s?.action === "CASH_OUT_PROFIT" ? 2
+          : s?.action === "CASH_OUT_FLIP" ? 3 : 4;
         return rank(a.sig) - rank(b.sig);
       });
-  }, [q.data, markets]);
+  }, [q.data, markets, velocity]);
+
+  // Rule 1 auto-exit: on STOP_LOSS_SPOT, fire market sell exactly once per trade.
+  useEffect(() => {
+    for (const { trade: t, sig } of open) {
+      if (sig?.action !== "STOP_LOSS_SPOT") continue;
+      if (autoExitedRef.current.has(t.id)) continue;
+      if (sell.isPending) continue;
+      autoExitedRef.current.add(t.id);
+      toast.error(`Auto-exit: spot crash on ${t.ticker}`, { description: sig.reason, duration: 10_000 });
+      sell.mutate({ tradeId: t.id, limitPriceCents: sig.exitCents });
+    }
+  }, [open, sell]);
+
 
   if (!open.length) return null;
 
