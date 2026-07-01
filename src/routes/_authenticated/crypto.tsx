@@ -958,6 +958,30 @@ function AutoTradePanel() {
     window.localStorage.setItem("crypto.autoMart.roundGate", roundGate ? "on" : "off");
   }, [roundGate]);
 
+  // Opt-in HTF (5m EMA20/50) trend gate — only fires when auto-mart's intended
+  // side agrees with the higher-timeframe trend. Default OFF.
+  const [htfGate, setHtfGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.htfGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.htfGate", htfGate ? "on" : "off");
+  }, [htfGate]);
+
+  // Opt-in ETH agreement gate — skip windows when BTC and ETH are moving
+  // in opposite directions (>0.1% each, opposite signs). Default OFF.
+  const [ethGate, setEthGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.ethGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.ethGate", ethGate ? "on" : "off");
+  }, [ethGate]);
+
+
+
 
 
 
