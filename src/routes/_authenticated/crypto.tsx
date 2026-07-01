@@ -944,6 +944,22 @@ function AutoTradePanel() {
     [marketsQ.data],
   );
 
+  // Opt-in Round-number gate: skip windows where the ATM strike is NOT a
+  // multiple of 50. Round strikes (65000, 65050) act as magnets / S&R levels;
+  // non-round strikes (65024, 65037) are unreliable — spot drifts to the
+  // nearest round level. Default OFF.
+  const ROUND_STEP = 50;
+  const [roundGate, setRoundGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.roundGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.roundGate", roundGate ? "on" : "off");
+  }, [roundGate]);
+
+
+
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1074,6 +1090,21 @@ function AutoTradePanel() {
         }
       }
 
+      // Optional Round-number gate — skip windows where ATM strike isn't a
+      // multiple of 50. Round levels act as magnets/support-resistance.
+      if (roundGate) {
+        const s = kalshiSentiment;
+        if (!s.ready || s.strike == null) {
+          // No market data yet — hold, don't burn the window.
+          return;
+        }
+        if (Math.round(s.strike) % ROUND_STEP !== 0) {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Round-number gate: window skipped — ATM strike $${s.strike.toFixed(0)} not a multiple of ${ROUND_STEP}`);
+          return;
+        }
+      }
+
 
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
@@ -1091,7 +1122,8 @@ function AutoTradePanel() {
     const h = setInterval(tick, 5_000);
     return () => { cancelled = true; clearInterval(h); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment]);
+  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment, roundGate]);
+
 
   return (
     <div className="border border-border rounded-lg bg-card">
@@ -1256,6 +1288,20 @@ function AutoTradePanel() {
               {sentimentGate ? "Sentiment gate ON" : "Sentiment gate OFF"}
             </button>
           )}
+          {autoMart && (
+            <button
+              onClick={() => setRoundGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${roundGate ? "border-amber-500/50 bg-amber-500/15 text-amber-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={roundGate
+                ? `Round-number gate ON: skip fire when ATM strike isn't a multiple of ${ROUND_STEP}. Current strike: ${kalshiSentiment.ready && kalshiSentiment.strike != null ? "$" + kalshiSentiment.strike.toFixed(0) : "…"}`
+                : `Round-number gate OFF: fire on any strike, including non-multiples of ${ROUND_STEP}`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${roundGate ? "bg-amber-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {roundGate ? "Round gate ON" : "Round gate OFF"}
+            </button>
+          )}
+
+
 
           <button
             onClick={() => runForce()}
