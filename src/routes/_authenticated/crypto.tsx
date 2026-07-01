@@ -17,6 +17,8 @@ import { useChartVerdict } from "@/hooks/useChartVerdict";
 import { useCalibrationShift } from "@/hooks/useCalibrationShift";
 import { useMarketRegime } from "@/hooks/useMarketRegime";
 import { useCoinbaseBtcSpot } from "@/hooks/useCoinbaseBtcSpot";
+import { useBinanceBtcTicks } from "@/hooks/useBinanceBtcTicks";
+import { shouldSkipForMagnet } from "@/lib/roundLevelGate";
 import { computeKalshiSentiment } from "@/lib/kalshiSentiment";
 
 import { toast } from "sonner";
