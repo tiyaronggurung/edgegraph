@@ -86,7 +86,7 @@ export interface AutoTradeRunResult {
 
 export const runAutoTrade = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { mode?: "paper" | "live"; maxOrders?: number; stakeUsd?: number; confirm?: string; force?: boolean } | undefined) => {
+  .inputValidator((data: { mode?: "paper" | "live"; maxOrders?: number; stakeUsd?: number; confirm?: string; force?: boolean; isMartingale?: boolean } | undefined) => {
     const mode: "paper" | "live" = data?.mode === "live" ? "live" : "paper";
     const sessionCap = mode === "live" ? LIVE_MAX_ORDERS_PER_SESSION : MAX_ORDERS_PER_SESSION_PAPER;
     const stakeCap = mode === "live" ? LIVE_MAX_STAKE_USD_PER_ORDER : MAX_STAKE_USD_PER_ORDER_PAPER;
@@ -94,6 +94,7 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       mode,
       confirm: data?.confirm ?? "",
       force: data?.force === true,
+      isMartingale: data?.isMartingale === true,
       maxOrders: Math.min(sessionCap, Math.max(1, data?.maxOrders ?? sessionCap)),
       stakeUsd: Math.min(stakeCap, Math.max(1, data?.stakeUsd ?? stakeCap)),
     };
@@ -394,6 +395,7 @@ export const runAutoTrade = createServerFn({ method: "POST" })
           contracts_remaining: contracts,
           partial_pnl_usd: 0,
           exit_ladder: DEFAULT_EXIT_LADDER as any,
+          is_martingale: data.isMartingale,
         })
         .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
         .single();
@@ -517,7 +519,7 @@ export async function autoExitForUser(
   const nowIso = new Date().toISOString();
   const { data: open } = await supabase
     .from("auto_trade_orders")
-    .select("id, ticker, side, mode, stake_usd, contracts, limit_cents, close_time, entry_price_cents, contracts_remaining, partial_pnl_usd, exit_ladder")
+    .select("id, ticker, side, mode, stake_usd, contracts, limit_cents, close_time, entry_price_cents, contracts_remaining, partial_pnl_usd, exit_ladder, is_martingale")
     .eq("user_id", userId)
     .in("mode", ["paper", "live"])
     .eq("status", "placed")
@@ -528,7 +530,7 @@ export async function autoExitForUser(
     id: string; ticker: string; side: "YES" | "NO"; mode: "paper" | "live";
     stake_usd: number; contracts: number; limit_cents: number; close_time: string;
     entry_price_cents: number | null; contracts_remaining: number | null;
-    partial_pnl_usd: number | null; exit_ladder: any;
+    partial_pnl_usd: number | null; exit_ladder: any; is_martingale: boolean | null;
   };
   const rows = (open ?? []) as Row[];
   if (!rows.length) return { exited: 0, reasons: [] };
@@ -717,15 +719,30 @@ export async function autoExitForUser(
     const adverseCents = entry - markCents;
     const sideProbNow = currentModelProbBySide.get(r.ticker);
 
-    let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | null = null;
-    if (sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
+    let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | "mart_hopeless" | "mart_hardcap" | null = null;
+    // Martingale-specific rules (only apply to martingale-tagged orders).
+    if (r.is_martingale === true) {
+      const stake = Number(r.stake_usd);
+      const lossFrac = stake > 0 ? -markPnl / stake : 0; // 0..1+
+      // Hard cap: any martingale trade down ≥70% → exit immediately.
+      if (lossFrac >= 0.70) {
+        exitReason = "mart_hardcap";
+        reasons.push(`${r.ticker}[mart]: HARD CAP — down ${(lossFrac * 100).toFixed(0)}% of $${stake} stake`);
+      }
+      // Hopeless: model side prob <15% AND already down ≥50%.
+      else if (sideProbNow !== undefined && sideProbNow < 0.15 && lossFrac >= 0.50) {
+        exitReason = "mart_hopeless";
+        reasons.push(`${r.ticker}[mart]: HOPELESS — model ${(sideProbNow * 100).toFixed(0)}% on ${r.side}, down ${(lossFrac * 100).toFixed(0)}%`);
+      }
+    }
+    if (!exitReason && sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
       exitReason = "flip";
       reasons.push(`${r.ticker}[${r.mode}]: flip — model now ${(sideProbNow * 100).toFixed(0)}% for ${r.side} (< ${LIVE_FLIP_PROB * 100}%)`);
     }
-    else if (netLock) exitReason = "net";
-    else if (markPnl >= tpThreshold) exitReason = "tp";
-    else if (markPnl <= slThreshold) exitReason = "sl";
-    else if (adverseCents >= LIVE_EDGE_DECAY_CENTS) exitReason = "edge";
+    else if (!exitReason && netLock) exitReason = "net";
+    else if (!exitReason && markPnl >= tpThreshold) exitReason = "tp";
+    else if (!exitReason && markPnl <= slThreshold) exitReason = "sl";
+    else if (!exitReason && adverseCents >= LIVE_EDGE_DECAY_CENTS) exitReason = "edge";
     if (!exitReason) continue;
 
     const { data: claimed } = await supabase

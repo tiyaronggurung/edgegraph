@@ -871,7 +871,7 @@ function AutoTradePanel() {
 
   async function runMartingale(stakeUsd: number): Promise<string | null> {
     try {
-      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd, maxOrders: 1, force: true } });
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd, maxOrders: 1, force: true, isMartingale: true } });
       if (res.placed > 0 && res.orders?.[0]) {
         const o = res.orders[0];
         toast.success(`Martingale $${stakeUsd}: ${o.side === "YES" ? "UP" : "DOWN"} ${o.ticker} @ ${o.limit_cents}¢`);

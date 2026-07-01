@@ -143,6 +143,7 @@ export type Database = {
           exit_ladder: Json | null
           gap_in_sigmas: number
           id: string
+          is_martingale: boolean
           kalshi_order_id: string | null
           limit_cents: number
           market_yes_price: number
@@ -175,6 +176,7 @@ export type Database = {
           exit_ladder?: Json | null
           gap_in_sigmas: number
           id?: string
+          is_martingale?: boolean
           kalshi_order_id?: string | null
           limit_cents: number
           market_yes_price: number
@@ -207,6 +209,7 @@ export type Database = {
           exit_ladder?: Json | null
           gap_in_sigmas?: number
           id?: string
+          is_martingale?: boolean
           kalshi_order_id?: string | null
           limit_cents?: number
           market_yes_price?: number
