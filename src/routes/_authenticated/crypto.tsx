@@ -929,6 +929,22 @@ function AutoTradePanel() {
   }, [chartGate]);
   const chartVerdict = useChartVerdict();
 
+  // Opt-in Kalshi-sentiment gate: skip windows where ATM YES sits in the chop
+  // belt (48–52¢). Uses market consensus instead of Binance ticks.
+  const [sentimentGate, setSentimentGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.sentimentGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.sentimentGate", sentimentGate ? "on" : "off");
+  }, [sentimentGate]);
+  const kalshiSentiment = useMemo(
+    () => computeKalshiSentiment(marketsQ.data?.markets ?? []),
+    [marketsQ.data],
+  );
+
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("crypto.autoMart", autoMart ? "on" : "off");
