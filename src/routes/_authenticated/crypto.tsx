@@ -1705,7 +1705,7 @@ function CryptoPage() {
   const q = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 10_000, staleTime: 5_000 });
   const cfg = useQuery({ queryKey: ["kalshi-cfg"], queryFn: () => cfgFn(), staleTime: 60_000 });
 
-  const [bankroll, setBankroll] = useState(1000);
+  const [bankroll, setBankroll] = useState(500);
   const [kellyMult, setKellyMult] = useState(0.25);
   const sizing: SizingState = { bankroll, kellyMult };
   const [pending, setPending] = useState<BtcMarket | null>(null);
