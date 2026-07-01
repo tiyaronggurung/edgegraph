@@ -1021,6 +1021,21 @@ function AutoTradePanel() {
         const settled = prev && (prev.status === "settled_win" || prev.status === "settled_loss");
         if (prev && !settled) return; // still open — hold fire
       }
+      // Optional chart gate — only when user has toggled it ON. Skip window on chop.
+      if (chartGate) {
+        const cv = chartVerdict;
+        if (!cv.ready) {
+          // Not enough ticks yet — hold, retry next tick (don't burn the window).
+          return;
+        }
+        const skew = Math.abs(cv.score - 50);
+        if (skew < CHART_GATE_MIN_SKEW) {
+          // Chop → skip this window entirely (burn it so we don't retry-fire mid-window).
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Chart gate: window skipped — chop (score ${cv.score.toFixed(0)}, skew ${skew.toFixed(0)} < ${CHART_GATE_MIN_SKEW})`);
+          return;
+        }
+      }
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
       window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
