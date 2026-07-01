@@ -1060,6 +1060,19 @@ function AutoTradePanel() {
           return;
         }
       }
+      // Optional Kalshi-sentiment gate — skip when market itself is chop (48–52¢).
+      if (sentimentGate) {
+        const s = kalshiSentiment;
+        if (!s.ready) {
+          // No market data yet — hold, don't burn the window.
+          return;
+        }
+        if (s.isChop) {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Sentiment gate: window skipped — ${s.reason}`);
+          return;
+        }
+
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
       window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
