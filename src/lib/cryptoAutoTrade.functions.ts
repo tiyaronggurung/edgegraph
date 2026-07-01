@@ -539,7 +539,10 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
     for (const { r, markCents, markPnl } of marked) {
       const entryCents = r.limit_cents;
       const tpThreshold = LIVE_TP_FRAC * Number(r.stake_usd);
-      const slThreshold = -LIVE_SL_FRAC * Number(r.stake_usd);
+      // #2 Time-decay-aware SL: tighten stop as expiry approaches (theta protection).
+      const secondsLeft = Math.max(0, (Date.parse(r.close_time) - Date.now()) / 1000);
+      const slFrac = secondsLeft < LIVE_LATE_TIGHTEN_SEC ? LIVE_LATE_SL_FRAC : LIVE_SL_FRAC;
+      const slThreshold = -slFrac * Number(r.stake_usd);
       const adverseCents = entryCents - markCents;
       const sideProbNow = currentModelProbBySide.get(r.ticker);
 
