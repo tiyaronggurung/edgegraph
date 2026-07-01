@@ -284,8 +284,10 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
           ok: true,
           totalPlaced,
           totalSettled,
+          totalExited,
           users: perUser.length,
           perUser: perUser.slice(0, 50),
+          perUserExits: perUserExits.slice(0, 50),
           ts: new Date().toISOString(),
         });
       },
