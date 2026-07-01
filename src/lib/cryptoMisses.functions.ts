@@ -272,6 +272,29 @@ export const studyMissesWithAI = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(20);
 
+    // Load prior recommendation feedback so the model learns what helped.
+    const { data: priorStudies } = await supabase
+      .from("crypto_model_studies")
+      .select("id, recommendations, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    const priorIds = (priorStudies ?? []).map((s: any) => s.id);
+    const { data: priorFeedback } = priorIds.length
+      ? await supabase
+          .from("crypto_study_feedback")
+          .select("study_id, rec_index, vote, rec_gate, rec_suggested, note")
+          .eq("user_id", userId)
+          .in("study_id", priorIds)
+      : { data: [] as any[] };
+    const feedbackDigest = (priorFeedback ?? []).map((f: any) => ({
+      vote: f.vote,
+      gate: f.rec_gate,
+      suggested: f.rec_suggested,
+      note: f.note ?? null,
+    }));
+
+
     const missesSlim = misses.map((m: any) => ({
       ticker: m.ticker,
       predicted: m.predicted_dir,
