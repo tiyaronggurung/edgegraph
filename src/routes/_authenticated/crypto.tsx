@@ -11,6 +11,8 @@ import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, autoExitLiveP
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { EquityMomentumPanel } from "@/components/EquityMomentumPanel";
+import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
+import { useChartVerdict } from "@/hooks/useChartVerdict";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/crypto")({
@@ -906,6 +908,18 @@ function AutoTradePanel() {
     if (typeof window === "undefined") return 0;
     return Number(window.localStorage.getItem("crypto.autoMart.wins")) || 0;
   });
+  // Opt-in chart gate: if ON, auto-mart skips windows where the chart is chop
+  // (|score - 50| < CHART_GATE_MIN_SKEW). Default OFF — never blocks unless user turns on.
+  const CHART_GATE_MIN_SKEW = 8;
+  const [chartGate, setChartGate] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoMart.chartGate") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoMart.chartGate", chartGate ? "on" : "off");
+  }, [chartGate]);
+  const chartVerdict = useChartVerdict();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1007,6 +1021,21 @@ function AutoTradePanel() {
         const settled = prev && (prev.status === "settled_win" || prev.status === "settled_loss");
         if (prev && !settled) return; // still open — hold fire
       }
+      // Optional chart gate — only when user has toggled it ON. Skip window on chop.
+      if (chartGate) {
+        const cv = chartVerdict;
+        if (!cv.ready) {
+          // Not enough ticks yet — hold, retry next tick (don't burn the window).
+          return;
+        }
+        const skew = Math.abs(cv.score - 50);
+        if (skew < CHART_GATE_MIN_SKEW) {
+          // Chop → skip this window entirely (burn it so we don't retry-fire mid-window).
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`Chart gate: window skipped — chop (score ${cv.score.toFixed(0)}, skew ${skew.toFixed(0)} < ${CHART_GATE_MIN_SKEW})`);
+          return;
+        }
+      }
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
       window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
@@ -1023,7 +1052,7 @@ function AutoTradePanel() {
     const h = setInterval(tick, 5_000);
     return () => { cancelled = true; clearInterval(h); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMart, martStake, liveOrders]);
+  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict]);
 
   return (
     <div className="border border-border rounded-lg bg-card">
@@ -1162,6 +1191,19 @@ function AutoTradePanel() {
             </button>
           )}
           {autoMart && <MartingaleCountdown windowMs={WINDOW_MS} />}
+          <ChartVerdictBadge compact />
+          {autoMart && (
+            <button
+              onClick={() => setChartGate(v => !v)}
+              className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${chartGate ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+              title={chartGate
+                ? `Chart gate ON: skip fire when |score-50| < ${CHART_GATE_MIN_SKEW} (chop). Current: ${chartVerdict.ready ? chartVerdict.score.toFixed(0) : "…"}`
+                : "Chart gate OFF: fire every window regardless of chart bias"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${chartGate ? "bg-cyan-400 animate-pulse" : "bg-muted-foreground"}`} />
+              {chartGate ? "Chart gate ON" : "Chart gate OFF"}
+            </button>
+          )}
           <button
             onClick={() => runForce()}
             disabled={forceBusy || liveBusy}
