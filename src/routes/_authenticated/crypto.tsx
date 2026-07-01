@@ -1637,3 +1637,35 @@ function CalibrationReportPanel() {
     </div>
   );
 }
+
+function MartingaleCountdown({ windowMs }: { windowMs: number }) {
+  const [msLeft, setMsLeft] = useState(() => {
+    const now = Date.now();
+    return windowMs - (now % windowMs);
+  });
+  useEffect(() => {
+    const tick = () => {
+      const now = Date.now();
+      setMsLeft(windowMs - (now % windowMs));
+    };
+    tick();
+    const h = setInterval(tick, 1000);
+    return () => clearInterval(h);
+  }, [windowMs]);
+  const totalSec = Math.max(0, Math.floor(msLeft / 1000));
+  const mm = Math.floor(totalSec / 60).toString().padStart(2, "0");
+  const ss = (totalSec % 60).toString().padStart(2, "0");
+  const soon = totalSec <= 30;
+  return (
+    <span
+      className={`text-[10px] font-mono px-2 py-1.5 rounded border ${
+        soon
+          ? "border-fuchsia-500/50 bg-fuchsia-500/15 text-fuchsia-300 animate-pulse"
+          : "border-border bg-muted/30 text-muted-foreground"
+      }`}
+      title="Time until the next 15-min martingale fires"
+    >
+      next fire in {mm}:{ss}
+    </span>
+  );
+}
