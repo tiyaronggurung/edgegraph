@@ -38,6 +38,21 @@ const LIVE_MIN_CONVICTION_MULT = 0.5;     // #3 sizing multiplier floor
 const LIVE_COINFLIP_BAND = 0.05;          // #4 |ask - 0.5| below this = coinflip zone
 const LIVE_COINFLIP_MIN_SIGMA = 1.5;      // #4 need this much sigma to trade coinflip prices
 
+// ── Odds-ladder exit tiers (price deltas in Kalshi ¢) ──
+// Each order snapshots this at entry so changing defaults never affects live positions.
+// Priority order: stop-loss first (safety), then most-aggressive TP, then partial.
+export type ExitLadderTier = {
+  kind: "tp" | "sl";
+  priceDeltaCents: number;   // signed: +N = mark improved N¢, -N = mark dropped N¢
+  exitFraction: number;      // 0 < f ≤ 1, fraction of REMAINING contracts to close
+  label: string;
+};
+export const DEFAULT_EXIT_LADDER: ExitLadderTier[] = [
+  { kind: "sl", priceDeltaCents: -15, exitFraction: 1.0, label: "SL -15¢" },
+  { kind: "tp", priceDeltaCents: +12, exitFraction: 1.0, label: "TP +12¢" },
+  { kind: "tp", priceDeltaCents: +6,  exitFraction: 0.5, label: "Partial TP +6¢" },
+];
+
 export interface AutoTradeOrderRow {
   id: string;
   ticker: string;
