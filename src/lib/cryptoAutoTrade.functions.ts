@@ -372,6 +372,7 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
     const rows = (open ?? []) as Array<{ id: string; ticker: string; side: "YES" | "NO"; stake_usd: number; contracts: number; limit_cents: number; close_time: string }>;
     if (!rows.length) return { exited: 0, reasons: [] };
 
+    let exited = 0;
     // ── Pass 1: fetch quote + compute unrealized PnL for every open row ──
     type Marked = { r: typeof rows[number]; markCents: number; markPnl: number };
     const marked: Marked[] = [];
