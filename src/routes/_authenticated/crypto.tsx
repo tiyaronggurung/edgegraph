@@ -677,6 +677,11 @@ function AutoTradePanel() {
   const runFn = useServerFn(runAutoTrade);
   const balanceFn = useServerFn(checkKalshiBalance);
   const diagFn = useServerFn(diagnoseKalshiAuth);
+  // Read the shared btc-markets cache populated by CryptoPage. React Query
+  // dedupes by key — no extra fetch, we just subscribe to updates.
+  const marketsFn = useServerFn(getBtcMarkets);
+  const marketsQ = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 10_000, staleTime: 5_000 });
+
   const [liveBusy, setLiveBusy] = useState(false);
   const [forceBusy, setForceBusy] = useState(false);
   const [testBusy, setTestBusy] = useState(false);
