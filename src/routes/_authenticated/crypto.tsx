@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle, ArrowUp, ArrowDown, Volume2, VolumeX } from "lucide-react";
 import { playOrderPlaced, playOrderFilled } from "@/lib/orderSounds";
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
@@ -9,6 +9,7 @@ import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshi
 import { getPredictionStats, getCalibrationReport, type CalibrationRow } from "@/lib/cryptoPredictions.functions";
 import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, autoExitLivePositions, settleAutoTradeSkipLog, getSkipReport, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
+import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { EquityMomentumPanel } from "@/components/EquityMomentumPanel";
 import { toast } from "sonner";
 
