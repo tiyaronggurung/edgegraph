@@ -1129,6 +1129,35 @@ function AutoTradePanel() {
         }
       }
 
+      // Optional HTF (5m EMA20/50) trend gate — skip when higher-timeframe
+      // trend is flat or opposes the chart verdict's implied side.
+      if (htfGate) {
+        const cv = chartVerdict;
+        if (!cv.htfReady || !cv.ready) return;
+        if (cv.htfTrend === "flat") {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`HTF gate: window skipped — ${cv.htfReason}`);
+          return;
+        }
+        // Direction the chart wants to bet (score>50 → up, <50 → down).
+        const chartSide: "up" | "down" = cv.score >= 50 ? "up" : "down";
+        if (chartSide !== cv.htfTrend) {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`HTF gate: window skipped — chart wants ${chartSide.toUpperCase()} but HTF is ${cv.htfTrend.toUpperCase()}`);
+          return;
+        }
+      }
+
+      // Optional ETH agreement gate — skip when BTC & ETH diverge.
+      if (ethGate) {
+        const cv = chartVerdict;
+        if (cv.ethAgrees === false) {
+          window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
+          toast.info(`ETH gate: window skipped — ${cv.ethReason}`);
+          return;
+        }
+      }
+
 
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
@@ -1146,7 +1175,8 @@ function AutoTradePanel() {
     const h = setInterval(tick, 5_000);
     return () => { cancelled = true; clearInterval(h); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment, roundGate]);
+  }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment, roundGate, htfGate, ethGate]);
+
 
 
   return (
