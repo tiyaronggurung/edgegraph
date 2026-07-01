@@ -1011,6 +1011,45 @@ function AutoTradePanel() {
             {autoLoop ? "Auto-loop ON (60s)" : "Auto-loop OFF"}
           </button>
           <button
+            onClick={() => {
+              if (!autoMart) {
+                const ok = window.confirm(
+                  "ENABLE AUTO-MARTINGALE (LIVE)?\n\n" +
+                  "• Fires ONCE per new 15m window (00/15/30/45)\n" +
+                  "• Takes model's UP/DOWN pick — no entry gates\n" +
+                  "• Ladder: $20 → $40 → $80 → $160 → $320 (cap)\n" +
+                  "• Reset to $20 on any WIN\n\n" +
+                  `Current stake: $${martStake} (loss streak: ${martLosses})\n\n` +
+                  "40 orders / 24h cap and auto-exit ladder still enforced.",
+                );
+                if (!ok) return;
+              }
+              setAutoMart(v => !v);
+            }}
+            className={`text-xs font-semibold px-3 py-1.5 rounded border flex items-center gap-1.5 ${autoMart ? "border-fuchsia-500/50 bg-fuchsia-500/15 text-fuchsia-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+            title="Auto-Martingale: once per 15m window, live, model direction, stake doubles on loss ($20→$40→$80→$160→$320), resets on win."
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${autoMart ? "bg-fuchsia-400 animate-pulse" : "bg-muted-foreground"}`} />
+            {autoMart ? `Martingale ON · $${martStake}` : "Martingale OFF"}
+            {autoMart && martLosses > 0 && <span className="text-[10px] text-red-300">L{martLosses}</span>}
+          </button>
+          {autoMart && (
+            <button
+              onClick={() => {
+                if (window.confirm("Reset Martingale stake back to $20?")) {
+                  setMartStake(MART_BASE);
+                  setMartLosses(0);
+                  window.localStorage.removeItem("crypto.autoMart.lastOrderId");
+                  toast.success("Martingale ladder reset to $20");
+                }
+              }}
+              className="text-[10px] font-semibold px-2 py-1.5 rounded border border-border bg-muted/30 hover:bg-muted/50"
+              title="Manually reset the doubling ladder back to base $20"
+            >
+              reset
+            </button>
+          )}
+          <button
             onClick={() => runForce()}
             disabled={forceBusy || liveBusy}
             className="text-xs font-semibold px-3 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 disabled:opacity-50 flex items-center gap-1.5"
