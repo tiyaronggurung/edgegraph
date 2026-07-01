@@ -348,7 +348,12 @@ export const settleAutoTradeOrders = createServerFn({ method: "POST" })
 const LIVE_TP_FRAC = 0.70;
 const LIVE_SL_FRAC = 0.50;
 const LIVE_EDGE_DECAY_CENTS = 2;
+// Direction-flip: if the live model now gives our side < this prob, bail out
+// instead of riding a losing conviction into expiry. 0.45 = model has rotated
+// meaningfully against us (from >0.5 at entry).
+const LIVE_FLIP_PROB = 0.45;
 const KALSHI_PUBLIC_BASE = "https://api.elections.kalshi.com/trade-api/v2";
+
 
 export const autoExitLivePositions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -373,6 +378,25 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
     if (!rows.length) return { exited: 0, reasons: [] };
 
     let exited = 0;
+
+    // Fresh model read for every open ticker — this is what lets us bail on a
+    // position whose direction has flipped since entry. One shared call; we
+    // index by ticker below. Fail-open: if the read errors we keep legacy exits.
+    const currentModelProbBySide = new Map<string, number>(); // ticker -> prob for OUR side
+    try {
+      const fresh = await getBtcMarkets();
+      const byTicker = new Map(fresh.markets.map(m => [m.ticker, m]));
+      for (const r of rows) {
+        const m = byTicker.get(r.ticker);
+        if (!m) continue;
+        const yesProb = Number(m.modelYesProb);
+        if (!Number.isFinite(yesProb)) continue;
+        currentModelProbBySide.set(r.ticker, r.side === "YES" ? yesProb : 1 - yesProb);
+      }
+    } catch (e: any) {
+      reasons.push(`model_read: ${e?.message?.slice(0, 60) ?? "err"} — flip exit disabled this tick`);
+    }
+
     // ── Pass 1: fetch quote + compute unrealized PnL for every open row ──
     type Marked = { r: typeof rows[number]; markCents: number; markPnl: number };
     const marked: Marked[] = [];
@@ -413,14 +437,22 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
       const tpThreshold = LIVE_TP_FRAC * Number(r.stake_usd);
       const slThreshold = -LIVE_SL_FRAC * Number(r.stake_usd);
       const adverseCents = entryCents - markCents;
+      const sideProbNow = currentModelProbBySide.get(r.ticker);
 
-      let exitReason: "tp" | "sl" | "edge" | "net" | null = null;
-      if (netLock) exitReason = "net";
+      let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | null = null;
+      // Flip has highest priority: model no longer supports our side. Cut the
+      // losing conviction even if the batch is net-positive on other rows.
+      if (sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
+        exitReason = "flip";
+        reasons.push(`${r.ticker}: flip — model now ${(sideProbNow * 100).toFixed(0)}% for ${r.side} (< ${LIVE_FLIP_PROB * 100}%)`);
+      }
+      else if (netLock) exitReason = "net";
       else if (markPnl >= tpThreshold) exitReason = "tp";
       else if (markPnl <= slThreshold) exitReason = "sl";
       else if (adverseCents >= LIVE_EDGE_DECAY_CENTS) exitReason = "edge";
 
       if (!exitReason) continue;
+
 
 
       // Race-safe claim: only one process closes this row.
