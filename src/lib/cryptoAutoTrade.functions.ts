@@ -91,6 +91,15 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       }
 
       const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: resetRow } = await (supabase as any)
+        .from("auto_trade_loss_cap_resets")
+        .select("reset_at")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const resetAtMs = resetRow?.reset_at ? new Date(resetRow.reset_at).getTime() : NaN;
+      const lossCapSince = Number.isFinite(resetAtMs) && resetAtMs > new Date(dayAgo).getTime()
+        ? new Date(resetAtMs).toISOString()
+        : dayAgo;
       const { data: liveRecent } = await supabase
         .from("auto_trade_orders")
         .select("pnl_usd")
@@ -105,11 +114,17 @@ export const runAutoTrade = createServerFn({ method: "POST" })
           orders: [],
         };
       }
-      const realized24h = (liveRecent ?? []).reduce((s: number, r: { pnl_usd: number | null }) => s + (Number(r.pnl_usd) || 0), 0);
-      if (realized24h <= -LIVE_DAILY_LOSS_CAP_USD) {
+      const { data: lossWindowRows } = await supabase
+        .from("auto_trade_orders")
+        .select("pnl_usd")
+        .eq("user_id", userId)
+        .eq("mode", "live")
+        .gte("created_at", lossCapSince);
+      const realizedSinceReset = (lossWindowRows ?? []).reduce((s: number, r: { pnl_usd: number | null }) => s + (Number(r.pnl_usd) || 0), 0);
+      if (!data.force && realizedSinceReset <= -LIVE_DAILY_LOSS_CAP_USD) {
         return {
           sessionId, mode: data.mode, attempted: 0, placed: 0, skipped: 1,
-          skipReasons: [`Daily live loss cap reached (realized $${realized24h.toFixed(2)} ≤ -$${LIVE_DAILY_LOSS_CAP_USD}). Auto-trade paused for 24h.`],
+          skipReasons: [`Daily live loss cap reached (realized $${realizedSinceReset.toFixed(2)} ≤ -$${LIVE_DAILY_LOSS_CAP_USD}). Auto-trade paused until reset or 24h rollover.`],
           orders: [],
         };
       }
