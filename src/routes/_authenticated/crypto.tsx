@@ -257,7 +257,7 @@ function ConfirmModal({
 }
 
 interface OpenPosSignal {
-  action: "CASH_OUT_PROFIT" | "CASH_OUT_FLIP" | "STOP_LOSS" | "HOLD";
+  action: "CASH_OUT_PROFIT" | "CASH_OUT_FLIP" | "STOP_LOSS" | "STOP_LOSS_SPOT" | "HOLD";
   label: string;
   reason: string;
   exitEdgePts: number;       // (currentSidePrice − modelSideProb) × 100. Positive = market overpaying us.
@@ -267,7 +267,19 @@ interface OpenPosSignal {
   currentSideProb: number;
 }
 
-function computeExitSignal(trade: any, market: BtcMarket | undefined): OpenPosSignal | null {
+// Rule 1 — spot-crash threshold: BTC moves against our side by this %
+// over the last 3min ⇒ force an immediate exit even if the model still likes us.
+const SPOT_CRASH_PCT_3MIN = 0.25;
+// Rule 2 — no-flip lockout: with ≤180s to close AND we're on the ≥80% side,
+// suppress FLIP/STOP_LOSS "panic" exits — market almost never flips this late.
+const NO_FLIP_MAX_SECS = 180;
+const NO_FLIP_MIN_MARKET_PROB = 0.80;
+
+function computeExitSignal(
+  trade: any,
+  market: BtcMarket | undefined,
+  velocity?: { pctChange3min: number | null } | null,
+): OpenPosSignal | null {
   if (!market) return null;
   const contracts = Number(trade.contracts);
   const stake = Number(trade.stake_usd);
@@ -282,13 +294,29 @@ function computeExitSignal(trade: any, market: BtcMarket | undefined): OpenPosSi
   const exitCents = Math.max(1, Math.min(99, Math.round(currentSidePrice * 100)));
 
   // Decision logic:
+  //  • STOP_LOSS_SPOT : BTC spot moved against us ≥ threshold in last 3min (Rule 1)
   //  • CASH_OUT_PROFIT: market overpays vs model by ≥3pts AND we're up money
-  //  • CASH_OUT_FLIP : model now disagrees with our side (model side prob < 0.40) AND we're still up
-  //  • STOP_LOSS     : model strongly against (< 0.25) AND down ≥30% of stake
-  //  • HOLD          : otherwise
+  //  • CASH_OUT_FLIP  : model now disagrees with our side (model side prob < 0.40) AND we're still up
+  //  • STOP_LOSS      : model strongly against (< 0.25) AND down ≥30% of stake
+  //  • HOLD           : otherwise
   let action: OpenPosSignal["action"] = "HOLD";
   let label = "Hold";
   let reason = `Model still ${(modelSideProb * 100).toFixed(0)}% on ${trade.side === "YES" ? "UP" : "DOWN"}`;
+
+  // Rule 1 — spot crash exit (highest priority; overrides no-flip lockout).
+  const v3 = velocity?.pctChange3min;
+  if (v3 != null && Number.isFinite(v3)) {
+    const against = trade.side === "YES" ? -v3 : v3; // positive = moving against us
+    if (against >= SPOT_CRASH_PCT_3MIN) {
+      return {
+        action: "STOP_LOSS_SPOT",
+        label: "Exit — spot crash",
+        reason: `BTC ${v3 >= 0 ? "+" : ""}${v3.toFixed(2)}% in 3min vs ${trade.side === "YES" ? "UP" : "DOWN"} — exit ASAP`,
+        exitEdgePts, pnlUsd, pnlPct, exitCents, currentSideProb: modelSideProb,
+      };
+    }
+  }
+
   if (exitEdgePts >= 3 && pnlUsd > 0) {
     action = "CASH_OUT_PROFIT";
     label = "Cash out (profit)";
@@ -301,6 +329,19 @@ function computeExitSignal(trade: any, market: BtcMarket | undefined): OpenPosSi
     action = "STOP_LOSS";
     label = "Stop loss";
     reason = `Model only ${(modelSideProb*100).toFixed(0)}% — cap loss at $${pnlUsd.toFixed(2)}`;
+  }
+
+  // Rule 2 — no-flip lockout: if we're on the winning side (market ≥ 80%) with
+  // ≤3min left, override CASH_OUT_FLIP / STOP_LOSS back to HOLD. Market almost
+  // never flips from 80/20 in the final 3min. STOP_LOSS_SPOT already returned.
+  if (
+    market.secondsToClose <= NO_FLIP_MAX_SECS &&
+    currentSidePrice >= NO_FLIP_MIN_MARKET_PROB &&
+    (action === "CASH_OUT_FLIP" || action === "STOP_LOSS")
+  ) {
+    action = "HOLD";
+    label = "Hold (no-flip)";
+    reason = `${(currentSidePrice*100).toFixed(0)}¢ on our side w/ ${market.secondsToClose}s left — flip unlikely`;
   }
 
   return { action, label, reason, exitEdgePts, pnlUsd, pnlPct, exitCents, currentSideProb: modelSideProb };
