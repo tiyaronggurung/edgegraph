@@ -395,6 +395,7 @@ export const runAutoTrade = createServerFn({ method: "POST" })
           contracts_remaining: contracts,
           partial_pnl_usd: 0,
           exit_ladder: DEFAULT_EXIT_LADDER as any,
+          is_martingale: data.isMartingale,
         })
         .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
         .single();
