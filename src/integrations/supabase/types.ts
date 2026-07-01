@@ -101,6 +101,35 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_trade_loss_cap_resets: {
+        Row: {
+          created_at: string
+          reset_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          reset_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          reset_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_trade_loss_cap_resets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auto_trade_orders: {
         Row: {
           close_time: string
