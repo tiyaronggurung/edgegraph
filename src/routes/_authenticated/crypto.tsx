@@ -1072,6 +1072,8 @@ function AutoTradePanel() {
           toast.info(`Sentiment gate: window skipped — ${s.reason}`);
           return;
         }
+      }
+
 
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
