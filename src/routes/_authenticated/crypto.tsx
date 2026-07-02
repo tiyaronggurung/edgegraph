@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, useEffect, useRef } from "react";
@@ -1338,6 +1339,28 @@ function AutoTradePanel() {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("crypto.autoOdds.losses", String(autoOddsLosses));
   }, [autoOddsLosses]);
+  // Mirror Auto-Odds on/off + loss count to the DB (server-of-record).
+  // Purely additive — client-side loop remains authoritative. Used by
+  // upcoming server-side tick (turn 2+) to know whether to trade for you.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        const uid = u?.user?.id;
+        if (!uid || cancelled) return;
+        await supabase.from("auto_odds_settings").upsert({
+          user_id: uid,
+          enabled: autoOdds,
+          consecutive_losses: autoOddsLosses,
+          auto_button_type: "odds_bet",
+          stopped_reason: autoOdds ? null : (autoOddsLosses >= 2 ? "two_losses" : null),
+        }, { onConflict: "user_id" });
+      } catch { /* non-fatal; client loop still runs */ }
+    })();
+    return () => { cancelled = true; };
+  }, [autoOdds, autoOddsLosses]);
+
   // Mutual exclusion: turning on Auto-Odds disables Auto-Martingale.
   useEffect(() => {
     if (autoOdds && autoMart) setAutoMart(false);
