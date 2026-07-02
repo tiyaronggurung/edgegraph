@@ -142,6 +142,69 @@ export type Database = {
           },
         ]
       }
+      auto_odds_study_log: {
+        Row: {
+          created_at: string
+          entered: boolean
+          hedge_fired: boolean
+          id: string
+          kalshi_favorite_side: string | null
+          model_side_prob: number | null
+          model_yes_prob: number | null
+          no_american: number | null
+          no_cents: number | null
+          note: string | null
+          picked_side: string | null
+          seconds_to_close: number | null
+          spot: number | null
+          ticker: string
+          user_id: string
+          window_start_at: string
+          yes_american: number | null
+          yes_cents: number | null
+        }
+        Insert: {
+          created_at?: string
+          entered?: boolean
+          hedge_fired?: boolean
+          id?: string
+          kalshi_favorite_side?: string | null
+          model_side_prob?: number | null
+          model_yes_prob?: number | null
+          no_american?: number | null
+          no_cents?: number | null
+          note?: string | null
+          picked_side?: string | null
+          seconds_to_close?: number | null
+          spot?: number | null
+          ticker: string
+          user_id: string
+          window_start_at: string
+          yes_american?: number | null
+          yes_cents?: number | null
+        }
+        Update: {
+          created_at?: string
+          entered?: boolean
+          hedge_fired?: boolean
+          id?: string
+          kalshi_favorite_side?: string | null
+          model_side_prob?: number | null
+          model_yes_prob?: number | null
+          no_american?: number | null
+          no_cents?: number | null
+          note?: string | null
+          picked_side?: string | null
+          seconds_to_close?: number | null
+          spot?: number | null
+          ticker?: string
+          user_id?: string
+          window_start_at?: string
+          yes_american?: number | null
+          yes_cents?: number | null
+        }
+        Relationships: []
+      }
       auto_odds_tracked_orders: {
         Row: {
           closed_reason: string | null
