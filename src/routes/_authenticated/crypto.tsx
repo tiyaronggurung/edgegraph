@@ -1511,6 +1511,7 @@ function AutoTradePanel() {
     let inFlight = false;
     const tick = async () => {
       if (cancelled || inFlight) return;
+      if (isKalshiMaintenanceWindow()) return; // Kalshi Thu 02:30–05:30 ET
       const now = Date.now();
       const currentWindow = Math.floor(now / WINDOW_MS) * WINDOW_MS;
       const remainingMs = WINDOW_MS - (now - currentWindow);
