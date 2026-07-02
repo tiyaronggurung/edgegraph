@@ -17,6 +17,7 @@ import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { EquityMomentumPanel } from "@/components/EquityMomentumPanel";
 import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
 import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
+import { OddsStudyPanel } from "@/components/crypto/OddsStudyPanel";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
 import { useCalibrationShift } from "@/hooks/useCalibrationShift";
 import { useMarketRegime } from "@/hooks/useMarketRegime";
