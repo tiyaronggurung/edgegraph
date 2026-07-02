@@ -230,7 +230,9 @@ export type Database = {
           entry_odds: number | null
           entry_side: string
           id: string
+          last_zone: string | null
           order_id: string
+          oscillation_count: number
           processed_settle: boolean
           updated_at: string
           user_id: string
@@ -242,7 +244,9 @@ export type Database = {
           entry_odds?: number | null
           entry_side: string
           id?: string
+          last_zone?: string | null
           order_id: string
+          oscillation_count?: number
           processed_settle?: boolean
           updated_at?: string
           user_id: string
@@ -254,7 +258,9 @@ export type Database = {
           entry_odds?: number | null
           entry_side?: string
           id?: string
+          last_zone?: string | null
           order_id?: string
+          oscillation_count?: number
           processed_settle?: boolean
           updated_at?: string
           user_id?: string
