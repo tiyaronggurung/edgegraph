@@ -1439,6 +1439,84 @@ function AutoTradePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOdds, marketsQ.data]);
 
+  // ── Whipsaw exit for Odds-Bet trades ──────────────────────────────────────
+  // Rule: after entry, once current American odds move ≥200 away from entry
+  // in EITHER direction AND then return to within ±50 of entry, market-sell
+  // whatever contracts remain. Disabled in the final 60s of the window.
+  // Only touches orders tagged via crypto.autoOdds.oids. Model + martingale
+  // trades are untouched.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    let inFlight = false;
+
+    const tick = async () => {
+      if (cancelled || inFlight) return;
+      let oids: string[] = [];
+      try {
+        const raw = window.localStorage.getItem("crypto.autoOdds.oids");
+        oids = raw ? JSON.parse(raw) : [];
+      } catch { oids = []; }
+      if (oids.length === 0) return;
+
+      // Match orders still open (not settled, still holding contracts).
+      const openOdds = liveOrders.filter(o =>
+        oids.includes(o.id)
+        && o.status !== "settled_win" && o.status !== "settled_loss" && o.status !== "cancelled" && o.status !== "sold"
+        && (o.contracts_remaining ?? o.contracts) > 0
+        && o.entry_price_cents != null,
+      );
+      if (openOdds.length === 0) return;
+
+      const markets = marketsQ.data?.markets ?? [];
+
+      for (const o of openOdds) {
+        const m = markets.find(mm => mm.ticker === o.ticker);
+        if (!m) continue;
+        if (m.secondsToClose <= 60) continue; // C: disable in final 60s
+
+        const entryCents = o.entry_price_cents ?? o.limit_cents;
+        const entryAm = centsToAmericanNum(entryCents);
+        const curCentsSide = o.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice));
+        const curCents = Math.max(1, Math.min(99, Math.round(curCentsSide * 100)));
+        const curAm = centsToAmericanNum(curCents);
+
+        const stateKey = `crypto.autoOdds.wsState.${o.id}`;
+        let extremeHit = window.localStorage.getItem(stateKey) === "1";
+        if (!extremeHit && Math.abs(curAm - entryAm) >= 200) {
+          extremeHit = true;
+          window.localStorage.setItem(stateKey, "1");
+        }
+
+        if (extremeHit && Math.abs(curAm - entryAm) <= 50) {
+          inFlight = true;
+          try {
+            const remaining = o.contracts_remaining ?? o.contracts;
+            // Market-sell at current bid on this side.
+            const bidCents = Math.max(1, Math.min(99, Math.round(
+              (o.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
+            )));
+            await sellFn({ data: { ticker: o.ticker, side: o.side, contracts: remaining, limitCents: bidCents } });
+            toast.info(`Odds-bet whipsaw exit: ${o.ticker} ${o.side === "YES" ? "UP" : "DOWN"} sold ${remaining} @ ${bidCents}¢ (entry ${entryAm}, cur ${curAm})`);
+            window.localStorage.removeItem(stateKey);
+            qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
+          } catch (e: any) {
+            // Silent — next tick will retry until settled/sold.
+            console.error("odds-bet whipsaw exit failed", e);
+          }
+          inFlight = false;
+        }
+      }
+    };
+
+    tick();
+    const h = setInterval(tick, 5_000);
+    return () => { cancelled = true; clearInterval(h); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveOrders, marketsQ.data]);
+
+
+
   // Live status for the Auto-Odds panel — computed every render so the user
   // can see WHY it hasn't fired yet (phase, current YES/NO American odds).
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
