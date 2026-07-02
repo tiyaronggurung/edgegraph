@@ -1606,23 +1606,30 @@ function AutoTradePanel() {
           extremeHit = true;
           window.localStorage.setItem(stateKey, "1");
         }
+        const whipsawFire = extremeHit && Math.abs(curAm - entryAm) <= 50;
 
-        if (extremeHit && Math.abs(curAm - entryAm) <= 50) {
+        // 40% implied-prob exit: fire when current implied prob on our side
+        // drops to <= 40% of entry implied prob.
+        const impliedProb = (am: number) => am < 0 ? (-am) / ((-am) + 100) : 100 / (am + 100);
+        const entryProb = impliedProb(entryAm);
+        const curProb = impliedProb(curAm);
+        const probFire = entryProb > 0 && curProb <= 0.4 * entryProb;
+
+        if (whipsawFire || probFire) {
+          const reason = whipsawFire ? "whipsaw" : "prob40";
           inFlight = true;
           try {
-            const remaining = o.contracts_remaining ?? o.contracts;
-            const res = await sellOddsFn({ data: { orderId: o.id, reason: "whipsaw" } });
+            const res = await sellOddsFn({ data: { orderId: o.id, reason } });
             if (res.ok) {
-              toast.info(`Odds-bet whipsaw exit: ${o.ticker} ${o.side === "YES" ? "UP" : "DOWN"} · ${res.message} (entry ${entryAm}, cur ${curAm})`);
+              const label = whipsawFire ? "whipsaw" : "40% prob";
+              toast.info(`Odds-bet ${label} exit: ${o.ticker} ${o.side === "YES" ? "UP" : "DOWN"} · ${res.message} (entry ${entryAm}, cur ${curAm})`);
               window.localStorage.removeItem(stateKey);
               qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
             } else {
-              // Keep state; retry next tick unless order settled.
-              console.warn("whipsaw sell skipped:", res.message);
+              console.warn(`${reason} sell skipped:`, res.message);
             }
-            void remaining;
           } catch (e: any) {
-            console.error("odds-bet whipsaw exit failed", e);
+            console.error("odds-bet exit failed", e);
           }
           inFlight = false;
         }
