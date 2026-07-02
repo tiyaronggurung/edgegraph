@@ -22,10 +22,33 @@ function centsToAmerican(cents: number): number {
   return p >= 0.5 ? -Math.round((p / (1 - p)) * 100) : Math.round(((1 - p) / p) * 100);
 }
 
+// Kalshi weekly maintenance: Thursday 2:30–5:30 AM ET (widened around the
+// official 3–5 window). Skip ALL entries and exits during this window to avoid
+// suspicious-request flags from the exchange.
+function isKalshiMaintenanceWindow(d: Date = new Date()): boolean {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const wd = parts.find(p => p.type === "weekday")?.value; // "Thu"
+  const hh = parseInt(parts.find(p => p.type === "hour")?.value ?? "0", 10);
+  const mm = parseInt(parts.find(p => p.type === "minute")?.value ?? "0", 10);
+  if (wd !== "Thu") return false;
+  const mins = hh * 60 + mm;
+  return mins >= 150 && mins < 330; // 02:30 .. 05:30
+}
+
 export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
   server: {
     handlers: {
       POST: async () => {
+        if (isKalshiMaintenanceWindow()) {
+          return Response.json({ ok: true, skipped: "kalshi_maintenance" });
+        }
+
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const { data: enabledUsers } = await supabaseAdmin
