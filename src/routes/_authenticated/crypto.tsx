@@ -1528,7 +1528,11 @@ function AutoTradePanel() {
         qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
         return o.id ?? null;
       }
-      toast.info(`Odds-bet skipped: ${res.skipReasons.slice(0, 2).join(" · ") || "no fill"}`);
+      // Hide the informational "equity: …" and "force: …" lines — those are
+      // always pushed even on success. Surface the actual failure reason
+      // (typically "IOC 0-fill @ Nc — no position taken").
+      const realReasons = res.skipReasons.filter(r => !/^(equity:|force:)/i.test(r));
+      toast.info(`Odds-bet skipped: ${(realReasons.length ? realReasons : res.skipReasons).slice(0, 2).join(" · ") || "no fill"}`);
       return null;
     } catch (e: any) {
       toast.error("Odds-bet failed", { description: e?.message ?? String(e) });

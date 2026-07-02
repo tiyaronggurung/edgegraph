@@ -175,28 +175,10 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               const offset = wallUtc - nowD.getTime();
               const etMidnightUtc = new Date(Date.UTC(yy, mo - 1, dd, 0, 0, 0) - offset);
 
-              const { data: todayTracked } = await supabaseAdmin
-                .from("auto_odds_tracked_orders")
-                .select("order_id")
-                .eq("user_id", userId)
-                .gte("created_at", etMidnightUtc.toISOString());
-              const todayIds = (todayTracked ?? []).map((r: any) => r.order_id);
-              if (todayIds.length > 0) {
-                const { count: lossCount } = await supabaseAdmin
-                  .from("auto_trade_orders")
-                  .select("id", { count: "exact", head: true })
-                  .in("id", todayIds)
-                  .eq("status", "settled_loss");
-                if ((lossCount ?? 0) >= 5) {
-                  await supabaseAdmin
-                    .from("auto_odds_settings")
-                    .update({ enabled: false, stopped_reason: "daily_5_losses", last_tick_at: new Date().toISOString() })
-                    .eq("user_id", userId);
-                  stopped = true;
-                  summary.push({ user_id: userId, entries, exits, stopped, note: `stopped: ${lossCount} losses today` });
-                  continue;
-                }
-              }
+              // 5-losses-per-day auto-off REMOVED per user request. The
+              // odds-bet loop now trades regardless of daily loss count.
+              // (Client-side 3-in-a-row stop still applies from the browser.)
+
             }
 
 
