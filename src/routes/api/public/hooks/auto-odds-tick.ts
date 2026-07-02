@@ -78,6 +78,18 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
 
         for (const u of enabledUsers) {
           const userId = u.user_id as string;
+          // Per-user AI-tunable parameters. Each falls back to the hardcoded
+          // default when the settings row has NULL. See TUNABLE_DEFS in
+          // src/lib/oddsStudy.functions.ts — safe ranges are enforced there.
+          const T = {
+            modelGateMin: (u as any).model_gate_min != null ? Number((u as any).model_gate_min) : 0.60,
+            hedgeLo: (u as any).hedge_band_lo != null ? Number((u as any).hedge_band_lo) : 0.60,
+            hedgeHi: (u as any).hedge_band_hi != null ? Number((u as any).hedge_band_hi) : 0.68,
+            tpCents: (u as any).tp_cents != null ? Number((u as any).tp_cents) : 98,
+            oscMax: (u as any).oscillation_max != null ? Number((u as any).oscillation_max) : 3,
+            skipLt15s: (u as any).skip_bucket_lt15s === true,
+            skip15_60s: (u as any).skip_bucket_15_60s === true,
+          };
           let entries = 0, exits = 0, stopped = false;
           let note: string | undefined;
 
