@@ -1892,6 +1892,28 @@ function CryptoPage() {
   const q = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 10_000, staleTime: 5_000 });
   const cfg = useQuery({ queryKey: ["kalshi-cfg"], queryFn: () => cfgFn(), staleTime: 60_000 });
 
+  // Record ATM odds snapshot every marketsQ refetch for post-hoc analysis.
+  // Fires once per new q.dataUpdatedAt; skips if no active window.
+  const recordTapeFn = useServerFn(recordOddsTape);
+  const lastTapeAt = useRef<number>(0);
+  useEffect(() => {
+    const updatedAt = q.dataUpdatedAt;
+    if (!updatedAt || updatedAt === lastTapeAt.current) return;
+    const markets = q.data?.markets ?? [];
+    const active = markets.filter(m => m.secondsToClose > 0 && m.secondsToClose <= 15 * 60 + 60);
+    if (active.length === 0) return;
+    const spotRef = active[0].spot ?? 0;
+    if (!spotRef) return;
+    const atm = active.slice().sort((a, b) => Math.abs(a.strike - spotRef) - Math.abs(b.strike - spotRef))[0];
+    const yesCents = Math.max(0, Math.min(100, Math.round((atm.yesAsk || atm.yesPrice) * 100)));
+    const noCents = Math.max(0, Math.min(100, Math.round((atm.noAsk || (1 - atm.yesPrice)) * 100)));
+    lastTapeAt.current = updatedAt;
+    recordTapeFn({ data: { snapshots: [{
+      ticker: atm.ticker, strike: atm.strike, spot: atm.spot,
+      yesCents, noCents, secondsToClose: atm.secondsToClose,
+    }] } }).catch(() => { /* silent — analytics best-effort */ });
+  }, [q.dataUpdatedAt, q.data, recordTapeFn]);
+
   const [bankroll, setBankroll] = useState(500);
   const [kellyMult, setKellyMult] = useState(0.25);
   const sizing: SizingState = { bankroll, kellyMult };
