@@ -238,12 +238,10 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 const curProb = impliedProb(curAm);
                 const probFire = entryProb > 0 && curProb <= 0.4 * entryProb;
 
-                // Flip stop-loss: entry side was ≥80% implied AND now either
-                //   (a) our side < 40% implied, OR
-                //   (b) opposite side ≥ 80% implied  (== our side ≤ 20%)
-                // Uses Kalshi mid ¢ on our side. curCents is 1..99.
-                const entryCentsImplied = Math.max(1, Math.min(99, entryCents));
-                const flipFire = entryCentsImplied >= 80 && curCents < 40;
+                // Flip stop-loss: entry American odds in [-750, -450] (deep
+                // favorite we bought) AND current side has flipped to +100 or
+                // worse (≤50¢ implied on our side).
+                const flipFire = entryAm <= -450 && entryAm >= -750 && curCents <= 50;
 
                 if (whipsawFire || probFire || flipFire) {
                   const reason = flipFire ? "flip_server" : whipsawFire ? "whipsaw_server" : "prob40_server";
