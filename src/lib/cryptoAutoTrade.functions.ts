@@ -894,9 +894,20 @@ export const sellOddsBetOrder = createServerFn({ method: "POST" })
     if (!data?.orderId || typeof data.orderId !== "string") throw new Error("orderId required");
     return { orderId: data.orderId, reason: data.reason ?? "whipsaw_exit" };
   })
-  .handler(async ({ data, context }): Promise<{ ok: boolean; message: string; pnlUsd?: number }> => {
-    const { supabase, userId } = context;
+  .handler(async ({ data, context }): Promise<{ ok: boolean; message: string; pnlUsd?: number }> =>
+    sellOddsBetCore(context.supabase as SupabaseClient, context.userId, data.orderId, data.reason),
+  );
+
+export async function sellOddsBetCore(
+  supabase: SupabaseClient,
+  userId: string,
+  orderId: string,
+  reason: string = "whipsaw_exit",
+): Promise<{ ok: boolean; message: string; pnlUsd?: number }> {
+    const data = { orderId, reason };
     const liveEnabled = process.env.KALSHI_LIVE_ENABLED === "true";
+
+
 
     const { data: row, error: rErr } = await supabase
       .from("auto_trade_orders")
