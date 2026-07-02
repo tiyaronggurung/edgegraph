@@ -965,8 +965,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         asOf: regimeState.asOf,
       } : null,
     };
-  };
 }
+
 
 export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
   async (): Promise<BtcMarketsResult> => computeBtcMarkets(),
