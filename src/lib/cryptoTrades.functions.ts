@@ -50,6 +50,7 @@ function normalizeKalshiPem(raw: string): string {
 
 type ValidatedKalshiKey = {
   key: import("node:crypto").KeyObject;
+  pem: string;
   constants: typeof import("node:crypto").constants;
   createSign: typeof import("node:crypto").createSign;
 };
@@ -95,12 +96,13 @@ export async function getValidatedKalshiKey(): Promise<ValidatedKalshiKey> {
   }
 
   // Smoke-test: actually sign with RSA-PSS so a broken key fails here, not mid-order.
+  // Workerd's crypto shim rejects KeyObject as options.key, so we sign with the PEM string.
   try {
     const signer = createSign("RSA-SHA256");
     signer.update("kalshi-key-validation");
     signer.end();
     signer.sign({
-      key,
+      key: pem,
       padding: constants.RSA_PKCS1_PSS_PADDING,
       saltLength: constants.RSA_PSS_SALTLEN_DIGEST,
     });
@@ -110,7 +112,7 @@ export async function getValidatedKalshiKey(): Promise<ValidatedKalshiKey> {
     );
   }
 
-  cachedKey = { key, constants, createSign };
+  cachedKey = { key, pem, constants, createSign };
   cachedKeyFingerprint = fingerprint;
   return cachedKey;
 }
@@ -118,7 +120,7 @@ export async function getValidatedKalshiKey(): Promise<ValidatedKalshiKey> {
 export async function signKalshi(method: string, path: string): Promise<Record<string, string>> {
   const keyId = process.env.KALSHI_API_KEY_ID;
   if (!keyId) throw new Error("KALSHI_API_KEY_ID is not configured");
-  const { key, constants, createSign } = await getValidatedKalshiKey();
+  const { pem, constants, createSign } = await getValidatedKalshiKey();
 
   const ts = Date.now().toString();
   // Kalshi requires the signed path to match the server-visible URL path,
@@ -128,7 +130,7 @@ export async function signKalshi(method: string, path: string): Promise<Record<s
   signer.update(msg);
   signer.end();
   const signature = signer.sign({
-    key,
+    key: pem,
     padding: constants.RSA_PKCS1_PSS_PADDING,
     saltLength: constants.RSA_PSS_SALTLEN_DIGEST,
   }).toString("base64");
@@ -138,6 +140,7 @@ export async function signKalshi(method: string, path: string): Promise<Record<s
     "KALSHI-ACCESS-SIGNATURE": signature,
   };
 }
+
 
 // Internal helper used by both placeKalshiOrder (manual click) and the
 // live auto-trade path. Same RSA-PSS signing, same crypto_trades logging.
