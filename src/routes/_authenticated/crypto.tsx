@@ -26,6 +26,7 @@ import { shouldSkipForMagnet } from "@/lib/roundLevelGate";
 import { useTrendlineAnalysis } from "@/hooks/useTrendlineAnalysis";
 import { useCandleMomentum } from "@/hooks/useCandleMomentum";
 import { computeKalshiSentiment } from "@/lib/kalshiSentiment";
+import { KalshiMaintenanceBanner } from "@/components/KalshiMaintenanceBanner";
 
 import { toast } from "sonner";
 
@@ -2206,6 +2207,7 @@ function CryptoPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      <KalshiMaintenanceBanner />
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
