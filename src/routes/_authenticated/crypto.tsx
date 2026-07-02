@@ -2014,6 +2014,8 @@ function CryptoPage() {
 
           <CalibrationReportPanel />
 
+          <ModelStudyPanel />
+
           <ModelAccuracyPanel />
 
           <EquityMomentumPanel />
