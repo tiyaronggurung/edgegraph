@@ -360,15 +360,16 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 let seconds_since_prior: number | null = null;
                 let crossed_50 = false;
                 if (prior) {
-                  const priorPicked = prior.picked_side === "YES" ? prior.yes_cents : prior.no_cents;
-                  prior_yes_cents = priorPicked;
-                  yes_cents_delta = pickedYesCents - priorPicked;
+                  const priorPicked: number | null = prior.picked_side === "YES" ? prior.yes_cents : prior.no_cents;
+                  if (priorPicked != null) {
+                    prior_yes_cents = priorPicked;
+                    yes_cents_delta = pickedYesCents - priorPicked;
+                    crossed_50 = (priorPicked < 50 && pickedYesCents >= 50) || (priorPicked >= 50 && pickedYesCents < 50);
+                  }
                   if (prior.spot != null && atm.spot != null) spot_delta = atm.spot - Number(prior.spot);
                   if (prior.created_at) {
                     seconds_since_prior = Math.round((Date.now() - new Date(prior.created_at).getTime()) / 1000);
                   }
-                  // Crossed 50¢: picked side's ¢ went from one side of 50 to the other.
-                  crossed_50 = (priorPicked < 50 && pickedYesCents >= 50) || (priorPicked >= 50 && pickedYesCents < 50);
                 }
 
                 await supabaseAdmin.from("auto_odds_study_log").insert({
