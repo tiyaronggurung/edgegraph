@@ -316,18 +316,57 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
 
             // ── STRICT MODEL GATE ──
             // Never buy when our model disagrees or is under-confident on the
-            // picked side. Blocks real-money entries at model ≤59% no matter
+            // picked side. Blocks real-money entries at model <60% no matter
             // how deep Kalshi's odds are. Applies to all three windows.
             const MODEL_MIN = 0.60;
+            // Coinflip hedge window: fire $5 opposite-side hedge only when
+            // the model is barely agreeing with Kalshi (right above the gate
+            // floor). Naturally fires ~1 in 4-5 trades since most passes sit
+            // higher than 68%.
+            const HEDGE_MIN = 0.60;
+            const HEDGE_MAX = 0.68;
+
             const modelYes = atm.modelYesProb;
-            if (typeof modelYes !== "number" || !Number.isFinite(modelYes)) {
-              note = `skipped: no model prob on ${atm.ticker}`;
+            const yesFav = yesCents >= noCents;
+            const kalshiFavSide: "YES" | "NO" = yesFav ? "YES" : "NO";
+            const hasModel = typeof modelYes === "number" && Number.isFinite(modelYes);
+            const modelSideP = hasModel
+              ? (pick.side === "YES" ? modelYes! : 1 - modelYes!)
+              : null;
+
+            // Study-log helper — one row per entry attempt regardless of gate.
+            const logStudy = async (opts: { entered: boolean; hedge_fired: boolean; note: string }) => {
+              try {
+                await supabaseAdmin.from("auto_odds_study_log").insert({
+                  user_id: userId,
+                  window_start_at: currentWindowStartIso,
+                  ticker: atm.ticker,
+                  seconds_to_close: atm.secondsToClose,
+                  spot: atm.spot ?? null,
+                  yes_cents: yesCents,
+                  no_cents: noCents,
+                  yes_american: yesAm,
+                  no_american: noAm,
+                  model_yes_prob: hasModel ? modelYes : null,
+                  kalshi_favorite_side: kalshiFavSide,
+                  picked_side: pick.side,
+                  model_side_prob: modelSideP,
+                  entered: opts.entered,
+                  hedge_fired: opts.hedge_fired,
+                  note: opts.note.slice(0, 500),
+                });
+              } catch { /* logging is best-effort */ }
+            };
+
+            if (!hasModel) {
+              note = `skipped: no model prob on ${atm.ticker} (Kalshi ${pick.reason})`;
+              await logStudy({ entered: false, hedge_fired: false, note });
               summary.push({ user_id: userId, entries, exits, stopped, note });
               continue;
             }
-            const modelSideP = pick.side === "YES" ? modelYes : 1 - modelYes;
-            if (modelSideP < MODEL_MIN) {
-              note = `skipped: model ${(modelSideP * 100).toFixed(1)}% on ${pick.side} < ${(MODEL_MIN * 100).toFixed(0)}% (Kalshi ${pick.reason})`;
+            if ((modelSideP as number) < MODEL_MIN) {
+              note = `skipped: model ${((modelSideP as number) * 100).toFixed(1)}% on ${pick.side} < ${(MODEL_MIN * 100).toFixed(0)}% (Kalshi ${pick.reason})`;
+              await logStudy({ entered: false, hedge_fired: false, note });
               summary.push({ user_id: userId, entries, exits, stopped, note });
               continue;
             }
@@ -343,6 +382,8 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               forceSide: pick.side,
             });
 
+            let hedgeFired = false;
+
             if (placeResult.placed > 0 && placeResult.orders[0]) {
               const placed = placeResult.orders[0];
               entries += 1;
@@ -355,44 +396,43 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                   entry_side: placed.side,
                   entry_odds: centsToAmerican(entryCents),
                 });
-              note = `entered ${placed.ticker} ${placed.side} @ ${entryCents}¢ (${pick.reason})`;
+              note = `entered ${placed.ticker} ${placed.side} @ ${entryCents}¢ · model ${((modelSideP as number) * 100).toFixed(1)}% (${pick.reason})`;
 
-              // ── 3b. COINFLIP HEDGE ──
-              // If our model disagrees with Kalshi's picked side, place a small
-              // $5 hedge on the OPPOSITE side. Not inserted into
-              // auto_odds_tracked_orders — so it does NOT count toward the
-              // 2-loss tail stop, the daily 5-loss cap, or trigger whipsaw
-              // exits. Pure settlement hedge for coinflip-style situations.
+              // ── 3b. COINFLIP-ZONE HEDGE ──
+              // Fire $5 hedge on the OPPOSITE side only when the model is in
+              // the true coinflip zone [60%, 68%] on our picked side — i.e.
+              // barely above the gate floor. NOT inserted into
+              // auto_odds_tracked_orders: does NOT count toward the 2-loss
+              // tail stop, daily 5-loss cap, or trigger whipsaw exits.
               try {
-                const modelYes = atm.modelYesProb;
-                if (typeof modelYes === "number" && Number.isFinite(modelYes)) {
-                  const kalshiPickYES = pick.side === "YES";
-                  const modelPickYES = modelYes >= 0.5;
-                  const disagree = kalshiPickYES !== modelPickYES;
-                  if (disagree) {
-                    const oppSide: "YES" | "NO" = pick.side === "YES" ? "NO" : "YES";
-                    const hedgeRes = await runAutoTradeCore(supabaseAdmin as any, userId, {
-                      mode: "live",
-                      confirm: "I_UNDERSTAND_LIVE",
-                      force: true,
-                      isMartingale: false,
-                      maxOrders: 1,
-                      stakeUsd: HEDGE_STAKE,
-                      forceTicker: atm.ticker,
-                      forceSide: oppSide,
-                    });
-                    if (hedgeRes.placed > 0) {
-                      note += ` · hedge ${oppSide} $${HEDGE_STAKE} (model ${(modelYes * 100).toFixed(0)}%)`;
-                    } else {
-                      note += ` · hedge skipped: ${hedgeRes.skipReasons.slice(0, 1).join("") || "no fill"}`;
-                    }
+                const p = modelSideP as number;
+                if (p >= HEDGE_MIN && p <= HEDGE_MAX) {
+                  const oppSide: "YES" | "NO" = pick.side === "YES" ? "NO" : "YES";
+                  const hedgeRes = await runAutoTradeCore(supabaseAdmin as any, userId, {
+                    mode: "live",
+                    confirm: "I_UNDERSTAND_LIVE",
+                    force: true,
+                    isMartingale: false,
+                    maxOrders: 1,
+                    stakeUsd: HEDGE_STAKE,
+                    forceTicker: atm.ticker,
+                    forceSide: oppSide,
+                  });
+                  if (hedgeRes.placed > 0) {
+                    hedgeFired = true;
+                    note += ` · coinflip hedge ${oppSide} $${HEDGE_STAKE}`;
+                  } else {
+                    note += ` · hedge skipped: ${hedgeRes.skipReasons.slice(0, 1).join("") || "no fill"}`;
                   }
                 }
               } catch (e: any) {
                 note += ` · hedge err: ${e?.message?.slice(0, 60) ?? "err"}`;
               }
+
+              await logStudy({ entered: true, hedge_fired: hedgeFired, note });
             } else {
               note = `skipped: ${placeResult.skipReasons.slice(0, 2).join(" · ") || "no fill"}`;
+              await logStudy({ entered: false, hedge_fired: false, note });
             }
           } catch (e: any) {
             note = `err: ${e?.message?.slice(0, 120) ?? String(e).slice(0, 120)}`;
