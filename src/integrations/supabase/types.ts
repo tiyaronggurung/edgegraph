@@ -489,6 +489,42 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_odds_tape: {
+        Row: {
+          id: number
+          no_cents: number
+          seconds_to_close: number
+          snapped_at: string
+          spot: number
+          strike: number
+          ticker: string
+          user_id: string
+          yes_cents: number
+        }
+        Insert: {
+          id?: number
+          no_cents: number
+          seconds_to_close: number
+          snapped_at?: string
+          spot: number
+          strike: number
+          ticker: string
+          user_id: string
+          yes_cents: number
+        }
+        Update: {
+          id?: number
+          no_cents?: number
+          seconds_to_close?: number
+          snapped_at?: string
+          spot?: number
+          strike?: number
+          ticker?: string
+          user_id?: string
+          yes_cents?: number
+        }
+        Relationships: []
+      }
       crypto_gate_shadow_sim: {
         Row: {
           created_at: string
