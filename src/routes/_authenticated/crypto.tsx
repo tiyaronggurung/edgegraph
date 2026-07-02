@@ -1349,6 +1349,13 @@ function AutoTradePanel() {
         const o = res.orders[0];
         if (soundOn) { playOrderPlaced(); setTimeout(() => playOrderFilled(), 200); }
         toast.success(`Odds-bet $${AUTO_ODDS_STAKE}: ${side === "YES" ? "UP" : "DOWN"} ${ticker} @ ${o.limit_cents}¢ — ${reason}`);
+        // Tag this order as an odds-bet trade so the whipsaw-exit watcher owns it.
+        try {
+          const raw = window.localStorage.getItem("crypto.autoOdds.oids");
+          const oids: string[] = raw ? JSON.parse(raw) : [];
+          if (o.id && !oids.includes(o.id)) oids.push(o.id);
+          window.localStorage.setItem("crypto.autoOdds.oids", JSON.stringify(oids.slice(-50)));
+        } catch { /* ignore */ }
         qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
         return o.id ?? null;
       }
