@@ -1493,16 +1493,17 @@ function AutoTradePanel() {
           inFlight = true;
           try {
             const remaining = o.contracts_remaining ?? o.contracts;
-            // Market-sell at current bid on this side.
-            const bidCents = Math.max(1, Math.min(99, Math.round(
-              (o.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
-            )));
-            await sellFn({ data: { ticker: o.ticker, side: o.side, contracts: remaining, limitCents: bidCents } });
-            toast.info(`Odds-bet whipsaw exit: ${o.ticker} ${o.side === "YES" ? "UP" : "DOWN"} sold ${remaining} @ ${bidCents}¢ (entry ${entryAm}, cur ${curAm})`);
-            window.localStorage.removeItem(stateKey);
-            qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
+            const res = await sellOddsFn({ data: { orderId: o.id, reason: "whipsaw" } });
+            if (res.ok) {
+              toast.info(`Odds-bet whipsaw exit: ${o.ticker} ${o.side === "YES" ? "UP" : "DOWN"} · ${res.message} (entry ${entryAm}, cur ${curAm})`);
+              window.localStorage.removeItem(stateKey);
+              qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
+            } else {
+              // Keep state; retry next tick unless order settled.
+              console.warn("whipsaw sell skipped:", res.message);
+            }
+            void remaining;
           } catch (e: any) {
-            // Silent — next tick will retry until settled/sold.
             console.error("odds-bet whipsaw exit failed", e);
           }
           inFlight = false;
