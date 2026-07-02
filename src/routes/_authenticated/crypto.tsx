@@ -8,7 +8,8 @@ import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.f
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades, checkKalshiBalance, diagnoseKalshiAuth, type KalshiDiagStep } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats, getCalibrationReport, type CalibrationRow } from "@/lib/cryptoPredictions.functions";
 import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, autoExitLivePositions, settleAutoTradeSkipLog, getSkipReport, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
-import { diagnoseRecentMisses, studyMissesWithAI, getLatestStudy, type StudyRecommendation } from "@/lib/cryptoMisses.functions";
+import { diagnoseRecentMisses, studyMissesWithAI, getLatestStudy, setRecommendationFeedback, type StudyRecommendation } from "@/lib/cryptoMisses.functions";
+import { recomputeShadowSim, getShadowSimReport, type ShadowSimGateStat } from "@/lib/cryptoShadowSim.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { EquityMomentumPanel } from "@/components/EquityMomentumPanel";
@@ -2287,26 +2288,183 @@ function ModelStudyPanel() {
 
           {study.recommendations.length > 0 && (
             <div className="space-y-2">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Recommendations</div>
-              {study.recommendations.map((r: StudyRecommendation, i: number) => {
-                const pColor = r.priority === "high" ? "border-red-500/50 text-red-300 bg-red-500/10"
-                  : r.priority === "medium" ? "border-amber-500/50 text-amber-300 bg-amber-500/10"
-                  : "border-border text-muted-foreground bg-muted/30";
-                return (
-                  <div key={i} className="border border-border/60 rounded p-2 space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${pColor}`}>{r.priority}</span>
-                      <span className="text-xs font-mono text-foreground/90">{r.gate}</span>
-                      <span className="text-[10px] text-muted-foreground">now: {r.currentSetting}</span>
-                    </div>
-                    <div className="text-xs text-emerald-300">→ {r.suggested}</div>
-                    <div className="text-[11px] text-muted-foreground leading-snug">{r.rationale}</div>
-                  </div>
-                );
-              })}
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Recommendations — vote to teach the next study</div>
+              {study.recommendations.map((r: StudyRecommendation, i: number) => (
+                <RecommendationCard
+                  key={i}
+                  rec={r}
+                  index={i}
+                  studyId={study.id}
+                  vote={study.feedback?.[i] ?? null}
+                  onVoted={() => qc.invalidateQueries({ queryKey: ["crypto-latest-study"] })}
+                />
+              ))}
             </div>
           )}
         </>
+      )}
+
+      <ShadowSimTable />
+    </div>
+  );
+}
+
+function RecommendationCard({
+  rec, index, studyId, vote, onVoted,
+}: {
+  rec: StudyRecommendation;
+  index: number;
+  studyId: string;
+  vote: "up" | "down" | null;
+  onVoted: () => void;
+}) {
+  const feedbackFn = useServerFn(setRecommendationFeedback);
+  const [busy, setBusy] = useState(false);
+  const pColor = rec.priority === "high" ? "border-red-500/50 text-red-300 bg-red-500/10"
+    : rec.priority === "medium" ? "border-amber-500/50 text-amber-300 bg-amber-500/10"
+    : "border-border text-muted-foreground bg-muted/30";
+
+  const send = async (next: "up" | "down") => {
+    setBusy(true);
+    try {
+      await feedbackFn({
+        data: {
+          studyId,
+          recIndex: index,
+          vote: vote === next ? null : next, // click same vote to clear
+          recGate: rec.gate,
+          recSuggested: rec.suggested,
+        },
+      });
+      onVoted();
+    } catch (e: any) {
+      toast.error(e?.message ?? "vote failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="border border-border/60 rounded p-2 space-y-1">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${pColor}`}>{rec.priority}</span>
+        <span className="text-xs font-mono text-foreground/90">{rec.gate}</span>
+        <span className="text-[10px] text-muted-foreground">now: {rec.currentSetting}</span>
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            disabled={busy}
+            onClick={() => send("up")}
+            className={`text-xs px-1.5 py-0.5 rounded border transition ${
+              vote === "up" ? "border-emerald-500/70 bg-emerald-500/20 text-emerald-300" : "border-border bg-muted/30 text-muted-foreground hover:text-emerald-300"
+            }`}
+            title="Helpful — the next study will favor patterns like this"
+          >
+            👍
+          </button>
+          <button
+            disabled={busy}
+            onClick={() => send("down")}
+            className={`text-xs px-1.5 py-0.5 rounded border transition ${
+              vote === "down" ? "border-red-500/70 bg-red-500/20 text-red-300" : "border-border bg-muted/30 text-muted-foreground hover:text-red-300"
+            }`}
+            title="Not helpful — the next study will avoid patterns like this"
+          >
+            👎
+          </button>
+        </div>
+      </div>
+      <div className="text-xs text-emerald-300">→ {rec.suggested}</div>
+      <div className="text-[11px] text-muted-foreground leading-snug">{rec.rationale}</div>
+    </div>
+  );
+}
+
+function ShadowSimTable() {
+  const qc = useQueryClient();
+  const recomputeFn = useServerFn(recomputeShadowSim);
+  const reportFn = useServerFn(getShadowSimReport);
+  const [running, setRunning] = useState(false);
+
+  const q = useQuery({
+    queryKey: ["crypto-shadow-sim"],
+    queryFn: () => reportFn(),
+    staleTime: 60_000,
+  });
+
+  const run = async () => {
+    setRunning(true);
+    try {
+      const r = await recomputeFn();
+      toast.success(`Simulated ${r.evaluated} settled orders across gate thresholds`);
+      await qc.invalidateQueries({ queryKey: ["crypto-shadow-sim"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "shadow sim failed");
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const stats: ShadowSimGateStat[] = q.data?.stats ?? [];
+  const evaluated = q.data?.orders_evaluated ?? 0;
+
+  return (
+    <div className="border-t border-border pt-3 mt-1 space-y-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Shadow simulator · what if these gates had been on
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            {evaluated > 0
+              ? `Replayed against ${evaluated} settled auto-trade order${evaluated === 1 ? "" : "s"}. Live trading is not affected.`
+              : "No shadow sim yet. Click to replay past settled auto-trade orders against gate thresholds."}
+          </div>
+        </div>
+        <button
+          onClick={run}
+          disabled={running}
+          className="text-xs px-3 py-1.5 rounded border border-border bg-muted/40 hover:bg-muted disabled:opacity-50 flex items-center gap-1.5"
+        >
+          {running ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
+          {running ? "Simulating…" : stats.length > 0 ? "Recompute" : "Run shadow sim"}
+        </button>
+      </div>
+
+      {stats.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs font-mono">
+            <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              <tr className="text-left">
+                <th className="py-1 pr-3">Gate</th>
+                <th className="pr-3">Threshold</th>
+                <th className="pr-3 text-right">Would block</th>
+                <th className="pr-3 text-right">Losses saved</th>
+                <th className="pr-3 text-right">Wins killed</th>
+                <th className="pr-3 text-right">Net $</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.map((s, i) => {
+                const netColor = s.net_usd > 5 ? "text-emerald-400"
+                  : s.net_usd < -5 ? "text-red-400"
+                  : "text-muted-foreground";
+                return (
+                  <tr key={i} className="border-t border-border/40">
+                    <td className="py-1 pr-3 text-foreground/90">{s.gate_name}</td>
+                    <td className="pr-3">{s.threshold_label}</td>
+                    <td className="pr-3 text-right">{s.would_block} / {s.n_evaluated}</td>
+                    <td className="pr-3 text-right text-emerald-300">{s.losses_saved_n} · ${s.losses_saved_usd.toFixed(2)}</td>
+                    <td className="pr-3 text-right text-red-300">{s.wins_killed_n} · ${s.wins_killed_usd.toFixed(2)}</td>
+                    <td className={`pr-3 text-right ${netColor}`}>{s.net_usd >= 0 ? "+" : ""}${s.net_usd.toFixed(2)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div className="text-[10px] text-muted-foreground italic mt-1">
+            Sorted by net $. Positive = the gate would have saved money if it had been on. Currently limited to sigma/edge/prob gates — richer gates (candle, trendline, verdict) start being simulatable once new trades log their full snapshot.
+          </div>
+        </div>
       )}
     </div>
   );
