@@ -1326,15 +1326,60 @@ function AutoTradePanel() {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("crypto.autoOdds") === "on";
   });
+  const [autoOddsLosses, setAutoOddsLosses] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    return Number(window.localStorage.getItem("crypto.autoOdds.losses")) || 0;
+  });
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("crypto.autoOdds", autoOdds ? "on" : "off");
   }, [autoOdds]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoOdds.losses", String(autoOddsLosses));
+  }, [autoOddsLosses]);
   // Mutual exclusion: turning on Auto-Odds disables Auto-Martingale.
   useEffect(() => {
     if (autoOdds && autoMart) setAutoMart(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOdds]);
+
+  // Auto-Odds safety stop: two consecutive losing odds-bet trades turns Auto-Odds off.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let taggedIds: string[] = [];
+    try {
+      const raw = window.localStorage.getItem("crypto.autoOdds.oids");
+      taggedIds = raw ? JSON.parse(raw) : [];
+    } catch { taggedIds = []; }
+    if (!taggedIds.length) return;
+
+    let processedIds: string[] = [];
+    try {
+      const raw = window.localStorage.getItem("crypto.autoOdds.processedSettles");
+      processedIds = raw ? JSON.parse(raw) : [];
+    } catch { processedIds = []; }
+    const processed = new Set(processedIds);
+    const tagged = new Set(taggedIds);
+    const newlySettled = liveOrders
+      .filter(o => tagged.has(o.id) && !processed.has(o.id) && (o.status === "settled_win" || o.status === "settled_loss"))
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    if (!newlySettled.length) return;
+
+    let nextLosses = autoOddsLosses;
+    for (const o of newlySettled) {
+      processed.add(o.id);
+      nextLosses = o.status === "settled_loss" ? nextLosses + 1 : 0;
+    }
+
+    window.localStorage.setItem("crypto.autoOdds.processedSettles", JSON.stringify(Array.from(processed).slice(-100)));
+    setAutoOddsLosses(nextLosses);
+    if (nextLosses >= 2) {
+      setAutoOdds(false);
+      window.localStorage.setItem("crypto.autoOdds", "off");
+      toast.error("Auto-Odds stopped — 2 losing trades in a row");
+    }
+  }, [liveOrders, autoOddsLosses]);
 
   // Numeric American odds from Kalshi ¢ (favorites negative, dogs positive).
   const centsToAmericanNum = (cents: number): number => {
