@@ -11,7 +11,9 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { getBtcMarkets } from "./cryptoBtc.functions";
+import { getBtcMarkets, computeBtcMarkets } from "./cryptoBtc.functions";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 
 // ── Paper rails (kept for backwards-compat with the existing paper UI) ──
 const MAX_ORDERS_PER_SESSION_PAPER = 5;
