@@ -1621,6 +1621,7 @@ function AutoTradePanel() {
             {autoOdds ? `Odds-Bet ON · $${AUTO_ODDS_STAKE}` : "Odds-Bet OFF"}
           </button>
           {(autoMart || autoOdds) && <MartingaleCountdown windowMs={WINDOW_MS} />}
+
           <ChartVerdictBadge compact />
           <KalshiSentimentBadge s={kalshiSentiment} compact />
           {autoMart && (
