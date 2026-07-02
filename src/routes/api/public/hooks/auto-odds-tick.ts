@@ -193,7 +193,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             // ── 2. WHIPSAW EXIT: for each tracked open order ──
             const { data: openTracked } = await supabaseAdmin
               .from("auto_odds_tracked_orders")
-              .select("id, order_id, entry_side, entry_odds, whipsaw_armed")
+              .select("id, order_id, entry_side, entry_odds, whipsaw_armed, oscillation_count, last_zone")
               .eq("user_id", userId)
               .eq("processed_settle", false);
 
@@ -244,8 +244,40 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 // the loss is still small, before the final-60s lockout.
                 const flipFire = entryAm <= -450 && entryAm >= -750 && curCents <= 65;
 
-                if (whipsawFire || probFire || flipFire) {
-                  const reason = flipFire ? "flip_server" : whipsawFire ? "whipsaw_server" : "prob40_server";
+                // 98¢ take-profit: don't wait for 99/100. Sell as soon as
+                // picked side hits 98¢ implied.
+                const tp98Fire = curCents >= 98;
+
+                // Oscillation exit: odds bouncing between "shallow" (≥ -1000,
+                // i.e. -1000 or lighter like -800/-500/+200) and "deep"
+                // (≤ -4000). Count each zone change; sell on the 3rd crossing.
+                // Middle band (-4000 < am < -1000) does not change zone —
+                // avoids noise from normal drift.
+                let zone: "shallow" | "deep" | null = null;
+                if (curAm >= -1000) zone = "shallow";
+                else if (curAm <= -4000) zone = "deep";
+                let oscCount = t.oscillation_count ?? 0;
+                let newZone = t.last_zone as string | null;
+                if (zone && t.last_zone && zone !== t.last_zone) {
+                  oscCount += 1;
+                  newZone = zone;
+                } else if (zone && !t.last_zone) {
+                  newZone = zone;
+                }
+                if (newZone !== t.last_zone || oscCount !== (t.oscillation_count ?? 0)) {
+                  await supabaseAdmin
+                    .from("auto_odds_tracked_orders")
+                    .update({ oscillation_count: oscCount, last_zone: newZone })
+                    .eq("id", t.id);
+                }
+                const oscFire = oscCount >= 3;
+
+                if (tp98Fire || oscFire || whipsawFire || probFire || flipFire) {
+                  const reason = tp98Fire ? "tp98_server"
+                    : oscFire ? "oscillation_server"
+                    : flipFire ? "flip_server"
+                    : whipsawFire ? "whipsaw_server"
+                    : "prob40_server";
                   try {
                     const res = await sellOddsBetCore(supabaseAdmin as any, userId, o.id, reason);
                     if (res.ok) {
@@ -257,6 +289,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                     }
                   } catch { /* retry next tick */ }
                 }
+
 
               }
             }
