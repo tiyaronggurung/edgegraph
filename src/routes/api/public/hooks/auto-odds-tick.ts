@@ -201,7 +201,9 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                   continue;
                 }
               }
+              } // /if (!overrideActive)
             }
+
 
 
             // ── 2. WHIPSAW EXIT: for each tracked open order ──
