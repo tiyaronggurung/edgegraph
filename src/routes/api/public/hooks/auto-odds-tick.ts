@@ -53,7 +53,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
 
         const { data: enabledUsers } = await supabaseAdmin
           .from("auto_odds_settings")
-          .select("user_id, enabled, consecutive_losses")
+          .select("user_id, enabled, consecutive_losses, dd_override_date")
           .eq("enabled", true);
 
         if (!enabledUsers || enabledUsers.length === 0) {
