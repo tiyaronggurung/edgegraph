@@ -241,7 +241,7 @@ export async function runAutoTradeCore(
         } else {
           // Override side so downstream uses caller's chosen leg (YES/NO ask, insert).
           top = [{ ...found, side: data.forceSide }];
-          skipReasons.push(`force: odds-bet ${data.forceTicker} ${data.forceSide} (model pick ignored)`);
+          skipReasons.push(`odds-bet: ${data.forceTicker} ${data.forceSide} (kalshi odds pick)`);
         }
       } else {
         // Pick the top N markets by strongest model conviction (largest |edge|),
