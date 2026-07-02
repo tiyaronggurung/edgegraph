@@ -1373,7 +1373,7 @@ function AutoTradePanel() {
           enabled: autoOdds,
           consecutive_losses: autoOddsLosses,
           auto_button_type: "odds_bet",
-          stopped_reason: autoOdds ? null : (autoOddsLosses >= 2 ? "two_losses" : null),
+          stopped_reason: autoOdds ? null : (autoOddsLosses >= 3 ? "three_losses" : null),
         }, { onConflict: "user_id" });
 
       } catch { /* non-fatal; client loop still runs */ }
