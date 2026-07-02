@@ -145,17 +145,26 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                     .update({ whipsaw_armed: true })
                     .eq("id", t.id);
                 }
-                if (armed && Math.abs(curAm - entryAm) <= 50) {
+                const whipsawFire = armed && Math.abs(curAm - entryAm) <= 50;
+
+                // 40% implied-prob exit
+                const impliedProb = (am: number) => am < 0 ? (-am) / ((-am) + 100) : 100 / (am + 100);
+                const entryProb = impliedProb(entryAm);
+                const curProb = impliedProb(curAm);
+                const probFire = entryProb > 0 && curProb <= 0.4 * entryProb;
+
+                if (whipsawFire || probFire) {
+                  const reason = whipsawFire ? "whipsaw_server" : "prob40_server";
                   try {
-                    const res = await sellOddsBetCore(supabaseAdmin as any, userId, o.id, "whipsaw_server");
+                    const res = await sellOddsBetCore(supabaseAdmin as any, userId, o.id, reason);
                     if (res.ok) {
                       exits += 1;
                       await supabaseAdmin
                         .from("auto_odds_tracked_orders")
-                        .update({ closed_reason: "whipsaw_server" })
+                        .update({ closed_reason: reason })
                         .eq("id", t.id);
                     }
-                  } catch { /* keep armed; retry next tick */ }
+                  } catch { /* retry next tick */ }
                 }
               }
             }
