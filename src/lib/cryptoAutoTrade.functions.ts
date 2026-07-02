@@ -208,7 +208,7 @@ export async function runAutoTradeCore(
       }
     }
 
-    const result = await getBtcMarkets();
+    const result = await computeBtcMarkets();
     const skipReasons: string[] = [];
 
     // ── Equity-momentum overlay (SPY/QQQ/ES/NQ leading indicator) ──
@@ -344,7 +344,7 @@ export async function runAutoTradeCore(
     let freshProbBySide = new Map<string, number>();
     if (!data.force && candidates.length > 0) {
       try {
-        const fresh = await getBtcMarkets();
+        const fresh = await computeBtcMarkets();
         for (const fm of fresh.markets) {
           const sideProb = fm.side === "YES" ? fm.modelYesProb : 1 - fm.modelYesProb;
           freshProbBySide.set(`${fm.ticker}|${fm.side}`, sideProb);
@@ -606,7 +606,7 @@ export async function autoExitForUser(
   // Fresh model read for flip detection.
   const currentModelProbBySide = new Map<string, number>();
   try {
-    const fresh = await getBtcMarkets();
+    const fresh = await computeBtcMarkets();
     const byTicker = new Map(fresh.markets.map(m => [m.ticker, m]));
     for (const r of rows) {
       const m = byTicker.get(r.ticker);
