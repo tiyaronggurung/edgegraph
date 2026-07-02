@@ -1429,6 +1429,37 @@ function AutoTradePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOdds, marketsQ.data]);
 
+  // Live status for the Auto-Odds panel — computed every render so the user
+  // can see WHY it hasn't fired yet (phase, current YES/NO American odds).
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  useEffect(() => {
+    if (!autoOdds) return;
+    const h = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(h);
+  }, [autoOdds]);
+  const oddsStatus = (() => {
+    if (!autoOdds) return null;
+    const markets = marketsQ.data?.markets ?? [];
+    const active = markets.filter(m => m.secondsToClose > 0 && m.secondsToClose <= 15 * 60 + 60);
+    if (active.length === 0) return { phase: "waiting for market", yesAm: null as number | null, noAm: null as number | null, remaining: 0, ticker: "", strike: 0 };
+    const spotRef = active[0].spot ?? 0;
+    const atm = active.slice().sort((a, b) => Math.abs(a.strike - spotRef) - Math.abs(b.strike - spotRef))[0];
+    const currentWindow = Math.floor(nowMs / WINDOW_MS) * WINDOW_MS;
+    const remainingMs = WINDOW_MS - (nowMs - currentWindow);
+    const yesCents = Math.max(1, Math.min(99, Math.round((atm.yesAsk || atm.yesPrice) * 100)));
+    const noCents = Math.max(1, Math.min(99, Math.round((atm.noAsk || (1 - atm.yesPrice)) * 100)));
+    const yesAm = centsToAmericanNum(yesCents);
+    const noAm = centsToAmericanNum(noCents);
+    const phase =
+      remainingMs > 12 * 60_000 + 30_000 ? "monitoring (>12:30)" :
+      remainingMs > 2 * 60_000 ? "scanning −450 to −750" :
+      remainingMs > 15_000 ? "fallback ≤−300" :
+      remainingMs > 0 ? "final 15s: closest side" : "window closed";
+    return { phase, yesAm, noAm, remaining: Math.max(0, Math.floor(remainingMs / 1000)), ticker: atm.ticker, strike: atm.strike };
+  })();
+
+
+
 
 
   return (
