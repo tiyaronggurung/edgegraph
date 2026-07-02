@@ -333,8 +333,10 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             const yesAm = centsToAmerican(yesCents);
             const noAm = centsToAmerican(noCents);
 
-            const inRange = (a: number) => a <= -450 && a >= -750;
-            const deepFav = (a: number) => a <= -300;
+            // STRICT odds-only entry. HARD CAP: never enter deeper than -750
+            // (i.e. never pay ≥89¢). Model prob is NOT a gate on this path.
+            const inRange = (a: number) => a <= -450 && a >= -750;              // main band 82¢–88¢
+            const fallbackRange = (a: number) => a <= -300 && a >= -750;         // ≤2:00 fallback 75¢–88¢
 
             let pick: { side: "YES" | "NO"; reason: string } | null = null;
             if (remainingMs > 2 * 60_000) {
@@ -343,14 +345,19 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               else if (noIn && !yesIn) pick = { side: "NO", reason: `NO ${noAm} in [-750,-450]` };
               else if (yesIn && noIn) pick = yesAm < noAm ? { side: "YES", reason: `both in-range, YES deeper ${yesAm}` } : { side: "NO", reason: `both in-range, NO deeper ${noAm}` };
             } else if (remainingMs > 15_000) {
-              const yesDeep = deepFav(yesAm), noDeep = deepFav(noAm);
-              if (yesDeep && !noDeep) pick = { side: "YES", reason: `≤2:00 fallback YES ${yesAm}` };
-              else if (noDeep && !yesDeep) pick = { side: "NO", reason: `≤2:00 fallback NO ${noAm}` };
-              else if (yesDeep && noDeep) pick = yesAm < noAm ? { side: "YES", reason: `both ≤-300, YES deeper ${yesAm}` } : { side: "NO", reason: `both ≤-300, NO deeper ${noAm}` };
+              const yesOk = fallbackRange(yesAm), noOk = fallbackRange(noAm);
+              if (yesOk && !noOk) pick = { side: "YES", reason: `≤2:00 fallback YES ${yesAm}` };
+              else if (noOk && !yesOk) pick = { side: "NO", reason: `≤2:00 fallback NO ${noAm}` };
+              else if (yesOk && noOk) pick = yesAm < noAm ? { side: "YES", reason: `≤2:00 both [-750,-300], YES deeper ${yesAm}` } : { side: "NO", reason: `≤2:00 both [-750,-300], NO deeper ${noAm}` };
             } else if (remainingMs > 0) {
-              const distTo = (a: number) => a > -450 ? Math.abs(-450 - a) : a < -750 ? Math.abs(a - -750) : 0;
-              const yd = distTo(yesAm), nd = distTo(noAm);
-              pick = yd <= nd ? { side: "YES", reason: `close-window closest YES ${yesAm}` } : { side: "NO", reason: `close-window closest NO ${noAm}` };
+              // close-window last-resort: still enforce -750 hard cap. If both
+              // sides are deeper than -750 (≥89¢), SKIP — no forced entry.
+              const capOk = (a: number) => a >= -750 && a <= -300;
+              const yesOk = capOk(yesAm), noOk = capOk(noAm);
+              if (yesOk && !noOk) pick = { side: "YES", reason: `close-window YES ${yesAm}` };
+              else if (noOk && !yesOk) pick = { side: "NO", reason: `close-window NO ${noAm}` };
+              else if (yesOk && noOk) pick = yesAm < noAm ? { side: "YES", reason: `close-window both ok, YES deeper ${yesAm}` } : { side: "NO", reason: `close-window both ok, NO deeper ${noAm}` };
+              // else: both outside [-750,-300] → pick stays null → skip
             }
 
             if (!pick) {
@@ -450,18 +457,9 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             };
 
 
-            if (!hasModel) {
-              note = `skipped: no model prob on ${atm.ticker} (Kalshi ${pick.reason})`;
-              await logStudy({ entered: false, hedge_fired: false, note });
-              summary.push({ user_id: userId, entries, exits, stopped, note });
-              continue;
-            }
-            if ((modelSideP as number) < MODEL_MIN) {
-              note = `skipped: model ${((modelSideP as number) * 100).toFixed(1)}% on ${pick.side} < ${(MODEL_MIN * 100).toFixed(0)}% (Kalshi ${pick.reason})`;
-              await logStudy({ entered: false, hedge_fired: false, note });
-              summary.push({ user_id: userId, entries, exits, stopped, note });
-              continue;
-            }
+            // Model prob is intentionally NOT a gate on the odds-bet path.
+            // It is still recorded in the study log below for analysis only.
+
 
             // ── 2-SECOND PERSISTENCE CHECK ──
             // Kalshi odds can flicker in/out of -450/-750 in <1s during
@@ -496,8 +494,11 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               persistOk = sideAm2 <= -450 && sideAm2 >= -750;
               thresholdLabel = "[-750,-450]";
             } else if (remainingMs > 15_000) {
-              persistOk = sideAm2 <= -300;
-              thresholdLabel = "≤-300";
+              persistOk = sideAm2 <= -300 && sideAm2 >= -750;
+              thresholdLabel = "[-750,-300]";
+            } else {
+              persistOk = sideAm2 <= -300 && sideAm2 >= -750;
+              thresholdLabel = "close-window [-750,-300]";
             }
             if (!persistOk) {
               note = `skipped: 2s flicker — ${pick.side} was ${pick.reason}, now ${sideAm2} outside ${thresholdLabel}`;
