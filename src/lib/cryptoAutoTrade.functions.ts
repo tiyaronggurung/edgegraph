@@ -479,7 +479,8 @@ export async function runAutoTradeCore(
       skipReasons: skipReasons.slice(0, 20),
       orders: placed,
     };
-  });
+}
+
 
 export const listAutoTradeOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
