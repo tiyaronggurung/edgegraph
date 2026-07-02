@@ -106,6 +106,7 @@ export type Database = {
           auto_button_type: string | null
           consecutive_losses: number
           created_at: string
+          dd_override_date: string | null
           enabled: boolean
           last_tick_at: string | null
           stopped_reason: string | null
@@ -116,6 +117,7 @@ export type Database = {
           auto_button_type?: string | null
           consecutive_losses?: number
           created_at?: string
+          dd_override_date?: string | null
           enabled?: boolean
           last_tick_at?: string | null
           stopped_reason?: string | null
@@ -126,6 +128,7 @@ export type Database = {
           auto_button_type?: string | null
           consecutive_losses?: number
           created_at?: string
+          dd_override_date?: string | null
           enabled?: boolean
           last_tick_at?: string | null
           stopped_reason?: string | null
