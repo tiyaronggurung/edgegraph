@@ -144,6 +144,57 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 .eq("user_id", userId);
             }
 
+            // ── 1b. DAILY 25% PEAK-DRAWDOWN STOP ──
+            // Sum today's realized P&L (ET calendar day) across tracked
+            // orders, run peak-tracking on the chronological trajectory,
+            // stop if current is ≥25% below peak. No new tables — recomputed
+            // each tick. User re-enables via the Auto-Odds button.
+            {
+              const nowD = new Date();
+              const partsD = new Intl.DateTimeFormat("en-US", {
+                timeZone: "America/New_York",
+                year: "numeric", month: "2-digit", day: "2-digit",
+                hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+              }).formatToParts(nowD);
+              const getP = (t: string) => partsD.find(p => p.type === t)?.value ?? "0";
+              const yy = +getP("year"), mo = +getP("month"), dd = +getP("day");
+              const hh2 = +getP("hour"), mi2 = +getP("minute"), ss2 = +getP("second");
+              const wallUtc = Date.UTC(yy, mo - 1, dd, hh2, mi2, ss2);
+              const offset = wallUtc - nowD.getTime();
+              const etMidnightUtc = new Date(Date.UTC(yy, mo - 1, dd, 0, 0, 0) - offset);
+
+              const { data: todayTracked } = await supabaseAdmin
+                .from("auto_odds_tracked_orders")
+                .select("order_id")
+                .eq("user_id", userId)
+                .gte("created_at", etMidnightUtc.toISOString());
+              const todayIds = (todayTracked ?? []).map((r: any) => r.order_id);
+              if (todayIds.length > 0) {
+                const { data: settledToday } = await supabaseAdmin
+                  .from("auto_trade_orders")
+                  .select("id, pnl_usd, settled_at, status")
+                  .in("id", todayIds)
+                  .in("status", ["settled_win", "settled_loss"])
+                  .not("settled_at", "is", null)
+                  .order("settled_at", { ascending: true });
+
+                let running = 0, peak = 0;
+                for (const r of (settledToday ?? []) as any[]) {
+                  running += Number(r.pnl_usd ?? 0);
+                  if (running > peak) peak = running;
+                }
+                if (peak > 0 && (peak - running) / peak >= 0.25) {
+                  await supabaseAdmin
+                    .from("auto_odds_settings")
+                    .update({ enabled: false, stopped_reason: "daily_drawdown_25", last_tick_at: new Date().toISOString() })
+                    .eq("user_id", userId);
+                  stopped = true;
+                  summary.push({ user_id: userId, entries, exits, stopped, note: `stopped: DD peak=$${peak.toFixed(0)} now=$${running.toFixed(0)}` });
+                  continue;
+                }
+              }
+            }
+
 
             // ── 2. WHIPSAW EXIT: for each tracked open order ──
             const { data: openTracked } = await supabaseAdmin
