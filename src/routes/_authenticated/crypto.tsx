@@ -8,6 +8,7 @@ import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.f
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades, checkKalshiBalance, diagnoseKalshiAuth, type KalshiDiagStep } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats, getCalibrationReport, type CalibrationRow } from "@/lib/cryptoPredictions.functions";
 import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, autoExitLivePositions, settleAutoTradeSkipLog, getSkipReport, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
+import { diagnoseRecentMisses, studyMissesWithAI, getLatestStudy, type StudyRecommendation } from "@/lib/cryptoMisses.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { EquityMomentumPanel } from "@/components/EquityMomentumPanel";
@@ -2013,6 +2014,8 @@ function CryptoPage() {
 
           <CalibrationReportPanel />
 
+          <ModelStudyPanel />
+
           <ModelAccuracyPanel />
 
           <EquityMomentumPanel />
@@ -2197,5 +2200,114 @@ function MartingaleCountdown({ windowMs }: { windowMs: number }) {
     >
       next fire in {mm}:{ss}
     </span>
+  );
+}
+
+function ModelStudyPanel() {
+  const qc = useQueryClient();
+  const latestFn = useServerFn(getLatestStudy);
+  const diagFn = useServerFn(diagnoseRecentMisses);
+  const studyFn = useServerFn(studyMissesWithAI);
+  const [running, setRunning] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const q = useQuery({
+    queryKey: ["crypto-latest-study"],
+    queryFn: () => latestFn(),
+    staleTime: 30_000,
+  });
+
+  const run = async () => {
+    setRunning(true);
+    setErr(null);
+    try {
+      const d = await diagFn();
+      toast.success(`Diagnosed ${d.diagnosed} new miss${d.diagnosed === 1 ? "" : "es"}`);
+      const s = await studyFn();
+      if (s.ran) toast.success("AI study complete");
+      else toast.message(s.reason ?? "Study skipped");
+      await qc.invalidateQueries({ queryKey: ["crypto-latest-study"] });
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      setErr(msg);
+      toast.error(msg);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const study = q.data?.study ?? null;
+  const newSince = q.data?.newMissesSinceStudy ?? 0;
+
+  return (
+    <div className="border border-border rounded-lg bg-card p-3 space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Model study · why we got picks wrong
+          </div>
+          {study && (
+            <div className="text-[10px] text-muted-foreground mt-0.5">
+              Last run {new Date(study.created_at).toLocaleString()} · {study.misses_analyzed} misses / {study.wins_analyzed} wins
+              {newSince > 0 && <span className="ml-2 text-amber-400">· {newSince} new miss{newSince === 1 ? "" : "es"} since</span>}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={run}
+          disabled={running}
+          className="text-xs px-3 py-1.5 rounded border border-border bg-muted/40 hover:bg-muted disabled:opacity-50 flex items-center gap-1.5"
+        >
+          {running ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+          {running ? "Studying…" : study ? "Re-run study" : "Diagnose & study losses"}
+        </button>
+      </div>
+
+      {err && <div className="text-xs text-red-400">{err}</div>}
+
+      {!study && !running && (
+        <div className="text-xs text-muted-foreground">
+          No AI study yet. Click above to diagnose recent losses and run a Gemini analysis of what went wrong.
+        </div>
+      )}
+
+      {study && (
+        <>
+          <div className="text-xs text-foreground/90 leading-relaxed">{study.summary}</div>
+
+          {study.dominant_failures.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {study.dominant_failures.map((f, i) => (
+                <span key={i} className="text-[10px] px-2 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300">
+                  {f}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {study.recommendations.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Recommendations</div>
+              {study.recommendations.map((r: StudyRecommendation, i: number) => {
+                const pColor = r.priority === "high" ? "border-red-500/50 text-red-300 bg-red-500/10"
+                  : r.priority === "medium" ? "border-amber-500/50 text-amber-300 bg-amber-500/10"
+                  : "border-border text-muted-foreground bg-muted/30";
+                return (
+                  <div key={i} className="border border-border/60 rounded p-2 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${pColor}`}>{r.priority}</span>
+                      <span className="text-xs font-mono text-foreground/90">{r.gate}</span>
+                      <span className="text-[10px] text-muted-foreground">now: {r.currentSetting}</span>
+                    </div>
+                    <div className="text-xs text-emerald-300">→ {r.suggested}</div>
+                    <div className="text-[11px] text-muted-foreground leading-snug">{r.rationale}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
