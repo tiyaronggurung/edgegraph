@@ -1590,6 +1590,7 @@ function AutoTradePanel() {
 
     const tick = async () => {
       if (cancelled || inFlight) return;
+      if (isKalshiMaintenanceWindow()) return; // Kalshi Thu 02:30–05:30 ET
       let oids: string[] = [];
       try {
         const raw = window.localStorage.getItem("crypto.autoOdds.oids");
