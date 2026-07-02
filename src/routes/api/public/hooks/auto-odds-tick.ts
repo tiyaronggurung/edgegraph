@@ -256,15 +256,13 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 // the loss is still small, before the final-60s lockout.
                 const flipFire = entryAm <= -450 && entryAm >= -750 && curCents <= 65;
 
-                // 98¢ take-profit: don't wait for 99/100. Sell as soon as
-                // picked side hits 98¢ implied.
-                const tp98Fire = curCents >= 98;
+                // Take-profit: sell as soon as picked side hits `tpCents`
+                // (default 98¢; AI can tune 95-99).
+                const tp98Fire = curCents >= T.tpCents;
 
-                // Oscillation exit: odds bouncing between "shallow" (≥ -1000,
-                // i.e. -1000 or lighter like -800/-500/+200) and "deep"
-                // (≤ -4000). Count each zone change; sell on the 3rd crossing.
-                // Middle band (-4000 < am < -1000) does not change zone —
-                // avoids noise from normal drift.
+                // Oscillation exit: odds bouncing between "shallow" (≥ -1000)
+                // and "deep" (≤ -4000). Count each zone change; sell on the
+                // `oscMax`-th crossing (default 3; AI can tune 2-5).
                 let zone: "shallow" | "deep" | null = null;
                 if (curAm >= -1000) zone = "shallow";
                 else if (curAm <= -4000) zone = "deep";
@@ -282,7 +280,8 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                     .update({ oscillation_count: oscCount, last_zone: newZone })
                     .eq("id", t.id);
                 }
-                const oscFire = oscCount >= 3;
+                const oscFire = oscCount >= T.oscMax;
+
 
                 if (tp98Fire || oscFire || whipsawFire || probFire || flipFire) {
                   const reason = tp98Fire ? "tp98_server"
