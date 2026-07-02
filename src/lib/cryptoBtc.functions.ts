@@ -687,8 +687,10 @@ function optionsImpliedProb(
 
 
 
-export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
-  async (): Promise<BtcMarketsResult> => {
+// Internal implementation, callable from any server-side context (including
+// public server routes without auth). getBtcMarkets is a thin wrapper.
+export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
+
     const [evJson, candles] = await Promise.all([
       kalshiFetch(`/events?status=open&with_nested_markets=true&series_ticker=KXBTC15M&limit=50`),
       fetchBtcCandles().catch(() => [] as BtcCandle[]),
