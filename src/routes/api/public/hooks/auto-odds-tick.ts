@@ -457,18 +457,9 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             };
 
 
-            if (!hasModel) {
-              note = `skipped: no model prob on ${atm.ticker} (Kalshi ${pick.reason})`;
-              await logStudy({ entered: false, hedge_fired: false, note });
-              summary.push({ user_id: userId, entries, exits, stopped, note });
-              continue;
-            }
-            if ((modelSideP as number) < MODEL_MIN) {
-              note = `skipped: model ${((modelSideP as number) * 100).toFixed(1)}% on ${pick.side} < ${(MODEL_MIN * 100).toFixed(0)}% (Kalshi ${pick.reason})`;
-              await logStudy({ entered: false, hedge_fired: false, note });
-              summary.push({ user_id: userId, entries, exits, stopped, note });
-              continue;
-            }
+            // Model prob is intentionally NOT a gate on the odds-bet path.
+            // It is still recorded in the study log below for analysis only.
+
 
             // ── 2-SECOND PERSISTENCE CHECK ──
             // Kalshi odds can flicker in/out of -450/-750 in <1s during
