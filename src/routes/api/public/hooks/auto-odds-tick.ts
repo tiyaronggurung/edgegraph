@@ -129,10 +129,10 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               }
             }
 
-            if (losses >= 2) {
+            if (losses >= 3) {
               await supabaseAdmin
                 .from("auto_odds_settings")
-                .update({ enabled: false, consecutive_losses: losses, stopped_reason: "two_losses", last_tick_at: new Date().toISOString() })
+                .update({ enabled: false, consecutive_losses: losses, stopped_reason: "three_losses", last_tick_at: new Date().toISOString() })
                 .eq("user_id", userId);
               stopped = true;
               summary.push({ user_id: userId, entries, exits, stopped, note: "stopped: 2 losses" });

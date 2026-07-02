@@ -1373,7 +1373,7 @@ function AutoTradePanel() {
           enabled: autoOdds,
           consecutive_losses: autoOddsLosses,
           auto_button_type: "odds_bet",
-          stopped_reason: autoOdds ? null : (autoOddsLosses >= 2 ? "two_losses" : null),
+          stopped_reason: autoOdds ? null : (autoOddsLosses >= 3 ? "three_losses" : null),
         }, { onConflict: "user_id" });
 
       } catch { /* non-fatal; client loop still runs */ }
@@ -1402,8 +1402,20 @@ function AutoTradePanel() {
           if (typeof window !== "undefined") {
             window.localStorage.setItem("crypto.autoOdds", row.enabled ? "on" : "off");
           }
-          if (!row.enabled && row.stopped_reason === "two_losses") {
-            toast.error("Auto-Odds stopped by server — 2 losing trades in a row");
+          if (!row.enabled && row.stopped_reason === "three_losses") {
+            toast.error("Auto-Odds stopped by server — 3 losing trades in a row", {
+              duration: 30_000,
+              action: {
+                label: "Re-enable",
+                onClick: () => {
+                  setAutoOdds(true);
+                  setAutoOddsLosses(0);
+                  if (typeof window !== "undefined") {
+                    window.localStorage.setItem("crypto.autoOdds", "on");
+                  }
+                },
+              },
+            });
           }
           if (!row.enabled && row.stopped_reason === "daily_5_losses") {
             toast.error("Auto-Odds stopped — 5 losing trades today. Locked until midnight ET.");
@@ -1460,10 +1472,20 @@ function AutoTradePanel() {
 
     window.localStorage.setItem("crypto.autoOdds.processedSettles", JSON.stringify(Array.from(processed).slice(-100)));
     setAutoOddsLosses(nextLosses);
-    if (nextLosses >= 2) {
+    if (nextLosses >= 3) {
       setAutoOdds(false);
       window.localStorage.setItem("crypto.autoOdds", "off");
-      toast.error("Auto-Odds stopped — 2 losing trades in a row");
+      toast.error("Auto-Odds stopped — 3 losing trades in a row", {
+        duration: 30_000,
+        action: {
+          label: "Re-enable",
+          onClick: () => {
+            setAutoOdds(true);
+            setAutoOddsLosses(0);
+            window.localStorage.setItem("crypto.autoOdds", "on");
+          },
+        },
+      });
     }
   }, [liveOrders, autoOddsLosses]);
 
