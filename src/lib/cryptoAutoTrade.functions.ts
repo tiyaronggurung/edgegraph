@@ -862,6 +862,140 @@ export const autoExitLivePositions = createServerFn({ method: "POST" })
     return autoExitForUser(supabase, userId);
   });
 
+// ── Targeted market sell for a single auto_trade_orders row ──────────────
+// Used by the Odds-Bet whipsaw exit on the client. Sells the row's remaining
+// contracts at current market bid via a Kalshi IOC. Updates row status and
+// pnl using the same conventions as autoExitForUser.
+export const sellOddsBetOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderId: string; reason?: string }) => {
+    if (!data?.orderId || typeof data.orderId !== "string") throw new Error("orderId required");
+    return { orderId: data.orderId, reason: data.reason ?? "whipsaw_exit" };
+  })
+  .handler(async ({ data, context }): Promise<{ ok: boolean; message: string; pnlUsd?: number }> => {
+    const { supabase, userId } = context;
+    const liveEnabled = process.env.KALSHI_LIVE_ENABLED === "true";
+
+    const { data: row, error: rErr } = await supabase
+      .from("auto_trade_orders")
+      .select("id, ticker, side, mode, contracts, contracts_remaining, entry_price_cents, limit_cents, partial_pnl_usd, status, close_time")
+      .eq("id", data.orderId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (rErr || !row) return { ok: false, message: "order not found" };
+    if (row.status !== "placed") return { ok: false, message: `status is ${row.status}` };
+    const remaining = row.contracts_remaining ?? row.contracts;
+    if (remaining <= 0) return { ok: false, message: "no contracts remaining" };
+    const entry = row.entry_price_cents ?? row.limit_cents;
+
+    // Claim the row so no other exit path double-sells.
+    const { data: claimed } = await supabase
+      .from("auto_trade_orders")
+      .update({ status: "closing" })
+      .eq("id", row.id)
+      .eq("status", "placed")
+      .select("id")
+      .maybeSingle();
+    if (!claimed) return { ok: false, message: "claim lost — already closing" };
+
+    // Fetch fresh Kalshi quote for the sell price.
+    let yesBid = 0, yesAsk = 0;
+    try {
+      const qres = await fetch(`${KALSHI_PUBLIC_BASE}/markets/${encodeURIComponent(row.ticker)}`, { headers: { Accept: "application/json" } });
+      const qj: any = await qres.json();
+      yesBid = Math.round(Number(qj?.market?.yes_bid ?? 0));
+      yesAsk = Math.round(Number(qj?.market?.yes_ask ?? 0));
+    } catch { /* fallthrough */ }
+    if (yesBid <= 0 || yesAsk <= 0) {
+      await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", row.id);
+      return { ok: false, message: "no live quote" };
+    }
+    const sellCents = row.side === "YES" ? yesBid : (100 - yesAsk);
+    const bounded = Math.max(1, Math.min(99, sellCents));
+
+    // Paper: simulated fill.
+    if (row.mode === "paper") {
+      const pnl = ((bounded - entry) / 100) * remaining + Number(row.partial_pnl_usd ?? 0);
+      await supabase.from("auto_trade_orders").update({
+        status: pnl > 0 ? "settled_win" : "settled_loss",
+        settle_price: bounded / 100,
+        pnl_usd: pnl,
+        partial_pnl_usd: pnl,
+        contracts_remaining: 0,
+        settled_at: new Date().toISOString(),
+      }).eq("id", row.id);
+      return { ok: true, message: `paper sold ${remaining}@${bounded}¢ · pnl $${pnl.toFixed(2)}`, pnlUsd: pnl };
+    }
+
+    if (!liveEnabled) {
+      await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", row.id);
+      return { ok: false, message: "KALSHI_LIVE_ENABLED not true" };
+    }
+
+    // Live: IOC market sell.
+    try {
+      const { signKalshi } = await import("./cryptoTrades.functions");
+      const path = "/portfolio/events/orders";
+      const headers = await signKalshi("POST", path);
+      const priceDollars = (row.side === "YES" ? bounded : 100 - bounded) / 100;
+      const body = {
+        ticker: row.ticker,
+        action: "sell",
+        side: row.side === "YES" ? "ask" : "bid",
+        type: "limit",
+        count: String(remaining),
+        price: priceDollars.toFixed(4),
+        time_in_force: "immediate_or_cancel",
+        self_trade_prevention_type: "taker_at_cross",
+        client_order_id: `${data.reason}-${row.id}-${Date.now()}`.slice(0, 64),
+      };
+      const res = await fetch(`${KALSHI_PUBLIC_BASE}${path}`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(body),
+      });
+      const j: any = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", row.id);
+        return { ok: false, message: `kalshi ${res.status}: ${j?.error?.message ?? "err"}` };
+      }
+      const fillCount = Number(j?.order?.fill_count ?? j?.fill_count ?? 0);
+      const avgFillDollars = Number(j?.order?.average_fill_price ?? j?.average_fill_price ?? 0);
+      if (!Number.isFinite(fillCount) || fillCount <= 0) {
+        await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", row.id);
+        return { ok: false, message: `0-fill IOC @ ${bounded}¢` };
+      }
+      const filledCents = avgFillDollars > 0
+        ? Math.round(avgFillDollars * (row.side === "YES" ? 100 : -100) + (row.side === "YES" ? 0 : 100))
+        : bounded;
+      const tierPnl = ((filledCents - entry) / 100) * fillCount;
+      const newPartial = Number(row.partial_pnl_usd ?? 0) + tierPnl;
+      const newRemaining = Math.max(0, remaining - fillCount);
+      if (newRemaining === 0) {
+        await supabase.from("auto_trade_orders").update({
+          status: newPartial > 0 ? "settled_win" : "settled_loss",
+          settle_price: filledCents / 100,
+          pnl_usd: newPartial,
+          partial_pnl_usd: newPartial,
+          contracts_remaining: 0,
+          settled_at: new Date().toISOString(),
+        }).eq("id", row.id);
+        return { ok: true, message: `sold ${fillCount}@${filledCents}¢ · pnl $${newPartial.toFixed(2)}`, pnlUsd: newPartial };
+      }
+      await supabase.from("auto_trade_orders").update({
+        status: "placed",
+        partial_pnl_usd: newPartial,
+        contracts_remaining: newRemaining,
+      }).eq("id", row.id);
+      return { ok: true, message: `partial sold ${fillCount}/${remaining}@${filledCents}¢ · rem ${newRemaining}`, pnlUsd: newPartial };
+    } catch (e: any) {
+      await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", row.id);
+      return { ok: false, message: `err ${e?.message ?? "x"}` };
+    }
+  });
+
+
+
 // ── #7 Counterfactual settle sweep ────────────────────────────────────────
 // For every skipped signal whose close_time has passed, look up the real BTC
 // close price and record whether the trade WOULD have won (and its would-be
