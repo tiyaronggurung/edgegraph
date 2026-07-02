@@ -15,6 +15,7 @@ import { computeBtcMarkets } from "@/lib/cryptoBtc.functions";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const AUTO_ODDS_STAKE = 100;
+const HEDGE_STAKE = 5; // Coinflip hedge: $5 on opposite side when model disagrees with Kalshi pick.
 
 // American odds from Kalshi ¢ (favorites negative, dogs positive).
 function centsToAmerican(cents: number): number {
@@ -338,6 +339,41 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                   entry_odds: centsToAmerican(entryCents),
                 });
               note = `entered ${placed.ticker} ${placed.side} @ ${entryCents}¢ (${pick.reason})`;
+
+              // ── 3b. COINFLIP HEDGE ──
+              // If our model disagrees with Kalshi's picked side, place a small
+              // $5 hedge on the OPPOSITE side. Not inserted into
+              // auto_odds_tracked_orders — so it does NOT count toward the
+              // 2-loss tail stop, the daily 5-loss cap, or trigger whipsaw
+              // exits. Pure settlement hedge for coinflip-style situations.
+              try {
+                const modelYes = atm.modelYesProb;
+                if (typeof modelYes === "number" && Number.isFinite(modelYes)) {
+                  const kalshiPickYES = pick.side === "YES";
+                  const modelPickYES = modelYes >= 0.5;
+                  const disagree = kalshiPickYES !== modelPickYES;
+                  if (disagree) {
+                    const oppSide: "YES" | "NO" = pick.side === "YES" ? "NO" : "YES";
+                    const hedgeRes = await runAutoTradeCore(supabaseAdmin as any, userId, {
+                      mode: "live",
+                      confirm: "I_UNDERSTAND_LIVE",
+                      force: true,
+                      isMartingale: false,
+                      maxOrders: 1,
+                      stakeUsd: HEDGE_STAKE,
+                      forceTicker: atm.ticker,
+                      forceSide: oppSide,
+                    });
+                    if (hedgeRes.placed > 0) {
+                      note += ` · hedge ${oppSide} $${HEDGE_STAKE} (model ${(modelYes * 100).toFixed(0)}%)`;
+                    } else {
+                      note += ` · hedge skipped: ${hedgeRes.skipReasons.slice(0, 1).join("") || "no fill"}`;
+                    }
+                  }
+                }
+              } catch (e: any) {
+                note += ` · hedge err: ${e?.message?.slice(0, 60) ?? "err"}`;
+              }
             } else {
               note = `skipped: ${placeResult.skipReasons.slice(0, 2).join(" · ") || "no fill"}`;
             }
