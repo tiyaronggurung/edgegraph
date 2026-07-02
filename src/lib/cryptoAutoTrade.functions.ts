@@ -138,7 +138,7 @@ export const runAutoTrade = createServerFn({ method: "POST" })
         .eq("mode", "live")
         .gte("created_at", dayAgo);
       const liveCount24h = (liveRecent ?? []).length;
-      if (liveCount24h >= LIVE_DAILY_ORDER_CAP) {
+      if (!data.force && liveCount24h >= LIVE_DAILY_ORDER_CAP) {
         return {
           sessionId, mode: data.mode, attempted: 0, placed: 0, skipped: 1,
           skipReasons: [`Daily live order cap reached (${LIVE_DAILY_ORDER_CAP} in last 24h). Auto-trade paused.`],
