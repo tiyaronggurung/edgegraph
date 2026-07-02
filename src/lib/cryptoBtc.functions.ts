@@ -769,7 +769,27 @@ export const getBtcMarkets = createServerFn({ method: "GET" }).handler(
     for (const e of events) {
       for (const m of e.markets ?? []) {
         if (m.status !== "active") continue;
-        const strike = Number(m.floor_strike ?? 0);
+        // Kalshi BTC 15m markets carry the level in different fields depending
+        // on market type: "above" uses floor_strike, "below" uses cap_strike,
+        // and some payloads only put the number in the human subtitle (e.g.
+        // "Above $109,750.00"). Fall back through all of them so we never
+        // silently treat a real market as strike=0 (which would render "$0" in
+        // Top Pick and poison the model prob).
+        const parseSubtitleStrike = (s: unknown): number => {
+          if (typeof s !== "string") return 0;
+          const match = s.match(/\$([\d,]+(?:\.\d+)?)/);
+          if (!match) return 0;
+          const n = Number(match[1].replace(/,/g, ""));
+          return Number.isFinite(n) ? n : 0;
+        };
+        const strike =
+          Number(m.floor_strike) ||
+          Number((m as { cap_strike?: number | string }).cap_strike) ||
+          Number((m as { strike?: number | string }).strike) ||
+          parseSubtitleStrike(m.yes_sub_title) ||
+          parseSubtitleStrike((m as { title?: string }).title) ||
+          0;
+        if (!(strike > 0)) continue; // skip malformed rows instead of publishing strike=$0
         const yesPrice = Number(m.last_price_dollars ?? m.yes_bid_dollars ?? 0);
         const openTime = m.open_time ?? null;
         const closeTime = m.close_time ?? m.expected_expiration_time ?? null;
