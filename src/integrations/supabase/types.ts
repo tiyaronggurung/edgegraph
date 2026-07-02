@@ -103,32 +103,56 @@ export type Database = {
       }
       auto_odds_settings: {
         Row: {
+          auto_apply_studies: boolean
           auto_button_type: string | null
           consecutive_losses: number
           created_at: string
           enabled: boolean
+          hedge_band_hi: number | null
+          hedge_band_lo: number | null
           last_tick_at: string | null
+          model_gate_min: number | null
+          oscillation_max: number | null
+          skip_bucket_15_60s: boolean | null
+          skip_bucket_lt15s: boolean | null
           stopped_reason: string | null
+          tp_cents: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          auto_apply_studies?: boolean
           auto_button_type?: string | null
           consecutive_losses?: number
           created_at?: string
           enabled?: boolean
+          hedge_band_hi?: number | null
+          hedge_band_lo?: number | null
           last_tick_at?: string | null
+          model_gate_min?: number | null
+          oscillation_max?: number | null
+          skip_bucket_15_60s?: boolean | null
+          skip_bucket_lt15s?: boolean | null
           stopped_reason?: string | null
+          tp_cents?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          auto_apply_studies?: boolean
           auto_button_type?: string | null
           consecutive_losses?: number
           created_at?: string
           enabled?: boolean
+          hedge_band_hi?: number | null
+          hedge_band_lo?: number | null
           last_tick_at?: string | null
+          model_gate_min?: number | null
+          oscillation_max?: number | null
+          skip_bucket_15_60s?: boolean | null
+          skip_bucket_lt15s?: boolean | null
           stopped_reason?: string | null
+          tp_cents?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -141,6 +165,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      auto_odds_studies: {
+        Row: {
+          applied_tunings: Json
+          created_at: string
+          findings: Json
+          id: string
+          model: string | null
+          raw: Json | null
+          rows_analyzed: number | null
+          summary: string | null
+          tunings: Json
+          user_id: string
+        }
+        Insert: {
+          applied_tunings?: Json
+          created_at?: string
+          findings?: Json
+          id?: string
+          model?: string | null
+          raw?: Json | null
+          rows_analyzed?: number | null
+          summary?: string | null
+          tunings?: Json
+          user_id: string
+        }
+        Update: {
+          applied_tunings?: Json
+          created_at?: string
+          findings?: Json
+          id?: string
+          model?: string | null
+          raw?: Json | null
+          rows_analyzed?: number | null
+          summary?: string | null
+          tunings?: Json
+          user_id?: string
+        }
+        Relationships: []
       }
       auto_odds_study_log: {
         Row: {
@@ -279,6 +342,56 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      auto_odds_tuning_audit: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          id: string
+          new_value: Json | null
+          param: string
+          prev_value: Json | null
+          rationale: string | null
+          reverted_at: string | null
+          source: string
+          study_id: string | null
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          new_value?: Json | null
+          param: string
+          prev_value?: Json | null
+          rationale?: string | null
+          reverted_at?: string | null
+          source?: string
+          study_id?: string | null
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          new_value?: Json | null
+          param?: string
+          prev_value?: Json | null
+          rationale?: string | null
+          reverted_at?: string | null
+          source?: string
+          study_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_odds_tuning_audit_study_id_fkey"
+            columns: ["study_id"]
+            isOneToOne: false
+            referencedRelation: "auto_odds_studies"
             referencedColumns: ["id"]
           },
         ]
