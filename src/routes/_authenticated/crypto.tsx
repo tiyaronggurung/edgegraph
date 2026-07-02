@@ -7,7 +7,7 @@ import { playOrderPlaced, playOrderFilled } from "@/lib/orderSounds";
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades, checkKalshiBalance, diagnoseKalshiAuth, type KalshiDiagStep } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats, getCalibrationReport, type CalibrationRow } from "@/lib/cryptoPredictions.functions";
-import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, autoExitLivePositions, settleAutoTradeSkipLog, getSkipReport, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
+import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, autoExitLivePositions, settleAutoTradeSkipLog, getSkipReport, sellOddsBetOrder, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
 import { recordOddsTape } from "@/lib/oddsTape.functions";
 import { diagnoseRecentMisses, studyMissesWithAI, getLatestStudy, setRecommendationFeedback, type StudyRecommendation } from "@/lib/cryptoMisses.functions";
 import { recomputeShadowSim, getShadowSimReport, type ShadowSimGateStat } from "@/lib/cryptoShadowSim.functions";
@@ -687,6 +687,7 @@ function AutoTradePanel() {
   const runFn = useServerFn(runAutoTrade);
   const balanceFn = useServerFn(checkKalshiBalance);
   const diagFn = useServerFn(diagnoseKalshiAuth);
+  const sellOddsFn = useServerFn(sellOddsBetOrder);
   // Read the shared btc-markets cache populated by CryptoPage. React Query
   // dedupes by key — no extra fetch, we just subscribe to updates.
   const marketsFn = useServerFn(getBtcMarkets);
@@ -1348,6 +1349,13 @@ function AutoTradePanel() {
         const o = res.orders[0];
         if (soundOn) { playOrderPlaced(); setTimeout(() => playOrderFilled(), 200); }
         toast.success(`Odds-bet $${AUTO_ODDS_STAKE}: ${side === "YES" ? "UP" : "DOWN"} ${ticker} @ ${o.limit_cents}¢ — ${reason}`);
+        // Tag this order as an odds-bet trade so the whipsaw-exit watcher owns it.
+        try {
+          const raw = window.localStorage.getItem("crypto.autoOdds.oids");
+          const oids: string[] = raw ? JSON.parse(raw) : [];
+          if (o.id && !oids.includes(o.id)) oids.push(o.id);
+          window.localStorage.setItem("crypto.autoOdds.oids", JSON.stringify(oids.slice(-50)));
+        } catch { /* ignore */ }
         qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
         return o.id ?? null;
       }
@@ -1430,6 +1438,85 @@ function AutoTradePanel() {
     return () => { cancelled = true; clearInterval(h); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOdds, marketsQ.data]);
+
+  // ── Whipsaw exit for Odds-Bet trades ──────────────────────────────────────
+  // Rule: after entry, once current American odds move ≥200 away from entry
+  // in EITHER direction AND then return to within ±50 of entry, market-sell
+  // whatever contracts remain. Disabled in the final 60s of the window.
+  // Only touches orders tagged via crypto.autoOdds.oids. Model + martingale
+  // trades are untouched.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    let inFlight = false;
+
+    const tick = async () => {
+      if (cancelled || inFlight) return;
+      let oids: string[] = [];
+      try {
+        const raw = window.localStorage.getItem("crypto.autoOdds.oids");
+        oids = raw ? JSON.parse(raw) : [];
+      } catch { oids = []; }
+      if (oids.length === 0) return;
+
+      // Match orders still open (not settled, still holding contracts).
+      const openOdds = liveOrders.filter(o =>
+        oids.includes(o.id)
+        && o.status !== "settled_win" && o.status !== "settled_loss" && o.status !== "cancelled" && o.status !== "sold"
+        && (o.contracts_remaining ?? o.contracts) > 0
+        && o.entry_price_cents != null,
+      );
+      if (openOdds.length === 0) return;
+
+      const markets = marketsQ.data?.markets ?? [];
+
+      for (const o of openOdds) {
+        const m = markets.find(mm => mm.ticker === o.ticker);
+        if (!m) continue;
+        if (m.secondsToClose <= 60) continue; // C: disable in final 60s
+
+        const entryCents = o.entry_price_cents ?? o.limit_cents;
+        const entryAm = centsToAmericanNum(entryCents);
+        const curCentsSide = o.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice));
+        const curCents = Math.max(1, Math.min(99, Math.round(curCentsSide * 100)));
+        const curAm = centsToAmericanNum(curCents);
+
+        const stateKey = `crypto.autoOdds.wsState.${o.id}`;
+        let extremeHit = window.localStorage.getItem(stateKey) === "1";
+        if (!extremeHit && Math.abs(curAm - entryAm) >= 200) {
+          extremeHit = true;
+          window.localStorage.setItem(stateKey, "1");
+        }
+
+        if (extremeHit && Math.abs(curAm - entryAm) <= 50) {
+          inFlight = true;
+          try {
+            const remaining = o.contracts_remaining ?? o.contracts;
+            const res = await sellOddsFn({ data: { orderId: o.id, reason: "whipsaw" } });
+            if (res.ok) {
+              toast.info(`Odds-bet whipsaw exit: ${o.ticker} ${o.side === "YES" ? "UP" : "DOWN"} · ${res.message} (entry ${entryAm}, cur ${curAm})`);
+              window.localStorage.removeItem(stateKey);
+              qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
+            } else {
+              // Keep state; retry next tick unless order settled.
+              console.warn("whipsaw sell skipped:", res.message);
+            }
+            void remaining;
+          } catch (e: any) {
+            console.error("odds-bet whipsaw exit failed", e);
+          }
+          inFlight = false;
+        }
+      }
+    };
+
+    tick();
+    const h = setInterval(tick, 5_000);
+    return () => { cancelled = true; clearInterval(h); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveOrders, marketsQ.data]);
+
+
 
   // Live status for the Auto-Odds panel — computed every render so the user
   // can see WHY it hasn't fired yet (phase, current YES/NO American odds).
