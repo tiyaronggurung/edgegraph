@@ -86,6 +86,17 @@ export interface AutoTradeRunResult {
   orders: AutoTradeOrderRow[];
 }
 
+export type RunAutoTradeInput = {
+  mode: "paper" | "live";
+  confirm: string;
+  force: boolean;
+  isMartingale: boolean;
+  maxOrders: number;
+  stakeUsd: number;
+  forceTicker: string | undefined;
+  forceSide: "YES" | "NO" | undefined;
+};
+
 export const runAutoTrade = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { mode?: "paper" | "live"; maxOrders?: number; stakeUsd?: number; confirm?: string; force?: boolean; isMartingale?: boolean; forceTicker?: string; forceSide?: "YES" | "NO" } | undefined) => {
@@ -101,10 +112,18 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       stakeUsd: Math.min(stakeCap, Math.max(1, data?.stakeUsd ?? stakeCap)),
       forceTicker: typeof data?.forceTicker === "string" && data.forceTicker.length > 0 ? data.forceTicker : undefined,
       forceSide: data?.forceSide === "YES" || data?.forceSide === "NO" ? data.forceSide : undefined,
-    };
+    } satisfies RunAutoTradeInput;
   })
-  .handler(async ({ data, context }): Promise<AutoTradeRunResult> => {
-    const { supabase, userId } = context;
+  .handler(async ({ data, context }): Promise<AutoTradeRunResult> =>
+    runAutoTradeCore(context.supabase as SupabaseClient, context.userId, data),
+  );
+
+export async function runAutoTradeCore(
+  supabase: SupabaseClient,
+  userId: string,
+  data: RunAutoTradeInput,
+): Promise<AutoTradeRunResult> {
+
     const sessionId = crypto.randomUUID();
     const isLive = data.mode === "live";
 
