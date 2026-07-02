@@ -1,95 +1,99 @@
 
-# Model Study — closing the learning loop
+# Server-Side Auto-Odds Trading
 
-Three layers, staged so nothing risks live trading until you've seen it work in shadow first.
+Goal: Auto-Odds keeps trading even when your computer is off / browser closed / you're logged out. Driven by a pg_cron job every minute hitting a server route that runs one strategy tick.
 
-## Part A — Vote on recommendations (small)
+## Scope (what moves, what stays)
 
-The `crypto_study_feedback` table and `setRecommendationFeedback` server fn already exist. What's missing is the UI.
+**Moves to server:**
+- Auto-Odds entry loop (place Odds-Bet order when conditions hit)
+- Whipsaw exit watcher (5s → 60s cadence, market-sell tagged orders)
+- 2-consecutive-loss auto-stop
+- All state that lives in `localStorage` today (`crypto.autoOdds.oids`, `crypto.autoOdds.ids`, `crypto.autoOdds.processedSettles`, loss counter, on/off flag)
 
-- Add 👍 / 👎 buttons next to each recommendation in `ModelStudyPanel`.
-- Vote is persisted per (study, recIndex). Existing vote highlights.
-- `studyMissesWithAI` already reads prior votes and passes them to Gemini as "favor up-voted, avoid down-voted" — so voting immediately makes the next study smarter. No backend work needed for A.
+**Stays client-side (untouched):**
+- Martingale auto (per your earlier "Auto-Odds only" scoping)
+- Manual buy / sell / ladder / close
+- Chart rendering, UI toggles, guest flows
+- Sentiment gate + chart gate defaults (still OFF)
 
-## Part B — Shadow-mode gate simulator (medium)
-
-For every settled trade (win or loss), replay each gate against the captured `inputs_snapshot` and record whether it *would have* blocked the trade. This gives hard numbers, not LLM opinions.
-
-New table `crypto_gate_shadow_sim`:
-- `trade_id`, `gate_name`, `threshold` (jsonb), `would_have_blocked` (bool), `pnl_saved` (numeric, positive if blocking would've avoided loss, negative if it would've killed a win).
-
-Gates simulated (each already logged in `inputs_snapshot`):
-- `candleGate` at strict / lenient
-- `trendlineGate` at strict / lenient
-- `sigmaMin` at 1.0 / 1.5 / 2.0 / 2.5
-- `verdictMin` at 55 / 60 / 65 / 70
-- `edgeMin` at 2 / 3 / 5
-- `roundLevelGate` (already exists as helper)
-
-Simulation runs:
-- On demand from the panel ("Recompute shadow sim").
-- Automatically inside `diagnoseRecentMisses` when a new miss is added.
-
-Panel shows a table:
+## New DB tables
 
 ```text
-Gate                Would've blocked   Losses saved   Wins killed   Net $
-candleGate=strict          14 / 32         $612           $180        +432
-verdictMin>=65             11 / 32         $488            $95        +393
-sigmaMin>=2.0               7 / 32         $301            $60        +241
-...
+auto_odds_settings          -- one row per user
+  user_id (PK, FK profiles)
+  enabled boolean            -- server-side on/off (mirrors the UI button)
+  consecutive_losses int
+  stopped_reason text        -- "two_losses" | null
+  updated_at
+
+auto_odds_tracked_orders    -- replaces localStorage oids/ids
+  id (PK)
+  user_id
+  order_id (FK auto_trade_orders)
+  entry_side, entry_odds
+  whipsaw_armed boolean      -- swung ≥200 away yet?
+  processed_settle boolean   -- counted toward loss stop yet?
+  created_at
 ```
 
-Sorted by net dollars. Green = would help, red = would hurt.
+Both tables: RLS on, `authenticated` can select/update own rows, `service_role` full. GRANTs included.
 
-## Part C — Auto-apply learned rules (careful, opt-in)
+## New server route
 
-**This is the part that changes live trading behavior. Everything here is off by default and requires an explicit user toggle.**
+`src/routes/api/public/hooks/auto-odds-tick.ts` — POST handler, called every minute by pg_cron.
 
-New table `crypto_learned_gates`:
-- `gate_name`, `threshold` (jsonb), `enabled` (bool), `source` ("shadow_sim" | "study" | "manual"), `min_samples`, `evidence` (jsonb with sim stats), `applied_at`, `disabled_at`.
+Per tick, for each user with `enabled = true`:
+1. **Entry check** — same conditions as current client `runOddsBet` (uses `auto_button` type, gates, safety caps). Places order via existing `cryptoTrades.functions` code paths, inserts a row into `auto_odds_tracked_orders`.
+2. **Whipsaw exit** — for each tracked order still open: read current American odds; once it swings ≥200 from entry then returns within ±50, market-sell it (existing `sellOddsBetOrder` logic, extracted to a shared helper).
+3. **Loss stop** — for each tracked order newly settled_loss and not yet processed: increment `consecutive_losses`, mark processed. If it reaches 2, set `enabled = false`, `stopped_reason = 'two_losses'`.
+4. **Reset losses** on any settled_win.
 
-Auto-apply rule (only when the user has flipped "Enable auto-learning" on):
+Auth: pg_cron calls with `apikey` header (anon key). Route is under `/api/public/*` so it bypasses site auth. Handler is idempotent (safe if cron fires twice).
 
-A gate becomes eligible for auto-apply when ALL of these are true:
-1. Shadow sim has ≥ 30 samples for that gate at that threshold.
-2. Net dollars saved > 0 across the sample.
-3. Losses saved / (wins killed + 1) ≥ 2 (double-benefit floor).
-4. If the gate was also up-voted in a study, weight raised. If down-voted, blocked.
+## Extract shared logic
 
-When eligible, it's written to `crypto_learned_gates` and the live auto-trade path reads it and applies the threshold as an *additional* filter on top of your manual gate settings. Never *loosens* an existing gate — only tightens.
+Today's client effect and `runOddsBet` / `sellOddsBetOrder` share logic. Move the pure decision + Kalshi-order code into `src/lib/autoOdds.server.ts` (server-only helpers). Both the tick route and existing server fns call it — no duplication.
 
-Auto-learning has a **kill switch** in the panel: one click reverts all learned gates to disabled without touching your manual settings.
+## Client changes (minimal)
 
-Live path change — one place only:
-- `runAutoTrade` in `cryptoAutoTrade.functions.ts` already evaluates each candidate market through gates. Add a single call after the existing gate stack: `applyLearnedGates(candidate)` which reads active `crypto_learned_gates` rows and skips the trade if any tighten-only learned gate rejects.
-- Every skip is logged to `auto_trade_skip_log` with `reason = "learned_<gate>"` so you can see it working.
+`src/routes/_authenticated/crypto.tsx`:
+- Auto-Odds button now writes `enabled` to `auto_odds_settings` (server-of-record) instead of just React state
+- Existing client-side effects (entry, whipsaw, 2-loss stop) gated by a new flag `runOddsClientSide` — default **off** now that server owns it. Left in code as a fallback in case you want it back.
+- Loss-stop toast still shows client-side by subscribing to `auto_odds_settings` row changes (realtime).
 
-## Rollout order
+Martingale, ladder, manual paths: untouched.
 
-1. Ship **A** immediately (UI only, zero live-trade risk). Vote on the misses we already have.
-2. Ship **B** next migration. Recompute for existing 23 misses + 9 wins. Read the table for a few days. **Nothing changes in live trading.**
-3. Ship **C** last, with the user toggle **off** by default. When you turn it on, learned gates start applying only after they cross the eligibility bar (min 30 samples, net positive, double-benefit floor).
+## pg_cron job
 
-## Files
+```sql
+select cron.schedule(
+  'auto-odds-tick',
+  '* * * * *',                                    -- every minute
+  $$ select net.http_post(
+       url:='https://project--921f21f3-4144-4400-a0a1-781603e22b1b.lovable.app/api/public/hooks/auto-odds-tick',
+       headers:='{"Content-Type":"application/json","apikey":"<anon>"}'::jsonb,
+       body:='{}'::jsonb
+     ); $$
+);
+```
 
-- Migration: `crypto_gate_shadow_sim`, `crypto_learned_gates` (both with GRANTs + RLS).
-- New: `src/lib/cryptoShadowSim.functions.ts` — `recomputeShadowSim`, `getShadowSimReport`, and a pure `simulateGates(trade)` helper.
-- New: `src/lib/cryptoLearnedGates.functions.ts` — `refreshLearnedGates` (evaluates eligibility), `getLearnedGates`, `toggleAutoLearning`, `revertLearnedGates`.
-- Edit: `src/lib/cryptoMisses.functions.ts` — call `simulateGates` inside `diagnoseRecentMisses` for new misses.
-- Edit: `src/lib/cryptoAutoTrade.functions.ts` — one hook after existing gates, reading learned rules.
-- Edit: `src/routes/_authenticated/crypto.tsx` — expand `ModelStudyPanel` with vote buttons, shadow-sim table, learned-gates panel, and the auto-learning toggle + kill switch.
+Whipsaw watcher runs inside the same tick (once/minute, not 5s). If you want sub-minute reaction, we'd need a separate `*/10 * * * * *` schedule — Postgres cron does minute granularity only, so true sub-minute needs an external scheduler. Recommend: start with 1-minute; upgrade later if whipsaw exits feel slow.
 
-## Non-goals / guardrails
+## Trade-offs / things to confirm
 
-- Never loosens a gate — learned rules only skip trades, never allow ones you'd have skipped.
-- Never touches auto-trade sizing, cash-out logic, buy/ladder/manual-close paths, or your $500/$150 caps.
-- Never modifies the auto-trade gate defaults you set (chart gate OFF, sentiment gate OFF stay OFF).
-- Kill switch reverts learned gates without touching your manual settings.
+1. **Whipsaw cadence drops from 5s → 60s.** OK, or is faster required? (Faster = external scheduler, more work.)
+2. **Kalshi credentials** — already in secrets (`KALSHI_API_KEY_ID`, `KALSHI_PRIVATE_KEY_PEM`). Server tick uses them directly; no user session needed.
+3. **Kill switch** — the Auto-Odds UI button remains authoritative; toggling it off writes `enabled=false` and the next tick stops. No stale trades.
+4. **First run** — after deploy, existing localStorage-tagged orders won't be tracked server-side. New tracked orders start clean. Acceptable?
 
-## Approval to proceed
+## Files touched
 
-Two things to confirm:
+- migration: new tables + GRANTs + RLS
+- new: `src/lib/autoOdds.server.ts` (shared strategy)
+- new: `src/routes/api/public/hooks/auto-odds-tick.ts`
+- edit: `src/routes/_authenticated/crypto.tsx` (button writes DB, effects gated off)
+- edit: `src/lib/cryptoAutoTrade.functions.ts` (small: expose helper the shared server module needs)
+- pg_cron schedule via supabase insert tool
 
-1. Ship A + B in one pass, then C in a second pass after you've eyeballed the shadow-sim numbers? (Recommended.) Or all three at once?
-2. The auto-apply eligibility bar — min 30 samples, net-positive dollars, 2:1 losses-saved-to-wins-killed. OK to start with those, or want stricter?
+**Confirm to proceed, or tell me which trade-off to change (especially whipsaw cadence).**
