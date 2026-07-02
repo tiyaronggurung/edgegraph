@@ -143,6 +143,7 @@ export type Database = {
           exit_ladder: Json | null
           gap_in_sigmas: number
           id: string
+          inputs_snapshot: Json | null
           is_martingale: boolean
           kalshi_order_id: string | null
           limit_cents: number
@@ -176,6 +177,7 @@ export type Database = {
           exit_ladder?: Json | null
           gap_in_sigmas: number
           id?: string
+          inputs_snapshot?: Json | null
           is_martingale?: boolean
           kalshi_order_id?: string | null
           limit_cents: number
@@ -209,6 +211,7 @@ export type Database = {
           exit_ladder?: Json | null
           gap_in_sigmas?: number
           id?: string
+          inputs_snapshot?: Json | null
           is_martingale?: boolean
           kalshi_order_id?: string | null
           limit_cents?: number
@@ -483,6 +486,48 @@ export type Database = {
           time_bucket?: string | null
           updated_at?: string
           was_correct?: boolean | null
+        }
+        Relationships: []
+      }
+      crypto_gate_shadow_sim: {
+        Row: {
+          created_at: string
+          gate_name: string
+          id: string
+          order_id: string
+          order_source: string
+          outcome: string
+          pnl_saved: number
+          pnl_usd: number
+          threshold: Json
+          user_id: string
+          would_have_blocked: boolean
+        }
+        Insert: {
+          created_at?: string
+          gate_name: string
+          id?: string
+          order_id: string
+          order_source: string
+          outcome: string
+          pnl_saved: number
+          pnl_usd: number
+          threshold: Json
+          user_id: string
+          would_have_blocked: boolean
+        }
+        Update: {
+          created_at?: string
+          gate_name?: string
+          id?: string
+          order_id?: string
+          order_source?: string
+          outcome?: string
+          pnl_saved?: number
+          pnl_usd?: number
+          threshold?: Json
+          user_id?: string
+          would_have_blocked?: boolean
         }
         Relationships: []
       }
