@@ -314,6 +314,24 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               continue;
             }
 
+            // ── STRICT MODEL GATE ──
+            // Never buy when our model disagrees or is under-confident on the
+            // picked side. Blocks real-money entries at model ≤59% no matter
+            // how deep Kalshi's odds are. Applies to all three windows.
+            const MODEL_MIN = 0.60;
+            const modelYes = atm.modelYesProb;
+            if (typeof modelYes !== "number" || !Number.isFinite(modelYes)) {
+              note = `skipped: no model prob on ${atm.ticker}`;
+              summary.push({ user_id: userId, entries, exits, stopped, note });
+              continue;
+            }
+            const modelSideP = pick.side === "YES" ? modelYes : 1 - modelYes;
+            if (modelSideP < MODEL_MIN) {
+              note = `skipped: model ${(modelSideP * 100).toFixed(1)}% on ${pick.side} < ${(MODEL_MIN * 100).toFixed(0)}% (Kalshi ${pick.reason})`;
+              summary.push({ user_id: userId, entries, exits, stopped, note });
+              continue;
+            }
+
             const placeResult = await runAutoTradeCore(supabaseAdmin as any, userId, {
               mode: "live",
               confirm: "I_UNDERSTAND_LIVE",
