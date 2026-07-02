@@ -273,7 +273,7 @@ Return ONLY the JSON.`;
       });
     }
     // Upsert settings.
-    await supabaseAdmin.from("auto_odds_settings").update(patch).eq("user_id", userId);
+    await supabaseAdmin.from("auto_odds_settings").update(patch as any).eq("user_id", userId);
     if (auditRows.length) await supabaseAdmin.from("auto_odds_tuning_audit").insert(auditRows);
   }
 
