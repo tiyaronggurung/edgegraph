@@ -101,6 +101,101 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_odds_settings: {
+        Row: {
+          auto_button_type: string | null
+          consecutive_losses: number
+          created_at: string
+          enabled: boolean
+          last_tick_at: string | null
+          stopped_reason: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_button_type?: string | null
+          consecutive_losses?: number
+          created_at?: string
+          enabled?: boolean
+          last_tick_at?: string | null
+          stopped_reason?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_button_type?: string | null
+          consecutive_losses?: number
+          created_at?: string
+          enabled?: boolean
+          last_tick_at?: string | null
+          stopped_reason?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_odds_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      auto_odds_tracked_orders: {
+        Row: {
+          closed_reason: string | null
+          created_at: string
+          entry_odds: number | null
+          entry_side: string
+          id: string
+          order_id: string
+          processed_settle: boolean
+          updated_at: string
+          user_id: string
+          whipsaw_armed: boolean
+        }
+        Insert: {
+          closed_reason?: string | null
+          created_at?: string
+          entry_odds?: number | null
+          entry_side: string
+          id?: string
+          order_id: string
+          processed_settle?: boolean
+          updated_at?: string
+          user_id: string
+          whipsaw_armed?: boolean
+        }
+        Update: {
+          closed_reason?: string | null
+          created_at?: string
+          entry_odds?: number | null
+          entry_side?: string
+          id?: string
+          order_id?: string
+          processed_settle?: boolean
+          updated_at?: string
+          user_id?: string
+          whipsaw_armed?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_odds_tracked_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "auto_trade_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auto_odds_tracked_orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auto_trade_loss_cap_resets: {
         Row: {
           created_at: string
