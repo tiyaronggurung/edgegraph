@@ -378,7 +378,7 @@ export const revertTuning = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!row) return { ok: false as const, error: "audit row not found" };
     if (row.reverted_at) return { ok: false as const, error: "already reverted" };
-    await supabaseAdmin.from("auto_odds_settings").update({ [row.param]: row.prev_value }).eq("user_id", context.userId);
+    await supabaseAdmin.from("auto_odds_settings").update({ [row.param]: row.prev_value } as any).eq("user_id", context.userId);
     await supabaseAdmin.from("auto_odds_tuning_audit").update({ reverted_at: new Date().toISOString() }).eq("id", data.auditId);
     return { ok: true as const };
   });
