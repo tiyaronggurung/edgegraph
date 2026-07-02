@@ -1413,6 +1413,10 @@ function AutoTradePanel() {
           if (!row.enabled && row.stopped_reason === "two_losses") {
             toast.error("Auto-Odds stopped by server — 2 losing trades in a row");
           }
+          if (!row.enabled && row.stopped_reason === "daily_drawdown_25") {
+            toast.error("Auto-Odds stopped — down 25% from today's peak. Re-enable to override for the rest of the day.");
+          }
+
         }
         if ((row.consecutive_losses ?? 0) !== autoOddsLosses) {
           setAutoOddsLosses(row.consecutive_losses ?? 0);
