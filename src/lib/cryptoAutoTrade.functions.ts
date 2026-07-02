@@ -1025,7 +1025,8 @@ export async function sellOddsBetCore(
       await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", row.id);
       return { ok: false, message: `err ${e?.message ?? "x"}` };
     }
-  });
+}
+
 
 
 
