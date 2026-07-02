@@ -51,6 +51,24 @@ const centsToAmerican = (c: number): string => {
   return `+${Math.round(((1 - p) / p) * 100)}`;
 };
 
+// Kalshi weekly maintenance: Thursday 2:30–5:30 AM ET. Skip all Auto-Odds
+// entries and exits during this window to avoid suspicious-request flags.
+const isKalshiMaintenanceWindow = (d: Date = new Date()): boolean => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const wd = parts.find(p => p.type === "weekday")?.value;
+  const hh = parseInt(parts.find(p => p.type === "hour")?.value ?? "0", 10);
+  const mm = parseInt(parts.find(p => p.type === "minute")?.value ?? "0", 10);
+  if (wd !== "Thu") return false;
+  const mins = hh * 60 + mm;
+  return mins >= 150 && mins < 330; // 02:30 .. 05:30 ET
+};
+
 function Sparkline({ candles, strike }: { candles: BtcCandle[]; strike?: number }) {
   if (!candles.length) return <div className="h-12 text-xs text-muted-foreground">no data</div>;
   const closes = candles.map(c => c.c);
