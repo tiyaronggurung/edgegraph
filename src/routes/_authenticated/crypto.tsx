@@ -1311,6 +1311,124 @@ function AutoTradePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoMart, martStake, liveOrders, chartGate, chartVerdict, sentimentGate, kalshiSentiment, roundGate, htfGate, ethGate, calibrate, calShift, magnetGate, btcTicks, trendGate, trendAnalysis, candleGate, candleMomentum]);
 
+  // ============================================================
+  // Auto-Odds bet: $100 every 15m window based on Kalshi odds, NOT model.
+  //   Phase 1 (>12:30 remaining): monitor only, do not fire.
+  //   Phase 2 (12:30 → 2:00 remaining): fire on side whose American odds ∈ [-750, -450].
+  //   Phase 3 (≤2:00 remaining): fire on side ≤ -300 (deeper favorite).
+  //   Phase 4 (final ≤15s): fire on side closest to [-750, -450].
+  // Fires once per 15m window. Mutually exclusive with Auto-Martingale.
+  // ============================================================
+  const AUTO_ODDS_STAKE = 100;
+  const [autoOdds, setAutoOdds] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("crypto.autoOdds") === "on";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("crypto.autoOdds", autoOdds ? "on" : "off");
+  }, [autoOdds]);
+  // Mutual exclusion: turning on Auto-Odds disables Auto-Martingale.
+  useEffect(() => {
+    if (autoOdds && autoMart) setAutoMart(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOdds]);
+
+  // Numeric American odds from Kalshi ¢ (favorites negative, dogs positive).
+  const centsToAmericanNum = (cents: number): number => {
+    const p = Math.max(0.01, Math.min(0.99, cents / 100));
+    return p >= 0.5 ? -Math.round((p / (1 - p)) * 100) : Math.round(((1 - p) / p) * 100);
+  };
+
+  async function runOddsBet(ticker: string, side: "YES" | "NO", reason: string): Promise<string | null> {
+    try {
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: AUTO_ODDS_STAKE, maxOrders: 1, force: true, forceTicker: ticker, forceSide: side } });
+      if (res.placed > 0 && res.orders?.[0]) {
+        const o = res.orders[0];
+        toast.success(`Odds-bet $${AUTO_ODDS_STAKE}: ${side === "YES" ? "UP" : "DOWN"} ${ticker} @ ${o.limit_cents}¢ — ${reason}`);
+        qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
+        return o.id ?? null;
+      }
+      toast.info(`Odds-bet skipped: ${res.skipReasons.slice(0, 2).join(" · ") || "no fill"}`);
+      return null;
+    } catch (e: any) {
+      toast.error("Odds-bet failed", { description: e?.message ?? String(e) });
+      return null;
+    }
+  }
+
+  useEffect(() => {
+    if (!autoOdds) return;
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    let inFlight = false;
+    const tick = async () => {
+      if (cancelled || inFlight) return;
+      const now = Date.now();
+      const currentWindow = Math.floor(now / WINDOW_MS) * WINDOW_MS;
+      const remainingMs = WINDOW_MS - (now - currentWindow);
+      const lastWindow = Number(window.localStorage.getItem("crypto.autoOdds.lastWindowMs")) || 0;
+      if (currentWindow === lastWindow) return;
+
+      // Phase 1: monitor only until 12:30 remaining.
+      if (remainingMs > 12 * 60_000 + 30_000) return;
+
+      const markets = marketsQ.data?.markets ?? [];
+      const nowSec = Date.now() / 1000;
+      // Only markets closing within this 15m window.
+      const active = markets.filter(m => m.secondsToClose > 0 && m.secondsToClose <= 15 * 60 + 60);
+      if (active.length === 0) return;
+      const spotRef = active[0].spot ?? 0;
+      // ATM = strike closest to spot.
+      const atm = active.slice().sort((a, b) => Math.abs(a.strike - spotRef) - Math.abs(b.strike - spotRef))[0];
+      const yesCents = Math.max(1, Math.min(99, Math.round((atm.yesAsk || atm.yesPrice) * 100)));
+      const noCents = Math.max(1, Math.min(99, Math.round((atm.noAsk || (1 - atm.yesPrice)) * 100)));
+      const yesAm = centsToAmericanNum(yesCents);
+      const noAm = centsToAmericanNum(noCents);
+
+      const inRange = (a: number) => a <= -450 && a >= -750;
+      const deepFav = (a: number) => a <= -300;
+
+      let pick: { side: "YES" | "NO"; reason: string } | null = null;
+
+      if (remainingMs > 2 * 60_000) {
+        // 12:30 → 2:00 remaining: look for -450..-750.
+        const yesIn = inRange(yesAm), noIn = inRange(noAm);
+        if (yesIn && !noIn) pick = { side: "YES", reason: `YES ${yesAm} in [-750,-450]` };
+        else if (noIn && !yesIn) pick = { side: "NO", reason: `NO ${noAm} in [-750,-450]` };
+        else if (yesIn && noIn) pick = yesAm < noAm ? { side: "YES", reason: `both in-range, YES deeper ${yesAm}` } : { side: "NO", reason: `both in-range, NO deeper ${noAm}` };
+      } else if (remainingMs > 15_000) {
+        // 2:00 → 0:15 remaining: fallback on ≤ -300 favorite.
+        const yesDeep = deepFav(yesAm), noDeep = deepFav(noAm);
+        if (yesDeep && !noDeep) pick = { side: "YES", reason: `≤2:00 fallback YES ${yesAm}` };
+        else if (noDeep && !yesDeep) pick = { side: "NO", reason: `≤2:00 fallback NO ${noAm}` };
+        else if (yesDeep && noDeep) pick = yesAm < noAm ? { side: "YES", reason: `both ≤-300, YES deeper ${yesAm}` } : { side: "NO", reason: `both ≤-300, NO deeper ${noAm}` };
+      } else if (remainingMs > 0) {
+        // Final ≤15s: closest side to [-750,-450].
+        const distTo = (a: number) => a > -450 ? Math.abs(-450 - a) : a < -750 ? Math.abs(a - -750) : 0;
+        const yd = distTo(yesAm), nd = distTo(noAm);
+        pick = yd <= nd ? { side: "YES", reason: `close-window closest YES ${yesAm}` } : { side: "NO", reason: `close-window closest NO ${noAm}` };
+      }
+
+      if (!pick) return; // keep watching
+
+      inFlight = true;
+      // Claim window before async call to prevent double-fire.
+      window.localStorage.setItem("crypto.autoOdds.lastWindowMs", String(currentWindow));
+      const orderId = await runOddsBet(atm.ticker, pick.side, pick.reason);
+      if (!orderId) {
+        // Placement failed/skipped — allow retry next tick.
+        window.localStorage.removeItem("crypto.autoOdds.lastWindowMs");
+      }
+      inFlight = false;
+      void nowSec;
+    };
+    tick();
+    const h = setInterval(tick, 5_000);
+    return () => { cancelled = true; clearInterval(h); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOdds, marketsQ.data]);
+
 
 
   return (
