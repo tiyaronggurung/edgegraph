@@ -1621,6 +1621,17 @@ function AutoTradePanel() {
             {autoOdds ? `Odds-Bet ON · $${AUTO_ODDS_STAKE}` : "Odds-Bet OFF"}
           </button>
           {(autoMart || autoOdds) && <MartingaleCountdown windowMs={WINDOW_MS} />}
+          {autoOdds && oddsStatus && (
+            <div className="text-[10px] font-mono px-2 py-1 rounded border border-amber-500/40 bg-amber-500/10 text-amber-200 flex items-center gap-2 whitespace-nowrap">
+              <span className="uppercase tracking-wider opacity-80">{oddsStatus.phase}</span>
+              <span className="opacity-60">·</span>
+              <span>YES <span className={oddsStatus.yesAm != null && oddsStatus.yesAm <= -450 && oddsStatus.yesAm >= -750 ? "text-emerald-300 font-bold" : ""}>{oddsStatus.yesAm ?? "—"}</span></span>
+              <span>NO <span className={oddsStatus.noAm != null && oddsStatus.noAm <= -450 && oddsStatus.noAm >= -750 ? "text-emerald-300 font-bold" : ""}>{oddsStatus.noAm ?? "—"}</span></span>
+              <span className="opacity-60">·</span>
+              <span>{Math.floor(oddsStatus.remaining / 60)}:{String(oddsStatus.remaining % 60).padStart(2, "0")}</span>
+            </div>
+          )}
+
 
           <ChartVerdictBadge compact />
           <KalshiSentimentBadge s={kalshiSentiment} compact />
