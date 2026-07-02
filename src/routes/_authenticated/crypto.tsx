@@ -1421,7 +1421,7 @@ function AutoTradePanel() {
         window.localStorage.removeItem("crypto.autoOdds.lastWindowMs");
       }
       inFlight = false;
-      void nowSec;
+      
     };
     tick();
     const h = setInterval(tick, 5_000);
