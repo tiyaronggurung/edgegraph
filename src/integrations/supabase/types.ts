@@ -145,6 +145,7 @@ export type Database = {
       auto_odds_study_log: {
         Row: {
           created_at: string
+          crossed_50: boolean
           entered: boolean
           hedge_fired: boolean
           id: string
@@ -155,16 +156,22 @@ export type Database = {
           no_cents: number | null
           note: string | null
           picked_side: string | null
+          prior_yes_cents: number | null
+          seconds_since_prior: number | null
           seconds_to_close: number | null
           spot: number | null
+          spot_delta: number | null
           ticker: string
+          time_bucket: string | null
           user_id: string
           window_start_at: string
           yes_american: number | null
           yes_cents: number | null
+          yes_cents_delta: number | null
         }
         Insert: {
           created_at?: string
+          crossed_50?: boolean
           entered?: boolean
           hedge_fired?: boolean
           id?: string
@@ -175,16 +182,22 @@ export type Database = {
           no_cents?: number | null
           note?: string | null
           picked_side?: string | null
+          prior_yes_cents?: number | null
+          seconds_since_prior?: number | null
           seconds_to_close?: number | null
           spot?: number | null
+          spot_delta?: number | null
           ticker: string
+          time_bucket?: string | null
           user_id: string
           window_start_at: string
           yes_american?: number | null
           yes_cents?: number | null
+          yes_cents_delta?: number | null
         }
         Update: {
           created_at?: string
+          crossed_50?: boolean
           entered?: boolean
           hedge_fired?: boolean
           id?: string
@@ -195,13 +208,18 @@ export type Database = {
           no_cents?: number | null
           note?: string | null
           picked_side?: string | null
+          prior_yes_cents?: number | null
+          seconds_since_prior?: number | null
           seconds_to_close?: number | null
           spot?: number | null
+          spot_delta?: number | null
           ticker?: string
+          time_bucket?: string | null
           user_id?: string
           window_start_at?: string
           yes_american?: number | null
           yes_cents?: number | null
+          yes_cents_delta?: number | null
         }
         Relationships: []
       }

@@ -335,8 +335,43 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               : null;
 
             // Study-log helper — one row per entry attempt regardless of gate.
+            // Also computes flip-detector fields vs the most recent prior row
+            // for the same ticker: Δ¢ on picked side, Δspot, seconds since,
+            // crossed_50 flag (picked side crossed the 50¢ line), and a
+            // time-to-close bucket label for aggregation.
+            const bucketFor = (s: number): string =>
+              s > 120 ? ">120s" : s > 60 ? "60-120s" : s > 15 ? "15-60s" : "<15s";
+            const pickedYesCents = pick.side === "YES" ? yesCents : noCents;
             const logStudy = async (opts: { entered: boolean; hedge_fired: boolean; note: string }) => {
               try {
+                // Fetch most recent prior snapshot for same ticker (same user).
+                const { data: prior } = await supabaseAdmin
+                  .from("auto_odds_study_log")
+                  .select("yes_cents, no_cents, picked_side, spot, seconds_to_close, created_at")
+                  .eq("user_id", userId)
+                  .eq("ticker", atm.ticker)
+                  .order("created_at", { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+
+                let prior_yes_cents: number | null = null;
+                let yes_cents_delta: number | null = null;
+                let spot_delta: number | null = null;
+                let seconds_since_prior: number | null = null;
+                let crossed_50 = false;
+                if (prior) {
+                  const priorPicked: number | null = prior.picked_side === "YES" ? prior.yes_cents : prior.no_cents;
+                  if (priorPicked != null) {
+                    prior_yes_cents = priorPicked;
+                    yes_cents_delta = pickedYesCents - priorPicked;
+                    crossed_50 = (priorPicked < 50 && pickedYesCents >= 50) || (priorPicked >= 50 && pickedYesCents < 50);
+                  }
+                  if (prior.spot != null && atm.spot != null) spot_delta = atm.spot - Number(prior.spot);
+                  if (prior.created_at) {
+                    seconds_since_prior = Math.round((Date.now() - new Date(prior.created_at).getTime()) / 1000);
+                  }
+                }
+
                 await supabaseAdmin.from("auto_odds_study_log").insert({
                   user_id: userId,
                   window_start_at: currentWindowStartIso,
@@ -354,9 +389,16 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                   entered: opts.entered,
                   hedge_fired: opts.hedge_fired,
                   note: opts.note.slice(0, 500),
+                  prior_yes_cents,
+                  yes_cents_delta,
+                  spot_delta,
+                  seconds_since_prior,
+                  crossed_50,
+                  time_bucket: bucketFor(atm.secondsToClose),
                 });
               } catch { /* logging is best-effort */ }
             };
+
 
             if (!hasModel) {
               note = `skipped: no model prob on ${atm.ticker} (Kalshi ${pick.reason})`;
