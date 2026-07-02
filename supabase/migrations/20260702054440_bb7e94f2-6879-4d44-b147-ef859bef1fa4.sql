@@ -1,0 +1,1 @@
+ALTER TABLE public.auto_odds_settings DROP COLUMN IF EXISTS dd_override_date;

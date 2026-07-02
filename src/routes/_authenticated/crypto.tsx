@@ -1368,22 +1368,14 @@ function AutoTradePanel() {
         const { data: u } = await supabase.auth.getUser();
         const uid = u?.user?.id;
         if (!uid || cancelled) return;
-        // ET calendar date (YYYY-MM-DD) — used as a same-day override so a
-        // manual re-enable after a daily-drawdown stop won't get re-tripped
-        // by the server tick recomputing the same losing trajectory.
-        const etDate = new Intl.DateTimeFormat("en-CA", {
-          timeZone: "America/New_York",
-          year: "numeric", month: "2-digit", day: "2-digit",
-        }).format(new Date()); // en-CA gives YYYY-MM-DD
-        const payload: any = {
+        await supabase.from("auto_odds_settings").upsert({
           user_id: uid,
           enabled: autoOdds,
           consecutive_losses: autoOddsLosses,
           auto_button_type: "odds_bet",
           stopped_reason: autoOdds ? null : (autoOddsLosses >= 2 ? "two_losses" : null),
-        };
-        if (autoOdds) payload.dd_override_date = etDate;
-        await supabase.from("auto_odds_settings").upsert(payload, { onConflict: "user_id" });
+        }, { onConflict: "user_id" });
+
       } catch { /* non-fatal; client loop still runs */ }
     })();
     return () => { cancelled = true; };
@@ -1413,9 +1405,11 @@ function AutoTradePanel() {
           if (!row.enabled && row.stopped_reason === "two_losses") {
             toast.error("Auto-Odds stopped by server — 2 losing trades in a row");
           }
-          if (!row.enabled && row.stopped_reason === "daily_drawdown_25") {
-            toast.error("Auto-Odds stopped — down 25% from today's peak. Re-enable to override for the rest of the day.");
+          if (!row.enabled && row.stopped_reason === "daily_5_losses") {
+            toast.error("Auto-Odds stopped — 5 losing trades today. Locked until midnight ET.");
           }
+
+
 
         }
         if ((row.consecutive_losses ?? 0) !== autoOddsLosses) {
