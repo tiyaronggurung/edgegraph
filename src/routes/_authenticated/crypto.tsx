@@ -1374,7 +1374,7 @@ function AutoTradePanel() {
       if (remainingMs > 12 * 60_000 + 30_000) return;
 
       const markets = marketsQ.data?.markets ?? [];
-      const nowSec = Date.now() / 1000;
+      // (window derived from Date.now() above)
       // Only markets closing within this 15m window.
       const active = markets.filter(m => m.secondsToClose > 0 && m.secondsToClose <= 15 * 60 + 60);
       if (active.length === 0) return;
