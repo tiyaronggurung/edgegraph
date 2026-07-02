@@ -350,11 +350,15 @@ export const Route = createFileRoute("/api/public/hooks/crypto-study")({
           .limit(1000);
         const userIds = Array.from(new Set((recent ?? []).map((r: any) => r.user_id)));
 
-        const results: Array<{ userId: string; ok: boolean; stats?: any; error?: string }> = [];
+        const results: Array<{ userId: string; ok: boolean; stats?: any; error?: string; odds?: any }> = [];
+        // Load the odds-study runner lazily so this file stays edge-safe.
+        const { runOddsStudyCore } = await import("@/lib/oddsStudy.functions");
         for (const uid of userIds) {
           try {
             const stats = await processUser(supabaseAdmin, uid);
-            results.push({ userId: uid, ok: true, stats });
+            let odds: any = null;
+            try { odds = await runOddsStudyCore(supabaseAdmin as any, uid); } catch (e: any) { odds = { ran: false, reason: e?.message ?? String(e) }; }
+            results.push({ userId: uid, ok: true, stats, odds });
           } catch (e: any) {
             results.push({ userId: uid, ok: false, error: e?.message ?? String(e) });
           }

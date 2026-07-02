@@ -54,7 +54,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
 
         const { data: enabledUsers } = await supabaseAdmin
           .from("auto_odds_settings")
-          .select("user_id, enabled, consecutive_losses")
+          .select("user_id, enabled, consecutive_losses, model_gate_min, hedge_band_lo, hedge_band_hi, tp_cents, oscillation_max, skip_bucket_lt15s, skip_bucket_15_60s")
           .eq("enabled", true);
 
         if (!enabledUsers || enabledUsers.length === 0) {
@@ -78,6 +78,18 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
 
         for (const u of enabledUsers) {
           const userId = u.user_id as string;
+          // Per-user AI-tunable parameters. Each falls back to the hardcoded
+          // default when the settings row has NULL. See TUNABLE_DEFS in
+          // src/lib/oddsStudy.functions.ts — safe ranges are enforced there.
+          const T = {
+            modelGateMin: (u as any).model_gate_min != null ? Number((u as any).model_gate_min) : 0.60,
+            hedgeLo: (u as any).hedge_band_lo != null ? Number((u as any).hedge_band_lo) : 0.60,
+            hedgeHi: (u as any).hedge_band_hi != null ? Number((u as any).hedge_band_hi) : 0.68,
+            tpCents: (u as any).tp_cents != null ? Number((u as any).tp_cents) : 98,
+            oscMax: (u as any).oscillation_max != null ? Number((u as any).oscillation_max) : 3,
+            skipLt15s: (u as any).skip_bucket_lt15s === true,
+            skip15_60s: (u as any).skip_bucket_15_60s === true,
+          };
           let entries = 0, exits = 0, stopped = false;
           let note: string | undefined;
 
@@ -244,15 +256,13 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 // the loss is still small, before the final-60s lockout.
                 const flipFire = entryAm <= -450 && entryAm >= -750 && curCents <= 65;
 
-                // 98¢ take-profit: don't wait for 99/100. Sell as soon as
-                // picked side hits 98¢ implied.
-                const tp98Fire = curCents >= 98;
+                // Take-profit: sell as soon as picked side hits `tpCents`
+                // (default 98¢; AI can tune 95-99).
+                const tp98Fire = curCents >= T.tpCents;
 
-                // Oscillation exit: odds bouncing between "shallow" (≥ -1000,
-                // i.e. -1000 or lighter like -800/-500/+200) and "deep"
-                // (≤ -4000). Count each zone change; sell on the 3rd crossing.
-                // Middle band (-4000 < am < -1000) does not change zone —
-                // avoids noise from normal drift.
+                // Oscillation exit: odds bouncing between "shallow" (≥ -1000)
+                // and "deep" (≤ -4000). Count each zone change; sell on the
+                // `oscMax`-th crossing (default 3; AI can tune 2-5).
                 let zone: "shallow" | "deep" | null = null;
                 if (curAm >= -1000) zone = "shallow";
                 else if (curAm <= -4000) zone = "deep";
@@ -270,7 +280,8 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                     .update({ oscillation_count: oscCount, last_zone: newZone })
                     .eq("id", t.id);
                 }
-                const oscFire = oscCount >= 3;
+                const oscFire = oscCount >= T.oscMax;
+
 
                 if (tp98Fire || oscFire || whipsawFire || probFire || flipFire) {
                   const reason = tp98Fire ? "tp98_server"
@@ -347,17 +358,23 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               continue;
             }
 
-            // ── STRICT MODEL GATE ──
+            // ── STRICT MODEL GATE ── (AI-tunable via T.modelGateMin)
             // Never buy when our model disagrees or is under-confident on the
-            // picked side. Blocks real-money entries at model <60% no matter
-            // how deep Kalshi's odds are. Applies to all three windows.
-            const MODEL_MIN = 0.60;
+            // picked side. Default 0.60; AI safe range 0.55-0.75.
+            const MODEL_MIN = T.modelGateMin;
             // Coinflip hedge window: fire $5 opposite-side hedge only when
-            // the model is barely agreeing with Kalshi (right above the gate
-            // floor). Naturally fires ~1 in 4-5 trades since most passes sit
-            // higher than 68%.
-            const HEDGE_MIN = 0.60;
-            const HEDGE_MAX = 0.68;
+            // the model is barely agreeing with Kalshi. AI-tunable band.
+            const HEDGE_MIN = T.hedgeLo;
+            const HEDGE_MAX = T.hedgeHi;
+
+            // Bucket skip (AI-tunable). AI can turn off entries in the
+            // most-volatile time buckets when flip rate is too high.
+            const bucketNow = atm.secondsToClose > 60 ? "60-120s" : atm.secondsToClose > 15 ? "15-60s" : "<15s";
+            if ((T.skipLt15s && bucketNow === "<15s") || (T.skip15_60s && bucketNow === "15-60s")) {
+              summary.push({ user_id: userId, entries, exits, stopped, note: `skipped: bucket ${bucketNow} disabled by AI tuning` });
+              continue;
+            }
+
 
             const modelYes = atm.modelYesProb;
             const yesFav = yesCents >= noCents;
