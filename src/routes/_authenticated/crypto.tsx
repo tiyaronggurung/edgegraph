@@ -1424,6 +1424,21 @@ function AutoTradePanel() {
           if (o.id && !oids.includes(o.id)) oids.push(o.id);
           window.localStorage.setItem("crypto.autoOdds.oids", JSON.stringify(oids.slice(-50)));
         } catch { /* ignore */ }
+        // Also mirror into DB so the server-side tick can run whipsaw/loss-stop
+        // even when this browser tab closes. Non-fatal if it fails.
+        try {
+          const { data: u } = await supabase.auth.getUser();
+          const uid = u?.user?.id;
+          if (uid && o.id) {
+            const entryCents = o.entry_price_cents ?? o.limit_cents;
+            await supabase.from("auto_odds_tracked_orders").insert({
+              user_id: uid,
+              order_id: o.id,
+              entry_side: o.side,
+              entry_odds: centsToAmericanNum(entryCents),
+            });
+          }
+        } catch { /* ignore — server can also insert on its own placements */ }
         qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
         return o.id ?? null;
       }
