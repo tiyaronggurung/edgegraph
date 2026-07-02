@@ -162,6 +162,14 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               const wallUtc = Date.UTC(yy, mo - 1, dd, hh2, mi2, ss2);
               const offset = wallUtc - nowD.getTime();
               const etMidnightUtc = new Date(Date.UTC(yy, mo - 1, dd, 0, 0, 0) - offset);
+              const etTodayStr = `${yy}-${String(mo).padStart(2,"0")}-${String(dd).padStart(2,"0")}`;
+
+              // Manual-override: user re-enabled after a DD stop today → skip.
+              const overrideDate = (u as any).dd_override_date as string | null | undefined;
+              const overrideActive = overrideDate && String(overrideDate).slice(0, 10) === etTodayStr;
+
+              if (!overrideActive) {
+
 
               const { data: todayTracked } = await supabaseAdmin
                 .from("auto_odds_tracked_orders")
