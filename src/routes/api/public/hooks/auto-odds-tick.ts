@@ -550,7 +550,13 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
 
               await logStudy({ entered: true, hedge_fired: hedgeFired, note });
             } else {
-              note = `skipped: ${placeResult.skipReasons.slice(0, 2).join(" · ") || "no fill"}`;
+              // Filter out informational log lines (equity/odds-bet/force headers) so
+              // the real failure reason (IOC 0-fill, kalshi order failed, insert
+              // error, etc.) surfaces instead of being truncated.
+              const realReasons = placeResult.skipReasons.filter(r =>
+                !/^equity:/i.test(r) && !/^odds-bet:/i.test(r) && !/^force:/i.test(r));
+              const shown = (realReasons.length ? realReasons : placeResult.skipReasons).slice(0, 3);
+              note = `skipped: ${shown.join(" · ") || "no fill"}`;
               await logStudy({ entered: false, hedge_fired: false, note });
             }
           } catch (e: any) {
