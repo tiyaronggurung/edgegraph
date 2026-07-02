@@ -86,7 +86,7 @@ export interface AutoTradeRunResult {
 
 export const runAutoTrade = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { mode?: "paper" | "live"; maxOrders?: number; stakeUsd?: number; confirm?: string; force?: boolean; isMartingale?: boolean } | undefined) => {
+  .inputValidator((data: { mode?: "paper" | "live"; maxOrders?: number; stakeUsd?: number; confirm?: string; force?: boolean; isMartingale?: boolean; forceTicker?: string; forceSide?: "YES" | "NO" } | undefined) => {
     const mode: "paper" | "live" = data?.mode === "live" ? "live" : "paper";
     const sessionCap = mode === "live" ? LIVE_MAX_ORDERS_PER_SESSION : MAX_ORDERS_PER_SESSION_PAPER;
     const stakeCap = mode === "live" ? LIVE_MAX_STAKE_USD_PER_ORDER : MAX_STAKE_USD_PER_ORDER_PAPER;
@@ -97,6 +97,8 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       isMartingale: data?.isMartingale === true,
       maxOrders: Math.min(sessionCap, Math.max(1, data?.maxOrders ?? sessionCap)),
       stakeUsd: Math.min(stakeCap, Math.max(1, data?.stakeUsd ?? stakeCap)),
+      forceTicker: typeof data?.forceTicker === "string" && data.forceTicker.length > 0 ? data.forceTicker : undefined,
+      forceSide: data?.forceSide === "YES" || data?.forceSide === "NO" ? data.forceSide : undefined,
     };
   })
   .handler(async ({ data, context }): Promise<AutoTradeRunResult> => {
