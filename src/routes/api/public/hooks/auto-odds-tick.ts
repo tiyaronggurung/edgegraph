@@ -515,7 +515,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                   entry_side: placed.side,
                   entry_odds: centsToAmerican(entryCents),
                 });
-              note = `entered ${placed.ticker} ${placed.side} @ ${entryCents}¢ · model ${((modelSideP as number) * 100).toFixed(1)}% (${pick.reason})`;
+              note = `entered ${placed.ticker} ${placed.side} @ ${entryCents}¢ (${pick.reason})`;
 
               // ── 3b. COINFLIP-ZONE HEDGE ──
               // Fire $5 hedge on the OPPOSITE side only when the model is in
