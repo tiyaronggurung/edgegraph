@@ -1596,13 +1596,6 @@ function AutoTradePanel() {
 
       if (!pick) return; // keep watching
 
-      // -750 hard cap: never pay more than 89¢ on the picked side.
-      const pickCents = pick.side === "YES" ? yesCents : noCents;
-      if (pickCents > 89) {
-        console.log(`[auto-odds] skip: ${pick.side} @ ${pickCents}¢ exceeds 89¢ cap (-750)`);
-        return;
-      }
-
       inFlight = true;
       // Claim window before async call to prevent double-fire.
       window.localStorage.setItem("crypto.autoOdds.lastWindowMs", String(currentWindow));
