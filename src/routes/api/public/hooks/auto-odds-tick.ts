@@ -144,11 +144,10 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 .eq("user_id", userId);
             }
 
-            // ── 1b. DAILY 25% PEAK-DRAWDOWN STOP ──
-            // Sum today's realized P&L (ET calendar day) across tracked
-            // orders, run peak-tracking on the chronological trajectory,
-            // stop if current is ≥25% below peak. No new tables — recomputed
-            // each tick. User re-enables via the Auto-Odds button.
+            // ── 1b. DAILY 5-LOSSES CAP ──
+            // Count settled losses across tracked auto-odds orders since ET
+            // midnight. At ≥5 → hard stop for the rest of the ET day.
+            // No override: rule re-arms only at next ET midnight.
             {
               const nowD = new Date();
               const partsD = new Intl.DateTimeFormat("en-US", {
@@ -162,14 +161,6 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               const wallUtc = Date.UTC(yy, mo - 1, dd, hh2, mi2, ss2);
               const offset = wallUtc - nowD.getTime();
               const etMidnightUtc = new Date(Date.UTC(yy, mo - 1, dd, 0, 0, 0) - offset);
-              const etTodayStr = `${yy}-${String(mo).padStart(2,"0")}-${String(dd).padStart(2,"0")}`;
-
-              // Manual-override: user re-enabled after a DD stop today → skip.
-              const overrideDate = (u as any).dd_override_date as string | null | undefined;
-              const overrideActive = overrideDate && String(overrideDate).slice(0, 10) === etTodayStr;
-
-              if (!overrideActive) {
-
 
               const { data: todayTracked } = await supabaseAdmin
                 .from("auto_odds_tracked_orders")
@@ -178,31 +169,23 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 .gte("created_at", etMidnightUtc.toISOString());
               const todayIds = (todayTracked ?? []).map((r: any) => r.order_id);
               if (todayIds.length > 0) {
-                const { data: settledToday } = await supabaseAdmin
+                const { count: lossCount } = await supabaseAdmin
                   .from("auto_trade_orders")
-                  .select("id, pnl_usd, settled_at, status")
+                  .select("id", { count: "exact", head: true })
                   .in("id", todayIds)
-                  .in("status", ["settled_win", "settled_loss"])
-                  .not("settled_at", "is", null)
-                  .order("settled_at", { ascending: true });
-
-                let running = 0, peak = 0;
-                for (const r of (settledToday ?? []) as any[]) {
-                  running += Number(r.pnl_usd ?? 0);
-                  if (running > peak) peak = running;
-                }
-                if (peak > 0 && (peak - running) / peak >= 0.25) {
+                  .eq("status", "settled_loss");
+                if ((lossCount ?? 0) >= 5) {
                   await supabaseAdmin
                     .from("auto_odds_settings")
-                    .update({ enabled: false, stopped_reason: "daily_drawdown_25", last_tick_at: new Date().toISOString() })
+                    .update({ enabled: false, stopped_reason: "daily_5_losses", last_tick_at: new Date().toISOString() })
                     .eq("user_id", userId);
                   stopped = true;
-                  summary.push({ user_id: userId, entries, exits, stopped, note: `stopped: DD peak=$${peak.toFixed(0)} now=$${running.toFixed(0)}` });
+                  summary.push({ user_id: userId, entries, exits, stopped, note: `stopped: ${lossCount} losses today` });
                   continue;
                 }
               }
-              } // /if (!overrideActive)
             }
+
 
 
 
