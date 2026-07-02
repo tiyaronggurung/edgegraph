@@ -1472,10 +1472,20 @@ function AutoTradePanel() {
 
     window.localStorage.setItem("crypto.autoOdds.processedSettles", JSON.stringify(Array.from(processed).slice(-100)));
     setAutoOddsLosses(nextLosses);
-    if (nextLosses >= 2) {
+    if (nextLosses >= 3) {
       setAutoOdds(false);
       window.localStorage.setItem("crypto.autoOdds", "off");
-      toast.error("Auto-Odds stopped — 2 losing trades in a row");
+      toast.error("Auto-Odds stopped — 3 losing trades in a row", {
+        duration: 30_000,
+        action: {
+          label: "Re-enable",
+          onClick: () => {
+            setAutoOdds(true);
+            setAutoOddsLosses(0);
+            window.localStorage.setItem("crypto.autoOdds", "on");
+          },
+        },
+      });
     }
   }, [liveOrders, autoOddsLosses]);
 
