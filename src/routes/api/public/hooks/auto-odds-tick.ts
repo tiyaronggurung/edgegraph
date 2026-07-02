@@ -14,7 +14,7 @@ import { runAutoTradeCore, sellOddsBetCore } from "@/lib/cryptoAutoTrade.functio
 import { computeBtcMarkets } from "@/lib/cryptoBtc.functions";
 
 const WINDOW_MS = 15 * 60 * 1000;
-const AUTO_ODDS_STAKE = 100;
+const AUTO_ODDS_STAKE = 200;
 
 // American odds from Kalshi ¢ (favorites negative, dogs positive).
 function centsToAmerican(cents: number): number {
