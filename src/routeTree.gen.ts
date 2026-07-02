@@ -42,6 +42,7 @@ import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/a
 import { Route as ApiPublicHooksBtcCalibrateRouteImport } from './routes/api/public/hooks/btc-calibrate'
 import { Route as ApiPublicHooksBackfillOutcomesRouteImport } from './routes/api/public/hooks/backfill-outcomes'
 import { Route as ApiPublicHooksAutoTradeRouteImport } from './routes/api/public/hooks/auto-trade'
+import { Route as ApiPublicHooksAutoOddsTickRouteImport } from './routes/api/public/hooks/auto-odds-tick'
 
 const UnsubscribeRoute = UnsubscribeRouteImport.update({
   id: '/unsubscribe',
@@ -218,6 +219,12 @@ const ApiPublicHooksAutoTradeRoute = ApiPublicHooksAutoTradeRouteImport.update({
   path: '/api/public/hooks/auto-trade',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksAutoOddsTickRoute =
+  ApiPublicHooksAutoOddsTickRouteImport.update({
+    id: '/api/public/hooks/auto-odds-tick',
+    path: '/api/public/hooks/auto-odds-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -243,6 +250,7 @@ export interface FileRoutesByFullPath {
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
@@ -277,6 +285,7 @@ export interface FileRoutesByTo {
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
@@ -313,6 +322,7 @@ export interface FileRoutesById {
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
@@ -349,6 +359,7 @@ export interface FileRouteTypes {
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/hooks/auto-odds-tick'
     | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
     | '/api/public/hooks/btc-calibrate'
@@ -383,6 +394,7 @@ export interface FileRouteTypes {
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/hooks/auto-odds-tick'
     | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
     | '/api/public/hooks/btc-calibrate'
@@ -418,6 +430,7 @@ export interface FileRouteTypes {
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/hooks/auto-odds-tick'
     | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
     | '/api/public/hooks/btc-calibrate'
@@ -440,6 +453,7 @@ export interface RootRouteChildren {
   ApiHealthKalshiRoute: typeof ApiHealthKalshiRoute
   ApiPublicSendDailyDigestsRoute: typeof ApiPublicSendDailyDigestsRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
+  ApiPublicHooksAutoOddsTickRoute: typeof ApiPublicHooksAutoOddsTickRoute
   ApiPublicHooksAutoTradeRoute: typeof ApiPublicHooksAutoTradeRoute
   ApiPublicHooksBackfillOutcomesRoute: typeof ApiPublicHooksBackfillOutcomesRoute
   ApiPublicHooksBtcCalibrateRoute: typeof ApiPublicHooksBtcCalibrateRoute
@@ -684,6 +698,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksAutoTradeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/auto-odds-tick': {
+      id: '/api/public/hooks/auto-odds-tick'
+      path: '/api/public/hooks/auto-odds-tick'
+      fullPath: '/api/public/hooks/auto-odds-tick'
+      preLoaderRoute: typeof ApiPublicHooksAutoOddsTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -736,6 +757,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthKalshiRoute: ApiHealthKalshiRoute,
   ApiPublicSendDailyDigestsRoute: ApiPublicSendDailyDigestsRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
+  ApiPublicHooksAutoOddsTickRoute: ApiPublicHooksAutoOddsTickRoute,
   ApiPublicHooksAutoTradeRoute: ApiPublicHooksAutoTradeRoute,
   ApiPublicHooksBackfillOutcomesRoute: ApiPublicHooksBackfillOutcomesRoute,
   ApiPublicHooksBtcCalibrateRoute: ApiPublicHooksBtcCalibrateRoute,
