@@ -81,29 +81,45 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
           let note: string | undefined;
 
           try {
-            // ── 1. LOSS-STOP: sweep newly settled tracked orders ──
-            const { data: unprocessed } = await supabaseAdmin
+            // ── 1. LOSS-STOP: derive counter fresh from tail of tracked
+            // orders. Race-proof: does NOT depend on processed_settle, so
+            // overlapping ticks can't double-count the same settled_loss.
+            // We still update processed_settle for bookkeeping / whipsaw
+            // exclusion, but the count itself is a pure read.
+            const { data: recentTracked } = await supabaseAdmin
               .from("auto_odds_tracked_orders")
-              .select("id, order_id")
+              .select("id, order_id, processed_settle, created_at")
               .eq("user_id", userId)
-              .eq("processed_settle", false);
+              .order("created_at", { ascending: false })
+              .limit(10);
 
-            let losses = u.consecutive_losses ?? 0;
-            if (unprocessed && unprocessed.length > 0) {
-              const orderIds = unprocessed.map((r: any) => r.order_id);
+            let losses = 0;
+            if (recentTracked && recentTracked.length > 0) {
+              const orderIds = recentTracked.map((r: any) => r.order_id);
               const { data: rows } = await supabaseAdmin
                 .from("auto_trade_orders")
                 .select("id, status")
                 .in("id", orderIds);
               const statusMap = new Map<string, string>((rows ?? []).map((r: any) => [r.id, r.status]));
-              const settledIds: string[] = [];
-              for (const r of unprocessed as any[]) {
+
+              // Walk newest → oldest; count tail-run of settled_loss until
+              // any settled_win (reset) or unsettled order (stop scanning).
+              for (const r of recentTracked as any[]) {
                 const st = statusMap.get(r.order_id);
-                if (st === "settled_win" || st === "settled_loss") {
-                  settledIds.push(r.id);
-                  losses = st === "settled_loss" ? losses + 1 : 0;
-                }
+                if (st === "settled_loss") { losses += 1; continue; }
+                if (st === "settled_win") break;
+                // still open / placed / cancelled → skip (doesn't reset, doesn't count)
+                continue;
               }
+
+              // Bookkeeping: mark settled tracked rows as processed so the
+              // whipsaw-exit loop below skips them.
+              const settledIds = (recentTracked as any[])
+                .filter(r => {
+                  const st = statusMap.get(r.order_id);
+                  return !r.processed_settle && (st === "settled_win" || st === "settled_loss");
+                })
+                .map(r => r.id);
               if (settledIds.length > 0) {
                 await supabaseAdmin
                   .from("auto_odds_tracked_orders")
@@ -127,6 +143,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 .update({ consecutive_losses: losses })
                 .eq("user_id", userId);
             }
+
 
             // ── 2. WHIPSAW EXIT: for each tracked open order ──
             const { data: openTracked } = await supabaseAdmin
