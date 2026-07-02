@@ -1,86 +1,95 @@
 
-# 15-min BTC model — accuracy upgrade plan
+# Model Study — closing the learning loop
 
-Goal: boost hit rate on 15-min predictions **without touching** buy/ladder/manual-close/martingale/hard-cap paths. Everything below is additive and defaults **OFF** (opt-in via toolbar toggles + `localStorage`), same pattern as the existing chart/HTF/ETH gates.
+Three layers, staged so nothing risks live trading until you've seen it work in shadow first.
 
-Ship in 4 phases. You approve each phase before I move to the next.
+## Part A — Vote on recommendations (small)
 
----
+The `crypto_study_feedback` table and `setRecommendationFeedback` server fn already exist. What's missing is the UI.
 
-## Phase 1 — Rolling calibration (safest, highest ROI)
+- Add 👍 / 👎 buttons next to each recommendation in `ModelStudyPanel`.
+- Vote is persisted per (study, recIndex). Existing vote highlights.
+- `studyMissesWithAI` already reads prior votes and passes them to Gemini as "favor up-voted, avoid down-voted" — so voting immediately makes the next study smarter. No backend work needed for A.
 
-**What:** compute score→win% mapping from the last N=200 settled trades, apply as a threshold shift.
+## Part B — Shadow-mode gate simulator (medium)
 
-**Where:**
-- New: `src/lib/rollingCalibration.functions.ts` — server fn that reads recent trades, buckets by chart-verdict score (0–100 in 10-wide bins), returns `{ binWinRate, shift, sampleSize }`.
-- Consumed on `/crypto` via `useQuery` (5-min stale). A `Calibration` badge shows current shift (e.g. `+3 pts, N=187`).
-- Chart verdict's final score gets `+ shift` before comparison to the fire threshold. Shift is clamped to ±8 pts so it can't do anything dramatic.
+For every settled trade (win or loss), replay each gate against the captured `inputs_snapshot` and record whether it *would have* blocked the trade. This gives hard numbers, not LLM opinions.
 
-**Toggle:** `Calibrate` (default OFF). When OFF, behavior is identical to today.
+New table `crypto_gate_shadow_sim`:
+- `trade_id`, `gate_name`, `threshold` (jsonb), `would_have_blocked` (bool), `pnl_saved` (numeric, positive if blocking would've avoided loss, negative if it would've killed a win).
 
-**Risk:** near zero — pure post-processing.
+Gates simulated (each already logged in `inputs_snapshot`):
+- `candleGate` at strict / lenient
+- `trendlineGate` at strict / lenient
+- `sigmaMin` at 1.0 / 1.5 / 2.0 / 2.5
+- `verdictMin` at 55 / 60 / 65 / 70
+- `edgeMin` at 2 / 3 / 5
+- `roundLevelGate` (already exists as helper)
 
----
+Simulation runs:
+- On demand from the panel ("Recompute shadow sim").
+- Automatically inside `diagnoseRecentMisses` when a new miss is added.
 
-## Phase 2 — Regime detector + dynamic verdict weights
+Panel shows a table:
 
-**What:** classify last 30 min as `trend` / `chop` / `mixed` from ATR + range vs. straight-line move, then reweight `useChartVerdict`.
+```text
+Gate                Would've blocked   Losses saved   Wins killed   Net $
+candleGate=strict          14 / 32         $612           $180        +432
+verdictMin>=65             11 / 32         $488            $95        +393
+sigmaMin>=2.0               7 / 32         $301            $60        +241
+...
+```
 
-**Rules:**
-- `trend`: VWAP 25%, RSI 5%, Flow 15%, Trend 20%, Wick 5%, Futures 20%, Liq 10%
-- `chop`: VWAP 15%, RSI 20%, Flow 10%, Trend 5%, Wick 20%, Futures 10%, Liq 20%
-- `mixed`: current static weights (baseline)
+Sorted by net dollars. Green = would help, red = would hurt.
 
-**Where:**
-- New: `src/hooks/useMarketRegime.ts` — derives regime from existing tick buffer, exposes `{ regime, atrPct, straightness }`.
-- Edit: `useChartVerdict.ts` — accept optional `regime` arg; switch weight table.
-- Verdict badge tooltip shows the active regime.
+## Part C — Auto-apply learned rules (careful, opt-in)
 
-**Toggle:** `Regime` (default OFF). OFF = static weights (today).
+**This is the part that changes live trading behavior. Everything here is off by default and requires an explicit user toggle.**
 
-**Risk:** moderate — changes score composition. Off by default; you can A/B by flipping toggle.
+New table `crypto_learned_gates`:
+- `gate_name`, `threshold` (jsonb), `enabled` (bool), `source` ("shadow_sim" | "study" | "manual"), `min_samples`, `evidence` (jsonb with sim stats), `applied_at`, `disabled_at`.
 
----
+Auto-apply rule (only when the user has flipped "Enable auto-learning" on):
 
-## Phase 3 — Coinbase second BTC feed (Binance/Coinbase lead-lag)
+A gate becomes eligible for auto-apply when ALL of these are true:
+1. Shadow sim has ≥ 30 samples for that gate at that threshold.
+2. Net dollars saved > 0 across the sample.
+3. Losses saved / (wins killed + 1) ≥ 2 (double-benefit floor).
+4. If the gate was also up-voted in a study, weight raised. If down-voted, blocked.
 
-**What:** subscribe to `wss://ws-feed.exchange.coinbase.com` (BTC-USD ticker/matches). Free, no auth, no CORS issue for WS.
+When eligible, it's written to `crypto_learned_gates` and the live auto-trade path reads it and applies the threshold as an *additional* filter on top of your manual gate settings. Never *loosens* an existing gate — only tightens.
 
-**Adds two signals:**
-- `leadLagBps` — Coinbase-Binance mid diff. |diff| > 2 bps and expanding = active flow imbalance.
-- `whichLeads` — which venue ticked first on the last 3 significant moves. Used as a small tie-breaker.
+Auto-learning has a **kill switch** in the panel: one click reverts all learned gates to disabled without touching your manual settings.
 
-**Where:**
-- New: `src/hooks/useCoinbaseBtcSpot.ts` — WS + reconnect logic mirroring `useBinanceBtcSpot.ts`.
-- Feeds into `useChartVerdict` as a **±3 pt bump** to the Flow component only. Not a hard gate.
+Live path change — one place only:
+- `runAutoTrade` in `cryptoAutoTrade.functions.ts` already evaluates each candidate market through gates. Add a single call after the existing gate stack: `applyLearnedGates(candidate)` which reads active `crypto_learned_gates` rows and skips the trade if any tighten-only learned gate rejects.
+- Every skip is logged to `auto_trade_skip_log` with `reason = "learned_<gate>"` so you can see it working.
 
-**Toggle:** `CB Feed` (default OFF).
+## Rollout order
 
-**Risk:** low — WS-only, small score contribution, no auth needed.
+1. Ship **A** immediately (UI only, zero live-trade risk). Vote on the misses we already have.
+2. Ship **B** next migration. Recompute for existing 23 misses + 9 wins. Read the table for a few days. **Nothing changes in live trading.**
+3. Ship **C** last, with the user toggle **off** by default. When you turn it on, learned gates start applying only after they cross the eligibility bar (min 30 samples, net positive, double-benefit floor).
 
----
+## Files
 
-## Phase 4 — Round-number magnet gate (already in memory)
+- Migration: `crypto_gate_shadow_sim`, `crypto_learned_gates` (both with GRANTs + RLS).
+- New: `src/lib/cryptoShadowSim.functions.ts` — `recomputeShadowSim`, `getShadowSimReport`, and a pure `simulateGates(trade)` helper.
+- New: `src/lib/cryptoLearnedGates.functions.ts` — `refreshLearnedGates` (evaluates eligibility), `getLearnedGates`, `toggleAutoLearning`, `revertLearnedGates`.
+- Edit: `src/lib/cryptoMisses.functions.ts` — call `simulateGates` inside `diagnoseRecentMisses` for new misses.
+- Edit: `src/lib/cryptoAutoTrade.functions.ts` — one hook after existing gates, reading learned rules.
+- Edit: `src/routes/_authenticated/crypto.tsx` — expand `ModelStudyPanel` with vote buttons, shadow-sim table, learned-gates panel, and the auto-learning toggle + kill switch.
 
-**What:** when spot is within `X bps` (default 5 bps ≈ $5 at $100k) of a $50 or $100 level, require a **confirmed break** (3 consecutive 15s closes on the far side) before firing against the level.
+## Non-goals / guardrails
 
-**Where:**
-- New: `src/lib/roundLevelGate.ts` — pure fn: `shouldSkipForMagnet(price, side, tickBuffer)`.
-- Called in `/crypto` gate chain right after `htfGate`.
+- Never loosens a gate — learned rules only skip trades, never allow ones you'd have skipped.
+- Never touches auto-trade sizing, cash-out logic, buy/ladder/manual-close paths, or your $500/$150 caps.
+- Never modifies the auto-trade gate defaults you set (chart gate OFF, sentiment gate OFF stay OFF).
+- Kill switch reverts learned gates without touching your manual settings.
 
-**Toggle:** `Magnet` (default OFF).
+## Approval to proceed
 
-**Risk:** low — skip-only gate, never forces a trade.
+Two things to confirm:
 
----
-
-## What I will NOT touch
-- Order placement, ladders, martingale sizing
-- Manual close, 35% hard cap, 70%-down rule
-- Kalshi ATM sentiment gate (already there, unchanged)
-- Existing default-OFF gates (chart/HTF/ETH)
-
-## Rollout
-Each phase ships behind its own toggle, verified in preview against live BTC before moving to the next. If any phase feels wrong you flip it off — zero regression risk vs. current behavior.
-
-**Confirm and I'll start Phase 1.** Or tell me to reorder / drop a phase.
+1. Ship A + B in one pass, then C in a second pass after you've eyeballed the shadow-sim numbers? (Recommended.) Or all three at once?
+2. The auto-apply eligibility bar — min 30 samples, net-positive dollars, 2:1 losses-saved-to-wins-killed. OK to start with those, or want stricter?
