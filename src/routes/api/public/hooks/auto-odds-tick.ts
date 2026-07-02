@@ -371,6 +371,50 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               continue;
             }
 
+            // ── 2-SECOND PERSISTENCE CHECK ──
+            // Kalshi odds can flicker in/out of -450/-750 in <1s during
+            // volatile moves. Wait 2s, re-fetch, and require the picked side
+            // to STILL satisfy the same window's threshold. If the odds
+            // moved out of range, treat as a flicker and skip.
+            await new Promise(r => setTimeout(r, 2000));
+            let persist: Awaited<ReturnType<typeof computeBtcMarkets>>["markets"] | null = null;
+            try {
+              const r = await computeBtcMarkets();
+              persist = r.markets;
+            } catch { /* if refetch fails, skip conservatively */ }
+
+            const atm2 = persist?.find(m => m.ticker === atm.ticker) ?? null;
+            if (!atm2) {
+              note = `skipped: 2s re-check unavailable on ${atm.ticker} (was ${pick.reason})`;
+              await logStudy({ entered: false, hedge_fired: false, note });
+              summary.push({ user_id: userId, entries, exits, stopped, note });
+              continue;
+            }
+            const yesCents2 = Math.max(1, Math.min(99, Math.round((atm2.yesAsk || atm2.yesPrice) * 100)));
+            const noCents2 = Math.max(1, Math.min(99, Math.round((atm2.noAsk || (1 - atm2.yesPrice)) * 100)));
+            const yesAm2 = centsToAmerican(yesCents2);
+            const noAm2 = centsToAmerican(noCents2);
+            const sideAm2 = pick.side === "YES" ? yesAm2 : noAm2;
+
+            // Threshold per window: main window keeps strict [-750, -450];
+            // ≤2:00 fallback keeps ≤-300; close-window (<15s) has no floor.
+            let persistOk = true;
+            let thresholdLabel = "";
+            if (remainingMs > 2 * 60_000) {
+              persistOk = sideAm2 <= -450 && sideAm2 >= -750;
+              thresholdLabel = "[-750,-450]";
+            } else if (remainingMs > 15_000) {
+              persistOk = sideAm2 <= -300;
+              thresholdLabel = "≤-300";
+            }
+            if (!persistOk) {
+              note = `skipped: 2s flicker — ${pick.side} was ${pick.reason}, now ${sideAm2} outside ${thresholdLabel}`;
+              await logStudy({ entered: false, hedge_fired: false, note });
+              summary.push({ user_id: userId, entries, exits, stopped, note });
+              continue;
+            }
+
+
             const placeResult = await runAutoTradeCore(supabaseAdmin as any, userId, {
               mode: "live",
               confirm: "I_UNDERSTAND_LIVE",
