@@ -1345,6 +1345,7 @@ function AutoTradePanel() {
       const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: AUTO_ODDS_STAKE, maxOrders: 1, force: true, forceTicker: ticker, forceSide: side } });
       if (res.placed > 0 && res.orders?.[0]) {
         const o = res.orders[0];
+        if (soundOn) { playOrderPlaced(); setTimeout(() => playOrderFilled(), 200); }
         toast.success(`Odds-bet $${AUTO_ODDS_STAKE}: ${side === "YES" ? "UP" : "DOWN"} ${ticker} @ ${o.limit_cents}¢ — ${reason}`);
         qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
         return o.id ?? null;
