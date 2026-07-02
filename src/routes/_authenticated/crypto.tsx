@@ -1361,6 +1361,42 @@ function AutoTradePanel() {
     return () => { cancelled = true; };
   }, [autoOdds, autoOddsLosses]);
 
+  // Sync FROM the server (auto_odds_settings) every 20s so a server-side
+  // 2-loss stop turns the UI off, and other tabs see the same state.
+  useEffect(() => {
+    let cancelled = false;
+    const sync = async () => {
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        const uid = u?.user?.id;
+        if (!uid || cancelled) return;
+        const { data: row } = await supabase
+          .from("auto_odds_settings")
+          .select("enabled, consecutive_losses, stopped_reason")
+          .eq("user_id", uid)
+          .maybeSingle();
+        if (cancelled || !row) return;
+        if (row.enabled !== autoOdds) {
+          setAutoOdds(row.enabled);
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem("crypto.autoOdds", row.enabled ? "on" : "off");
+          }
+          if (!row.enabled && row.stopped_reason === "two_losses") {
+            toast.error("Auto-Odds stopped by server — 2 losing trades in a row");
+          }
+        }
+        if ((row.consecutive_losses ?? 0) !== autoOddsLosses) {
+          setAutoOddsLosses(row.consecutive_losses ?? 0);
+        }
+      } catch { /* ignore */ }
+    };
+    sync();
+    const h = setInterval(sync, 20_000);
+    return () => { cancelled = true; clearInterval(h); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
   // Mutual exclusion: turning on Auto-Odds disables Auto-Martingale.
   useEffect(() => {
     if (autoOdds && autoMart) setAutoMart(false);
@@ -1424,6 +1460,21 @@ function AutoTradePanel() {
           if (o.id && !oids.includes(o.id)) oids.push(o.id);
           window.localStorage.setItem("crypto.autoOdds.oids", JSON.stringify(oids.slice(-50)));
         } catch { /* ignore */ }
+        // Also mirror into DB so the server-side tick can run whipsaw/loss-stop
+        // even when this browser tab closes. Non-fatal if it fails.
+        try {
+          const { data: u } = await supabase.auth.getUser();
+          const uid = u?.user?.id;
+          if (uid && o.id) {
+            const entryCents = o.entry_price_cents ?? o.limit_cents;
+            await supabase.from("auto_odds_tracked_orders").insert({
+              user_id: uid,
+              order_id: o.id,
+              entry_side: o.side,
+              entry_odds: centsToAmericanNum(entryCents),
+            });
+          }
+        } catch { /* ignore — server can also insert on its own placements */ }
         qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
         return o.id ?? null;
       }

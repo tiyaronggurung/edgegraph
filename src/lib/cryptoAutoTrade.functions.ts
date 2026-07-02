@@ -11,7 +11,9 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { getBtcMarkets } from "./cryptoBtc.functions";
+import { getBtcMarkets, computeBtcMarkets } from "./cryptoBtc.functions";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 
 // ── Paper rails (kept for backwards-compat with the existing paper UI) ──
 const MAX_ORDERS_PER_SESSION_PAPER = 5;
@@ -84,6 +86,17 @@ export interface AutoTradeRunResult {
   orders: AutoTradeOrderRow[];
 }
 
+export type RunAutoTradeInput = {
+  mode: "paper" | "live";
+  confirm: string;
+  force: boolean;
+  isMartingale: boolean;
+  maxOrders: number;
+  stakeUsd: number;
+  forceTicker: string | undefined;
+  forceSide: "YES" | "NO" | undefined;
+};
+
 export const runAutoTrade = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { mode?: "paper" | "live"; maxOrders?: number; stakeUsd?: number; confirm?: string; force?: boolean; isMartingale?: boolean; forceTicker?: string; forceSide?: "YES" | "NO" } | undefined) => {
@@ -99,10 +112,18 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       stakeUsd: Math.min(stakeCap, Math.max(1, data?.stakeUsd ?? stakeCap)),
       forceTicker: typeof data?.forceTicker === "string" && data.forceTicker.length > 0 ? data.forceTicker : undefined,
       forceSide: data?.forceSide === "YES" || data?.forceSide === "NO" ? data.forceSide : undefined,
-    };
+    } satisfies RunAutoTradeInput;
   })
-  .handler(async ({ data, context }): Promise<AutoTradeRunResult> => {
-    const { supabase, userId } = context;
+  .handler(async ({ data, context }): Promise<AutoTradeRunResult> =>
+    runAutoTradeCore(context.supabase as SupabaseClient, context.userId, data),
+  );
+
+export async function runAutoTradeCore(
+  supabase: SupabaseClient,
+  userId: string,
+  data: RunAutoTradeInput,
+): Promise<AutoTradeRunResult> {
+
     const sessionId = crypto.randomUUID();
     const isLive = data.mode === "live";
 
@@ -187,7 +208,7 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       }
     }
 
-    const result = await getBtcMarkets();
+    const result = await computeBtcMarkets();
     const skipReasons: string[] = [];
 
     // ── Equity-momentum overlay (SPY/QQQ/ES/NQ leading indicator) ──
@@ -323,7 +344,7 @@ export const runAutoTrade = createServerFn({ method: "POST" })
     let freshProbBySide = new Map<string, number>();
     if (!data.force && candidates.length > 0) {
       try {
-        const fresh = await getBtcMarkets();
+        const fresh = await computeBtcMarkets();
         for (const fm of fresh.markets) {
           const sideProb = fm.side === "YES" ? fm.modelYesProb : 1 - fm.modelYesProb;
           freshProbBySide.set(`${fm.ticker}|${fm.side}`, sideProb);
@@ -458,7 +479,8 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       skipReasons: skipReasons.slice(0, 20),
       orders: placed,
     };
-  });
+}
+
 
 export const listAutoTradeOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -584,7 +606,7 @@ export async function autoExitForUser(
   // Fresh model read for flip detection.
   const currentModelProbBySide = new Map<string, number>();
   try {
-    const fresh = await getBtcMarkets();
+    const fresh = await computeBtcMarkets();
     const byTicker = new Map(fresh.markets.map(m => [m.ticker, m]));
     for (const r of rows) {
       const m = byTicker.get(r.ticker);
@@ -872,9 +894,20 @@ export const sellOddsBetOrder = createServerFn({ method: "POST" })
     if (!data?.orderId || typeof data.orderId !== "string") throw new Error("orderId required");
     return { orderId: data.orderId, reason: data.reason ?? "whipsaw_exit" };
   })
-  .handler(async ({ data, context }): Promise<{ ok: boolean; message: string; pnlUsd?: number }> => {
-    const { supabase, userId } = context;
+  .handler(async ({ data, context }): Promise<{ ok: boolean; message: string; pnlUsd?: number }> =>
+    sellOddsBetCore(context.supabase as SupabaseClient, context.userId, data.orderId, data.reason),
+  );
+
+export async function sellOddsBetCore(
+  supabase: SupabaseClient,
+  userId: string,
+  orderId: string,
+  reason: string = "whipsaw_exit",
+): Promise<{ ok: boolean; message: string; pnlUsd?: number }> {
+    const data = { orderId, reason };
     const liveEnabled = process.env.KALSHI_LIVE_ENABLED === "true";
+
+
 
     const { data: row, error: rErr } = await supabase
       .from("auto_trade_orders")
@@ -992,7 +1025,8 @@ export const sellOddsBetOrder = createServerFn({ method: "POST" })
       await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", row.id);
       return { ok: false, message: `err ${e?.message ?? "x"}` };
     }
-  });
+}
+
 
 
 
