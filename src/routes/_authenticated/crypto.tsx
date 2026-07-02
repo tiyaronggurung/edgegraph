@@ -1567,7 +1567,29 @@ function AutoTradePanel() {
               reset
             </button>
           )}
-          {autoMart && <MartingaleCountdown windowMs={WINDOW_MS} />}
+          <button
+            onClick={() => {
+              if (!autoOdds) {
+                const ok = window.confirm(
+                  "ENABLE AUTO-ODDS BET (LIVE, REAL MONEY)?\n\n" +
+                  "• $100 per 15m window · ignores model pick\n" +
+                  "• Monitors first 2:30 of window\n" +
+                  "• 12:30 → 2:00 remaining: fires on side with odds in -450 to -750\n" +
+                  "• ≤ 2:00 remaining: fallback fires on side ≤ -300\n" +
+                  "• Final seconds: fires on side closest to the range\n" +
+                  "• Turning this ON disables Auto-Martingale.",
+                );
+                if (!ok) return;
+              }
+              setAutoOdds(v => !v);
+            }}
+            className={`text-xs font-semibold px-3 py-1.5 rounded border flex items-center gap-1.5 ${autoOdds ? "border-amber-500/50 bg-amber-500/15 text-amber-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+            title="Auto-Odds: $100/window on side with odds -450 to -750 (fallback -300 near close). Ignores model pick."
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${autoOdds ? "bg-amber-400 animate-pulse" : "bg-muted-foreground"}`} />
+            {autoOdds ? `Odds-Bet ON · $${AUTO_ODDS_STAKE}` : "Odds-Bet OFF"}
+          </button>
+          {(autoMart || autoOdds) && <MartingaleCountdown windowMs={WINDOW_MS} />}
           <ChartVerdictBadge compact />
           <KalshiSentimentBadge s={kalshiSentiment} compact />
           {autoMart && (
