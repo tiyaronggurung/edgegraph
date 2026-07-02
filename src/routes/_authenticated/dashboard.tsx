@@ -16,6 +16,7 @@ import { ModelLiveSoccerFeed } from "@/components/edge/ModelLiveSoccerFeed";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { KalshiMaintenanceBanner } from "@/components/KalshiMaintenanceBanner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — EdgeGraph AI" }] }),
@@ -187,6 +188,7 @@ function Dashboard() {
 
   return (
     <div className="space-y-6 font-mono">
+      <KalshiMaintenanceBanner />
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold uppercase tracking-wider">// Terminal</h1>
