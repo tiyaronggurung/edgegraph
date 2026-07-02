@@ -238,14 +238,21 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 }
                 const whipsawFire = armed && Math.abs(curAm - entryAm) <= 50;
 
-                // 40% implied-prob exit
+                // 40% implied-prob exit (of ENTRY prob)
                 const impliedProb = (am: number) => am < 0 ? (-am) / ((-am) + 100) : 100 / (am + 100);
                 const entryProb = impliedProb(entryAm);
                 const curProb = impliedProb(curAm);
                 const probFire = entryProb > 0 && curProb <= 0.4 * entryProb;
 
-                if (whipsawFire || probFire) {
-                  const reason = whipsawFire ? "whipsaw_server" : "prob40_server";
+                // Flip stop-loss: entry side was ≥80% implied AND now either
+                //   (a) our side < 40% implied, OR
+                //   (b) opposite side ≥ 80% implied  (== our side ≤ 20%)
+                // Uses Kalshi mid ¢ on our side. curCents is 1..99.
+                const entryCentsImplied = Math.max(1, Math.min(99, entryCents));
+                const flipFire = entryCentsImplied >= 80 && curCents < 40;
+
+                if (whipsawFire || probFire || flipFire) {
+                  const reason = flipFire ? "flip_server" : whipsawFire ? "whipsaw_server" : "prob40_server";
                   try {
                     const res = await sellOddsBetCore(supabaseAdmin as any, userId, o.id, reason);
                     if (res.ok) {
@@ -257,6 +264,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                     }
                   } catch { /* retry next tick */ }
                 }
+
               }
             }
 
