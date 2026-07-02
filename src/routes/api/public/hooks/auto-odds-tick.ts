@@ -239,9 +239,10 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 const probFire = entryProb > 0 && curProb <= 0.4 * entryProb;
 
                 // Flip stop-loss: entry American odds in [-750, -450] (deep
-                // favorite we bought) AND current side has flipped to +100 or
-                // worse (≤50¢ implied on our side).
-                const flipFire = entryAm <= -450 && entryAm >= -750 && curCents <= 50;
+                // favorite we bought) AND current side has drifted to ≤65¢
+                // implied. Fires earlier than a full flip so we exit while
+                // the loss is still small, before the final-60s lockout.
+                const flipFire = entryAm <= -450 && entryAm >= -750 && curCents <= 65;
 
                 if (whipsawFire || probFire || flipFire) {
                   const reason = flipFire ? "flip_server" : whipsawFire ? "whipsaw_server" : "prob40_server";
