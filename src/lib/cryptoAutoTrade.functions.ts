@@ -210,16 +210,30 @@ export const runAutoTrade = createServerFn({ method: "POST" })
     if (data.force) {
       // Force mode: bypass entry gates (edge/sigma/momentum/time/dedupe/equity-block).
       // Daily caps, kill switch, confirm token, and key health still apply (checked above).
-      // Pick the top N markets by strongest model conviction (largest |edge|),
-      // restricted to markets with a tradeable side and >0s to close.
-      const top = result.markets
-        .filter(m => m.secondsToClose > 0 && (m.yesAsk > 0 || m.noAsk > 0))
-        .sort((a, b) => b.edgeAbs - a.edgeAbs)
-        .slice(0, Math.max(1, data.maxOrders));
-      if (top.length === 0) {
-        skipReasons.push("force: no tradeable market with valid quotes");
+      let top: typeof result.markets;
+      if (data.forceTicker && data.forceSide) {
+        // Odds-driven bet: caller specifies exact ticker + side; ignore model pick.
+        const found = result.markets.find(mm => mm.ticker === data.forceTicker && mm.secondsToClose > 0);
+        if (!found) {
+          top = [];
+          skipReasons.push(`force: ticker ${data.forceTicker} not found or expired`);
+        } else {
+          // Override side so downstream uses caller's chosen leg (YES/NO ask, insert).
+          top = [{ ...found, side: data.forceSide }];
+          skipReasons.push(`force: odds-bet ${data.forceTicker} ${data.forceSide} (model pick ignored)`);
+        }
       } else {
-        skipReasons.push(`force: picked ${top.length} market(s): ${top.map(t => `${t.ticker} ${t.side} edge=${t.edgeAbs.toFixed(1)}pts`).join("; ")} (gates bypassed)`);
+        // Pick the top N markets by strongest model conviction (largest |edge|),
+        // restricted to markets with a tradeable side and >0s to close.
+        top = result.markets
+          .filter(m => m.secondsToClose > 0 && (m.yesAsk > 0 || m.noAsk > 0))
+          .sort((a, b) => b.edgeAbs - a.edgeAbs)
+          .slice(0, Math.max(1, data.maxOrders));
+        if (top.length === 0) {
+          skipReasons.push("force: no tradeable market with valid quotes");
+        } else {
+          skipReasons.push(`force: picked ${top.length} market(s): ${top.map(t => `${t.ticker} ${t.side} edge=${t.edgeAbs.toFixed(1)}pts`).join("; ")} (gates bypassed)`);
+        }
       }
       candidates = top;
     } else {
