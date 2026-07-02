@@ -332,8 +332,8 @@ export const applyTuning = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .maybeSingle();
     if (!study) return { ok: false as const, error: "study not found" };
-    const pending = Array.isArray(study.tunings) ? study.tunings : [];
-    const t = pending.find((x: any) => x.param === data.param);
+    const pending = Array.isArray(study.tunings) ? (study.tunings as any[]) : [];
+    const t = pending.find((x: any) => x && typeof x === "object" && x.param === data.param) as any;
     if (!t) return { ok: false as const, error: "tuning not found or already applied" };
 
     const { data: settings } = await supabaseAdmin
@@ -346,7 +346,7 @@ export const applyTuning = createServerFn({ method: "POST" })
     const check = coerceTuning(data.param, t.suggested, cur);
     if (!check.ok) return { ok: false as const, error: `unsafe: ${check.reason}` };
 
-    await supabaseAdmin.from("auto_odds_settings").update({ [data.param]: check.value }).eq("user_id", context.userId);
+    await supabaseAdmin.from("auto_odds_settings").update({ [data.param]: check.value } as any).eq("user_id", context.userId);
     await supabaseAdmin.from("auto_odds_tuning_audit").insert({
       user_id: context.userId, study_id: data.studyId, param: data.param,
       prev_value: cur, new_value: check.value,
@@ -354,14 +354,15 @@ export const applyTuning = createServerFn({ method: "POST" })
       source: "user_apply",
     });
     // Move from pending to applied on the study row.
-    const remaining = pending.filter((x: any) => x.param !== data.param);
-    const applied = Array.isArray(study.applied_tunings) ? study.applied_tunings : [];
+    const remaining = pending.filter((x: any) => !x || x.param !== data.param);
+    const applied = Array.isArray(study.applied_tunings) ? (study.applied_tunings as any[]) : [];
     await supabaseAdmin.from("auto_odds_studies").update({
       tunings: remaining,
       applied_tunings: [...applied, { ...t, current: cur, applied_at: new Date().toISOString() }],
     }).eq("id", data.studyId);
     return { ok: true as const };
   });
+
 
 const RevertInput = z.object({ auditId: z.string().uuid() });
 export const revertTuning = createServerFn({ method: "POST" })
