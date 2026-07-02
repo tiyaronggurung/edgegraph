@@ -358,17 +358,23 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               continue;
             }
 
-            // ── STRICT MODEL GATE ──
+            // ── STRICT MODEL GATE ── (AI-tunable via T.modelGateMin)
             // Never buy when our model disagrees or is under-confident on the
-            // picked side. Blocks real-money entries at model <60% no matter
-            // how deep Kalshi's odds are. Applies to all three windows.
-            const MODEL_MIN = 0.60;
+            // picked side. Default 0.60; AI safe range 0.55-0.75.
+            const MODEL_MIN = T.modelGateMin;
             // Coinflip hedge window: fire $5 opposite-side hedge only when
-            // the model is barely agreeing with Kalshi (right above the gate
-            // floor). Naturally fires ~1 in 4-5 trades since most passes sit
-            // higher than 68%.
-            const HEDGE_MIN = 0.60;
-            const HEDGE_MAX = 0.68;
+            // the model is barely agreeing with Kalshi. AI-tunable band.
+            const HEDGE_MIN = T.hedgeLo;
+            const HEDGE_MAX = T.hedgeHi;
+
+            // Bucket skip (AI-tunable). AI can turn off entries in the
+            // most-volatile time buckets when flip rate is too high.
+            const bucketNow = atm.secondsToClose > 60 ? "60-120s" : atm.secondsToClose > 15 ? "15-60s" : "<15s";
+            if ((T.skipLt15s && bucketNow === "<15s") || (T.skip15_60s && bucketNow === "15-60s")) {
+              summary.push({ user_id: userId, entries, exits, stopped, note: `skipped: bucket ${bucketNow} disabled by AI tuning` });
+              continue;
+            }
+
 
             const modelYes = atm.modelYesProb;
             const yesFav = yesCents >= noCents;
