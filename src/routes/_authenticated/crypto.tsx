@@ -1474,21 +1474,9 @@ function AutoTradePanel() {
 
     window.localStorage.setItem("crypto.autoOdds.processedSettles", JSON.stringify(Array.from(processed).slice(-100)));
     setAutoOddsLosses(nextLosses);
-    if (nextLosses >= 3) {
-      setAutoOdds(false);
-      window.localStorage.setItem("crypto.autoOdds", "off");
-      toast.error("Auto-Odds stopped — 3 losing trades in a row", {
-        duration: 30_000,
-        action: {
-          label: "Re-enable",
-          onClick: () => {
-            setAutoOdds(true);
-            setAutoOddsLosses(0);
-            window.localStorage.setItem("crypto.autoOdds", "on");
-          },
-        },
-      });
-    }
+    // Consecutive-loss auto-stop DISABLED per user request (overnight run).
+    // Losses are still tracked in state for display, but never disable Auto-Odds.
+    // To re-enable, restore the `if (nextLosses >= 3) { setAutoOdds(false); ... }` block.
   }, [liveOrders, autoOddsLosses]);
 
   // Numeric American odds from Kalshi ¢ (favorites negative, dogs positive).
