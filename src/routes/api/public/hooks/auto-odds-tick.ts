@@ -208,13 +208,32 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
 
                 const m = markets.find(mm => mm.ticker === o.ticker);
                 if (!m) continue;
-                if (m.secondsToClose <= 60) continue; // disable in final 60s
 
                 const entryCents = o.entry_price_cents ?? o.limit_cents;
                 const entryAm = t.entry_odds ?? centsToAmerican(entryCents);
                 const curCentsSide = o.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice));
                 const curCents = Math.max(1, Math.min(99, Math.round(curCentsSide * 100)));
                 const curAm = centsToAmerican(curCents);
+
+                // ── T-30s TIME EXIT ──
+                // In the final 30s, if we're still underwater (curCents <
+                // entryCents), market-sell to avoid a full $100 wipe on
+                // expiry. Runs BEFORE the ≤60s lockout below.
+                if (m.secondsToClose <= 30 && curCents < entryCents) {
+                  try {
+                    const res = await sellOddsBetCore(supabaseAdmin as any, userId, o.id, "time_exit_t30_server");
+                    if (res.ok) {
+                      exits += 1;
+                      await supabaseAdmin
+                        .from("auto_odds_tracked_orders")
+                        .update({ closed_reason: "time_exit_t30_server" })
+                        .eq("id", t.id);
+                    }
+                  } catch { /* retry next tick */ }
+                  continue;
+                }
+
+                if (m.secondsToClose <= 60) continue; // disable other exits in final 60s
 
                 let armed = t.whipsaw_armed === true;
                 if (!armed && Math.abs(curAm - entryAm) >= 200) {
@@ -443,12 +462,12 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             // It is still recorded in the study log below for analysis only.
 
 
-            // ── 2-SECOND PERSISTENCE CHECK ──
-            // Kalshi odds can flicker in/out of -450/-750 in <1s during
-            // volatile moves. Wait 2s, re-fetch, and require the picked side
+            // ── 4-SECOND PERSISTENCE CHECK ──
+            // Kalshi odds can flicker in/out of -450/-750 in <2s during
+            // volatile moves. Wait 4s, re-fetch, and require the picked side
             // to STILL satisfy the same window's threshold. If the odds
             // moved out of range, treat as a flicker and skip.
-            await new Promise(r => setTimeout(r, 2000));
+            await new Promise(r => setTimeout(r, 4000));
             let persist: Awaited<ReturnType<typeof computeBtcMarkets>>["markets"] | null = null;
             try {
               const r = await computeBtcMarkets();
