@@ -385,7 +385,25 @@ export async function runAutoTradeCore(
       // overwritten with the true IOC fill result before we insert the row.
       let filledContracts = contracts;
       let filledEntryCents = limitCents;
+      // Ladder telemetry: recorded on the auto_trade_orders.inputs_snapshot
+      // so the dashboard widget can compute success rate, avg climb, and P&L.
+      let ladderTelemetry: {
+        attempts: number;
+        startedCents: number;
+        filledCents: number | null;
+        climbedCents: number | null;
+        filled: boolean;
+        hardCapped: boolean;
+      } = {
+        attempts: 1,
+        startedCents: limitCents,
+        filledCents: null,
+        climbedCents: null,
+        filled: false,
+        hardCapped: false,
+      };
       if (isLive) {
+
         // IOC retry ladder: on 0-fill, bump limit by 1¢ and retry. Stays
         // within the odds-bet hard cap (89¢ = -750 American). Non-force
         // (model-driven) entries also allowed to nudge up to 89¢ so we don't
@@ -399,6 +417,7 @@ export async function runAutoTradeCore(
         while (attempt <= MAX_RETRIES) {
           if (attemptCents > HARD_CAP_CENTS) {
             ladderNote = `stopped at ${attemptCents}¢ (>${HARD_CAP_CENTS}¢ cap)`;
+            ladderTelemetry.hardCapped = true;
             break;
           }
           const attemptContracts = Math.max(1, Math.floor((sizedStake * 100) / attemptCents));
@@ -442,6 +461,10 @@ export async function runAutoTradeCore(
               filledContracts = out.fillCount;
               filledEntryCents = out.filledCents || attemptCents;
               filledOk = true;
+              ladderTelemetry.attempts = attempt + 1;
+              ladderTelemetry.filledCents = filledEntryCents;
+              ladderTelemetry.climbedCents = filledEntryCents - limitCents;
+              ladderTelemetry.filled = true;
               if (attempt > 0) {
                 ladderNote = `filled on retry ${attempt} @ ${filledEntryCents}¢ (started ${limitCents}¢)`;
               }
@@ -457,6 +480,21 @@ export async function runAutoTradeCore(
           }
         }
         if (!filledOk) {
+          ladderTelemetry.attempts = attempt + 1;
+          // Log the exhausted ladder attempt so the widget can show
+          // failure rate even when no order row is created.
+          try {
+            await supabase.from("auto_odds_study_log").insert({
+              user_id: userId,
+              ticker: m.ticker,
+              window_start_at: new Date().toISOString(),
+              seconds_to_close: m.secondsToClose,
+              yes_cents: m.yesAsk ?? null,
+              no_cents: m.noAsk ?? null,
+              entered: false,
+              note: `ioc_ladder_exhausted:${JSON.stringify(ladderTelemetry)}`,
+            });
+          } catch {}
           skipReasons.push(`${m.ticker}: ${ladderNote || `IOC ladder exhausted from ${limitCents}¢`}`);
           continue;
         }
@@ -464,6 +502,7 @@ export async function runAutoTradeCore(
           skipReasons.push(`${m.ticker}: ${ladderNote}`);
         }
       }
+
 
 
       const stakeFilled = (filledContracts * filledEntryCents) / 100;
@@ -496,6 +535,8 @@ export async function runAutoTradeCore(
           partial_pnl_usd: 0,
           exit_ladder: DEFAULT_EXIT_LADDER as any,
           is_martingale: data.isMartingale,
+          inputs_snapshot: { iocLadder: ladderTelemetry } as any,
+
         })
         .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
         .single();

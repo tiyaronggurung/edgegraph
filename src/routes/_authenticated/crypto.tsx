@@ -18,6 +18,7 @@ import { EquityMomentumPanel } from "@/components/EquityMomentumPanel";
 import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
 import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
 import { OddsStudyPanel } from "@/components/crypto/OddsStudyPanel";
+import { IocLadderPanel } from "@/components/crypto/IocLadderPanel";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
 import { useCalibrationShift } from "@/hooks/useCalibrationShift";
 import { useMarketRegime } from "@/hooks/useMarketRegime";
@@ -2504,6 +2505,9 @@ function CryptoPage() {
           <AutoTradePanel />
 
           <OddsStudyPanel />
+
+          <IocLadderPanel />
+
 
 
           <div>
