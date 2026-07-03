@@ -443,12 +443,12 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             // It is still recorded in the study log below for analysis only.
 
 
-            // ── 4-SECOND PERSISTENCE CHECK ──
+            // ── 2-SECOND PERSISTENCE CHECK ──
             // Kalshi odds can flicker in/out of -450/-750 in <2s during
-            // volatile moves. Wait 4s, re-fetch, and require the picked side
+            // volatile moves. Wait 2s, re-fetch, and require the picked side
             // to STILL satisfy the same window's threshold. If the odds
             // moved out of range, treat as a flicker and skip.
-            await new Promise(r => setTimeout(r, 4000));
+            await new Promise(r => setTimeout(r, 2000));
             let persist: Awaited<ReturnType<typeof computeBtcMarkets>>["markets"] | null = null;
             try {
               const r = await computeBtcMarkets();
