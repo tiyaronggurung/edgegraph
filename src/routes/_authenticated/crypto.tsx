@@ -2165,7 +2165,7 @@ function CryptoPage() {
   const cfgFn = useServerFn(checkKalshiConfigured);
   const placeFn = useServerFn(placeKalshiOrder);
 
-  const q = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 10_000, staleTime: 5_000 });
+  const q = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 2_000, staleTime: 1_000 });
   const cfg = useQuery({ queryKey: ["kalshi-cfg"], queryFn: () => cfgFn(), staleTime: 60_000 });
 
   // Record ATM odds snapshot every marketsQ refetch for post-hoc analysis.
