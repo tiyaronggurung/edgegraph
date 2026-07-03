@@ -417,6 +417,7 @@ export async function runAutoTradeCore(
         while (attempt <= MAX_RETRIES) {
           if (attemptCents > HARD_CAP_CENTS) {
             ladderNote = `stopped at ${attemptCents}¢ (>${HARD_CAP_CENTS}¢ cap)`;
+            ladderTelemetry.hardCapped = true;
             break;
           }
           const attemptContracts = Math.max(1, Math.floor((sizedStake * 100) / attemptCents));
@@ -460,6 +461,10 @@ export async function runAutoTradeCore(
               filledContracts = out.fillCount;
               filledEntryCents = out.filledCents || attemptCents;
               filledOk = true;
+              ladderTelemetry.attempts = attempt + 1;
+              ladderTelemetry.filledCents = filledEntryCents;
+              ladderTelemetry.climbedCents = filledEntryCents - limitCents;
+              ladderTelemetry.filled = true;
               if (attempt > 0) {
                 ladderNote = `filled on retry ${attempt} @ ${filledEntryCents}¢ (started ${limitCents}¢)`;
               }
@@ -475,6 +480,21 @@ export async function runAutoTradeCore(
           }
         }
         if (!filledOk) {
+          ladderTelemetry.attempts = attempt + 1;
+          // Log the exhausted ladder attempt so the widget can show
+          // failure rate even when no order row is created.
+          try {
+            await supabase.from("auto_odds_study_log").insert({
+              user_id: userId,
+              ticker: m.ticker,
+              window_start_at: new Date().toISOString(),
+              seconds_to_close: m.secondsToClose,
+              yes_cents: m.yesAsk ?? null,
+              no_cents: m.noAsk ?? null,
+              entered: false,
+              note: `ioc_ladder_exhausted:${JSON.stringify(ladderTelemetry)}`,
+            });
+          } catch {}
           skipReasons.push(`${m.ticker}: ${ladderNote || `IOC ladder exhausted from ${limitCents}¢`}`);
           continue;
         }
@@ -482,6 +502,7 @@ export async function runAutoTradeCore(
           skipReasons.push(`${m.ticker}: ${ladderNote}`);
         }
       }
+
 
 
       const stakeFilled = (filledContracts * filledEntryCents) / 100;
