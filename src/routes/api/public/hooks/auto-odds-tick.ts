@@ -468,20 +468,9 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             const noAm2 = centsToAmerican(noCents2);
             const sideAm2 = pick.side === "YES" ? yesAm2 : noAm2;
 
-            // Threshold per window: main window keeps strict [-750, -450];
-            // ≤2:00 fallback keeps ≤-300; close-window (<15s) has no floor.
-            let persistOk = true;
-            let thresholdLabel = "";
-            if (remainingMs > 2 * 60_000) {
-              persistOk = sideAm2 <= -450 && sideAm2 >= -750;
-              thresholdLabel = "[-750,-450]";
-            } else if (remainingMs > 15_000) {
-              persistOk = sideAm2 <= -300 && sideAm2 >= -750;
-              thresholdLabel = "[-750,-300]";
-            } else {
-              persistOk = sideAm2 <= -300 && sideAm2 >= -750;
-              thresholdLabel = "close-window [-750,-300]";
-            }
+            // Strict band on re-check for ALL phases.
+            let persistOk = sideAm2 <= -450 && sideAm2 >= -750;
+            let thresholdLabel = "[-750,-450]";
             if (!persistOk) {
               note = `skipped: 2s flicker — ${pick.side} was ${pick.reason}, now ${sideAm2} outside ${thresholdLabel}`;
               await logStudy({ entered: false, hedge_fired: false, note });
