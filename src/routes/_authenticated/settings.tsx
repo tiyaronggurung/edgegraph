@@ -1,11 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useEffect, useState } from "react";
 import { SPORTS } from "@/lib/sports";
 import { toast } from "sonner";
 import { AlertPreferencesCard } from "@/components/settings/AlertPreferencesCard";
+import {
+  getKalshiCredsStatus,
+  saveKalshiCreds,
+  testKalshiConnection,
+} from "@/lib/kalshiUserConnection.functions";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — EdgeGraph AI" }] }),
@@ -90,15 +96,10 @@ function Settings() {
           </div>
           <div>
             <h2 className="terminal-label mb-2">// API connectors</h2>
-            <div className="space-y-2">
-              {["Kalshi", "Sports Data", "Odds API"].map((n) => (
-                <div key={n} className="flex gap-2 items-center">
-                  <span className="text-xs w-28">{n}</span>
-                  <input className={cls + " flex-1"} placeholder={`${n} API key…`} />
-                </div>
-              ))}
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-2 uppercase tracking-widest">Connectors in manual mode — keys stored securely server-side once enabled.</p>
+            <KalshiConnectionCard />
+            <p className="text-[10px] text-muted-foreground mt-2 uppercase tracking-widest">
+              Kalshi keys are stored securely per-user and never sent to the browser after saving.
+            </p>
           </div>
           <div>
             <button onClick={() => setShowSchema((v) => !v)} className="text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground">
@@ -125,6 +126,201 @@ graph_snapshots(id, analysis_id, user_id, timestamp,
         </div>
         <AlertPreferencesCard />
       </div>
+    </div>
+  );
+}
+
+function KalshiConnectionCard() {
+  const saveFn = useServerFn(saveKalshiCreds);
+  const statusFn = useServerFn(getKalshiCredsStatus);
+  const testFn = useServerFn(testKalshiConnection);
+
+  const status = useQuery({
+    queryKey: ["kalshi-creds-status"],
+    queryFn: () => statusFn(),
+    staleTime: 30_000,
+  });
+
+  const [keyId, setKeyId] = useState("");
+  const [pem, setPem] = useState("");
+  const [editingPem, setEditingPem] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<
+    | { ok: true; balanceCents: number | null }
+    | { ok: false; error: string }
+    | null
+  >(null);
+
+  useEffect(() => {
+    if (status.data?.apiKeyId) setKeyId(status.data.apiKeyId);
+  }, [status.data?.apiKeyId]);
+
+  const hasKeyId = !!status.data?.hasKeyId;
+  const hasPem = !!status.data?.hasPem;
+  const connected = hasKeyId && hasPem;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await saveFn({
+        data: {
+          apiKeyId: keyId,
+          // Only send pem when the user actually edited it; otherwise leave stored value unchanged.
+          ...(editingPem ? { privateKeyPem: pem } : {}),
+        },
+      });
+      if (editingPem) {
+        setPem("");
+        setEditingPem(false);
+      }
+      toast.success("Kalshi credentials saved");
+      status.refetch();
+      setTestResult(null);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const test = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await testFn();
+      setTestResult(res as typeof testResult);
+      if (res.ok) toast.success("Kalshi connection verified");
+      else toast.error(res.error ?? "Connection failed");
+    } catch (e: any) {
+      const err = e?.message ?? "Test failed";
+      setTestResult({ ok: false, error: err });
+      toast.error(err);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const clear = async () => {
+    if (!confirm("Remove your saved Kalshi API credentials?")) return;
+    setSaving(true);
+    try {
+      await saveFn({ data: { apiKeyId: "", privateKeyPem: "" } });
+      setKeyId("");
+      setPem("");
+      setEditingPem(false);
+      setTestResult(null);
+      toast.success("Kalshi credentials cleared");
+      status.refetch();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to clear");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cls = "w-full bg-background border border-border rounded px-2.5 py-1.5 text-sm font-mono";
+
+  return (
+    <div className="space-y-3 border border-border/60 bg-background/40 rounded p-3">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-bold uppercase tracking-wider">Kalshi</div>
+        <span
+          className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded border ${
+            connected
+              ? "border-[color:var(--color-primary)] text-[color:var(--color-primary)]"
+              : "border-border text-muted-foreground"
+          }`}
+        >
+          {connected ? "Connected" : "Not connected"}
+        </span>
+      </div>
+
+      <label className="block">
+        <span className="terminal-label">API Key ID</span>
+        <input
+          className={cls}
+          placeholder="e.g. 12345678-abcd-..."
+          value={keyId}
+          onChange={(e) => setKeyId(e.target.value)}
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </label>
+
+      <label className="block">
+        <span className="terminal-label">Private Key (PEM)</span>
+        {hasPem && !editingPem ? (
+          <div className="flex items-center gap-2">
+            <input className={cls + " flex-1"} value="•••••••••••••••••••••••• (stored)" disabled />
+            <button
+              type="button"
+              onClick={() => setEditingPem(true)}
+              className="text-[10px] uppercase tracking-widest px-2 py-1.5 border border-border rounded hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]"
+            >
+              Replace
+            </button>
+          </div>
+        ) : (
+          <textarea
+            className={cls + " h-32 whitespace-pre"}
+            placeholder={"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"}
+            value={pem}
+            onChange={(e) => {
+              setPem(e.target.value);
+              if (!editingPem) setEditingPem(true);
+            }}
+            spellCheck={false}
+          />
+        )}
+        <p className="text-[10px] text-muted-foreground mt-1">
+          Paste the full PEM including BEGIN/END lines. Unencrypted PKCS#8 RSA key only.
+        </p>
+      </label>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={save}
+          disabled={saving || (!keyId.trim() && !editingPem && !hasKeyId)}
+          className="text-xs uppercase tracking-wider px-3 py-1.5 border border-[color:var(--color-primary)] text-[color:var(--color-primary)] rounded disabled:opacity-40"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button
+          onClick={test}
+          disabled={testing || !connected}
+          className="text-xs uppercase tracking-wider px-3 py-1.5 border border-border rounded hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)] disabled:opacity-40"
+        >
+          {testing ? "Testing…" : "Test connection"}
+        </button>
+        {(hasKeyId || hasPem) && (
+          <button
+            onClick={clear}
+            disabled={saving}
+            className="text-xs uppercase tracking-wider px-3 py-1.5 border border-border rounded hover:border-[color:var(--color-destructive)] hover:text-[color:var(--color-destructive)] disabled:opacity-40 ml-auto"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+
+      {testResult && (
+        <div
+          className={`text-[11px] font-mono border rounded px-2 py-1.5 ${
+            testResult.ok
+              ? "border-[color:var(--color-primary)]/40 text-[color:var(--color-primary)]"
+              : "border-[color:var(--color-destructive)]/40 text-[color:var(--color-destructive)]"
+          }`}
+        >
+          {testResult.ok
+            ? `OK — balance ${
+                testResult.balanceCents == null
+                  ? "n/a"
+                  : `$${(testResult.balanceCents / 100).toFixed(2)}`
+              }`
+            : testResult.error}
+        </div>
+      )}
     </div>
   );
 }

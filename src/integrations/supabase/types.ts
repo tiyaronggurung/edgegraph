@@ -1469,6 +1469,8 @@ export type Database = {
           email: string | null
           id: string
           is_admin: boolean
+          kalshi_api_key_id: string | null
+          kalshi_private_key_pem: string | null
           preferred_sports: string[]
           risk_tolerance: string
           stripe_customer_id: string | null
@@ -1488,6 +1490,8 @@ export type Database = {
           email?: string | null
           id: string
           is_admin?: boolean
+          kalshi_api_key_id?: string | null
+          kalshi_private_key_pem?: string | null
           preferred_sports?: string[]
           risk_tolerance?: string
           stripe_customer_id?: string | null
@@ -1507,6 +1511,8 @@ export type Database = {
           email?: string | null
           id?: string
           is_admin?: boolean
+          kalshi_api_key_id?: string | null
+          kalshi_private_key_pem?: string | null
           preferred_sports?: string[]
           risk_tolerance?: string
           stripe_customer_id?: string | null
