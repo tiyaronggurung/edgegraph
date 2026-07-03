@@ -96,15 +96,10 @@ function Settings() {
           </div>
           <div>
             <h2 className="terminal-label mb-2">// API connectors</h2>
-            <div className="space-y-2">
-              {["Kalshi", "Sports Data", "Odds API"].map((n) => (
-                <div key={n} className="flex gap-2 items-center">
-                  <span className="text-xs w-28">{n}</span>
-                  <input className={cls + " flex-1"} placeholder={`${n} API key…`} />
-                </div>
-              ))}
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-2 uppercase tracking-widest">Connectors in manual mode — keys stored securely server-side once enabled.</p>
+            <KalshiConnectionCard />
+            <p className="text-[10px] text-muted-foreground mt-2 uppercase tracking-widest">
+              Kalshi keys are stored securely per-user and never sent to the browser after saving.
+            </p>
           </div>
           <div>
             <button onClick={() => setShowSchema((v) => !v)} className="text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground">
