@@ -80,14 +80,17 @@ async function signWithUserKey(
 
 // ---------------------------- server functions ----------------------------
 
-/** Save (or clear) the user's Kalshi credentials on their profile. */
+/** Save (or clear) the user's Kalshi credentials on their profile.
+ *  - apiKeyId: empty string clears; any non-empty value replaces.
+ *  - privateKeyPem: undefined leaves the stored value unchanged;
+ *                   empty string clears; non-empty replaces. */
 export const saveKalshiCreds = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { apiKeyId: string; privateKeyPem: string }) =>
+  .inputValidator((input: { apiKeyId: string; privateKeyPem?: string }) =>
     z
       .object({
         apiKeyId: z.string().trim().max(200),
-        privateKeyPem: z.string().max(20_000),
+        privateKeyPem: z.string().max(20_000).optional(),
       })
       .parse(input),
   )
@@ -95,26 +98,29 @@ export const saveKalshiCreds = createServerFn({ method: "POST" })
     const apiKeyId = data.apiKeyId.trim();
     const rawPem = data.privateKeyPem;
 
-    const updates = {
+    const updates: { kalshi_api_key_id: string | null; kalshi_private_key_pem?: string | null } = {
       kalshi_api_key_id: apiKeyId.length ? apiKeyId : null,
-      kalshi_private_key_pem: rawPem.trim().length ? rawPem : null,
     };
 
-    // If a PEM was provided, sanity-parse it before saving so the user gets
-    // an immediate error rather than a save-then-fail-on-test surprise.
-    if (updates.kalshi_private_key_pem) {
-      const pem = normalizePem(rawPem);
-      if (/-----BEGIN ENCRYPTED PRIVATE KEY-----/.test(pem)) {
-        throw new Error("Encrypted/passphrase-protected PEM is not supported. Export an unencrypted PKCS#8 PEM.");
-      }
-      const { createPrivateKey } = await import("node:crypto");
-      try {
-        const key = createPrivateKey({ key: pem, format: "pem" });
-        if (key.asymmetricKeyType !== "rsa") {
-          throw new Error(`Kalshi requires an RSA key (got ${key.asymmetricKeyType ?? "unknown"}).`);
+    if (rawPem !== undefined) {
+      if (rawPem.trim().length === 0) {
+        updates.kalshi_private_key_pem = null;
+      } else {
+        // Sanity-parse before saving so the user gets an immediate error.
+        const pem = normalizePem(rawPem);
+        if (/-----BEGIN ENCRYPTED PRIVATE KEY-----/.test(pem)) {
+          throw new Error("Encrypted/passphrase-protected PEM is not supported. Export an unencrypted PKCS#8 PEM.");
         }
-      } catch (e: any) {
-        throw new Error("Private key could not be decoded: " + (e?.message ?? String(e)));
+        const { createPrivateKey } = await import("node:crypto");
+        try {
+          const key = createPrivateKey({ key: pem, format: "pem" });
+          if (key.asymmetricKeyType !== "rsa") {
+            throw new Error(`Kalshi requires an RSA key (got ${key.asymmetricKeyType ?? "unknown"}).`);
+          }
+        } catch (e: any) {
+          throw new Error("Private key could not be decoded: " + (e?.message ?? String(e)));
+        }
+        updates.kalshi_private_key_pem = rawPem;
       }
     }
 
