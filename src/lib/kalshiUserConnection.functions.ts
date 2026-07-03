@@ -95,8 +95,7 @@ export const saveKalshiCreds = createServerFn({ method: "POST" })
     const apiKeyId = data.apiKeyId.trim();
     const rawPem = data.privateKeyPem;
 
-    // Empty strings clear the credential.
-    const updates: Record<string, string | null> = {
+    const updates = {
       kalshi_api_key_id: apiKeyId.length ? apiKeyId : null,
       kalshi_private_key_pem: rawPem.trim().length ? rawPem : null,
     };
