@@ -385,7 +385,25 @@ export async function runAutoTradeCore(
       // overwritten with the true IOC fill result before we insert the row.
       let filledContracts = contracts;
       let filledEntryCents = limitCents;
+      // Ladder telemetry: recorded on the auto_trade_orders.inputs_snapshot
+      // so the dashboard widget can compute success rate, avg climb, and P&L.
+      let ladderTelemetry: {
+        attempts: number;
+        startedCents: number;
+        filledCents: number | null;
+        climbedCents: number | null;
+        filled: boolean;
+        hardCapped: boolean;
+      } = {
+        attempts: 1,
+        startedCents: limitCents,
+        filledCents: null,
+        climbedCents: null,
+        filled: false,
+        hardCapped: false,
+      };
       if (isLive) {
+
         // IOC retry ladder: on 0-fill, bump limit by 1¢ and retry. Stays
         // within the odds-bet hard cap (89¢ = -750 American). Non-force
         // (model-driven) entries also allowed to nudge up to 89¢ so we don't
