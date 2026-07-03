@@ -1560,33 +1560,23 @@ function AutoTradePanel() {
       const noAm = centsToAmericanNum(noCents);
 
       const inRange = (a: number) => a <= -450 && a >= -750;
-      const deepFav = (a: number) => a <= -300;
 
       let pick: { side: "YES" | "NO"; reason: string } | null = null;
 
-      if (remainingMs > 2 * 60_000) {
-        // 12:30 → 2:00 remaining: look for -450..-750.
+      if (remainingMs > 0) {
+        // STRICT band [-750,-450] in all phases — no -300 fallback.
         const yesIn = inRange(yesAm), noIn = inRange(noAm);
         if (yesIn && !noIn) pick = { side: "YES", reason: `YES ${yesAm} in [-750,-450]` };
         else if (noIn && !yesIn) pick = { side: "NO", reason: `NO ${noAm} in [-750,-450]` };
         else if (yesIn && noIn) pick = yesAm < noAm ? { side: "YES", reason: `both in-range, YES deeper ${yesAm}` } : { side: "NO", reason: `both in-range, NO deeper ${noAm}` };
-      } else if (remainingMs > 15_000) {
-        // 2:00 → 0:15 remaining: fallback on ≤ -300 favorite.
-        const yesDeep = deepFav(yesAm), noDeep = deepFav(noAm);
-        if (yesDeep && !noDeep) pick = { side: "YES", reason: `≤2:00 fallback YES ${yesAm}` };
-        else if (noDeep && !yesDeep) pick = { side: "NO", reason: `≤2:00 fallback NO ${noAm}` };
-        else if (yesDeep && noDeep) pick = yesAm < noAm ? { side: "YES", reason: `both ≤-300, YES deeper ${yesAm}` } : { side: "NO", reason: `both ≤-300, NO deeper ${noAm}` };
       }
-      // NOTE: no final ≤15s "closest side" fallback — that branch used to
-      // fire at 98–99¢ which violates the -450/-750 rule. Only fire when
-      // odds actually sit inside the required range.
 
       if (!pick) return; // keep watching
 
-      // Hard cap: never attempt above 89¢ / better than -750. Mirrors server tick.
+      // Hard cap: strict [-750,-450] and ≤89¢. Mirrors server tick.
       const pickCents = pick.side === "YES" ? yesCents : noCents;
       const pickAm = pick.side === "YES" ? yesAm : noAm;
-      if (pickCents > 89 || pickAm < -750 || pickAm > -300) return;
+      if (pickCents > 89 || pickAm < -750 || pickAm > -450) return;
 
       inFlight = true;
       // Claim window before async call to prevent double-fire.
