@@ -608,10 +608,22 @@ export const settleAutoTradeOrders = createServerFn({ method: "POST" })
     );
 
     let settled = 0;
+    const { fetchKalshiSettlement } = await import("@/lib/kalshiSettle");
     for (const o of pending) {
-      const px = priceByTicker.get(o.ticker);
-      if (px === undefined) continue;
-      const won = o.side === "YES" ? px >= Number(o.strike) : px < Number(o.strike);
+      // Kalshi is the source of truth. Fall back to internal spot only if
+      // Kalshi hasn't finalized yet.
+      let won: boolean | null = null;
+      let settlePx: number | null = null;
+      const k = await fetchKalshiSettlement(o.ticker);
+      if (k && k.finalized && k.result) {
+        won = o.side === "YES" ? k.result === "yes" : k.result === "no";
+        settlePx = k.expirationValue;
+      } else {
+        const px = priceByTicker.get(o.ticker);
+        if (px === undefined) continue;
+        won = o.side === "YES" ? px >= Number(o.strike) : px < Number(o.strike);
+        settlePx = px;
+      }
       const pnl = won
         ? ((100 - o.limit_cents) / 100) * o.contracts
         : -(o.limit_cents / 100) * o.contracts;
@@ -619,7 +631,7 @@ export const settleAutoTradeOrders = createServerFn({ method: "POST" })
         .from("auto_trade_orders")
         .update({
           status: won ? "settled_win" : "settled_loss",
-          settle_price: px,
+          settle_price: settlePx,
           pnl_usd: pnl,
           settled_at: new Date().toISOString(),
         })
