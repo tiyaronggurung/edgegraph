@@ -2257,9 +2257,12 @@ function CryptoPage() {
             Live Kalshi <code className="text-xs">KXBTC15M</code> markets · model uses intra-window realized price action conditioned on remaining time.
           </p>
         </div>
-        <button onClick={() => q.refetch()} className="flex items-center gap-1 text-xs uppercase tracking-wider px-3 py-1.5 border border-border rounded hover:bg-card">
-          {q.isFetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <KalshiBalanceBadge />
+          <button onClick={() => q.refetch()} className="flex items-center gap-1 text-xs uppercase tracking-wider px-3 py-1.5 border border-border rounded hover:bg-card">
+            {q.isFetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
+          </button>
+        </div>
       </div>
 
       <div className="border border-yellow-500/30 bg-yellow-500/5 rounded-lg p-3 text-xs text-yellow-200/90 flex gap-2">
