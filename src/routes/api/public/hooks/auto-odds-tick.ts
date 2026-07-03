@@ -141,15 +141,10 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               }
             }
 
-            if (losses >= 3) {
-              await supabaseAdmin
-                .from("auto_odds_settings")
-                .update({ enabled: false, consecutive_losses: losses, stopped_reason: "three_losses", last_tick_at: new Date().toISOString() })
-                .eq("user_id", userId);
-              stopped = true;
-              summary.push({ user_id: userId, entries, exits, stopped, note: "stopped: 2 losses" });
-              continue;
-            }
+            // Consecutive-loss auto-stop DISABLED per user request (overnight run).
+            // Keep counting losses for telemetry, but never disable the loop.
+            // To re-enable, restore the `if (losses >= 3)` block.
+            // if (losses >= 3) { ...disable... }
             if (losses !== (u.consecutive_losses ?? 0)) {
               await supabaseAdmin
                 .from("auto_odds_settings")
