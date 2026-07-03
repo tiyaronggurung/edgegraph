@@ -166,13 +166,23 @@ function KalshiConnectionCard() {
       await saveFn({
         data: {
           apiKeyId: keyId,
-          // If the user didn't open the PEM editor, keep the existing stored value.
-          // Sending the current stored PEM is impossible (we never fetch it),
-          // so an empty pem when not editing means "leave unchanged" — we
-          // achieve that by only sending pem when they actually edited.
-          privateKeyPem: editingPem ? pem : (hasPem ? "__KEEP__" : ""),
+          // Only send pem when the user actually edited it; otherwise leave stored value unchanged.
+          ...(editingPem ? { privateKeyPem: pem } : {}),
         },
       });
+      if (editingPem) {
+        setPem("");
+        setEditingPem(false);
+      }
+      toast.success("Kalshi credentials saved");
+      status.refetch();
+      setTestResult(null);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
       // Special sentinel handling: if not editing, we need to preserve the
       // existing PEM. Do that by re-fetching only if they DID edit.
       if (editingPem) {
