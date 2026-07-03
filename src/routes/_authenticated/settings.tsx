@@ -1,11 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useEffect, useState } from "react";
 import { SPORTS } from "@/lib/sports";
 import { toast } from "sonner";
 import { AlertPreferencesCard } from "@/components/settings/AlertPreferencesCard";
+import {
+  getKalshiCredsStatus,
+  saveKalshiCreds,
+  testKalshiConnection,
+} from "@/lib/kalshiUserConnection.functions";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — EdgeGraph AI" }] }),
