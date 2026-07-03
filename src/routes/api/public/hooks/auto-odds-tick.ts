@@ -329,31 +329,17 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             const yesAm = centsToAmerican(yesCents);
             const noAm = centsToAmerican(noCents);
 
-            // STRICT odds-only entry. HARD CAP: never enter deeper than -750
-            // (i.e. never pay ≥89¢). Model prob is NOT a gate on this path.
-            const inRange = (a: number) => a <= -450 && a >= -750;              // main band 82¢–88¢
-            const fallbackRange = (a: number) => a <= -300 && a >= -750;         // ≤2:00 fallback 75¢–88¢
+            // STRICT odds-only entry. Band is [-750, -450] in ALL phases.
+            // No -300 fallback — user requirement: strictly -450 to -750 or skip.
+            const inRange = (a: number) => a <= -450 && a >= -750;              // strict band 82¢–88¢
 
             let pick: { side: "YES" | "NO"; reason: string } | null = null;
-            if (remainingMs > 2 * 60_000) {
+            if (remainingMs > 0) {
               const yesIn = inRange(yesAm), noIn = inRange(noAm);
               if (yesIn && !noIn) pick = { side: "YES", reason: `YES ${yesAm} in [-750,-450]` };
               else if (noIn && !yesIn) pick = { side: "NO", reason: `NO ${noAm} in [-750,-450]` };
               else if (yesIn && noIn) pick = yesAm < noAm ? { side: "YES", reason: `both in-range, YES deeper ${yesAm}` } : { side: "NO", reason: `both in-range, NO deeper ${noAm}` };
-            } else if (remainingMs > 15_000) {
-              const yesOk = fallbackRange(yesAm), noOk = fallbackRange(noAm);
-              if (yesOk && !noOk) pick = { side: "YES", reason: `≤2:00 fallback YES ${yesAm}` };
-              else if (noOk && !yesOk) pick = { side: "NO", reason: `≤2:00 fallback NO ${noAm}` };
-              else if (yesOk && noOk) pick = yesAm < noAm ? { side: "YES", reason: `≤2:00 both [-750,-300], YES deeper ${yesAm}` } : { side: "NO", reason: `≤2:00 both [-750,-300], NO deeper ${noAm}` };
-            } else if (remainingMs > 0) {
-              // close-window last-resort: still enforce -750 hard cap. If both
-              // sides are deeper than -750 (≥89¢), SKIP — no forced entry.
-              const capOk = (a: number) => a >= -750 && a <= -300;
-              const yesOk = capOk(yesAm), noOk = capOk(noAm);
-              if (yesOk && !noOk) pick = { side: "YES", reason: `close-window YES ${yesAm}` };
-              else if (noOk && !yesOk) pick = { side: "NO", reason: `close-window NO ${noAm}` };
-              else if (yesOk && noOk) pick = yesAm < noAm ? { side: "YES", reason: `close-window both ok, YES deeper ${yesAm}` } : { side: "NO", reason: `close-window both ok, NO deeper ${noAm}` };
-              // else: both outside [-750,-300] → pick stays null → skip
+              // else: neither side in strict band → skip
             }
 
             if (!pick) {
@@ -482,20 +468,9 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             const noAm2 = centsToAmerican(noCents2);
             const sideAm2 = pick.side === "YES" ? yesAm2 : noAm2;
 
-            // Threshold per window: main window keeps strict [-750, -450];
-            // ≤2:00 fallback keeps ≤-300; close-window (<15s) has no floor.
-            let persistOk = true;
-            let thresholdLabel = "";
-            if (remainingMs > 2 * 60_000) {
-              persistOk = sideAm2 <= -450 && sideAm2 >= -750;
-              thresholdLabel = "[-750,-450]";
-            } else if (remainingMs > 15_000) {
-              persistOk = sideAm2 <= -300 && sideAm2 >= -750;
-              thresholdLabel = "[-750,-300]";
-            } else {
-              persistOk = sideAm2 <= -300 && sideAm2 >= -750;
-              thresholdLabel = "close-window [-750,-300]";
-            }
+            // Strict band on re-check for ALL phases.
+            let persistOk = sideAm2 <= -450 && sideAm2 >= -750;
+            let thresholdLabel = "[-750,-450]";
             if (!persistOk) {
               note = `skipped: 2s flicker — ${pick.side} was ${pick.reason}, now ${sideAm2} outside ${thresholdLabel}`;
               await logStudy({ entered: false, hedge_fired: false, note });
