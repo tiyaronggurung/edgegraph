@@ -1587,14 +1587,17 @@ function AutoTradePanel() {
         if (yesDeep && !noDeep) pick = { side: "YES", reason: `≤2:00 fallback YES ${yesAm}` };
         else if (noDeep && !yesDeep) pick = { side: "NO", reason: `≤2:00 fallback NO ${noAm}` };
         else if (yesDeep && noDeep) pick = yesAm < noAm ? { side: "YES", reason: `both ≤-300, YES deeper ${yesAm}` } : { side: "NO", reason: `both ≤-300, NO deeper ${noAm}` };
-      } else if (remainingMs > 0) {
-        // Final ≤15s: closest side to [-750,-450].
-        const distTo = (a: number) => a > -450 ? Math.abs(-450 - a) : a < -750 ? Math.abs(a - -750) : 0;
-        const yd = distTo(yesAm), nd = distTo(noAm);
-        pick = yd <= nd ? { side: "YES", reason: `close-window closest YES ${yesAm}` } : { side: "NO", reason: `close-window closest NO ${noAm}` };
       }
+      // NOTE: no final ≤15s "closest side" fallback — that branch used to
+      // fire at 98–99¢ which violates the -450/-750 rule. Only fire when
+      // odds actually sit inside the required range.
 
       if (!pick) return; // keep watching
+
+      // Hard cap: never attempt above 89¢ / better than -750. Mirrors server tick.
+      const pickCents = pick.side === "YES" ? yesCents : noCents;
+      const pickAm = pick.side === "YES" ? yesAm : noAm;
+      if (pickCents > 89 || pickAm < -750 || pickAm > -300) return;
 
       inFlight = true;
       // Claim window before async call to prevent double-fire.
