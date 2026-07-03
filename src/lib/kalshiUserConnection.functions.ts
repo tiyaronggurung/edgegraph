@@ -121,7 +121,7 @@ export const saveKalshiCreds = createServerFn({ method: "POST" })
 
     const { error } = await context.supabase
       .from("profiles")
-      .update(updates)
+      .update(updates as never)
       .eq("id", context.userId);
 
     if (error) throw new Error(error.message);
