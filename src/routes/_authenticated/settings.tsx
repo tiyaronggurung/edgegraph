@@ -183,21 +183,6 @@ function KalshiConnectionCard() {
       setSaving(false);
     }
   };
-      // Special sentinel handling: if not editing, we need to preserve the
-      // existing PEM. Do that by re-fetching only if they DID edit.
-      if (editingPem) {
-        setPem("");
-        setEditingPem(false);
-      }
-      toast.success("Kalshi credentials saved");
-      status.refetch();
-      setTestResult(null);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to save");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const test = async () => {
     setTesting(true);
