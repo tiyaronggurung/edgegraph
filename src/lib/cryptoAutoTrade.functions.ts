@@ -386,51 +386,85 @@ export async function runAutoTradeCore(
       let filledContracts = contracts;
       let filledEntryCents = limitCents;
       if (isLive) {
-        try {
-          const { submitKalshiBuy } = await import("./cryptoTrades.functions");
-          const out = await submitKalshiBuy(supabase, userId, {
-            ticker: m.ticker,
-            eventTicker: m.eventTicker ?? undefined,
-            side: m.side,
-            contracts,
-            limitPriceCents: limitCents,
-            strike: m.strike,
-            spot: m.spot,
-            modelProb: m.modelYesProb,
-            marketYesPrice: m.yesPrice,
-            edgePts: m.edgePts,
-            stakeUsd: stakeActual,
-            closeTime: m.closeTime ?? undefined,
-            inputsSnapshot: {
-              source: "auto_trade",
-              sigmaDistance: m.sigmaDistance,
-              gateAction: m.gateAction,
-              momentumAlignsWithSide: m.gapAnalysis?.momentumAlignsWithSide,
-              effectiveEdgePts: m.edgePts,
-              convictionMult,
-              minSigma,
-              minEdgePts,
-              equityAdjust: equity?.btcImpact?.edgeAdjustPts ?? null,
-              equityBlock: equity?.btcImpact?.wouldBlock ?? null,
-              yesAsk: m.yesAsk ?? null,
-              noAsk: m.noAsk ?? null,
-              secondsToClose: m.secondsToClose,
-              firedAt: new Date().toISOString(),
-            },
-          });
-          kalshiOrderId = out.orderId;
-          // IOC 0-fill: nothing was bought — don't create a phantom position.
-          if (!out.fillCount || out.fillCount <= 0) {
-            skipReasons.push(`${m.ticker}: IOC 0-fill @ ${limitCents}¢ — no position taken`);
-            continue;
+        // IOC retry ladder: on 0-fill, bump limit by 1¢ and retry. Stays
+        // within the odds-bet hard cap (89¢ = -750 American). Non-force
+        // (model-driven) entries also allowed to nudge up to 89¢ so we don't
+        // sit chasing a stale ask. Max 3 retries (4 attempts total).
+        const HARD_CAP_CENTS = 89;
+        const MAX_RETRIES = 3;
+        let attemptCents = limitCents;
+        let attempt = 0;
+        let ladderNote = "";
+        let filledOk = false;
+        while (attempt <= MAX_RETRIES) {
+          if (attemptCents > HARD_CAP_CENTS) {
+            ladderNote = `stopped at ${attemptCents}¢ (>${HARD_CAP_CENTS}¢ cap)`;
+            break;
           }
-          filledContracts = out.fillCount;
-          filledEntryCents = out.filledCents || limitCents;
-        } catch (e: any) {
-          skipReasons.push(`${m.ticker}: kalshi order failed — ${e?.message ?? String(e)}`);
+          const attemptContracts = Math.max(1, Math.floor((sizedStake * 100) / attemptCents));
+          try {
+            const { submitKalshiBuy } = await import("./cryptoTrades.functions");
+            const out = await submitKalshiBuy(supabase, userId, {
+              ticker: m.ticker,
+              eventTicker: m.eventTicker ?? undefined,
+              side: m.side,
+              contracts: attemptContracts,
+              limitPriceCents: attemptCents,
+              strike: m.strike,
+              spot: m.spot,
+              modelProb: m.modelYesProb,
+              marketYesPrice: m.yesPrice,
+              edgePts: m.edgePts,
+              stakeUsd: (attemptContracts * attemptCents) / 100,
+              closeTime: m.closeTime ?? undefined,
+              inputsSnapshot: {
+                source: "auto_trade",
+                sigmaDistance: m.sigmaDistance,
+                gateAction: m.gateAction,
+                momentumAlignsWithSide: m.gapAnalysis?.momentumAlignsWithSide,
+                effectiveEdgePts: m.edgePts,
+                convictionMult,
+                minSigma,
+                minEdgePts,
+                equityAdjust: equity?.btcImpact?.edgeAdjustPts ?? null,
+                equityBlock: equity?.btcImpact?.wouldBlock ?? null,
+                yesAsk: m.yesAsk ?? null,
+                noAsk: m.noAsk ?? null,
+                secondsToClose: m.secondsToClose,
+                firedAt: new Date().toISOString(),
+                iocLadderAttempt: attempt,
+                iocLadderStartCents: limitCents,
+                iocLadderCents: attemptCents,
+              },
+            });
+            kalshiOrderId = out.orderId;
+            if (out.fillCount && out.fillCount > 0) {
+              filledContracts = out.fillCount;
+              filledEntryCents = out.filledCents || attemptCents;
+              filledOk = true;
+              if (attempt > 0) {
+                ladderNote = `filled on retry ${attempt} @ ${filledEntryCents}¢ (started ${limitCents}¢)`;
+              }
+              break;
+            }
+            // 0-fill: step up 1¢ and try again.
+            ladderNote = `IOC 0-fill @ ${attemptCents}¢ (attempt ${attempt + 1})`;
+            attempt += 1;
+            attemptCents += 1;
+          } catch (e: any) {
+            skipReasons.push(`${m.ticker}: kalshi order failed — ${e?.message ?? String(e)}`);
+            break;
+          }
+        }
+        if (!filledOk) {
+          skipReasons.push(`${m.ticker}: ${ladderNote || `IOC ladder exhausted from ${limitCents}¢`}`);
           continue;
         }
+        if (ladderNote && attempt > 0) {
+          skipReasons.push(`${m.ticker}: ${ladderNote}`);
+        }
       }
+
 
       const stakeFilled = (filledContracts * filledEntryCents) / 100;
 
