@@ -368,43 +368,34 @@ export type KalshiDiagStep = {
 
 export const diagnoseKalshiAuth = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<{ ok: boolean; steps: KalshiDiagStep[]; summary: string; serverTimeIso: string }> => {
+  .handler(async ({ context }): Promise<{ ok: boolean; steps: KalshiDiagStep[]; summary: string; serverTimeIso: string }> => {
     const steps: KalshiDiagStep[] = [];
     const push = (s: KalshiDiagStep) => { steps.push(s); return s.ok; };
 
-    // 1) Env presence
-    const keyId = process.env.KALSHI_API_KEY_ID ?? "";
-    const rawPem = process.env.KALSHI_PRIVATE_KEY_PEM ?? "";
-    const keyIdOk = !!keyId;
-    push({
-      name: "KALSHI_API_KEY_ID secret present",
-      ok: keyIdOk,
-      detail: keyIdOk
-        ? `length=${keyId.length}, preview=${keyId.slice(0, 4)}…${keyId.slice(-4)}`
-        : "Missing. Add it via Settings → Secrets. Kalshi shows this on the API Keys page.",
-    });
-    const pemOk = !!rawPem;
-    push({
-      name: "KALSHI_PRIVATE_KEY_PEM secret present",
-      ok: pemOk,
-      detail: pemOk
-        ? `length=${rawPem.length} chars, starts with "${rawPem.slice(0, 27).replace(/\n/g, "⏎")}"`
-        : "Missing. Paste the full PEM (BEGIN/END lines included) into the secret.",
-    });
-
-    if (!keyIdOk || !pemOk) {
+    // 1) Resolve creds: prefer user's saved profile creds; fall back to env.
+    let creds: { keyId: string; rawPem: string; source: "user" | "env" };
+    try {
+      creds = await resolveKalshiCreds(context.userId);
+    } catch (e: any) {
+      push({ name: "Kalshi credentials available", ok: false, detail: e?.message ?? String(e) });
       return {
         ok: false,
         steps,
-        summary: "Required secret(s) not configured. /portfolio/balance will return 401 because no KALSHI-ACCESS-KEY header can be sent.",
+        summary: "No Kalshi credentials found. Save your API Key ID + Private Key in Settings, or ensure env fallback is configured.",
         serverTimeIso: new Date().toISOString(),
       };
     }
+    const { keyId, rawPem, source } = creds;
+    push({
+      name: `Credentials source: ${source === "user" ? "user profile (Settings)" : "env fallback"}`,
+      ok: true,
+      detail: `keyId length=${keyId.length}, preview=${keyId.slice(0, 4)}…${keyId.slice(-4)}; pem length=${rawPem.length}`,
+    });
 
     // 2) PEM parse + RSA-PSS smoke test
     let validated: ValidatedKalshiKey | null = null;
     try {
-      validated = await getValidatedKalshiKey();
+      validated = await validatePem(rawPem);
       const details = (validated.key.asymmetricKeyDetails ?? {}) as { modulusLength?: number };
       push({
         name: "Private key parses & passes RSA-PSS sign smoke test",
@@ -417,7 +408,7 @@ export const diagnoseKalshiAuth = createServerFn({ method: "GET" })
       return {
         ok: false,
         steps,
-        summary: "PEM is unusable. Re-export an unencrypted PKCS#8 RSA key from Kalshi and update the secret.",
+        summary: "PEM is unusable. Re-export an unencrypted PKCS#8 RSA key from Kalshi and save it in Settings.",
         serverTimeIso: new Date().toISOString(),
       };
     }
@@ -427,7 +418,7 @@ export const diagnoseKalshiAuth = createServerFn({ method: "GET" })
     const path = "/portfolio/balance";
     let headers: Record<string, string> = {};
     try {
-      headers = await signKalshi(method, path);
+      headers = await signKalshi(method, path, context.userId);
       push({
         name: "Built signed request headers",
         ok: true,
