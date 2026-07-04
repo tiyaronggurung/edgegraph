@@ -546,6 +546,21 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 !/^equity:/i.test(r) && !/^odds-bet:/i.test(r) && !/^force:/i.test(r));
               const shown = (realReasons.length ? realReasons : placeResult.skipReasons).slice(0, 3);
               note = `skipped: ${shown.join(" · ") || "no fill"}`;
+
+              // Auto-disable auto-odds when Kalshi rejects this user's credentials.
+              // Stops a runaway loop of failed orders; user must re-save their key
+              // on Settings → Kalshi and toggle auto-odds back on.
+              const authFailed = placeResult.skipReasons.some(r =>
+                /authentication_error|401\s*UNAUTHORIZED|Kalshi\s*401/i.test(r));
+              if (authFailed) {
+                await supabaseAdmin
+                  .from("auto_odds_settings")
+                  .update({ enabled: false })
+                  .eq("user_id", userId);
+                stopped = true;
+                note += " · auto-odds DISABLED (Kalshi rejected credentials — re-save your API key in Settings and re-enable)";
+              }
+
               await logStudy({ entered: false, hedge_fired: false, note });
             }
           } catch (e: any) {
