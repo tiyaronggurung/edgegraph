@@ -572,8 +572,8 @@ export const sellKalshiOrder = createServerFn({ method: "POST" })
 // trade with the realized P&L. YES wins → 1.00, NO wins → 0.00. P&L =
 // (settleCents − entryCents)/100 × contracts. Idempotent: skips already-
 // settled/closed/errored rows; safe to poll every 10s from the client.
-async function signKalshiGet(path: string): Promise<Record<string, string>> {
-  return signKalshi("GET", path);
+async function signKalshiGet(path: string, userId?: string): Promise<Record<string, string>> {
+  return signKalshi("GET", path, userId);
 }
 
 export const settleExpiredTrades = createServerFn({ method: "POST" })
