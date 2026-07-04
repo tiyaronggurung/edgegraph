@@ -718,7 +718,7 @@ export async function autoExitForUser(
     try {
       const { signKalshi } = await import("./cryptoTrades.functions");
       const path = "/portfolio/events/orders";
-      const headers = await signKalshi("POST", path);
+      const headers = await signKalshi("POST", path, userId);
       const priceDollars = (r.side === "YES" ? sellCents : 100 - sellCents) / 100;
       const body = {
         ticker: r.ticker,
@@ -1056,7 +1056,7 @@ export async function sellOddsBetCore(
     try {
       const { signKalshi } = await import("./cryptoTrades.functions");
       const path = "/portfolio/events/orders";
-      const headers = await signKalshi("POST", path);
+      const headers = await signKalshi("POST", path, userId);
       const priceDollars = (row.side === "YES" ? bounded : 100 - bounded) / 100;
       const body = {
         ticker: row.ticker,
