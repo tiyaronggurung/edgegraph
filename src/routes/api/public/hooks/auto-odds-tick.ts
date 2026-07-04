@@ -86,7 +86,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             hedgeLo: (u as any).hedge_band_lo != null ? Number((u as any).hedge_band_lo) : 0.60,
             hedgeHi: (u as any).hedge_band_hi != null ? Number((u as any).hedge_band_hi) : 0.68,
             tpCents: (u as any).tp_cents != null ? Number((u as any).tp_cents) : 98,
-            oscMax: (u as any).oscillation_max != null ? Number((u as any).oscillation_max) : 3,
+            oscMax: (u as any).oscillation_max != null ? Number((u as any).oscillation_max) : 2,
             skipLt15s: (u as any).skip_bucket_lt15s === true,
             skip15_60s: (u as any).skip_bucket_15_60s === true,
           };
