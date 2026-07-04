@@ -140,6 +140,11 @@ const _kalshiCache = new Map<string, { at: number; data: any }>();
 const KALSHI_TTL_MS = 8_000;
 const _sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+// INVARIANT: odds/market reads are PUBLIC and SHARED across all users.
+// No Authorization header, no per-user Kalshi key — the response is identical
+// for everyone and cached globally (KALSHI_TTL_MS). Per-user API keys apply
+// only to signed trading calls (submit/sell/settle) in cryptoTrades.functions.ts.
+// Do NOT thread userId into this path or every user would see different odds.
 async function kalshiFetch(path: string): Promise<any> {
   const cached = _kalshiCache.get(path);
   if (cached && Date.now() - cached.at < KALSHI_TTL_MS) return cached.data;
