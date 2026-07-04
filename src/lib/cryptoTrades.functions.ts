@@ -333,10 +333,10 @@ export const checkKalshiKeyHealth = createServerFn({ method: "GET" })
 // from Kalshi on failure. Read-only — never places an order.
 export const checkKalshiBalance = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<{ ok: boolean; balanceCents?: number; payoutCents?: number; error?: string; status?: number }> => {
+  .handler(async ({ context }): Promise<{ ok: boolean; balanceCents?: number; payoutCents?: number; error?: string; status?: number }> => {
     try {
       const path = "/portfolio/balance";
-      const headers = await signKalshi("GET", path);
+      const headers = await signKalshi("GET", path, context.userId);
       const res = await fetch(`${KALSHI_BASE}${path}`, { method: "GET", headers });
       const text = await res.text();
       let json: any = null;
