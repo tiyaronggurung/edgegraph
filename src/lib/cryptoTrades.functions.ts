@@ -522,7 +522,7 @@ export const sellKalshiOrder = createServerFn({ method: "POST" })
     if (!trade.contracts || trade.contracts <= 0) throw new Error("Trade has no contracts");
 
     const path = "/portfolio/events/orders";
-    const headers = await signKalshi("POST", path);
+    const headers = await signKalshi("POST", path, userId);
 
     // Sell = opposite side of position. YES holder sells via ask, NO holder via bid.
     const priceDollars = (trade.side === "YES"
