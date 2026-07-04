@@ -596,7 +596,7 @@ export const settleExpiredTrades = createServerFn({ method: "POST" })
     for (const t of trades) {
       try {
         const path = `/markets/${encodeURIComponent(t.ticker)}`;
-        const headers = await signKalshiGet(path);
+        const headers = await signKalshiGet(path, userId);
         const res = await fetch(`${KALSHI_BASE}${path}`, {
           headers: { ...headers, Accept: "application/json" },
         });
