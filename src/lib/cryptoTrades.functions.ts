@@ -55,24 +55,17 @@ type ValidatedKalshiKey = {
   createSign: typeof import("node:crypto").createSign;
 };
 
-let cachedKey: ValidatedKalshiKey | null = null;
-let cachedKeyFingerprint: string | null = null;
+const validatedKeyCache = new Map<string, ValidatedKalshiKey>();
 
-export async function getValidatedKalshiKey(): Promise<ValidatedKalshiKey> {
-  const rawPem = process.env.KALSHI_PRIVATE_KEY_PEM;
-  if (!rawPem) throw new Error("KALSHI_PRIVATE_KEY_PEM is not configured");
-
-  // Re-validate if the secret value changed.
+async function validatePem(rawPem: string): Promise<ValidatedKalshiKey> {
   const fingerprint = `${rawPem.length}:${rawPem.slice(0, 16)}:${rawPem.slice(-16)}`;
-  if (cachedKey && cachedKeyFingerprint === fingerprint) return cachedKey;
+  const cached = validatedKeyCache.get(fingerprint);
+  if (cached) return cached;
 
   const pem = normalizeKalshiPem(rawPem);
-
   if (/-----BEGIN ENCRYPTED PRIVATE KEY-----/.test(pem)) {
     throw new Error(
-      "KALSHI_PRIVATE_KEY_PEM is an encrypted/passphrase-protected key. " +
-        "Export an unencrypted PKCS#8 PEM from Kalshi (begins with " +
-        "'-----BEGIN PRIVATE KEY-----' or '-----BEGIN RSA PRIVATE KEY-----') and update the secret.",
+      "Kalshi private key is encrypted/passphrase-protected. Export an unencrypted PKCS#8 PEM.",
     );
   }
 
@@ -82,21 +75,15 @@ export async function getValidatedKalshiKey(): Promise<ValidatedKalshiKey> {
     key = createPrivateKey({ key: pem, format: "pem" });
   } catch (e: any) {
     throw new Error(
-      "KALSHI_PRIVATE_KEY_PEM could not be decoded. Paste the full PEM exactly as Kalshi gave it " +
-        "(including BEGIN/END lines, with newlines preserved). Underlying error: " +
+      "Kalshi private key could not be decoded (need full PEM incl. BEGIN/END lines). Underlying: " +
         (e?.message ?? String(e)),
     );
   }
-
   if (key.asymmetricKeyType !== "rsa") {
     throw new Error(
-      `KALSHI_PRIVATE_KEY_PEM must be an RSA key (got ${key.asymmetricKeyType ?? "unknown"}). ` +
-        "Kalshi requires RSA-PSS signatures.",
+      `Kalshi private key must be RSA (got ${key.asymmetricKeyType ?? "unknown"}).`,
     );
   }
-
-  // Smoke-test: actually sign with RSA-PSS so a broken key fails here, not mid-order.
-  // Workerd's crypto shim rejects KeyObject as options.key, so we sign with the PEM string.
   try {
     const signer = createSign("RSA-SHA256");
     signer.update("kalshi-key-validation");
@@ -107,24 +94,61 @@ export async function getValidatedKalshiKey(): Promise<ValidatedKalshiKey> {
       saltLength: constants.RSA_PSS_SALTLEN_DIGEST,
     });
   } catch (e: any) {
-    throw new Error(
-      "KALSHI_PRIVATE_KEY_PEM failed RSA-PSS test sign: " + (e?.message ?? String(e)),
-    );
+    throw new Error("Kalshi private key failed RSA-PSS test sign: " + (e?.message ?? String(e)));
   }
 
-  cachedKey = { key, pem, constants, createSign };
-  cachedKeyFingerprint = fingerprint;
-  return cachedKey;
+  const validated: ValidatedKalshiKey = { key, pem, constants, createSign };
+  validatedKeyCache.set(fingerprint, validated);
+  return validated;
 }
 
-export async function signKalshi(method: string, path: string): Promise<Record<string, string>> {
-  const keyId = process.env.KALSHI_API_KEY_ID;
-  if (!keyId) throw new Error("KALSHI_API_KEY_ID is not configured");
-  const { pem, constants, createSign } = await getValidatedKalshiKey();
+/** Back-compat: env-only validated key (used by health probe + diagnostics). */
+export async function getValidatedKalshiKey(): Promise<ValidatedKalshiKey> {
+  const rawPem = process.env.KALSHI_PRIVATE_KEY_PEM;
+  if (!rawPem) throw new Error("KALSHI_PRIVATE_KEY_PEM is not configured");
+  return validatePem(rawPem);
+}
+
+/**
+ * Resolve Kalshi credentials for a request.
+ * Preference order: user's saved profile creds → env fallback.
+ * Both `kalshi_api_key_id` AND `kalshi_private_key_pem` must be present to use per-user;
+ * otherwise env is used (current behavior).
+ */
+export async function resolveKalshiCreds(
+  userId?: string,
+): Promise<{ keyId: string; rawPem: string; source: "user" | "env" }> {
+  if (userId) {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data } = await supabaseAdmin
+        .from("profiles")
+        .select("kalshi_api_key_id, kalshi_private_key_pem")
+        .eq("id", userId)
+        .maybeSingle();
+      const keyId = (data?.kalshi_api_key_id ?? "").trim();
+      const rawPem = (data?.kalshi_private_key_pem ?? "").trim();
+      if (keyId && rawPem) return { keyId, rawPem, source: "user" };
+    } catch {
+      // fall through to env
+    }
+  }
+  const envKeyId = process.env.KALSHI_API_KEY_ID;
+  const envPem = process.env.KALSHI_PRIVATE_KEY_PEM;
+  if (!envKeyId) throw new Error("KALSHI_API_KEY_ID is not configured");
+  if (!envPem) throw new Error("KALSHI_PRIVATE_KEY_PEM is not configured");
+  return { keyId: envKeyId, rawPem: envPem, source: "env" };
+}
+
+export async function signKalshi(
+  method: string,
+  path: string,
+  userId?: string,
+): Promise<Record<string, string>> {
+  const { keyId, rawPem } = await resolveKalshiCreds(userId);
+  const { pem, constants, createSign } = await validatePem(rawPem);
 
   const ts = Date.now().toString();
-  // Kalshi requires the signed path to match the server-visible URL path,
-  // which includes the /trade-api/v2 prefix.
   const msg = `${ts}${method}/trade-api/v2${path}`;
   const signer = createSign("RSA-SHA256");
   signer.update(msg);
@@ -180,7 +204,7 @@ export async function submitKalshiBuy(
 
   let headers: Record<string, string>;
   try {
-    headers = await signKalshi("POST", path);
+    headers = await signKalshi("POST", path, userId);
   } catch (e: any) {
     await supabase.from("crypto_trades").update({
       status: "error", error: e?.message ?? "sign failed",
@@ -309,10 +333,10 @@ export const checkKalshiKeyHealth = createServerFn({ method: "GET" })
 // from Kalshi on failure. Read-only — never places an order.
 export const checkKalshiBalance = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<{ ok: boolean; balanceCents?: number; payoutCents?: number; error?: string; status?: number }> => {
+  .handler(async ({ context }): Promise<{ ok: boolean; balanceCents?: number; payoutCents?: number; error?: string; status?: number }> => {
     try {
       const path = "/portfolio/balance";
-      const headers = await signKalshi("GET", path);
+      const headers = await signKalshi("GET", path, context.userId);
       const res = await fetch(`${KALSHI_BASE}${path}`, { method: "GET", headers });
       const text = await res.text();
       let json: any = null;
@@ -344,43 +368,34 @@ export type KalshiDiagStep = {
 
 export const diagnoseKalshiAuth = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<{ ok: boolean; steps: KalshiDiagStep[]; summary: string; serverTimeIso: string }> => {
+  .handler(async ({ context }): Promise<{ ok: boolean; steps: KalshiDiagStep[]; summary: string; serverTimeIso: string }> => {
     const steps: KalshiDiagStep[] = [];
     const push = (s: KalshiDiagStep) => { steps.push(s); return s.ok; };
 
-    // 1) Env presence
-    const keyId = process.env.KALSHI_API_KEY_ID ?? "";
-    const rawPem = process.env.KALSHI_PRIVATE_KEY_PEM ?? "";
-    const keyIdOk = !!keyId;
-    push({
-      name: "KALSHI_API_KEY_ID secret present",
-      ok: keyIdOk,
-      detail: keyIdOk
-        ? `length=${keyId.length}, preview=${keyId.slice(0, 4)}…${keyId.slice(-4)}`
-        : "Missing. Add it via Settings → Secrets. Kalshi shows this on the API Keys page.",
-    });
-    const pemOk = !!rawPem;
-    push({
-      name: "KALSHI_PRIVATE_KEY_PEM secret present",
-      ok: pemOk,
-      detail: pemOk
-        ? `length=${rawPem.length} chars, starts with "${rawPem.slice(0, 27).replace(/\n/g, "⏎")}"`
-        : "Missing. Paste the full PEM (BEGIN/END lines included) into the secret.",
-    });
-
-    if (!keyIdOk || !pemOk) {
+    // 1) Resolve creds: prefer user's saved profile creds; fall back to env.
+    let creds: { keyId: string; rawPem: string; source: "user" | "env" };
+    try {
+      creds = await resolveKalshiCreds(context.userId);
+    } catch (e: any) {
+      push({ name: "Kalshi credentials available", ok: false, detail: e?.message ?? String(e) });
       return {
         ok: false,
         steps,
-        summary: "Required secret(s) not configured. /portfolio/balance will return 401 because no KALSHI-ACCESS-KEY header can be sent.",
+        summary: "No Kalshi credentials found. Save your API Key ID + Private Key in Settings, or ensure env fallback is configured.",
         serverTimeIso: new Date().toISOString(),
       };
     }
+    const { keyId, rawPem, source } = creds;
+    push({
+      name: `Credentials source: ${source === "user" ? "user profile (Settings)" : "env fallback"}`,
+      ok: true,
+      detail: `keyId length=${keyId.length}, preview=${keyId.slice(0, 4)}…${keyId.slice(-4)}; pem length=${rawPem.length}`,
+    });
 
     // 2) PEM parse + RSA-PSS smoke test
     let validated: ValidatedKalshiKey | null = null;
     try {
-      validated = await getValidatedKalshiKey();
+      validated = await validatePem(rawPem);
       const details = (validated.key.asymmetricKeyDetails ?? {}) as { modulusLength?: number };
       push({
         name: "Private key parses & passes RSA-PSS sign smoke test",
@@ -393,7 +408,7 @@ export const diagnoseKalshiAuth = createServerFn({ method: "GET" })
       return {
         ok: false,
         steps,
-        summary: "PEM is unusable. Re-export an unencrypted PKCS#8 RSA key from Kalshi and update the secret.",
+        summary: "PEM is unusable. Re-export an unencrypted PKCS#8 RSA key from Kalshi and save it in Settings.",
         serverTimeIso: new Date().toISOString(),
       };
     }
@@ -403,7 +418,7 @@ export const diagnoseKalshiAuth = createServerFn({ method: "GET" })
     const path = "/portfolio/balance";
     let headers: Record<string, string> = {};
     try {
-      headers = await signKalshi(method, path);
+      headers = await signKalshi(method, path, context.userId);
       push({
         name: "Built signed request headers",
         ok: true,
@@ -507,7 +522,7 @@ export const sellKalshiOrder = createServerFn({ method: "POST" })
     if (!trade.contracts || trade.contracts <= 0) throw new Error("Trade has no contracts");
 
     const path = "/portfolio/events/orders";
-    const headers = await signKalshi("POST", path);
+    const headers = await signKalshi("POST", path, userId);
 
     // Sell = opposite side of position. YES holder sells via ask, NO holder via bid.
     const priceDollars = (trade.side === "YES"
@@ -557,8 +572,8 @@ export const sellKalshiOrder = createServerFn({ method: "POST" })
 // trade with the realized P&L. YES wins → 1.00, NO wins → 0.00. P&L =
 // (settleCents − entryCents)/100 × contracts. Idempotent: skips already-
 // settled/closed/errored rows; safe to poll every 10s from the client.
-async function signKalshiGet(path: string): Promise<Record<string, string>> {
-  return signKalshi("GET", path);
+async function signKalshiGet(path: string, userId?: string): Promise<Record<string, string>> {
+  return signKalshi("GET", path, userId);
 }
 
 export const settleExpiredTrades = createServerFn({ method: "POST" })
@@ -581,7 +596,7 @@ export const settleExpiredTrades = createServerFn({ method: "POST" })
     for (const t of trades) {
       try {
         const path = `/markets/${encodeURIComponent(t.ticker)}`;
-        const headers = await signKalshiGet(path);
+        const headers = await signKalshiGet(path, userId);
         const res = await fetch(`${KALSHI_BASE}${path}`, {
           headers: { ...headers, Accept: "application/json" },
         });
