@@ -86,7 +86,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             hedgeLo: (u as any).hedge_band_lo != null ? Number((u as any).hedge_band_lo) : 0.60,
             hedgeHi: (u as any).hedge_band_hi != null ? Number((u as any).hedge_band_hi) : 0.68,
             tpCents: (u as any).tp_cents != null ? Number((u as any).tp_cents) : 98,
-            oscMax: (u as any).oscillation_max != null ? Number((u as any).oscillation_max) : 3,
+            oscMax: (u as any).oscillation_max != null ? Number((u as any).oscillation_max) : 2,
             skipLt15s: (u as any).skip_bucket_lt15s === true,
             skip15_60s: (u as any).skip_bucket_15_60s === true,
           };
@@ -231,14 +231,17 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 if (m.secondsToClose <= 60) continue; // disable other exits in final 60s
 
                 let armed = t.whipsaw_armed === true;
-                if (!armed && Math.abs(curAm - entryAm) >= 200) {
+                // Arm sooner: any ≥150am swing away from entry (was 200) —
+                // catches coin-flip conditions earlier.
+                if (!armed && Math.abs(curAm - entryAm) >= 150) {
                   armed = true;
                   await supabaseAdmin
                     .from("auto_odds_tracked_orders")
                     .update({ whipsaw_armed: true })
                     .eq("id", t.id);
                 }
-                const whipsawFire = armed && Math.abs(curAm - entryAm) <= 50;
+                // Fire sooner on the return leg: within 75am of entry (was 50).
+                const whipsawFire = armed && Math.abs(curAm - entryAm) <= 75;
 
                 // 40% implied-prob exit (of ENTRY prob)
                 const impliedProb = (am: number) => am < 0 ? (-am) / ((-am) + 100) : 100 / (am + 100);
