@@ -204,7 +204,7 @@ export async function submitKalshiBuy(
 
   let headers: Record<string, string>;
   try {
-    headers = await signKalshi("POST", path);
+    headers = await signKalshi("POST", path, userId);
   } catch (e: any) {
     await supabase.from("crypto_trades").update({
       status: "error", error: e?.message ?? "sign failed",
