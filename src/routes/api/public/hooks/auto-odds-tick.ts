@@ -231,14 +231,17 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 if (m.secondsToClose <= 60) continue; // disable other exits in final 60s
 
                 let armed = t.whipsaw_armed === true;
-                if (!armed && Math.abs(curAm - entryAm) >= 200) {
+                // Arm sooner: any ≥150am swing away from entry (was 200) —
+                // catches coin-flip conditions earlier.
+                if (!armed && Math.abs(curAm - entryAm) >= 150) {
                   armed = true;
                   await supabaseAdmin
                     .from("auto_odds_tracked_orders")
                     .update({ whipsaw_armed: true })
                     .eq("id", t.id);
                 }
-                const whipsawFire = armed && Math.abs(curAm - entryAm) <= 50;
+                // Fire sooner on the return leg: within 75am of entry (was 50).
+                const whipsawFire = armed && Math.abs(curAm - entryAm) <= 75;
 
                 // 40% implied-prob exit (of ENTRY prob)
                 const impliedProb = (am: number) => am < 0 ? (-am) / ((-am) + 100) : 100 / (am + 100);
