@@ -445,6 +445,45 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             // Model prob is intentionally NOT a gate on the odds-bet path.
             // It is still recorded in the study log below for analysis only.
 
+            // ── PRE-ENTRY CHAOS GATE ──
+            // Look at the last few study-log snapshots for this ticker in the
+            // past ~2 min. If odds have been flip-flopping (multiple 50¢
+            // crossings, or big total oscillation), skip entry — we don't
+            // want to bet into a coin-flip market. Best-effort: on any error,
+            // fall through to normal entry (never blocks by default).
+            try {
+              const since = new Date(Date.now() - 120_000).toISOString();
+              const { data: recent } = await supabaseAdmin
+                .from("auto_odds_study_log")
+                .select("yes_cents, no_cents, picked_side, created_at")
+                .eq("user_id", userId)
+                .eq("ticker", atm.ticker)
+                .gte("created_at", since)
+                .order("created_at", { ascending: true });
+              if (recent && recent.length >= 3) {
+                let crossings = 0;
+                let totalAbsDelta = 0;
+                let prevPicked: number | null = null;
+                for (const r of recent as any[]) {
+                  const px = pick.side === "YES" ? r.yes_cents : r.no_cents;
+                  if (px == null) continue;
+                  if (prevPicked != null) {
+                    totalAbsDelta += Math.abs(px - prevPicked);
+                    if ((prevPicked < 50 && px >= 50) || (prevPicked >= 50 && px < 50)) crossings += 1;
+                  }
+                  prevPicked = px;
+                }
+                if (crossings >= 2 || totalAbsDelta >= 30) {
+                  note = `skipped: chaotic market on ${atm.ticker} (${crossings} 50¢ flips, ${totalAbsDelta}¢ osc in 2min)`;
+                  await logStudy({ entered: false, hedge_fired: false, note });
+                  summary.push({ user_id: userId, entries, exits, stopped, note });
+                  continue;
+                }
+              }
+            } catch { /* chaos check is best-effort — never block on error */ }
+
+
+
 
             // ── 2-SECOND PERSISTENCE CHECK ──
             // Kalshi odds can flicker in/out of -450/-750 in <2s during
