@@ -447,8 +447,13 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
 
             // ── COOLDOWN AFTER 2 BACK-TO-BACK WINS ──
             // If the user's last 2 settled odds-bet trades were both wins,
-            // skip the next 2 entry attempts. Prevents "revenge sizing" /
-            // streak-chasing into a hot market. Best-effort — never blocks on error.
+            // pause new entries for 15 minutes of wall-clock time from the
+            // moment the 2nd win settled. The point is to sit out the
+            // *flip window* that typically follows a hot streak — flip risk
+            // is a time phenomenon, not a count. A subsequent loss/breakeven
+            // ends the streak automatically (no longer "2 wins in a row").
+            // Best-effort — never blocks on error.
+            const COOLDOWN_MS = 15 * 60_000;
             try {
               const { data: recentClosed } = await supabaseAdmin
                 .from("auto_odds_tracked_orders")
@@ -463,15 +468,11 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 const w0 = Number(rows[0].auto_trade_orders?.pnl_usd ?? 0);
                 const w1 = Number(rows[1].auto_trade_orders?.pnl_usd ?? 0);
                 if (w0 > 0 && w1 > 0) {
-                  const streakEndedAt = rows[0].auto_trade_orders.settled_at;
-                  const { count: entriesSince } = await supabaseAdmin
-                    .from("auto_odds_tracked_orders")
-                    .select("id", { count: "exact", head: true })
-                    .eq("user_id", userId)
-                    .gt("created_at", streakEndedAt);
-                  const skipped = entriesSince ?? 0;
-                  if (skipped < 2) {
-                    note = `skipped: cooldown after 2 wins (${skipped + 1}/2)`;
+                  const streakEndedAt = new Date(rows[0].auto_trade_orders.settled_at).getTime();
+                  const elapsedMs = Date.now() - streakEndedAt;
+                  if (elapsedMs >= 0 && elapsedMs < COOLDOWN_MS) {
+                    const remainMin = Math.max(1, Math.ceil((COOLDOWN_MS - elapsedMs) / 60_000));
+                    note = `skipped: cooldown after 2 wins (${remainMin}m left)`;
                     await logStudy({ entered: false, hedge_fired: false, note });
                     summary.push({ user_id: userId, entries, exits, stopped, note });
                     continue;
@@ -479,6 +480,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 }
               }
             } catch { /* cooldown check is best-effort — never block on error */ }
+
 
 
 
