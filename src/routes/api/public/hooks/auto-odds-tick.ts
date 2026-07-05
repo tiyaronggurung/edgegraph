@@ -445,6 +445,43 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             // Model prob is intentionally NOT a gate on the odds-bet path.
             // It is still recorded in the study log below for analysis only.
 
+            // ── COOLDOWN AFTER 2 BACK-TO-BACK WINS ──
+            // If the user's last 2 settled odds-bet trades were both wins,
+            // skip the next 2 entry attempts. Prevents "revenge sizing" /
+            // streak-chasing into a hot market. Best-effort — never blocks on error.
+            try {
+              const { data: recentClosed } = await supabaseAdmin
+                .from("auto_odds_tracked_orders")
+                .select("order_id, auto_trade_orders!inner(pnl_usd, status, settled_at)")
+                .eq("user_id", userId)
+                .in("auto_trade_orders.status", ["settled_win", "settled_loss"])
+                .not("auto_trade_orders.settled_at", "is", null)
+                .order("auto_trade_orders(settled_at)", { ascending: false })
+                .limit(2);
+              const rows = (recentClosed ?? []) as any[];
+              if (rows.length === 2) {
+                const w0 = Number(rows[0].auto_trade_orders?.pnl_usd ?? 0);
+                const w1 = Number(rows[1].auto_trade_orders?.pnl_usd ?? 0);
+                if (w0 > 0 && w1 > 0) {
+                  const streakEndedAt = rows[0].auto_trade_orders.settled_at;
+                  const { count: entriesSince } = await supabaseAdmin
+                    .from("auto_odds_tracked_orders")
+                    .select("id", { count: "exact", head: true })
+                    .eq("user_id", userId)
+                    .gt("created_at", streakEndedAt);
+                  const skipped = entriesSince ?? 0;
+                  if (skipped < 2) {
+                    note = `skipped: cooldown after 2 wins (${skipped + 1}/2)`;
+                    await logStudy({ entered: false, hedge_fired: false, note });
+                    summary.push({ user_id: userId, entries, exits, stopped, note });
+                    continue;
+                  }
+                }
+              }
+            } catch { /* cooldown check is best-effort — never block on error */ }
+
+
+
             // ── PRE-ENTRY CHAOS GATE ──
             // Look at the last few study-log snapshots for this ticker in the
             // past ~2 min. If odds have been flip-flopping (multiple 50¢
