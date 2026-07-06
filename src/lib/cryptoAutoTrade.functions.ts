@@ -787,22 +787,34 @@ export async function autoExitForUser(
   let exited = 0;
   const handledIds = new Set<string>();
 
+  // Hard price floor: if our side has crashed to ≤25¢, close 100% immediately.
+  // Backtest against 131 settled live trades: floor at 25¢ saved $228 on 8 big
+  // losses and cost only $130 across 112 wins (1 win of 112 ever touched 25¢).
+  // Runs BEFORE ladder logic so it always wins over per-order exit tiers.
+  const HARD_FLOOR_CENTS = 25;
+
   for (const mk of marked) {
     const { r, markCents, entry, remaining } = mk;
     const ladder = Array.isArray(r.exit_ladder) ? (r.exit_ladder as ExitLadderTier[]) : DEFAULT_EXIT_LADDER;
     const delta = markCents - entry;
 
+    const hardFloorHit = markCents <= HARD_FLOOR_CENTS;
+
     const triggered = ladder.filter(t => {
       if (t.kind === "sl") return delta <= t.priceDeltaCents;
       return delta >= t.priceDeltaCents;
     });
-    if (triggered.length === 0) continue;
+    if (!hardFloorHit && triggered.length === 0) continue;
+
 
     triggered.sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === "sl" ? -1 : 1;
       return b.exitFraction - a.exitFraction;
     });
-    const tier = triggered[0];
+    // Hard floor overrides any ladder tier: full 100% exit at mark.
+    const tier: ExitLadderTier = hardFloorHit
+      ? { kind: "sl", priceDeltaCents: delta, exitFraction: 1.0, label: `HARD FLOOR ≤${HARD_FLOOR_CENTS}¢` }
+      : triggered[0];
     const toSell = Math.max(1, Math.min(remaining, Math.floor(remaining * tier.exitFraction)));
 
     const { data: claimed } = await supabase
@@ -815,7 +827,8 @@ export async function autoExitForUser(
     if (!claimed) { reasons.push(`${r.ticker}: ladder claim lost`); continue; }
 
     const sellCents = Math.max(1, Math.min(99, markCents));
-    const fill = await trySell(r, toSell, sellCents, `ladder-${tier.kind}`);
+    const fill = await trySell(r, toSell, sellCents, hardFloorHit ? "hard-floor" : `ladder-${tier.kind}`);
+
     if (!fill) {
       await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", r.id);
       continue;

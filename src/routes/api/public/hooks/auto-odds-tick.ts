@@ -210,6 +210,26 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 const curCents = Math.max(1, Math.min(99, Math.round(curCentsSide * 100)));
                 const curAm = centsToAmerican(curCents);
 
+                // ── HARD PRICE FLOOR (≤25¢) ──
+                // Backtest-proven crash-catcher: fires when our side has
+                // truly flipped. <1% of wins ever touch 25¢, ~half of big
+                // losses do. Runs FIRST — before the T-30 exit and the
+                // ≤60s lockout — because most wipes happen in the final
+                // minute and existing exits are disabled there.
+                if (curCents <= 25) {
+                  try {
+                    const res = await sellOddsBetCore(supabaseAdmin as any, userId, o.id, "hard_floor_25c");
+                    if (res.ok) {
+                      exits += 1;
+                      await supabaseAdmin
+                        .from("auto_odds_tracked_orders")
+                        .update({ closed_reason: "hard_floor_25c" })
+                        .eq("id", t.id);
+                    }
+                  } catch { /* retry next tick */ }
+                  continue;
+                }
+
                 // ── T-30s TIME EXIT ──
                 // In the final 30s, if we're still underwater (curCents <
                 // entryCents), market-sell to avoid a full $100 wipe on
@@ -229,6 +249,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 }
 
                 if (m.secondsToClose <= 60) continue; // disable other exits in final 60s
+
 
                 let armed = t.whipsaw_armed === true;
                 // Arm sooner: any ≥150am swing away from entry (was 200) —
