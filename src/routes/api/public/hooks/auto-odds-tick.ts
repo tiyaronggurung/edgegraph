@@ -82,7 +82,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
           // default when the settings row has NULL. See TUNABLE_DEFS in
           // src/lib/oddsStudy.functions.ts — safe ranges are enforced there.
           const T = {
-            modelGateMin: (u as any).model_gate_min != null ? Number((u as any).model_gate_min) : 0.55,
+            modelGateMin: (u as any).model_gate_min != null ? Number((u as any).model_gate_min) : 0.60,
             hedgeLo: (u as any).hedge_band_lo != null ? Number((u as any).hedge_band_lo) : 0.60,
             hedgeHi: (u as any).hedge_band_hi != null ? Number((u as any).hedge_band_hi) : 0.68,
             tpCents: (u as any).tp_cents != null ? Number((u as any).tp_cents) : 98,
