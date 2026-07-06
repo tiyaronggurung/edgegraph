@@ -85,7 +85,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             modelGateMin: (u as any).model_gate_min != null ? Number((u as any).model_gate_min) : 0.60,
             hedgeLo: (u as any).hedge_band_lo != null ? Number((u as any).hedge_band_lo) : 0.60,
             hedgeHi: (u as any).hedge_band_hi != null ? Number((u as any).hedge_band_hi) : 0.68,
-            tpCents: (u as any).tp_cents != null ? Number((u as any).tp_cents) : 98,
+            tpCents: (u as any).tp_cents != null ? Number((u as any).tp_cents) : 95,
             oscMax: (u as any).oscillation_max != null ? Number((u as any).oscillation_max) : 2,
             skipLt15s: (u as any).skip_bucket_lt15s === true,
             skip15_60s: (u as any).skip_bucket_15_60s === true,
@@ -152,10 +152,11 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 .eq("user_id", userId);
             }
 
-            // ── 1b. DAILY 5-LOSSES CAP ──
-            // Count settled losses across tracked auto-odds orders since ET
-            // midnight. At ≥5 → hard stop for the rest of the ET day.
-            // No override: rule re-arms only at next ET midnight.
+            // ── 1b. DAILY 2-LOSS CIRCUIT BREAKER ──
+            // After 2 settled losses since ET midnight, pause new entries for
+            // the rest of the ET day. Rearms automatically at next midnight.
+            // Prevents tilt/regime-change drawdowns during bad sessions.
+            let dailyLossesReached = false;
             {
               const nowD = new Date();
               const partsD = new Intl.DateTimeFormat("en-US", {
@@ -170,11 +171,26 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               const offset = wallUtc - nowD.getTime();
               const etMidnightUtc = new Date(Date.UTC(yy, mo - 1, dd, 0, 0, 0) - offset);
 
-              // 5-losses-per-day auto-off REMOVED per user request. The
-              // odds-bet loop now trades regardless of daily loss count.
-              // (Client-side 3-in-a-row stop still applies from the browser.)
-
+              try {
+                const { data: todayTracked } = await supabaseAdmin
+                  .from("auto_odds_tracked_orders")
+                  .select("order_id")
+                  .eq("user_id", userId)
+                  .gte("created_at", etMidnightUtc.toISOString());
+                const ids = (todayTracked ?? []).map((r: any) => r.order_id);
+                if (ids.length > 0) {
+                  const { data: settledToday } = await supabaseAdmin
+                    .from("auto_trade_orders")
+                    .select("status")
+                    .in("id", ids)
+                    .eq("status", "settled_loss");
+                  if ((settledToday?.length ?? 0) >= 2) {
+                    dailyLossesReached = true;
+                  }
+                }
+              } catch { /* best-effort — never block on error */ }
             }
+
 
 
 
@@ -277,7 +293,8 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 const flipFire = entryAm <= -280 && entryAm >= -750 && curCents <= 65;
 
                 // Take-profit: sell as soon as picked side hits `tpCents`
-                // (default 98¢; AI can tune 95-99).
+                // (default 95¢; AI can tune 90-99). 95 locks wins ~5-10s
+                // sooner than 98, avoiding late flips the floor can't save.
                 const tp98Fire = curCents >= T.tpCents;
 
                 // Oscillation exit: odds bouncing between "shallow" (≥ -1000)
@@ -330,6 +347,14 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               summary.push({ user_id: userId, entries, exits, stopped });
               continue;
             }
+
+            // Daily 2-loss circuit breaker: skip entries for the rest of the ET day.
+            if (dailyLossesReached) {
+              const note = "skipped: daily 2-loss circuit breaker (resumes at ET midnight)";
+              summary.push({ user_id: userId, entries, exits, stopped, note });
+              continue;
+            }
+
 
             const { count: winTracked } = await supabaseAdmin
               .from("auto_odds_tracked_orders")
@@ -577,9 +602,9 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             const noAm2 = centsToAmerican(noCents2);
             const sideAm2 = pick.side === "YES" ? yesAm2 : noAm2;
 
-            // Strict band on re-check for ALL phases.
-            let persistOk = sideAm2 <= -450 && sideAm2 >= -750;
-            let thresholdLabel = "[-750,-450]";
+            // Persistence band matches entry band [-750, -370] (78¢–88¢).
+            let persistOk = sideAm2 <= -370 && sideAm2 >= -750;
+            let thresholdLabel = "[-750,-370]";
             if (!persistOk) {
               note = `skipped: 2s flicker — ${pick.side} was ${pick.reason}, now ${sideAm2} outside ${thresholdLabel}`;
               await logStudy({ entered: false, hedge_fired: false, note });
@@ -588,16 +613,27 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             }
 
 
+            // ── DYNAMIC STAKE SIZING ──
+            // Bet more when model confidence is higher. Same win-rate,
+            // ~40% more $ over time.
+            //   model ≥ 0.75 → $150 (high conviction)
+            //   0.60–0.75    → $100 (base)
+            //   < 0.60       → gate would've blocked it (defensive fallback $100)
+            const dynStake = (typeof modelSideP === "number" && modelSideP >= 0.75)
+              ? 150
+              : AUTO_ODDS_STAKE;
+
             const placeResult = await runAutoTradeCore(supabaseAdmin as any, userId, {
               mode: "live",
               confirm: "I_UNDERSTAND_LIVE",
               force: true,
               isMartingale: false,
               maxOrders: 1,
-              stakeUsd: AUTO_ODDS_STAKE,
+              stakeUsd: dynStake,
               forceTicker: atm.ticker,
               forceSide: pick.side,
             });
+
 
             let hedgeFired = false;
 
