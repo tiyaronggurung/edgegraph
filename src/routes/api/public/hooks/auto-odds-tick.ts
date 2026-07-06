@@ -668,6 +668,67 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               : compoundBase;
 
 
+            // ── CONFIDENCE SCORE (SHADOW / LOG-ONLY) ──
+            // Computes the new decision-layer signal alongside existing gates.
+            // Does NOT affect whether we trade — pure observation. Once we
+            // have ~200 rows we can compare would_enter vs actual outcomes and
+            // decide whether to promote it to a real gate.
+            //
+            // Weights (per spec): 35% EV, 20% calibration, 15% sigma,
+            // 10% momentum, 10% order flow, 5% vol regime, 5% whale.
+            // Missing inputs contribute neutral 50 to their bucket.
+            const entryCents2 = pick.side === "YES" ? yesCents2 : noCents2;
+            const marketSideProb = entryCents2 / 100;                    // implied
+            const pWin = (typeof modelSideP === "number") ? modelSideP : marketSideProb;
+            const pLoss = 1 - pWin;
+            const netProfit = dynStake * (1 - marketSideProb) / marketSideProb; // payoff at YES-share economics
+            const ev = pWin * netProfit - pLoss * dynStake;
+            const edgeVal = pWin - marketSideProb;
+
+            // EV score: normalize to 0-100 around stake. +stake → 100, 0 → 50, -stake → 0.
+            const evScore = Math.max(0, Math.min(100, 50 + (ev / dynStake) * 50));
+            // Calibration score: raw model prob mapped 0.5→50, 1.0→100.
+            const calibScore = Math.max(0, Math.min(100, pWin * 100));
+            // Sigma-lite: use |edge| / 0.05 as a proxy z-score (0.05 edge = 1σ).
+            const sigmaProxy = Math.abs(edgeVal) / 0.05;
+            const sigmaScore = Math.max(0, Math.min(100, 50 + Math.sign(edgeVal) * Math.min(50, sigmaProxy * 50)));
+            // Sigma multiplier per spec: <1σ heavily penalizes; ≥2σ boosts.
+            const sigmaMult = sigmaProxy < 1.0 ? 0.7 + 0.3 * sigmaProxy  // 0.7 at 0σ → 1.0 at 1σ
+                                                : Math.min(1.2, 1.0 + (sigmaProxy - 1) * 0.1); // up to 1.2 at 3σ
+            // Time-to-expiry penalty (points subtracted from final score).
+            const secs = atm.secondsToClose;
+            const timePenalty = secs >= 480 ? 0
+                              : secs >= 300 ? 1
+                              : secs >= 180 ? 2
+                              : secs >= 120 ? 3
+                              : secs >= 60  ? 5
+                              : 15; // <60s: heavy penalty (effectively skip in real gate)
+
+            // Unavailable inputs in server tick — neutral 50, wire up later.
+            const momentumScore = 50;
+            const orderflowScore = 50;
+            const volRegimeScore = 50;
+            const whaleScoreVal = 50;
+
+            let confidence =
+              evScore          * 0.35 +
+              calibScore       * 0.20 +
+              sigmaScore       * 0.15 +
+              momentumScore    * 0.10 +
+              orderflowScore   * 0.10 +
+              volRegimeScore   * 0.05 +
+              whaleScoreVal    * 0.05;
+            confidence = confidence * sigmaMult - timePenalty;
+            confidence = Math.max(0, Math.min(100, confidence));
+
+            const confidenceTier =
+              confidence >= 95 ? "elite"
+              : confidence >= 90 ? "large"
+              : confidence >= 85 ? "standard"
+              : confidence >= 80 ? "half"
+              : "pass";
+            const wouldEnter = confidence >= 80;
+
             const placeResult = await runAutoTradeCore(supabaseAdmin as any, userId, {
               mode: "live",
               confirm: "I_UNDERSTAND_LIVE",
@@ -678,6 +739,43 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               forceTicker: atm.ticker,
               forceSide: pick.side,
             });
+
+            // Shadow-log the decision. Best-effort — never blocks the trade.
+            try {
+              await supabaseAdmin.from("auto_odds_decision_log").insert({
+                user_id: userId,
+                ticker: atm.ticker,
+                spot: atm.spot ?? null,
+                seconds_to_close: secs,
+                time_bucket: bucketFor(secs),
+                picked_side: pick.side,
+                kalshi_favorite_side: kalshiFavSide,
+                model_yes_prob: hasModel ? modelYes : null,
+                model_side_prob: modelSideP,
+                market_side_prob: marketSideProb,
+                entry_price_cents: entryCents2,
+                edge: edgeVal,
+                expected_value: ev,
+                stake_used: dynStake,
+                ev_score: evScore,
+                calibration_score: calibScore,
+                sigma_score: sigmaScore,
+                momentum_score: momentumScore,
+                orderflow_score: orderflowScore,
+                volregime_score: volRegimeScore,
+                whale_score: whaleScoreVal,
+                time_penalty: timePenalty,
+                sigma_multiplier: sigmaMult,
+                confidence_score: confidence,
+                confidence_tier: confidenceTier,
+                would_enter: wouldEnter,
+                actual_entered: placeResult.placed > 0,
+                order_id: placeResult.orders[0]?.id ?? null,
+                note: `edge ${(edgeVal*100).toFixed(1)}% · EV $${ev.toFixed(1)} · σ≈${sigmaProxy.toFixed(2)} · tPen ${timePenalty} · conf ${confidence.toFixed(1)} (${confidenceTier})`,
+              });
+            } catch { /* shadow log is best-effort */ }
+
+
 
 
             let hedgeFired = false;
