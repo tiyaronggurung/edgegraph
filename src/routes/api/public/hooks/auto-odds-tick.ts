@@ -152,10 +152,11 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 .eq("user_id", userId);
             }
 
-            // ── 1b. DAILY 5-LOSSES CAP ──
-            // Count settled losses across tracked auto-odds orders since ET
-            // midnight. At ≥5 → hard stop for the rest of the ET day.
-            // No override: rule re-arms only at next ET midnight.
+            // ── 1b. DAILY 2-LOSS CIRCUIT BREAKER ──
+            // After 2 settled losses since ET midnight, pause new entries for
+            // the rest of the ET day. Rearms automatically at next midnight.
+            // Prevents tilt/regime-change drawdowns during bad sessions.
+            let dailyLossesReached = false;
             {
               const nowD = new Date();
               const partsD = new Intl.DateTimeFormat("en-US", {
@@ -170,11 +171,26 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               const offset = wallUtc - nowD.getTime();
               const etMidnightUtc = new Date(Date.UTC(yy, mo - 1, dd, 0, 0, 0) - offset);
 
-              // 5-losses-per-day auto-off REMOVED per user request. The
-              // odds-bet loop now trades regardless of daily loss count.
-              // (Client-side 3-in-a-row stop still applies from the browser.)
-
+              try {
+                const { data: todayTracked } = await supabaseAdmin
+                  .from("auto_odds_tracked_orders")
+                  .select("order_id")
+                  .eq("user_id", userId)
+                  .gte("created_at", etMidnightUtc.toISOString());
+                const ids = (todayTracked ?? []).map((r: any) => r.order_id);
+                if (ids.length > 0) {
+                  const { data: settledToday } = await supabaseAdmin
+                    .from("auto_trade_orders")
+                    .select("status")
+                    .in("id", ids)
+                    .eq("status", "settled_loss");
+                  if ((settledToday?.length ?? 0) >= 2) {
+                    dailyLossesReached = true;
+                  }
+                }
+              } catch { /* best-effort — never block on error */ }
             }
+
 
 
 
