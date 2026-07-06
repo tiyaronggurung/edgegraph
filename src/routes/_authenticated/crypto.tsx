@@ -933,8 +933,11 @@ function AutoTradePanel() {
   const MART_PAROLI_MIN_EDGE = 5;
 
   const [autoMart, setAutoMart] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("crypto.autoMart") === "on";
+    // Auto-Martingale permanently disabled — remove any persisted "on" state.
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("crypto.autoMart");
+    }
+    return false;
   });
   const [martStake, setMartStake] = useState<number>(() => {
     if (typeof window === "undefined") return MART_BASE;
