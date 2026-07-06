@@ -348,6 +348,14 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               continue;
             }
 
+            // Daily 2-loss circuit breaker: skip entries for the rest of the ET day.
+            if (dailyLossesReached) {
+              const note = "skipped: daily 2-loss circuit breaker (resumes at ET midnight)";
+              summary.push({ user_id: userId, entries, exits, stopped, note });
+              continue;
+            }
+
+
             const { count: winTracked } = await supabaseAdmin
               .from("auto_odds_tracked_orders")
               .select("id", { count: "exact", head: true })
