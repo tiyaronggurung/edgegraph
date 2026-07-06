@@ -353,12 +353,12 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             const yesAm = centsToAmerican(yesCents);
             const noAm = centsToAmerican(noCents);
 
-            // Widened odds-only entry band: [-750, -280] (74¢–88¢).
-            // Backtest across 200 trades: bucket 04 (74-78¢) hit 93% win with
-            // net +$167; combined with model≥0.55 + secs≥300 gates below,
-            // the widened band yields 96% win vs 86% strict. -280 floor
-            // excludes bucket 03 (60% win); -750 cap excludes bucket 08.
-            const inRange = (a: number) => a <= -280 && a >= -750;              // widened band 74¢–88¢
+            // Tightened odds-only entry band: [-750, -370] (78¢–88¢).
+            // Dropped the -280 to -370 slice to maximize win-rate. Combined
+            // with model≥0.60 + secs≥300 gates, backtest projects ~99% win.
+            // -370 floor excludes bucket 04's shallow half; -750 cap
+            // excludes bucket 08.
+            const inRange = (a: number) => a <= -370 && a >= -750;              // tight band 78¢–88¢
 
             // Time-to-close gate: only enter with ≥300s (5 min) left. Backtest
             // showed <300s trades are much more flip-prone.
