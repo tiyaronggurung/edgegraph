@@ -648,36 +648,9 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 });
               note = `entered ${placed.ticker} ${placed.side} @ ${entryCents}¢ (${pick.reason})`;
 
-              // ── 3b. COINFLIP-ZONE HEDGE ──
-              // Fire $5 hedge on the OPPOSITE side only when the model is in
-              // the true coinflip zone [60%, 68%] on our picked side — i.e.
-              // barely above the gate floor. NOT inserted into
-              // auto_odds_tracked_orders: does NOT count toward the 2-loss
-              // tail stop, daily 5-loss cap, or trigger whipsaw exits.
-              try {
-                const p = modelSideP as number;
-                if (p >= HEDGE_MIN && p <= HEDGE_MAX) {
-                  const oppSide: "YES" | "NO" = pick.side === "YES" ? "NO" : "YES";
-                  const hedgeRes = await runAutoTradeCore(supabaseAdmin as any, userId, {
-                    mode: "live",
-                    confirm: "I_UNDERSTAND_LIVE",
-                    force: true,
-                    isMartingale: false,
-                    maxOrders: 1,
-                    stakeUsd: HEDGE_STAKE,
-                    forceTicker: atm.ticker,
-                    forceSide: oppSide,
-                  });
-                  if (hedgeRes.placed > 0) {
-                    hedgeFired = true;
-                    note += ` · coinflip hedge ${oppSide} $${HEDGE_STAKE}`;
-                  } else {
-                    note += ` · hedge skipped: ${hedgeRes.skipReasons.slice(0, 1).join("") || "no fill"}`;
-                  }
-                }
-              } catch (e: any) {
-                note += ` · hedge err: ${e?.message?.slice(0, 60) ?? "err"}`;
-              }
+              // ── COINFLIP-ZONE HEDGE: DISABLED ──
+              // User rule: one bet per trade, never two. Hedge removed.
+
 
               await logStudy({ entered: true, hedge_fired: hedgeFired, note });
             } else {
