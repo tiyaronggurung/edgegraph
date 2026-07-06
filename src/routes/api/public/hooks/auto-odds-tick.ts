@@ -225,13 +225,39 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 const curCentsSide = o.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice));
                 const curCents = Math.max(1, Math.min(99, Math.round(curCentsSide * 100)));
                 const curAm = centsToAmerican(curCents);
+                // ── STRIKE-CROSS EMERGENCY EXIT ──
+                // Final-90s guard: if BTC spot has crossed the strike against
+                // our side, market-sell now. Prevents the "flipped through
+                // strike in the last minute" full-wipe (e.g. NO held while
+                // spot ticks from -$60 below strike to +$3 above at expiry).
+                // Runs FIRST — before hard floor and T-30 — because the flip
+                // often happens while Kalshi price is still 30-60¢ (floor
+                // won't fire) and >30s remain (T-30 won't fire).
+                if (
+                  m.secondsToClose <= 90 &&
+                  m.spot != null && m.strike != null &&
+                  (
+                    (o.side === "NO"  && m.spot >= m.strike) ||
+                    (o.side === "YES" && m.spot <  m.strike)
+                  )
+                ) {
+                  try {
+                    const res = await sellOddsBetCore(supabaseAdmin as any, userId, o.id, "strike_cross_emergency");
+                    if (res.ok) {
+                      exits += 1;
+                      await supabaseAdmin
+                        .from("auto_odds_tracked_orders")
+                        .update({ closed_reason: "strike_cross_emergency" })
+                        .eq("id", t.id);
+                    }
+                  } catch { /* retry next tick */ }
+                  continue;
+                }
 
                 // ── HARD PRICE FLOOR (≤25¢) ──
                 // Backtest-proven crash-catcher: fires when our side has
                 // truly flipped. <1% of wins ever touch 25¢, ~half of big
-                // losses do. Runs FIRST — before the T-30 exit and the
-                // ≤60s lockout — because most wipes happen in the final
-                // minute and existing exits are disabled there.
+                // losses do. Runs before the T-30 exit and the ≤60s lockout.
                 if (curCents <= 25) {
                   try {
                     const res = await sellOddsBetCore(supabaseAdmin as any, userId, o.id, "hard_floor_25c");
@@ -245,6 +271,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                   } catch { /* retry next tick */ }
                   continue;
                 }
+
 
                 // ── T-30s TIME EXIT ──
                 // In the final 30s, if we're still underwater (curCents <
