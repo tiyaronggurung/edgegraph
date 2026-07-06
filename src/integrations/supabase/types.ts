@@ -150,6 +150,7 @@ export type Database = {
           volregime_score: number | null
           whale_score: number | null
           would_enter: boolean
+          would_skip_time_gate_400: boolean | null
         }
         Insert: {
           actual_entered?: boolean
@@ -199,6 +200,7 @@ export type Database = {
           volregime_score?: number | null
           whale_score?: number | null
           would_enter?: boolean
+          would_skip_time_gate_400?: boolean | null
         }
         Update: {
           actual_entered?: boolean
@@ -248,6 +250,7 @@ export type Database = {
           volregime_score?: number | null
           whale_score?: number | null
           would_enter?: boolean
+          would_skip_time_gate_400?: boolean | null
         }
         Relationships: []
       }

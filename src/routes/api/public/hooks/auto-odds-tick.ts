@@ -851,6 +851,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 confidence_tier: confidenceTier,
                 would_enter: wouldEnter,
                 actual_entered: placeResult.placed > 0,
+                would_skip_time_gate_400: typeof secs === "number" ? secs < 400 : null,
                 order_id: placeResult.orders[0]?.id ?? null,
                 // Model-history shadow fields
                 model_prob_1min_ago: hist.p1,
