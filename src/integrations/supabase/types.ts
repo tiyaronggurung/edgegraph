@@ -114,16 +114,30 @@ export type Database = {
           expected_value: number | null
           final_outcome: string | null
           final_pnl_usd: number | null
+          history_samples_count: number | null
           id: string
           kalshi_favorite_side: string | null
           market_side_prob: number | null
+          max_probability_last_10min: number | null
+          min_probability_last_10min: number | null
+          model_prob_10min_ago: number | null
+          model_prob_1min_ago: number | null
+          model_prob_3min_ago: number | null
+          model_prob_5min_ago: number | null
           model_side_prob: number | null
+          model_stability_score: number | null
           model_yes_prob: number | null
           momentum_score: number | null
           note: string | null
           order_id: string | null
           orderflow_score: number | null
           picked_side: string
+          prediction_direction_10min_ago: string | null
+          prediction_direction_1min_ago: string | null
+          prediction_direction_3min_ago: string | null
+          prediction_direction_5min_ago: string | null
+          prediction_duration_seconds: number | null
+          prediction_flip_count: number | null
           seconds_to_close: number | null
           sigma_multiplier: number | null
           sigma_score: number | null
@@ -149,16 +163,30 @@ export type Database = {
           expected_value?: number | null
           final_outcome?: string | null
           final_pnl_usd?: number | null
+          history_samples_count?: number | null
           id?: string
           kalshi_favorite_side?: string | null
           market_side_prob?: number | null
+          max_probability_last_10min?: number | null
+          min_probability_last_10min?: number | null
+          model_prob_10min_ago?: number | null
+          model_prob_1min_ago?: number | null
+          model_prob_3min_ago?: number | null
+          model_prob_5min_ago?: number | null
           model_side_prob?: number | null
+          model_stability_score?: number | null
           model_yes_prob?: number | null
           momentum_score?: number | null
           note?: string | null
           order_id?: string | null
           orderflow_score?: number | null
           picked_side: string
+          prediction_direction_10min_ago?: string | null
+          prediction_direction_1min_ago?: string | null
+          prediction_direction_3min_ago?: string | null
+          prediction_direction_5min_ago?: string | null
+          prediction_duration_seconds?: number | null
+          prediction_flip_count?: number | null
           seconds_to_close?: number | null
           sigma_multiplier?: number | null
           sigma_score?: number | null
@@ -184,16 +212,30 @@ export type Database = {
           expected_value?: number | null
           final_outcome?: string | null
           final_pnl_usd?: number | null
+          history_samples_count?: number | null
           id?: string
           kalshi_favorite_side?: string | null
           market_side_prob?: number | null
+          max_probability_last_10min?: number | null
+          min_probability_last_10min?: number | null
+          model_prob_10min_ago?: number | null
+          model_prob_1min_ago?: number | null
+          model_prob_3min_ago?: number | null
+          model_prob_5min_ago?: number | null
           model_side_prob?: number | null
+          model_stability_score?: number | null
           model_yes_prob?: number | null
           momentum_score?: number | null
           note?: string | null
           order_id?: string | null
           orderflow_score?: number | null
           picked_side?: string
+          prediction_direction_10min_ago?: string | null
+          prediction_direction_1min_ago?: string | null
+          prediction_direction_3min_ago?: string | null
+          prediction_direction_5min_ago?: string | null
+          prediction_duration_seconds?: number | null
+          prediction_flip_count?: number | null
           seconds_to_close?: number | null
           sigma_multiplier?: number | null
           sigma_score?: number | null
