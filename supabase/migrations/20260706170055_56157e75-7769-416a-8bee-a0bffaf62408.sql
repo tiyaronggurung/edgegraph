@@ -1,0 +1,1 @@
+ALTER TABLE public.auto_odds_decision_log ADD COLUMN IF NOT EXISTS would_skip_time_gate_400 boolean;
