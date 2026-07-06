@@ -156,6 +156,52 @@ export async function runOddsStudyCore(supabaseAdmin: any, userId: string): Prom
     .order("created_at", { ascending: false })
     .limit(15);
 
+  // ── Shadow-flag stats (read-only, NOT tunable) ──
+  // Summarizes how the three shadow flags correlate with entries, wins, and
+  // losses on recent decision-log rows. Gemini may reason about these but MUST
+  // NOT propose tunings for them — they are not on the whitelist.
+  const SHADOW_FLAGS = [
+    "would_skip_time_gate_400",
+    "would_skip_bucket_d",
+    "would_skip_extreme_kalshi_weak_model",
+  ] as const;
+  const { data: decisionRows } = await supabaseAdmin
+    .from("auto_odds_decision_log")
+    .select("actual_entered, final_outcome, final_pnl_usd, would_skip_time_gate_400, would_skip_bucket_d, would_skip_extreme_kalshi_weak_model")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  const summarizeGroup = (arr: any[]) => {
+    const entered = arr.filter(r => r.actual_entered === true);
+    const settled = entered.filter(r => r.final_outcome === "win" || r.final_outcome === "loss");
+    const w = settled.filter(r => r.final_outcome === "win").length;
+    const l = settled.filter(r => r.final_outcome === "loss").length;
+    const pnl = entered.reduce((s: number, r: any) => s + Number(r.final_pnl_usd ?? 0), 0);
+    return {
+      total: arr.length,
+      entered: entered.length,
+      wins: w,
+      losses: l,
+      win_rate: w + l > 0 ? +(w / (w + l)).toFixed(3) : null,
+      pnl_usd: +pnl.toFixed(2),
+    };
+  };
+  const shadowStats = SHADOW_FLAGS.map(flag => {
+    const rows = (decisionRows ?? []) as any[];
+    const flagged = rows.filter(r => r[flag] === true);
+    const unflagged = rows.filter(r => r[flag] === false);
+    const f = summarizeGroup(flagged);
+    const u = summarizeGroup(unflagged);
+    return {
+      flag,
+      flagged: f,
+      unflagged: u,
+      winners_this_flag_would_skip: f.wins,
+      losses_this_flag_would_avoid: f.losses,
+      pnl_delta_if_flag_enforced: +(-f.pnl_usd).toFixed(2),
+    };
+  });
+
   // Build prompt.
   const systemPrompt = `You are a quantitative trading coach studying BTC 15-min Kalshi odds behavior.
 You analyze the relationship between BTC spot price, YES/NO cent prices, and time-to-close (flip rate = how often the picked side crossed 50¢).
