@@ -85,7 +85,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             modelGateMin: (u as any).model_gate_min != null ? Number((u as any).model_gate_min) : 0.60,
             hedgeLo: (u as any).hedge_band_lo != null ? Number((u as any).hedge_band_lo) : 0.60,
             hedgeHi: (u as any).hedge_band_hi != null ? Number((u as any).hedge_band_hi) : 0.68,
-            tpCents: (u as any).tp_cents != null ? Number((u as any).tp_cents) : 98,
+            tpCents: (u as any).tp_cents != null ? Number((u as any).tp_cents) : 95,
             oscMax: (u as any).oscillation_max != null ? Number((u as any).oscillation_max) : 2,
             skipLt15s: (u as any).skip_bucket_lt15s === true,
             skip15_60s: (u as any).skip_bucket_15_60s === true,
@@ -277,7 +277,8 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 const flipFire = entryAm <= -280 && entryAm >= -750 && curCents <= 65;
 
                 // Take-profit: sell as soon as picked side hits `tpCents`
-                // (default 98¢; AI can tune 95-99).
+                // (default 95¢; AI can tune 90-99). 95 locks wins ~5-10s
+                // sooner than 98, avoiding late flips the floor can't save.
                 const tp98Fire = curCents >= T.tpCents;
 
                 // Oscillation exit: odds bouncing between "shallow" (≥ -1000)
@@ -577,9 +578,9 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             const noAm2 = centsToAmerican(noCents2);
             const sideAm2 = pick.side === "YES" ? yesAm2 : noAm2;
 
-            // Strict band on re-check for ALL phases.
-            let persistOk = sideAm2 <= -450 && sideAm2 >= -750;
-            let thresholdLabel = "[-750,-450]";
+            // Persistence band matches entry band [-750, -370] (78¢–88¢).
+            let persistOk = sideAm2 <= -370 && sideAm2 >= -750;
+            let thresholdLabel = "[-750,-370]";
             if (!persistOk) {
               note = `skipped: 2s flicker — ${pick.side} was ${pick.reason}, now ${sideAm2} outside ${thresholdLabel}`;
               await logStudy({ entered: false, hedge_fired: false, note });
