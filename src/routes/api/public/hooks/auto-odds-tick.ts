@@ -613,59 +613,11 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             }
 
 
-            // ── COMPOUND BASE STAKE ──
-            // Each ET day starts from actual balance, not fixed $100. Grow
-            // stake as we win, shrink as we lose. Formula:
-            //   base_stake = $100 * (bankroll / $500), clamped $50–$300
-            // where bankroll = $500 + sum(pnl of all auto-odds trades settled
-            // BEFORE today's ET midnight). Best-effort: on any error, fall
-            // back to the fixed $100 base. Never blocks the trade.
-            const STARTING_BANKROLL = 500;
-            let compoundBase = AUTO_ODDS_STAKE;
-            try {
-              const nowD = new Date();
-              const partsD = new Intl.DateTimeFormat("en-US", {
-                timeZone: "America/New_York",
-                year: "numeric", month: "2-digit", day: "2-digit",
-                hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-              }).formatToParts(nowD);
-              const getP = (t: string) => partsD.find(p => p.type === t)?.value ?? "0";
-              const yy = +getP("year"), mo = +getP("month"), dd = +getP("day");
-              const hh2 = +getP("hour"), mi2 = +getP("minute"), ss2 = +getP("second");
-              const wallUtc = Date.UTC(yy, mo - 1, dd, hh2, mi2, ss2);
-              const offset = wallUtc - nowD.getTime();
-              const etMidnightIso = new Date(Date.UTC(yy, mo - 1, dd, 0, 0, 0) - offset).toISOString();
+            // ── FIXED STAKE ──
+            // Hard rule from user: never bet more than $100 per trade.
+            // Compound sizing + high-conviction multiplier are DISABLED.
+            const dynStake = AUTO_ODDS_STAKE; // $100, always
 
-              const { data: priorTracked } = await supabaseAdmin
-                .from("auto_odds_tracked_orders")
-                .select("order_id")
-                .eq("user_id", userId)
-                .lt("created_at", etMidnightIso);
-              const ids = (priorTracked ?? []).map((r: any) => r.order_id);
-              let priorPnl = 0;
-              if (ids.length > 0) {
-                const { data: settledPrior } = await supabaseAdmin
-                  .from("auto_trade_orders")
-                  .select("pnl_usd, status")
-                  .in("id", ids)
-                  .in("status", ["settled_win", "settled_loss"]);
-                priorPnl = (settledPrior ?? []).reduce(
-                  (s: number, r: any) => s + Number(r.pnl_usd ?? 0),
-                  0
-                );
-              }
-              const bankroll = STARTING_BANKROLL + priorPnl;
-              const scaled = AUTO_ODDS_STAKE * (bankroll / STARTING_BANKROLL);
-              compoundBase = Math.max(50, Math.min(300, Math.round(scaled)));
-            } catch { /* best-effort — fall back to fixed base */ }
-
-            // ── DYNAMIC STAKE SIZING (on top of compound base) ──
-            // High-conviction (model ≥ 0.75) gets a 1.5× multiplier.
-            //   model ≥ 0.75 → 1.5× compoundBase (capped $450)
-            //   0.60–0.75    → 1.0× compoundBase
-            const dynStake = (typeof modelSideP === "number" && modelSideP >= 0.75)
-              ? Math.min(450, Math.round(compoundBase * 1.5))
-              : compoundBase;
 
 
             const placeResult = await runAutoTradeCore(supabaseAdmin as any, userId, {
@@ -696,36 +648,9 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 });
               note = `entered ${placed.ticker} ${placed.side} @ ${entryCents}¢ (${pick.reason})`;
 
-              // ── 3b. COINFLIP-ZONE HEDGE ──
-              // Fire $5 hedge on the OPPOSITE side only when the model is in
-              // the true coinflip zone [60%, 68%] on our picked side — i.e.
-              // barely above the gate floor. NOT inserted into
-              // auto_odds_tracked_orders: does NOT count toward the 2-loss
-              // tail stop, daily 5-loss cap, or trigger whipsaw exits.
-              try {
-                const p = modelSideP as number;
-                if (p >= HEDGE_MIN && p <= HEDGE_MAX) {
-                  const oppSide: "YES" | "NO" = pick.side === "YES" ? "NO" : "YES";
-                  const hedgeRes = await runAutoTradeCore(supabaseAdmin as any, userId, {
-                    mode: "live",
-                    confirm: "I_UNDERSTAND_LIVE",
-                    force: true,
-                    isMartingale: false,
-                    maxOrders: 1,
-                    stakeUsd: HEDGE_STAKE,
-                    forceTicker: atm.ticker,
-                    forceSide: oppSide,
-                  });
-                  if (hedgeRes.placed > 0) {
-                    hedgeFired = true;
-                    note += ` · coinflip hedge ${oppSide} $${HEDGE_STAKE}`;
-                  } else {
-                    note += ` · hedge skipped: ${hedgeRes.skipReasons.slice(0, 1).join("") || "no fill"}`;
-                  }
-                }
-              } catch (e: any) {
-                note += ` · hedge err: ${e?.message?.slice(0, 60) ?? "err"}`;
-              }
+              // ── COINFLIP-ZONE HEDGE: DISABLED ──
+              // User rule: one bet per trade, never two. Hedge removed.
+
 
               await logStudy({ entered: true, hedge_fired: hedgeFired, note });
             } else {
