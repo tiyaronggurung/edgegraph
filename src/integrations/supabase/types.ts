@@ -101,6 +101,114 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_odds_decision_log: {
+        Row: {
+          actual_entered: boolean
+          calibration_score: number | null
+          confidence_score: number | null
+          confidence_tier: string | null
+          created_at: string
+          edge: number | null
+          entry_price_cents: number | null
+          ev_score: number | null
+          expected_value: number | null
+          final_outcome: string | null
+          final_pnl_usd: number | null
+          id: string
+          kalshi_favorite_side: string | null
+          market_side_prob: number | null
+          model_side_prob: number | null
+          model_yes_prob: number | null
+          momentum_score: number | null
+          note: string | null
+          order_id: string | null
+          orderflow_score: number | null
+          picked_side: string
+          seconds_to_close: number | null
+          sigma_multiplier: number | null
+          sigma_score: number | null
+          spot: number | null
+          stake_used: number | null
+          ticker: string
+          time_bucket: string | null
+          time_penalty: number | null
+          user_id: string
+          volregime_score: number | null
+          whale_score: number | null
+          would_enter: boolean
+        }
+        Insert: {
+          actual_entered?: boolean
+          calibration_score?: number | null
+          confidence_score?: number | null
+          confidence_tier?: string | null
+          created_at?: string
+          edge?: number | null
+          entry_price_cents?: number | null
+          ev_score?: number | null
+          expected_value?: number | null
+          final_outcome?: string | null
+          final_pnl_usd?: number | null
+          id?: string
+          kalshi_favorite_side?: string | null
+          market_side_prob?: number | null
+          model_side_prob?: number | null
+          model_yes_prob?: number | null
+          momentum_score?: number | null
+          note?: string | null
+          order_id?: string | null
+          orderflow_score?: number | null
+          picked_side: string
+          seconds_to_close?: number | null
+          sigma_multiplier?: number | null
+          sigma_score?: number | null
+          spot?: number | null
+          stake_used?: number | null
+          ticker: string
+          time_bucket?: string | null
+          time_penalty?: number | null
+          user_id: string
+          volregime_score?: number | null
+          whale_score?: number | null
+          would_enter?: boolean
+        }
+        Update: {
+          actual_entered?: boolean
+          calibration_score?: number | null
+          confidence_score?: number | null
+          confidence_tier?: string | null
+          created_at?: string
+          edge?: number | null
+          entry_price_cents?: number | null
+          ev_score?: number | null
+          expected_value?: number | null
+          final_outcome?: string | null
+          final_pnl_usd?: number | null
+          id?: string
+          kalshi_favorite_side?: string | null
+          market_side_prob?: number | null
+          model_side_prob?: number | null
+          model_yes_prob?: number | null
+          momentum_score?: number | null
+          note?: string | null
+          order_id?: string | null
+          orderflow_score?: number | null
+          picked_side?: string
+          seconds_to_close?: number | null
+          sigma_multiplier?: number | null
+          sigma_score?: number | null
+          spot?: number | null
+          stake_used?: number | null
+          ticker?: string
+          time_bucket?: string | null
+          time_penalty?: number | null
+          user_id?: string
+          volregime_score?: number | null
+          whale_score?: number | null
+          would_enter?: boolean
+        }
+        Relationships: []
+      }
       auto_odds_settings: {
         Row: {
           auto_apply_studies: boolean
