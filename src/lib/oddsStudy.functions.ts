@@ -156,6 +156,52 @@ export async function runOddsStudyCore(supabaseAdmin: any, userId: string): Prom
     .order("created_at", { ascending: false })
     .limit(15);
 
+  // ── Shadow-flag stats (read-only, NOT tunable) ──
+  // Summarizes how the three shadow flags correlate with entries, wins, and
+  // losses on recent decision-log rows. Gemini may reason about these but MUST
+  // NOT propose tunings for them — they are not on the whitelist.
+  const SHADOW_FLAGS = [
+    "would_skip_time_gate_400",
+    "would_skip_bucket_d",
+    "would_skip_extreme_kalshi_weak_model",
+  ] as const;
+  const { data: decisionRows } = await supabaseAdmin
+    .from("auto_odds_decision_log")
+    .select("actual_entered, final_outcome, final_pnl_usd, would_skip_time_gate_400, would_skip_bucket_d, would_skip_extreme_kalshi_weak_model")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  const summarizeGroup = (arr: any[]) => {
+    const entered = arr.filter(r => r.actual_entered === true);
+    const settled = entered.filter(r => r.final_outcome === "win" || r.final_outcome === "loss");
+    const w = settled.filter(r => r.final_outcome === "win").length;
+    const l = settled.filter(r => r.final_outcome === "loss").length;
+    const pnl = entered.reduce((s: number, r: any) => s + Number(r.final_pnl_usd ?? 0), 0);
+    return {
+      total: arr.length,
+      entered: entered.length,
+      wins: w,
+      losses: l,
+      win_rate: w + l > 0 ? +(w / (w + l)).toFixed(3) : null,
+      pnl_usd: +pnl.toFixed(2),
+    };
+  };
+  const shadowStats = SHADOW_FLAGS.map(flag => {
+    const rows = (decisionRows ?? []) as any[];
+    const flagged = rows.filter(r => r[flag] === true);
+    const unflagged = rows.filter(r => r[flag] === false);
+    const f = summarizeGroup(flagged);
+    const u = summarizeGroup(unflagged);
+    return {
+      flag,
+      flagged: f,
+      unflagged: u,
+      winners_this_flag_would_skip: f.wins,
+      losses_this_flag_would_avoid: f.losses,
+      pnl_delta_if_flag_enforced: +(-f.pnl_usd).toFixed(2),
+    };
+  });
+
   // Build prompt.
   const systemPrompt = `You are a quantitative trading coach studying BTC 15-min Kalshi odds behavior.
 You analyze the relationship between BTC spot price, YES/NO cent prices, and time-to-close (flip rate = how often the picked side crossed 50¢).
@@ -173,7 +219,13 @@ Return STRICT JSON only. Never recommend disabling loss caps or trade size.`;
   "findings": {
     "flip_zones": ["short phrases describing when flips happen"],
     "price_odds_relationship": "short description",
-    "time_bucket_observations": ["short phrases per bucket if relevant"]
+    "time_bucket_observations": ["short phrases per bucket if relevant"],
+    "shadow_flag_analysis": {
+      "would_skip_time_gate_400": "1-3 sentences: does this flag protect losses without killing winners?",
+      "would_skip_bucket_d": "1-3 sentences: does this flag isolate D-bucket losses? does it hit A-bucket winners?",
+      "would_skip_extreme_kalshi_weak_model": "1-3 sentences: same treatment",
+      "verdict": "which flags look promising vs harmful vs inconclusive"
+    }
   },
   "tunings": [
     {
@@ -187,6 +239,11 @@ Return STRICT JSON only. Never recommend disabling loss caps or trade size.`;
 
 Only propose tunings when data supports it. Prefer fewer, higher-confidence recommendations. Never propose values outside safe ranges — they will be rejected.
 
+IMPORTANT — shadow flags are READ-ONLY validation signals:
+- would_skip_time_gate_400, would_skip_bucket_d, would_skip_extreme_kalshi_weak_model are NOT tunable.
+- Do NOT propose any tuning whose param is a shadow flag. They are not on the whitelist and will be rejected.
+- Analyze them ONLY in findings.shadow_flag_analysis. Kalshi odds remain the primary edge; these flags only help identify weak Kalshi setups.
+
 Whitelisted params (only these are tunable):
 ${paramSchema}
 
@@ -196,6 +253,7 @@ DATA:
 - Per-bucket: ${JSON.stringify(byBucket)}
 - Recent trades: ${wins}W / ${losses}L (winRate ${winRate == null ? "n/a" : (winRate*100).toFixed(1)+"%"})
 - Prior applied tunings (last 15): ${JSON.stringify(prevAudit ?? [])}
+- Shadow-flag stats over last ${decisionRows?.length ?? 0} decision-log rows (read-only, not tunable): ${JSON.stringify(shadowStats)}
 - Sample snapshots (10): ${JSON.stringify((withPrior.slice(0,10)).map((r: any) => ({
     bucket: r.time_bucket, seconds: r.seconds_to_close, picked: r.picked_side,
     modelP: r.model_side_prob, dCents: r.yes_cents_delta, dSpot: r.spot_delta,
