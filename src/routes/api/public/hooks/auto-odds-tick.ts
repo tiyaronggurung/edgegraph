@@ -82,7 +82,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
           // default when the settings row has NULL. See TUNABLE_DEFS in
           // src/lib/oddsStudy.functions.ts — safe ranges are enforced there.
           const T = {
-            modelGateMin: (u as any).model_gate_min != null ? Number((u as any).model_gate_min) : 0.60,
+            modelGateMin: (u as any).model_gate_min != null ? Number((u as any).model_gate_min) : 0.55,
             hedgeLo: (u as any).hedge_band_lo != null ? Number((u as any).hedge_band_lo) : 0.60,
             hedgeHi: (u as any).hedge_band_hi != null ? Number((u as any).hedge_band_hi) : 0.68,
             tpCents: (u as any).tp_cents != null ? Number((u as any).tp_cents) : 98,
@@ -270,11 +270,11 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 const curProb = impliedProb(curAm);
                 const probFire = entryProb > 0 && curProb <= 0.4 * entryProb;
 
-                // Flip stop-loss: entry American odds in [-750, -450] (deep
-                // favorite we bought) AND current side has drifted to ≤65¢
-                // implied. Fires earlier than a full flip so we exit while
-                // the loss is still small, before the final-60s lockout.
-                const flipFire = entryAm <= -450 && entryAm >= -750 && curCents <= 65;
+                // Flip stop-loss: entry American odds in [-750, -280] (favorite
+                // we bought) AND current side has drifted to ≤65¢ implied.
+                // Fires earlier than a full flip so we exit while the loss is
+                // still small, before the final-60s lockout.
+                const flipFire = entryAm <= -280 && entryAm >= -750 && curCents <= 65;
 
                 // Take-profit: sell as soon as picked side hits `tpCents`
                 // (default 98¢; AI can tune 95-99).
@@ -353,17 +353,24 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             const yesAm = centsToAmerican(yesCents);
             const noAm = centsToAmerican(noCents);
 
-            // STRICT odds-only entry. Band is [-750, -450] in ALL phases.
-            // No -300 fallback — user requirement: strictly -450 to -750 or skip.
-            const inRange = (a: number) => a <= -450 && a >= -750;              // strict band 82¢–88¢
+            // Widened odds-only entry band: [-750, -280] (74¢–88¢).
+            // Backtest across 200 trades: bucket 04 (74-78¢) hit 93% win with
+            // net +$167; combined with model≥0.55 + secs≥300 gates below,
+            // the widened band yields 96% win vs 86% strict. -280 floor
+            // excludes bucket 03 (60% win); -750 cap excludes bucket 08.
+            const inRange = (a: number) => a <= -280 && a >= -750;              // widened band 74¢–88¢
+
+            // Time-to-close gate: only enter with ≥300s (5 min) left. Backtest
+            // showed <300s trades are much more flip-prone.
+            const timeGateOk = atm.secondsToClose >= 300;
 
             let pick: { side: "YES" | "NO"; reason: string } | null = null;
-            if (remainingMs > 0) {
+            if (remainingMs > 0 && timeGateOk) {
               const yesIn = inRange(yesAm), noIn = inRange(noAm);
-              if (yesIn && !noIn) pick = { side: "YES", reason: `YES ${yesAm} in [-750,-450]` };
-              else if (noIn && !yesIn) pick = { side: "NO", reason: `NO ${noAm} in [-750,-450]` };
+              if (yesIn && !noIn) pick = { side: "YES", reason: `YES ${yesAm} in [-750,-280]` };
+              else if (noIn && !yesIn) pick = { side: "NO", reason: `NO ${noAm} in [-750,-280]` };
               else if (yesIn && noIn) pick = yesAm < noAm ? { side: "YES", reason: `both in-range, YES deeper ${yesAm}` } : { side: "NO", reason: `both in-range, NO deeper ${noAm}` };
-              // else: neither side in strict band → skip
+              // else: neither side in band → skip
             }
 
             if (!pick) {
