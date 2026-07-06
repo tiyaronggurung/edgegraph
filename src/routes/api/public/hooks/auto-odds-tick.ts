@@ -740,6 +740,87 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               forceSide: pick.side,
             });
 
+            // ── MODEL HISTORY FEATURES (SHADOW / LOG-ONLY) ──
+            // Pull last 10 min of model_yes_prob snapshots for this ticker
+            // from the study log and derive stability / flip / duration
+            // features. Best-effort: any error → all fields null.
+            let hist: {
+              p1: number | null; p3: number | null; p5: number | null; p10: number | null;
+              d1: string | null; d3: string | null; d5: string | null; d10: string | null;
+              stability: number | null; flips: number | null; durationS: number | null;
+              maxP: number | null; minP: number | null; samples: number;
+            } = {
+              p1: null, p3: null, p5: null, p10: null,
+              d1: null, d3: null, d5: null, d10: null,
+              stability: null, flips: null, durationS: null,
+              maxP: null, minP: null, samples: 0,
+            };
+            try {
+              const nowMs = Date.now();
+              const since10 = new Date(nowMs - 10 * 60_000 - 30_000).toISOString();
+              const { data: histRows } = await supabaseAdmin
+                .from("auto_odds_study_log")
+                .select("model_yes_prob, created_at")
+                .eq("user_id", userId)
+                .eq("ticker", atm.ticker)
+                .gte("created_at", since10)
+                .order("created_at", { ascending: true });
+              const rows = (histRows ?? []).filter((r: any) => typeof r.model_yes_prob === "number");
+              hist.samples = rows.length;
+              if (rows.length > 0) {
+                // Include the current tick as the most recent sample so
+                // duration/flip counts reflect "as of now".
+                const nowP = hasModel ? modelYes! : null;
+                const series: Array<{ p: number; t: number }> = rows.map((r: any) => ({
+                  p: Number(r.model_yes_prob),
+                  t: new Date(r.created_at).getTime(),
+                }));
+                if (nowP != null) series.push({ p: nowP, t: nowMs });
+
+                // Nearest-in-time helper: find the row closest to targetMs;
+                // return null if nothing within ±60s of the target.
+                const pick = (ago: number): { p: number; t: number } | null => {
+                  const target = nowMs - ago * 60_000;
+                  let best: { p: number; t: number } | null = null;
+                  let bestDiff = Infinity;
+                  for (const s of series) {
+                    const d = Math.abs(s.t - target);
+                    if (d < bestDiff) { bestDiff = d; best = s; }
+                  }
+                  return best && bestDiff <= 60_000 ? best : null;
+                };
+                const dirOf = (p: number) => p >= 0.5 ? "UP" : "DOWN";
+                const s1 = pick(1), s3 = pick(3), s5 = pick(5), s10 = pick(10);
+                hist.p1 = s1?.p ?? null; hist.d1 = s1 ? dirOf(s1.p) : null;
+                hist.p3 = s3?.p ?? null; hist.d3 = s3 ? dirOf(s3.p) : null;
+                hist.p5 = s5?.p ?? null; hist.d5 = s5 ? dirOf(s5.p) : null;
+                hist.p10 = s10?.p ?? null; hist.d10 = s10 ? dirOf(s10.p) : null;
+
+                // Derived features over the full series (last 10 min).
+                const probs = series.map(s => s.p);
+                hist.maxP = Math.max(...probs);
+                hist.minP = Math.min(...probs);
+                // Stability: 100 when max-min = 0 (flat), 0 when max-min = 1
+                // (full flip). Linear.
+                hist.stability = Math.max(0, Math.min(100, 100 - (hist.maxP - hist.minP) * 100));
+
+                // Flip count + current-direction duration.
+                let flips = 0;
+                let lastFlipT = series[0].t;
+                let prevDir = dirOf(series[0].p);
+                for (let i = 1; i < series.length; i++) {
+                  const d = dirOf(series[i].p);
+                  if (d !== prevDir) {
+                    flips += 1;
+                    lastFlipT = series[i].t;
+                    prevDir = d;
+                  }
+                }
+                hist.flips = flips;
+                hist.durationS = Math.round((nowMs - lastFlipT) / 1000);
+              }
+            } catch { /* history is best-effort */ }
+
             // Shadow-log the decision. Best-effort — never blocks the trade.
             try {
               await supabaseAdmin.from("auto_odds_decision_log").insert({
@@ -771,9 +852,25 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 would_enter: wouldEnter,
                 actual_entered: placeResult.placed > 0,
                 order_id: placeResult.orders[0]?.id ?? null,
-                note: `edge ${(edgeVal*100).toFixed(1)}% · EV $${ev.toFixed(1)} · σ≈${sigmaProxy.toFixed(2)} · tPen ${timePenalty} · conf ${confidence.toFixed(1)} (${confidenceTier})`,
+                // Model-history shadow fields
+                model_prob_1min_ago: hist.p1,
+                model_prob_3min_ago: hist.p3,
+                model_prob_5min_ago: hist.p5,
+                model_prob_10min_ago: hist.p10,
+                prediction_direction_1min_ago: hist.d1,
+                prediction_direction_3min_ago: hist.d3,
+                prediction_direction_5min_ago: hist.d5,
+                prediction_direction_10min_ago: hist.d10,
+                model_stability_score: hist.stability,
+                prediction_flip_count: hist.flips,
+                prediction_duration_seconds: hist.durationS,
+                max_probability_last_10min: hist.maxP,
+                min_probability_last_10min: hist.minP,
+                history_samples_count: hist.samples,
+                note: `edge ${(edgeVal*100).toFixed(1)}% · EV $${ev.toFixed(1)} · σ≈${sigmaProxy.toFixed(2)} · tPen ${timePenalty} · conf ${confidence.toFixed(1)} (${confidenceTier}) · stab ${hist.stability?.toFixed(0) ?? "?"} · flips ${hist.flips ?? "?"}`,
               });
             } catch { /* shadow log is best-effort */ }
+
 
 
 
