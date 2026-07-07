@@ -225,6 +225,11 @@ export interface FlipShadowThresholdStats {
   actual_pnl: number;
   sim_pnl: number;
   delta_pnl: number;
+  total_loss_avoided: number;      // sum of damage prevented on losing trades
+  total_profit_given_up: number;   // sum of profit sacrificed on winners
+  net_damage_prevented: number;    // avoided − given_up
+  shakeout_rate: number | null;    // fraction of flip exits where price later recovered to TP
+  avg_minutes_remaining: number | null;
 }
 
 export interface FlipShadowReport {
@@ -256,13 +261,26 @@ export const getFlipShadowReport = createServerFn({ method: "GET" })
       const simKey = `t${T}_sim_pnl`;
       const savedKey = `t${T}_saved_loss`;
       const killedKey = `t${T}_killed_winner`;
+      const avoidedKey = `t${T}_loss_avoided`;
+      const givenUpKey = `t${T}_profit_given_up`;
+      const minsKey = `t${T}_minutes_remaining`;
+      const recoveredKey = `t${T}_recovered_to_tp`;
 
       let exits = 0, saved = 0, killed = 0, simPnl = 0;
+      let totAvoided = 0, totGivenUp = 0;
+      let recoveredCount = 0, minsSum = 0, minsCount = 0;
       for (const r of rows as any[]) {
-        if (r[markKey] != null) exits += 1;
+        if (r[markKey] != null) {
+          exits += 1;
+          if (r[recoveredKey] === true) recoveredCount += 1;
+          const m = r[minsKey];
+          if (m != null) { minsSum += Number(m); minsCount += 1; }
+        }
         if (r[savedKey]) saved += 1;
         if (r[killedKey]) killed += 1;
         simPnl += Number(r[simKey] ?? 0);
+        totAvoided += Number(r[avoidedKey] ?? 0);
+        totGivenUp += Number(r[givenUpKey] ?? 0);
       }
       return {
         threshold: T,
@@ -272,6 +290,11 @@ export const getFlipShadowReport = createServerFn({ method: "GET" })
         actual_pnl: actualPnl,
         sim_pnl: simPnl,
         delta_pnl: simPnl - actualPnl,
+        total_loss_avoided: totAvoided,
+        total_profit_given_up: totGivenUp,
+        net_damage_prevented: totAvoided - totGivenUp,
+        shakeout_rate: exits > 0 ? recoveredCount / exits : null,
+        avg_minutes_remaining: minsCount > 0 ? minsSum / minsCount : null,
       };
     });
 
