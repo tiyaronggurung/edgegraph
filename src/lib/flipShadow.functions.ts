@@ -9,6 +9,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const THRESHOLDS = [45, 40, 35, 30] as const;
 type Threshold = typeof THRESHOLDS[number];
 
+const TP_DELTA_CENTS = 12; // matches live TP rung: entry + 12¢
+
 interface SimResult {
   first_cross_mark: number | null;
   first_cross_secs: number | null;
@@ -16,6 +18,10 @@ interface SimResult {
   sim_pnl: number;
   saved_loss: boolean;
   killed_winner: boolean;
+  loss_avoided: number;      // max(0, actual_pnl_if_loss - sim_pnl) → positive = damage prevented
+  profit_given_up: number;   // max(0, actual_pnl_if_win - sim_pnl) → positive = winner cost
+  minutes_remaining: number | null;
+  recovered_to_tp: boolean | null; // did our-side mark later reach entry + TP_DELTA before settle
 }
 
 function simulateThreshold(
@@ -25,14 +31,11 @@ function simulateThreshold(
   contracts: number,
   actualPnl: number,
 ): SimResult {
-  let hit: { mark: number; secs: number } | null = null;
-  for (const s of tape) {
-    if (s.our_side_cents < threshold) {
-      hit = { mark: s.our_side_cents, secs: s.seconds_to_close };
-      break;
-    }
+  let hitIdx = -1;
+  for (let i = 0; i < tape.length; i++) {
+    if (tape[i].our_side_cents < threshold) { hitIdx = i; break; }
   }
-  if (!hit) {
+  if (hitIdx < 0) {
     return {
       first_cross_mark: null,
       first_cross_secs: null,
@@ -40,19 +43,40 @@ function simulateThreshold(
       sim_pnl: actualPnl,
       saved_loss: false,
       killed_winner: false,
+      loss_avoided: 0,
+      profit_given_up: 0,
+      minutes_remaining: null,
+      recovered_to_tp: null,
     };
   }
-  const simExit = hit.mark;
+  const hit = tape[hitIdx];
+  const simExit = hit.our_side_cents;
   const simPnl = (contracts * (simExit - entryCents)) / 100;
+
+  // Did price later recover to the TP target after the flip cross?
+  const tpTarget = entryCents + TP_DELTA_CENTS;
+  let recovered = false;
+  for (let i = hitIdx + 1; i < tape.length; i++) {
+    if (tape[i].our_side_cents >= tpTarget) { recovered = true; break; }
+  }
+
+  const savedLoss = actualPnl < 0 && simPnl > actualPnl;
+  const killedWinner = actualPnl > 0 && simPnl < actualPnl - 0.01;
+
   return {
-    first_cross_mark: hit.mark,
-    first_cross_secs: hit.secs,
+    first_cross_mark: hit.our_side_cents,
+    first_cross_secs: hit.seconds_to_close,
     sim_exit_cents: simExit,
     sim_pnl: simPnl,
-    saved_loss: actualPnl < 0 && simPnl > actualPnl,
-    killed_winner: actualPnl > 0 && simPnl < actualPnl - 0.01,
+    saved_loss: savedLoss,
+    killed_winner: killedWinner,
+    loss_avoided: savedLoss ? simPnl - actualPnl : 0,
+    profit_given_up: killedWinner ? actualPnl - simPnl : 0,
+    minutes_remaining: hit.seconds_to_close / 60,
+    recovered_to_tp: recovered,
   };
 }
+
 
 /**
  * Recompute the shadow rows for all settled tracked auto-odds trades for
@@ -135,6 +159,10 @@ export const recomputeFlipShadow = createServerFn({ method: "POST" })
         t45_sim_pnl: sims[45].sim_pnl,
         t45_saved_loss: sims[45].saved_loss,
         t45_killed_winner: sims[45].killed_winner,
+        t45_loss_avoided: sims[45].loss_avoided,
+        t45_profit_given_up: sims[45].profit_given_up,
+        t45_minutes_remaining: sims[45].minutes_remaining,
+        t45_recovered_to_tp: sims[45].recovered_to_tp,
 
         t40_first_cross_mark: sims[40].first_cross_mark,
         t40_first_cross_secs: sims[40].first_cross_secs,
@@ -142,6 +170,10 @@ export const recomputeFlipShadow = createServerFn({ method: "POST" })
         t40_sim_pnl: sims[40].sim_pnl,
         t40_saved_loss: sims[40].saved_loss,
         t40_killed_winner: sims[40].killed_winner,
+        t40_loss_avoided: sims[40].loss_avoided,
+        t40_profit_given_up: sims[40].profit_given_up,
+        t40_minutes_remaining: sims[40].minutes_remaining,
+        t40_recovered_to_tp: sims[40].recovered_to_tp,
 
         t35_first_cross_mark: sims[35].first_cross_mark,
         t35_first_cross_secs: sims[35].first_cross_secs,
@@ -149,6 +181,10 @@ export const recomputeFlipShadow = createServerFn({ method: "POST" })
         t35_sim_pnl: sims[35].sim_pnl,
         t35_saved_loss: sims[35].saved_loss,
         t35_killed_winner: sims[35].killed_winner,
+        t35_loss_avoided: sims[35].loss_avoided,
+        t35_profit_given_up: sims[35].profit_given_up,
+        t35_minutes_remaining: sims[35].minutes_remaining,
+        t35_recovered_to_tp: sims[35].recovered_to_tp,
 
         t30_first_cross_mark: sims[30].first_cross_mark,
         t30_first_cross_secs: sims[30].first_cross_secs,
@@ -156,6 +192,10 @@ export const recomputeFlipShadow = createServerFn({ method: "POST" })
         t30_sim_pnl: sims[30].sim_pnl,
         t30_saved_loss: sims[30].saved_loss,
         t30_killed_winner: sims[30].killed_winner,
+        t30_loss_avoided: sims[30].loss_avoided,
+        t30_profit_given_up: sims[30].profit_given_up,
+        t30_minutes_remaining: sims[30].minutes_remaining,
+        t30_recovered_to_tp: sims[30].recovered_to_tp,
 
         computed_at: new Date().toISOString(),
       });
@@ -185,6 +225,11 @@ export interface FlipShadowThresholdStats {
   actual_pnl: number;
   sim_pnl: number;
   delta_pnl: number;
+  total_loss_avoided: number;      // sum of damage prevented on losing trades
+  total_profit_given_up: number;   // sum of profit sacrificed on winners
+  net_damage_prevented: number;    // avoided − given_up
+  shakeout_rate: number | null;    // fraction of flip exits where price later recovered to TP
+  avg_minutes_remaining: number | null;
 }
 
 export interface FlipShadowReport {
@@ -216,13 +261,26 @@ export const getFlipShadowReport = createServerFn({ method: "GET" })
       const simKey = `t${T}_sim_pnl`;
       const savedKey = `t${T}_saved_loss`;
       const killedKey = `t${T}_killed_winner`;
+      const avoidedKey = `t${T}_loss_avoided`;
+      const givenUpKey = `t${T}_profit_given_up`;
+      const minsKey = `t${T}_minutes_remaining`;
+      const recoveredKey = `t${T}_recovered_to_tp`;
 
       let exits = 0, saved = 0, killed = 0, simPnl = 0;
+      let totAvoided = 0, totGivenUp = 0;
+      let recoveredCount = 0, minsSum = 0, minsCount = 0;
       for (const r of rows as any[]) {
-        if (r[markKey] != null) exits += 1;
+        if (r[markKey] != null) {
+          exits += 1;
+          if (r[recoveredKey] === true) recoveredCount += 1;
+          const m = r[minsKey];
+          if (m != null) { minsSum += Number(m); minsCount += 1; }
+        }
         if (r[savedKey]) saved += 1;
         if (r[killedKey]) killed += 1;
         simPnl += Number(r[simKey] ?? 0);
+        totAvoided += Number(r[avoidedKey] ?? 0);
+        totGivenUp += Number(r[givenUpKey] ?? 0);
       }
       return {
         threshold: T,
@@ -232,6 +290,11 @@ export const getFlipShadowReport = createServerFn({ method: "GET" })
         actual_pnl: actualPnl,
         sim_pnl: simPnl,
         delta_pnl: simPnl - actualPnl,
+        total_loss_avoided: totAvoided,
+        total_profit_given_up: totGivenUp,
+        net_damage_prevented: totAvoided - totGivenUp,
+        shakeout_rate: exits > 0 ? recoveredCount / exits : null,
+        avg_minutes_remaining: minsCount > 0 ? minsSum / minsCount : null,
       };
     });
 
