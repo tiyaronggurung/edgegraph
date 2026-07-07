@@ -74,44 +74,95 @@ export function FlipShadowPanel() {
                 <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
                   <th className="py-1 pr-3">Rule</th>
                   <th className="py-1 pr-3">Exits</th>
-                  <th className="py-1 pr-3">Saved loss</th>
-                  <th className="py-1 pr-3">Killed winner</th>
-                  <th className="py-1 pr-3">Sim PnL</th>
+                  <th className="py-1 pr-3">Saved / Killed</th>
+                  <th className="py-1 pr-3">Loss avoided</th>
+                  <th className="py-1 pr-3">Profit given up</th>
+                  <th className="py-1 pr-3">Net prevented</th>
+                  <th className="py-1 pr-3">Shakeout %</th>
+                  <th className="py-1 pr-3">Avg min left</th>
                   <th className="py-1 pr-3">Δ vs actual</th>
                 </tr>
               </thead>
               <tbody>
-                {data.thresholds.map((t) => (
-                  <tr key={t.threshold} className="border-t border-border/40">
-                    <td className="py-1 pr-3">mark &lt; {t.threshold}¢</td>
-                    <td className="py-1 pr-3">{t.exits}</td>
-                    <td className="py-1 pr-3 text-emerald-400">{t.losses_saved}</td>
-                    <td className="py-1 pr-3 text-red-400">{t.winners_killed}</td>
-                    <td className="py-1 pr-3">
-                      {t.sim_pnl >= 0 ? "+" : ""}${t.sim_pnl.toFixed(2)}
-                    </td>
-                    <td
-                      className={
-                        "py-1 pr-3 " +
-                        (t.delta_pnl > 0
-                          ? "text-emerald-400"
-                          : t.delta_pnl < 0
-                          ? "text-red-400"
-                          : "text-muted-foreground")
-                      }
-                    >
-                      {t.delta_pnl >= 0 ? "+" : ""}${t.delta_pnl.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
+                {data.thresholds.map((t) => {
+                  const shakeoutPct = t.shakeout_rate == null ? null : t.shakeout_rate * 100;
+                  return (
+                    <tr key={t.threshold} className="border-t border-border/40">
+                      <td className="py-1 pr-3">mark &lt; {t.threshold}¢</td>
+                      <td className="py-1 pr-3">{t.exits}</td>
+                      <td className="py-1 pr-3">
+                        <span className="text-emerald-400">{t.losses_saved}</span>
+                        <span className="text-muted-foreground"> / </span>
+                        <span className="text-red-400">{t.winners_killed}</span>
+                      </td>
+                      <td className="py-1 pr-3 text-emerald-400">
+                        +${t.total_loss_avoided.toFixed(2)}
+                      </td>
+                      <td className="py-1 pr-3 text-red-400">
+                        −${t.total_profit_given_up.toFixed(2)}
+                      </td>
+                      <td
+                        className={
+                          "py-1 pr-3 " +
+                          (t.net_damage_prevented > 0
+                            ? "text-emerald-400"
+                            : t.net_damage_prevented < 0
+                            ? "text-red-400"
+                            : "text-muted-foreground")
+                        }
+                      >
+                        {t.net_damage_prevented >= 0 ? "+" : ""}${t.net_damage_prevented.toFixed(2)}
+                      </td>
+                      <td
+                        className={
+                          "py-1 pr-3 " +
+                          (shakeoutPct == null
+                            ? "text-muted-foreground"
+                            : shakeoutPct >= 50
+                            ? "text-red-400"
+                            : shakeoutPct >= 25
+                            ? "text-amber-400"
+                            : "text-emerald-400")
+                        }
+                      >
+                        {shakeoutPct == null ? "—" : `${shakeoutPct.toFixed(0)}%`}
+                      </td>
+                      <td className="py-1 pr-3 text-muted-foreground">
+                        {t.avg_minutes_remaining == null ? "—" : `${t.avg_minutes_remaining.toFixed(1)}m`}
+                      </td>
+                      <td
+                        className={
+                          "py-1 pr-3 " +
+                          (t.delta_pnl > 0
+                            ? "text-emerald-400"
+                            : t.delta_pnl < 0
+                            ? "text-red-400"
+                            : "text-muted-foreground")
+                        }
+                      >
+                        {t.delta_pnl >= 0 ? "+" : ""}${t.delta_pnl.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          <div className="text-[10px] text-muted-foreground mt-3 leading-relaxed">
-            Sim exit price = mark on our side at first cross. Sim PnL = contracts × (exit − entry) / 100.
-            No exit found → sim PnL equals actual PnL. Promotion requires meaningful loss reduction
-            without materially killing winners across 50–100 forward trades.
+          <div className="text-[10px] text-muted-foreground mt-3 leading-relaxed space-y-1">
+            <div>
+              <span className="text-foreground">Loss avoided</span> = damage the shadow exit would have prevented on losing trades.
+              <span className="text-foreground"> Profit given up</span> = winning PnL sacrificed when the shadow exit fired on a trade that later won.
+              <span className="text-foreground"> Net prevented</span> = avoided − given up.
+            </div>
+            <div>
+              <span className="text-foreground">Shakeout %</span> = share of shadow exits where our-side mark later recovered to entry + 12¢ (the TP target) before settle.
+              High % means we&apos;d be exiting on temporary dips; low % means genuine reversals.
+              <span className="text-foreground"> Avg min left</span> = minutes remaining in the contract when the flip fired.
+            </div>
+            <div>
+              Promotion requires meaningful net damage prevented with a low shakeout rate across 50–100 forward trades.
+            </div>
           </div>
         </>
       )}
