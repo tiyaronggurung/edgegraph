@@ -350,7 +350,15 @@ ${JSON.stringify(feedbackDigest)}
 Return ONLY the JSON object.`;
 
 
-    const parsed = await callLovableAi(prompt);
+    let parsed: any;
+    try {
+      parsed = await callLovableAi(prompt);
+    } catch (e: any) {
+      if (e?.code === "AI_UNAVAILABLE" || /credit_limit_reached|Workspace credit limit/i.test(String(e?.message))) {
+        return { ran: false, reason: "AI workspace credit limit reached — add credits in Settings → Plans & credits" };
+      }
+      throw e;
+    }
     const summary = typeof parsed.summary === "string" ? parsed.summary : "No summary returned.";
     const dominant = Array.isArray(parsed.dominant_failures) ? parsed.dominant_failures.slice(0, 10) : [];
     const recs = Array.isArray(parsed.recommendations) ? parsed.recommendations.slice(0, 10) : [];
