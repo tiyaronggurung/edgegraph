@@ -2478,6 +2478,8 @@ function CryptoPage() {
 
           <IocLadderPanel />
 
+          <FlipShadowPanel />
+
 
 
           <div>
