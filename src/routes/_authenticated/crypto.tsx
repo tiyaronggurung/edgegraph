@@ -19,6 +19,7 @@ import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
 import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
 import { OddsStudyPanel } from "@/components/crypto/OddsStudyPanel";
 import { IocLadderPanel } from "@/components/crypto/IocLadderPanel";
+import { FlipShadowPanel } from "@/components/crypto/FlipShadowPanel";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
 import { useCalibrationShift } from "@/hooks/useCalibrationShift";
 import { useMarketRegime } from "@/hooks/useMarketRegime";
