@@ -149,7 +149,7 @@ export async function runAutoTradeCore(
         const { signKalshi: _sign } = await import("./cryptoTrades.functions");
         const path = "/portfolio/balance";
         const headers = await _sign("GET", path, userId);
-        const res = await fetch(`${KALSHI_BASE}${path}`, { method: "GET", headers });
+        const res = await fetch(`https://api.elections.kalshi.com/trade-api/v2${path}`, { method: "GET", headers });
         if (res.ok) {
           const j: any = await res.json().catch(() => null);
           const balCents = typeof j?.balance === "number" ? j.balance : null;
