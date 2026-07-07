@@ -159,6 +159,10 @@ export const recomputeFlipShadow = createServerFn({ method: "POST" })
         t45_sim_pnl: sims[45].sim_pnl,
         t45_saved_loss: sims[45].saved_loss,
         t45_killed_winner: sims[45].killed_winner,
+        t45_loss_avoided: sims[45].loss_avoided,
+        t45_profit_given_up: sims[45].profit_given_up,
+        t45_minutes_remaining: sims[45].minutes_remaining,
+        t45_recovered_to_tp: sims[45].recovered_to_tp,
 
         t40_first_cross_mark: sims[40].first_cross_mark,
         t40_first_cross_secs: sims[40].first_cross_secs,
@@ -166,6 +170,10 @@ export const recomputeFlipShadow = createServerFn({ method: "POST" })
         t40_sim_pnl: sims[40].sim_pnl,
         t40_saved_loss: sims[40].saved_loss,
         t40_killed_winner: sims[40].killed_winner,
+        t40_loss_avoided: sims[40].loss_avoided,
+        t40_profit_given_up: sims[40].profit_given_up,
+        t40_minutes_remaining: sims[40].minutes_remaining,
+        t40_recovered_to_tp: sims[40].recovered_to_tp,
 
         t35_first_cross_mark: sims[35].first_cross_mark,
         t35_first_cross_secs: sims[35].first_cross_secs,
@@ -173,6 +181,10 @@ export const recomputeFlipShadow = createServerFn({ method: "POST" })
         t35_sim_pnl: sims[35].sim_pnl,
         t35_saved_loss: sims[35].saved_loss,
         t35_killed_winner: sims[35].killed_winner,
+        t35_loss_avoided: sims[35].loss_avoided,
+        t35_profit_given_up: sims[35].profit_given_up,
+        t35_minutes_remaining: sims[35].minutes_remaining,
+        t35_recovered_to_tp: sims[35].recovered_to_tp,
 
         t30_first_cross_mark: sims[30].first_cross_mark,
         t30_first_cross_secs: sims[30].first_cross_secs,
@@ -180,6 +192,10 @@ export const recomputeFlipShadow = createServerFn({ method: "POST" })
         t30_sim_pnl: sims[30].sim_pnl,
         t30_saved_loss: sims[30].saved_loss,
         t30_killed_winner: sims[30].killed_winner,
+        t30_loss_avoided: sims[30].loss_avoided,
+        t30_profit_given_up: sims[30].profit_given_up,
+        t30_minutes_remaining: sims[30].minutes_remaining,
+        t30_recovered_to_tp: sims[30].recovered_to_tp,
 
         computed_at: new Date().toISOString(),
       });
