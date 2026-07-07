@@ -574,24 +574,40 @@ export type Database = {
           t30_first_cross_mark: number | null
           t30_first_cross_secs: number | null
           t30_killed_winner: boolean | null
+          t30_loss_avoided: number | null
+          t30_minutes_remaining: number | null
+          t30_profit_given_up: number | null
+          t30_recovered_to_tp: boolean | null
           t30_saved_loss: boolean | null
           t30_sim_exit_cents: number | null
           t30_sim_pnl: number | null
           t35_first_cross_mark: number | null
           t35_first_cross_secs: number | null
           t35_killed_winner: boolean | null
+          t35_loss_avoided: number | null
+          t35_minutes_remaining: number | null
+          t35_profit_given_up: number | null
+          t35_recovered_to_tp: boolean | null
           t35_saved_loss: boolean | null
           t35_sim_exit_cents: number | null
           t35_sim_pnl: number | null
           t40_first_cross_mark: number | null
           t40_first_cross_secs: number | null
           t40_killed_winner: boolean | null
+          t40_loss_avoided: number | null
+          t40_minutes_remaining: number | null
+          t40_profit_given_up: number | null
+          t40_recovered_to_tp: boolean | null
           t40_saved_loss: boolean | null
           t40_sim_exit_cents: number | null
           t40_sim_pnl: number | null
           t45_first_cross_mark: number | null
           t45_first_cross_secs: number | null
           t45_killed_winner: boolean | null
+          t45_loss_avoided: number | null
+          t45_minutes_remaining: number | null
+          t45_profit_given_up: number | null
+          t45_recovered_to_tp: boolean | null
           t45_saved_loss: boolean | null
           t45_sim_exit_cents: number | null
           t45_sim_pnl: number | null
@@ -614,24 +630,40 @@ export type Database = {
           t30_first_cross_mark?: number | null
           t30_first_cross_secs?: number | null
           t30_killed_winner?: boolean | null
+          t30_loss_avoided?: number | null
+          t30_minutes_remaining?: number | null
+          t30_profit_given_up?: number | null
+          t30_recovered_to_tp?: boolean | null
           t30_saved_loss?: boolean | null
           t30_sim_exit_cents?: number | null
           t30_sim_pnl?: number | null
           t35_first_cross_mark?: number | null
           t35_first_cross_secs?: number | null
           t35_killed_winner?: boolean | null
+          t35_loss_avoided?: number | null
+          t35_minutes_remaining?: number | null
+          t35_profit_given_up?: number | null
+          t35_recovered_to_tp?: boolean | null
           t35_saved_loss?: boolean | null
           t35_sim_exit_cents?: number | null
           t35_sim_pnl?: number | null
           t40_first_cross_mark?: number | null
           t40_first_cross_secs?: number | null
           t40_killed_winner?: boolean | null
+          t40_loss_avoided?: number | null
+          t40_minutes_remaining?: number | null
+          t40_profit_given_up?: number | null
+          t40_recovered_to_tp?: boolean | null
           t40_saved_loss?: boolean | null
           t40_sim_exit_cents?: number | null
           t40_sim_pnl?: number | null
           t45_first_cross_mark?: number | null
           t45_first_cross_secs?: number | null
           t45_killed_winner?: boolean | null
+          t45_loss_avoided?: number | null
+          t45_minutes_remaining?: number | null
+          t45_profit_given_up?: number | null
+          t45_recovered_to_tp?: boolean | null
           t45_saved_loss?: boolean | null
           t45_sim_exit_cents?: number | null
           t45_sim_pnl?: number | null
@@ -654,24 +686,40 @@ export type Database = {
           t30_first_cross_mark?: number | null
           t30_first_cross_secs?: number | null
           t30_killed_winner?: boolean | null
+          t30_loss_avoided?: number | null
+          t30_minutes_remaining?: number | null
+          t30_profit_given_up?: number | null
+          t30_recovered_to_tp?: boolean | null
           t30_saved_loss?: boolean | null
           t30_sim_exit_cents?: number | null
           t30_sim_pnl?: number | null
           t35_first_cross_mark?: number | null
           t35_first_cross_secs?: number | null
           t35_killed_winner?: boolean | null
+          t35_loss_avoided?: number | null
+          t35_minutes_remaining?: number | null
+          t35_profit_given_up?: number | null
+          t35_recovered_to_tp?: boolean | null
           t35_saved_loss?: boolean | null
           t35_sim_exit_cents?: number | null
           t35_sim_pnl?: number | null
           t40_first_cross_mark?: number | null
           t40_first_cross_secs?: number | null
           t40_killed_winner?: boolean | null
+          t40_loss_avoided?: number | null
+          t40_minutes_remaining?: number | null
+          t40_profit_given_up?: number | null
+          t40_recovered_to_tp?: boolean | null
           t40_saved_loss?: boolean | null
           t40_sim_exit_cents?: number | null
           t40_sim_pnl?: number | null
           t45_first_cross_mark?: number | null
           t45_first_cross_secs?: number | null
           t45_killed_winner?: boolean | null
+          t45_loss_avoided?: number | null
+          t45_minutes_remaining?: number | null
+          t45_profit_given_up?: number | null
+          t45_recovered_to_tp?: boolean | null
           t45_saved_loss?: boolean | null
           t45_sim_exit_cents?: number | null
           t45_sim_pnl?: number | null
