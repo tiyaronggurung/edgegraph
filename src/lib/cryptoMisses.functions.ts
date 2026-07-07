@@ -232,6 +232,12 @@ async function callLovableAi(prompt: string): Promise<any> {
   });
   if (res.status === 429) throw new Error("AI rate limited — try again shortly");
   if (res.status === 402) throw new Error("AI credits exhausted — top up in Settings → Plans");
+  if (res.status === 403) {
+    const body = (await res.text()).slice(0, 300);
+    const err: any = new Error(`AI unavailable: ${body}`);
+    err.code = "AI_UNAVAILABLE";
+    throw err;
+  }
   if (!res.ok) throw new Error(`AI gateway ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const j: any = await res.json();
   const content = j?.choices?.[0]?.message?.content;
@@ -344,7 +350,15 @@ ${JSON.stringify(feedbackDigest)}
 Return ONLY the JSON object.`;
 
 
-    const parsed = await callLovableAi(prompt);
+    let parsed: any;
+    try {
+      parsed = await callLovableAi(prompt);
+    } catch (e: any) {
+      if (e?.code === "AI_UNAVAILABLE" || /credit_limit_reached|Workspace credit limit/i.test(String(e?.message))) {
+        return { ran: false, reason: "AI workspace credit limit reached — add credits in Settings → Plans & credits" };
+      }
+      throw e;
+    }
     const summary = typeof parsed.summary === "string" ? parsed.summary : "No summary returned.";
     const dominant = Array.isArray(parsed.dominant_failures) ? parsed.dominant_failures.slice(0, 10) : [];
     const recs = Array.isArray(parsed.recommendations) ? parsed.recommendations.slice(0, 10) : [];
