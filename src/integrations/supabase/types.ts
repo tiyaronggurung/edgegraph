@@ -926,6 +926,108 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_trade_ta_shadow: {
+        Row: {
+          actual_outcome: string | null
+          actual_pnl_usd: number | null
+          all_three_agree: boolean | null
+          created_at: string
+          edge_pts: number | null
+          full_loss: boolean | null
+          id: string
+          kalshi_direction: string | null
+          kalshi_price_cents: number | null
+          model_direction: string | null
+          model_prob: number | null
+          nearest_round_level: number | null
+          order_id: string | null
+          rejection_wick_flag: boolean | null
+          resistance_level: number | null
+          settled_at: string | null
+          side_evaluated: string | null
+          support_level: number | null
+          ta_confidence: number | null
+          ta_direction_1m: string | null
+          ta_direction_5m: string | null
+          ta_direction_combined: string | null
+          ta_disagrees_kalshi: boolean | null
+          ta_disagrees_model: boolean | null
+          ta_reasons: Json | null
+          ticker: string | null
+          trend_1m: string | null
+          trend_5m: string | null
+          two_of_three_agree: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          actual_outcome?: string | null
+          actual_pnl_usd?: number | null
+          all_three_agree?: boolean | null
+          created_at?: string
+          edge_pts?: number | null
+          full_loss?: boolean | null
+          id?: string
+          kalshi_direction?: string | null
+          kalshi_price_cents?: number | null
+          model_direction?: string | null
+          model_prob?: number | null
+          nearest_round_level?: number | null
+          order_id?: string | null
+          rejection_wick_flag?: boolean | null
+          resistance_level?: number | null
+          settled_at?: string | null
+          side_evaluated?: string | null
+          support_level?: number | null
+          ta_confidence?: number | null
+          ta_direction_1m?: string | null
+          ta_direction_5m?: string | null
+          ta_direction_combined?: string | null
+          ta_disagrees_kalshi?: boolean | null
+          ta_disagrees_model?: boolean | null
+          ta_reasons?: Json | null
+          ticker?: string | null
+          trend_1m?: string | null
+          trend_5m?: string | null
+          two_of_three_agree?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          actual_outcome?: string | null
+          actual_pnl_usd?: number | null
+          all_three_agree?: boolean | null
+          created_at?: string
+          edge_pts?: number | null
+          full_loss?: boolean | null
+          id?: string
+          kalshi_direction?: string | null
+          kalshi_price_cents?: number | null
+          model_direction?: string | null
+          model_prob?: number | null
+          nearest_round_level?: number | null
+          order_id?: string | null
+          rejection_wick_flag?: boolean | null
+          resistance_level?: number | null
+          settled_at?: string | null
+          side_evaluated?: string | null
+          support_level?: number | null
+          ta_confidence?: number | null
+          ta_direction_1m?: string | null
+          ta_direction_5m?: string | null
+          ta_direction_combined?: string | null
+          ta_disagrees_kalshi?: boolean | null
+          ta_disagrees_model?: boolean | null
+          ta_reasons?: Json | null
+          ticker?: string | null
+          trend_1m?: string | null
+          trend_5m?: string | null
+          two_of_three_agree?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bets: {
         Row: {
           analysis_id: string | null
