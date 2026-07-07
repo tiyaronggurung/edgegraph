@@ -142,6 +142,38 @@ export async function runAutoTradeCore(
         throw new Error(`Kalshi key precheck failed: ${e?.message ?? String(e)}`);
       }
 
+      // ── Balance-aware stake sizing (live only) ──
+      // If Kalshi cash balance < requested stake ($100 default), shrink stake
+      // to the whole remaining balance (rounded down to $1). Skip if balance < $1.
+      try {
+        const { signKalshi: _sign } = await import("./cryptoTrades.functions");
+        const path = "/portfolio/balance";
+        const headers = await _sign("GET", path, userId);
+        const res = await fetch(`${KALSHI_BASE}${path}`, { method: "GET", headers });
+        if (res.ok) {
+          const j: any = await res.json().catch(() => null);
+          const balCents = typeof j?.balance === "number" ? j.balance : null;
+          if (balCents !== null) {
+            const balUsd = balCents / 100;
+            if (balUsd < 1) {
+              return {
+                sessionId, mode: data.mode, attempted: 0, placed: 0, skipped: 1,
+                skipReasons: [`Kalshi balance $${balUsd.toFixed(2)} < $1 — no stake available.`],
+                orders: [],
+              };
+            }
+            if (balUsd < data.stakeUsd) {
+              const shrunk = Math.max(1, Math.floor(balUsd));
+              (data as { stakeUsd: number }).stakeUsd = shrunk;
+            }
+          }
+        }
+      } catch {
+        // Balance probe is best-effort; fall through to normal stake if it fails.
+      }
+
+
+
       const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data: resetRow } = await (supabase as any)
         .from("auto_trade_loss_cap_resets")
