@@ -9,6 +9,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const THRESHOLDS = [45, 40, 35, 30] as const;
 type Threshold = typeof THRESHOLDS[number];
 
+const TP_DELTA_CENTS = 12; // matches live TP rung: entry + 12¢
+
 interface SimResult {
   first_cross_mark: number | null;
   first_cross_secs: number | null;
@@ -16,6 +18,10 @@ interface SimResult {
   sim_pnl: number;
   saved_loss: boolean;
   killed_winner: boolean;
+  loss_avoided: number;      // max(0, actual_pnl_if_loss - sim_pnl) → positive = damage prevented
+  profit_given_up: number;   // max(0, actual_pnl_if_win - sim_pnl) → positive = winner cost
+  minutes_remaining: number | null;
+  recovered_to_tp: boolean | null; // did our-side mark later reach entry + TP_DELTA before settle
 }
 
 function simulateThreshold(
@@ -25,14 +31,11 @@ function simulateThreshold(
   contracts: number,
   actualPnl: number,
 ): SimResult {
-  let hit: { mark: number; secs: number } | null = null;
-  for (const s of tape) {
-    if (s.our_side_cents < threshold) {
-      hit = { mark: s.our_side_cents, secs: s.seconds_to_close };
-      break;
-    }
+  let hitIdx = -1;
+  for (let i = 0; i < tape.length; i++) {
+    if (tape[i].our_side_cents < threshold) { hitIdx = i; break; }
   }
-  if (!hit) {
+  if (hitIdx < 0) {
     return {
       first_cross_mark: null,
       first_cross_secs: null,
@@ -40,19 +43,40 @@ function simulateThreshold(
       sim_pnl: actualPnl,
       saved_loss: false,
       killed_winner: false,
+      loss_avoided: 0,
+      profit_given_up: 0,
+      minutes_remaining: null,
+      recovered_to_tp: null,
     };
   }
-  const simExit = hit.mark;
+  const hit = tape[hitIdx];
+  const simExit = hit.our_side_cents;
   const simPnl = (contracts * (simExit - entryCents)) / 100;
+
+  // Did price later recover to the TP target after the flip cross?
+  const tpTarget = entryCents + TP_DELTA_CENTS;
+  let recovered = false;
+  for (let i = hitIdx + 1; i < tape.length; i++) {
+    if (tape[i].our_side_cents >= tpTarget) { recovered = true; break; }
+  }
+
+  const savedLoss = actualPnl < 0 && simPnl > actualPnl;
+  const killedWinner = actualPnl > 0 && simPnl < actualPnl - 0.01;
+
   return {
-    first_cross_mark: hit.mark,
-    first_cross_secs: hit.secs,
+    first_cross_mark: hit.our_side_cents,
+    first_cross_secs: hit.seconds_to_close,
     sim_exit_cents: simExit,
     sim_pnl: simPnl,
-    saved_loss: actualPnl < 0 && simPnl > actualPnl,
-    killed_winner: actualPnl > 0 && simPnl < actualPnl - 0.01,
+    saved_loss: savedLoss,
+    killed_winner: killedWinner,
+    loss_avoided: savedLoss ? simPnl - actualPnl : 0,
+    profit_given_up: killedWinner ? actualPnl - simPnl : 0,
+    minutes_remaining: hit.seconds_to_close / 60,
+    recovered_to_tp: recovered,
   };
 }
+
 
 /**
  * Recompute the shadow rows for all settled tracked auto-odds trades for
