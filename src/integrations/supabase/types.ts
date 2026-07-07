@@ -272,6 +272,7 @@ export type Database = {
           last_tick_at: string | null
           model_gate_min: number | null
           oscillation_max: number | null
+          shadow_flip_enabled: boolean
           skip_bucket_15_60s: boolean | null
           skip_bucket_lt15s: boolean | null
           stopped_reason: string | null
@@ -290,6 +291,7 @@ export type Database = {
           last_tick_at?: string | null
           model_gate_min?: number | null
           oscillation_max?: number | null
+          shadow_flip_enabled?: boolean
           skip_bucket_15_60s?: boolean | null
           skip_bucket_lt15s?: boolean | null
           stopped_reason?: string | null
@@ -308,6 +310,7 @@ export type Database = {
           last_tick_at?: string | null
           model_gate_min?: number | null
           oscillation_max?: number | null
+          shadow_flip_enabled?: boolean
           skip_bucket_15_60s?: boolean | null
           skip_bucket_lt15s?: boolean | null
           stopped_reason?: string | null
@@ -554,6 +557,129 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      auto_trade_flip_shadow: {
+        Row: {
+          actual_outcome: string | null
+          actual_pnl: number | null
+          computed_at: string
+          contracts: number
+          entry_cents: number
+          id: string
+          min_mark_seen: number | null
+          order_id: string
+          placed_at: string
+          settled_at: string | null
+          side: string
+          t30_first_cross_mark: number | null
+          t30_first_cross_secs: number | null
+          t30_killed_winner: boolean | null
+          t30_saved_loss: boolean | null
+          t30_sim_exit_cents: number | null
+          t30_sim_pnl: number | null
+          t35_first_cross_mark: number | null
+          t35_first_cross_secs: number | null
+          t35_killed_winner: boolean | null
+          t35_saved_loss: boolean | null
+          t35_sim_exit_cents: number | null
+          t35_sim_pnl: number | null
+          t40_first_cross_mark: number | null
+          t40_first_cross_secs: number | null
+          t40_killed_winner: boolean | null
+          t40_saved_loss: boolean | null
+          t40_sim_exit_cents: number | null
+          t40_sim_pnl: number | null
+          t45_first_cross_mark: number | null
+          t45_first_cross_secs: number | null
+          t45_killed_winner: boolean | null
+          t45_saved_loss: boolean | null
+          t45_sim_exit_cents: number | null
+          t45_sim_pnl: number | null
+          tape_samples: number
+          ticker: string
+          user_id: string
+        }
+        Insert: {
+          actual_outcome?: string | null
+          actual_pnl?: number | null
+          computed_at?: string
+          contracts: number
+          entry_cents: number
+          id?: string
+          min_mark_seen?: number | null
+          order_id: string
+          placed_at: string
+          settled_at?: string | null
+          side: string
+          t30_first_cross_mark?: number | null
+          t30_first_cross_secs?: number | null
+          t30_killed_winner?: boolean | null
+          t30_saved_loss?: boolean | null
+          t30_sim_exit_cents?: number | null
+          t30_sim_pnl?: number | null
+          t35_first_cross_mark?: number | null
+          t35_first_cross_secs?: number | null
+          t35_killed_winner?: boolean | null
+          t35_saved_loss?: boolean | null
+          t35_sim_exit_cents?: number | null
+          t35_sim_pnl?: number | null
+          t40_first_cross_mark?: number | null
+          t40_first_cross_secs?: number | null
+          t40_killed_winner?: boolean | null
+          t40_saved_loss?: boolean | null
+          t40_sim_exit_cents?: number | null
+          t40_sim_pnl?: number | null
+          t45_first_cross_mark?: number | null
+          t45_first_cross_secs?: number | null
+          t45_killed_winner?: boolean | null
+          t45_saved_loss?: boolean | null
+          t45_sim_exit_cents?: number | null
+          t45_sim_pnl?: number | null
+          tape_samples?: number
+          ticker: string
+          user_id: string
+        }
+        Update: {
+          actual_outcome?: string | null
+          actual_pnl?: number | null
+          computed_at?: string
+          contracts?: number
+          entry_cents?: number
+          id?: string
+          min_mark_seen?: number | null
+          order_id?: string
+          placed_at?: string
+          settled_at?: string | null
+          side?: string
+          t30_first_cross_mark?: number | null
+          t30_first_cross_secs?: number | null
+          t30_killed_winner?: boolean | null
+          t30_saved_loss?: boolean | null
+          t30_sim_exit_cents?: number | null
+          t30_sim_pnl?: number | null
+          t35_first_cross_mark?: number | null
+          t35_first_cross_secs?: number | null
+          t35_killed_winner?: boolean | null
+          t35_saved_loss?: boolean | null
+          t35_sim_exit_cents?: number | null
+          t35_sim_pnl?: number | null
+          t40_first_cross_mark?: number | null
+          t40_first_cross_secs?: number | null
+          t40_killed_winner?: boolean | null
+          t40_saved_loss?: boolean | null
+          t40_sim_exit_cents?: number | null
+          t40_sim_pnl?: number | null
+          t45_first_cross_mark?: number | null
+          t45_first_cross_secs?: number | null
+          t45_killed_winner?: boolean | null
+          t45_saved_loss?: boolean | null
+          t45_sim_exit_cents?: number | null
+          t45_sim_pnl?: number | null
+          tape_samples?: number
+          ticker?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       auto_trade_loss_cap_resets: {
         Row: {
