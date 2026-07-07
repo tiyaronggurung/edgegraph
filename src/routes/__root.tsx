@@ -119,8 +119,14 @@ function AuthCacheBridge() {
   const qc = useQueryClient();
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+      if (event === "SIGNED_OUT") {
+        // Stop in-flight protected queries before their 401s land, then drop cache.
+        qc.cancelQueries();
+        qc.clear();
+      }
       router.invalidate();
-      qc.invalidateQueries();
+      if (event !== "SIGNED_OUT") qc.invalidateQueries();
       if (event === "SIGNED_IN" && typeof window !== "undefined") {
         const stored = sessionStorage.getItem("post_login_redirect");
         if (stored && stored.startsWith("/") && !stored.startsWith("//")) {
