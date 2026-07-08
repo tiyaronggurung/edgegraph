@@ -116,17 +116,45 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
                 entry_velocity_cents: d.velocity,
               });
               if (!error) firedTotal++;
-            } else if (res.skip) {
-              skipRows.push({
-                user_id: userId, ticker: tk,
-                reason: res.skip.reason,
-                trigger_candidate: res.skip.trigger_candidate ?? null,
-                yes_cents: res.skip.yes_cents ?? null,
-                no_cents: res.skip.no_cents ?? null,
-                seconds_to_close: res.skip.seconds_to_close ?? null,
-                flip_count: res.skip.flip_count ?? null,
-                detail: res.skip.detail ?? null,
-              });
+            } else {
+              const rd = evaluateReentry(atm);
+              if (rd) {
+                const limitCents = rd.side === "YES" ? rd.yes_cents : rd.no_cents;
+                const halfStake = Math.max(dynStake * 0.5, 50);
+                const rContracts = Math.floor((halfStake * 100) / limitCents);
+                if (rContracts >= 1) {
+                  const rStake = (rContracts * limitCents) / 100;
+                  const { error: rErr } = await supabaseAdmin.from("auto_trade_odds_shadow").insert({
+                    user_id: userId,
+                    ticker: rd.ticker,
+                    strike: rd.strike,
+                    side: rd.side,
+                    trigger: rd.trigger,
+                    seconds_to_close_at_fire: rd.seconds_to_close,
+                    yes_cents_at_fire: rd.yes_cents,
+                    no_cents_at_fire: rd.no_cents,
+                    limit_cents: limitCents,
+                    contracts: rContracts,
+                    stake_usd: rStake,
+                    flip_count_at_fire: rd.flip_count,
+                    spot_at_fire: rd.spot,
+                    entry_velocity_cents: rd.velocity,
+                    rotation_index: 2,
+                  });
+                  if (!rErr) reentriesTotal++;
+                }
+              } else if (res.skip) {
+                skipRows.push({
+                  user_id: userId, ticker: tk,
+                  reason: res.skip.reason,
+                  trigger_candidate: res.skip.trigger_candidate ?? null,
+                  yes_cents: res.skip.yes_cents ?? null,
+                  no_cents: res.skip.no_cents ?? null,
+                  seconds_to_close: res.skip.seconds_to_close ?? null,
+                  flip_count: res.skip.flip_count ?? null,
+                  detail: res.skip.detail ?? null,
+                });
+              }
             }
           }
           skippedTotal += skipRows.length;
