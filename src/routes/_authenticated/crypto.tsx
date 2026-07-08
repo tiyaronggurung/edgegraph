@@ -20,6 +20,7 @@ import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
 import { OddsStudyPanel } from "@/components/crypto/OddsStudyPanel";
 import { IocLadderPanel } from "@/components/crypto/IocLadderPanel";
 import { FlipShadowPanel } from "@/components/crypto/FlipShadowPanel";
+import { ScalpShadowPanel } from "@/components/crypto/ScalpShadowPanel";
 import { TaShadowPanel } from "@/components/crypto/TaShadowPanel";
 import { SkipBucketPanel } from "@/components/crypto/SkipBucketPanel";
 import { LossCapPanel } from "@/components/crypto/LossCapPanel";
