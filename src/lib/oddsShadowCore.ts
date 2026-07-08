@@ -4,6 +4,11 @@
 export const WINDOW = 900;
 export const STALE_SECONDS = 20; // tape freshness cutoff (#2 proxy)
 export const FLIP_COOLDOWN_SECONDS = 20; // (#5)
+// Re-entry (pullback) params.
+export const REENTRY_RAN_TO = 78;      // must have run ≥78¢ at some earlier snap
+export const REENTRY_MIN_BAND = 55;    // current leader cents floor
+export const REENTRY_MAX_BAND = 70;    // current leader cents ceiling (tighter than first-entry)
+export const REENTRY_MIN_TIME = 120;   // ≥2 min left
 export const STABILITY_TICKS = 3; // (#4) consecutive same-leader snaps
 export const MIN_TIME_TO_ENTER = 30; // don't fire in the final 30s
 
