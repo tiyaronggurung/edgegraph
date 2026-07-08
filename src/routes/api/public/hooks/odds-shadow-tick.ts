@@ -76,17 +76,26 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
           const bank = Math.max(0, (allSettled ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0));
           const { data: recent } = await supabaseAdmin
             .from("auto_trade_odds_shadow")
-            .select("pnl_usd")
+            .select("pnl_usd, stake_usd")
             .eq("user_id", userId)
             .eq("settled", true)
             .order("settled_at", { ascending: false })
             .limit(UNLOCK_WINDOW);
-          const unlocked = (recent?.length ?? 0) >= UNLOCK_WINDOW
-            && (recent ?? []).every((r) => Number(r.pnl_usd ?? 0) > 0)
+          const recentArr = (recent ?? []) as Array<{ pnl_usd: number | string | null; stake_usd: number | string | null }>;
+          const unlocked = recentArr.length >= UNLOCK_WINDOW
+            && recentArr.every((r) => Number(r.pnl_usd ?? 0) > 0)
             && bank > 0;
-          const dynStake = unlocked
-            ? Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD)
-            : BASE_STAKE_USD;
+          let dynStake = BASE_STAKE_USD;
+          if (unlocked) {
+            const baseStake = Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD);
+            const last = recentArr[0];
+            if (last && Number(last.pnl_usd ?? 0) <= 0) {
+              const doubled = Math.min(Number(last.stake_usd ?? baseStake) * 2, MAX_STAKE_USD);
+              dynStake = bank >= doubled ? doubled : baseStake;
+            } else {
+              dynStake = baseStake;
+            }
+          }
 
           const skipRows: Array<Record<string, unknown>> = [];
           for (const [tk, atm] of groups) {
