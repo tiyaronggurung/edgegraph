@@ -45,6 +45,48 @@ function leaderOf(yes: number): "YES" | "NO" | "TIE" {
   return "TIE";
 }
 
+// Strict regression-based chop detector on the 15-min tape.
+// Fits linear regression of yes_cents and no_cents vs time (minutes).
+// Skip if: <8 points, R² of YES < 0.5, YES/NO slopes share sign, or |YES slope| < 0.3¢/min.
+export function regressionChopSkip(atm: Row[]): Skip | null {
+  if (atm.length < 8) {
+    return { reason: "regression_insufficient_points", detail: { points: atm.length } };
+  }
+  const t0 = new Date(atm[0].snapped_at).getTime();
+  const xs = atm.map(r => (new Date(r.snapped_at).getTime() - t0) / 60_000); // minutes
+  const ys = atm.map(r => Number(r.yes_cents));
+  const ns = atm.map(r => Number(r.no_cents));
+
+  const fit = (x: number[], y: number[]) => {
+    const n = x.length;
+    const mx = x.reduce((a, b) => a + b, 0) / n;
+    const my = y.reduce((a, b) => a + b, 0) / n;
+    let num = 0, denX = 0, denY = 0;
+    for (let i = 0; i < n; i++) {
+      const dx = x[i] - mx, dy = y[i] - my;
+      num += dx * dy; denX += dx * dx; denY += dy * dy;
+    }
+    const slope = denX === 0 ? 0 : num / denX;
+    const r2 = denX === 0 || denY === 0 ? 0 : (num * num) / (denX * denY);
+    return { slope, r2 };
+  };
+
+  const y = fit(xs, ys);
+  const n = fit(xs, ns);
+
+  if (y.r2 < 0.5) {
+    return { reason: "regression_low_r2", detail: { r2_yes: y.r2, slope_yes: y.slope } };
+  }
+  if (Math.sign(y.slope) === Math.sign(n.slope) && y.slope !== 0 && n.slope !== 0) {
+    return { reason: "regression_same_sign", detail: { slope_yes: y.slope, slope_no: n.slope } };
+  }
+  if (Math.abs(y.slope) < 0.3) {
+    return { reason: "regression_flat", detail: { slope_yes: y.slope } };
+  }
+  return null;
+}
+
+
 export function atmByTicker(rows: Row[]): Map<string, Row[]> {
   const perTicker = new Map<string, Row[]>();
   for (const r of rows) {
