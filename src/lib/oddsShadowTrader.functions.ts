@@ -380,7 +380,7 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
     const dayAgo = new Date(Date.now() - 24 * 3600_000).toISOString();
     const { data: skips } = await supabase
       .from("auto_trade_odds_skip_log")
-      .select("reason, trigger_candidate, created_at")
+      .select("reason, trigger_candidate, ticker, yes_cents, no_cents, detail, created_at")
       .eq("user_id", userId)
       .gte("created_at", dayAgo)
       .order("created_at", { ascending: false })
@@ -394,6 +394,19 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
       .map(([k, n]) => ({ key: k, count: n }));
+
+    // Recent regression skips (chop detector) with slope/R² detail.
+    const regressionSkips = (skips ?? [])
+      .filter((s: any) => typeof s.reason === "string" && s.reason.startsWith("regression_"))
+      .slice(0, 15)
+      .map((s: any) => ({
+        ticker: String(s.ticker ?? ""),
+        reason: String(s.reason),
+        yes_cents: s.yes_cents ?? null,
+        no_cents: s.no_cents ?? null,
+        detail: s.detail ?? null,
+        created_at: s.created_at,
+      }));
 
     // Calibration state.
     const { data: cal } = await supabase
