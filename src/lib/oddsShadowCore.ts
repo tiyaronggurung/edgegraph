@@ -45,10 +45,17 @@ function leaderOf(yes: number): "YES" | "NO" | "TIE" {
   return "TIE";
 }
 
+// Toggle bag for bypassing the two most-triggered safety filters.
+// Both default to false — same behavior as before.
+export interface GateOpts {
+  ignoreLowR2?: boolean;
+  ignoreCentsBand?: boolean;
+}
+
 // Strict regression-based chop detector on the 15-min tape.
 // Fits linear regression of yes_cents and no_cents vs time (minutes).
 // Skip if: <8 points, R² of YES < 0.5, YES/NO slopes share sign, or |YES slope| < 0.3¢/min.
-export function regressionChopSkip(atm: Row[]): Skip | null {
+export function regressionChopSkip(atm: Row[], opts: GateOpts = {}): Skip | null {
   if (atm.length < 8) {
     return { reason: "regression_insufficient_points", detail: { points: atm.length } };
   }
@@ -74,7 +81,7 @@ export function regressionChopSkip(atm: Row[]): Skip | null {
   const y = fit(xs, ys);
   const n = fit(xs, ns);
 
-  if (y.r2 < 0.5) {
+  if (y.r2 < 0.5 && !opts.ignoreLowR2) {
     return { reason: "regression_low_r2", detail: { r2_yes: y.r2, slope_yes: y.slope } };
   }
   if (Math.sign(y.slope) === Math.sign(n.slope) && y.slope !== 0 && n.slope !== 0) {
@@ -85,6 +92,7 @@ export function regressionChopSkip(atm: Row[]): Skip | null {
   }
   return null;
 }
+
 
 
 export function atmByTicker(rows: Row[]): Map<string, Row[]> {
