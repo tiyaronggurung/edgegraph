@@ -138,7 +138,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
         }
       } else {
         // Re-entry (pullback) check — half stake, rotation_index=2, one per ticker.
-        const rd = evaluateReentry(atm);
+        const rd = evaluateReentry(atm, gateOpts);
         if (rd) {
           const limitCents = rd.side === "YES" ? rd.yes_cents : rd.no_cents;
           const halfStake = ladder.profitBankMode ? ladder.nextStake * 0.5 : 50;
