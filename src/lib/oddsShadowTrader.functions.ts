@@ -141,14 +141,15 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
       await supabase.from("auto_trade_odds_skip_log").insert(skipRows.slice(0, 20) as any);
     }
 
-    // 5. Settlement + early exit for open positions.
+    // 5. Settlement + early exit + flip rotation for open positions.
     const { data: open } = await supabase
       .from("auto_trade_odds_shadow")
-      .select("id, ticker, side, contracts, limit_cents, fired_at")
+      .select("id, ticker, strike, side, contracts, limit_cents, fired_at, rotation_index, spot_at_fire")
       .eq("user_id", userId)
       .eq("settled", false);
     let settledCount = 0;
     let earlyExits = 0;
+    let rotations = 0;
     for (const row of open ?? []) {
       const atm = groups.get(row.ticker as string);
       if (!atm || atm.length === 0) continue;
@@ -177,18 +178,14 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
         continue;
       }
 
-      // Early-exit rule (#10): our side is losing leadership by ≥8¢
-      // for at least 2 consecutive snaps, and we still have >60s to close.
+      // Adverse-flip early exit + optional 1x rotation into the new leader side.
       if (atm.length >= 2 && last.seconds_to_close > 60) {
         const ourCents = (r: Row) => (row.side === "YES" ? r.yes_cents : r.no_cents);
         const c1 = ourCents(atm[atm.length - 1]);
         const c2 = ourCents(atm[atm.length - 2]);
-        // Only exit if trade already existed before both snaps.
         const firedAtMs = row.fired_at ? new Date(String(row.fired_at)).getTime() : 0;
-        const s1 = new Date(atm[atm.length - 1].snapped_at).getTime();
         const s2 = new Date(atm[atm.length - 2].snapped_at).getTime();
         if (firedAtMs < s2 && c1 <= 42 && c2 <= 42) {
-          // Realize at current cents.
           const contracts = Number(row.contracts);
           const limit = Number(row.limit_cents);
           const pnl = (contracts * (c1 - limit)) / 100;
@@ -207,9 +204,43 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
             })
             .eq("id", row.id);
           if (!exErr) earlyExits++;
+
+          // Flip rotation: only if this trade wasn't already a rotation and
+          // there's ≥90s left. Buy the OPPOSITE side at its current cents.
+          const rotIdx = Number(row.rotation_index ?? 0);
+          if (!exErr && rotIdx === 0 && last.seconds_to_close >= 90) {
+            const newSide: "YES" | "NO" = row.side === "YES" ? "NO" : "YES";
+            const newCents = newSide === "YES" ? last.yes_cents : last.no_cents;
+            if (newCents >= 30 && newCents <= 90) {
+              const rotContracts = Math.floor((stakeInfo.stake * 100) / newCents);
+              if (rotContracts >= 1) {
+                const rotStake = (rotContracts * newCents) / 100;
+                const { error: insErr } = await supabase.from("auto_trade_odds_shadow").insert({
+                  user_id: userId,
+                  ticker: row.ticker as string,
+                  strike: Number(row.strike),
+                  side: newSide,
+                  trigger: "flip_fade",
+                  seconds_to_close_at_fire: last.seconds_to_close,
+                  yes_cents_at_fire: last.yes_cents,
+                  no_cents_at_fire: last.no_cents,
+                  limit_cents: newCents,
+                  contracts: rotContracts,
+                  stake_usd: rotStake,
+                  flip_count_at_fire: 0,
+                  spot_at_fire: Number(row.spot_at_fire ?? 0) || null,
+                  entry_velocity_cents: 0,
+                  rotation_index: 1,
+                  parent_shadow_id: row.id,
+                });
+                if (!insErr) rotations++;
+              }
+            }
+          }
         }
       }
     }
+
 
     // 6. Live calibration (#13). Once per tick, if any trigger has ≥20 settled trades,
     // tune min_cents up/down to push win rate above target.
