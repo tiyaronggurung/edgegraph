@@ -90,6 +90,10 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
     let inserted = 0;
     const skipRows: Array<Record<string, unknown>> = [];
 
+    // Compute dynamic stake once per tick — same bankroll basis for every fire this cycle.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const stakeInfo = await computeStake(supabase as any, userId);
+
     for (const [tk, atm] of groups) {
       if (firedSet.has(tk)) continue;
       const res = evaluateAtm(atm, cal);
@@ -97,7 +101,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
         const d = res.decision;
         const limitCents = d.side === "YES" ? d.yes_cents : d.no_cents;
         if (limitCents < 1 || limitCents > 99) continue;
-        const contracts = Math.floor((STAKE_USD * 100) / limitCents);
+        const contracts = Math.floor((stakeInfo.stake * 100) / limitCents);
         if (contracts < 1) continue;
         const stake = (contracts * limitCents) / 100;
         const { error } = await supabase.from("auto_trade_odds_shadow").insert({
