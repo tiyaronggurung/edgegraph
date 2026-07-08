@@ -139,6 +139,35 @@ export function OddsShadowTraderPanel() {
             </div>
           )}
 
+          {r.regressionSkips && r.regressionSkips.length > 0 && (
+            <div className="rounded border">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1 border-b">
+                Regression chop skips (24h) · slope/R² on 15-min tape
+              </div>
+              <div className="max-h-56 overflow-y-auto divide-y">
+                {r.regressionSkips.map((s, i) => {
+                  const d = (s.detail ?? {}) as { slope_yes?: number; slope_no?: number; r2_yes?: number; r2?: number; points?: number };
+                  const reasonLabel = s.reason.replace("regression_", "");
+                  return (
+                    <div key={i} className="px-2 py-1 text-[11px] font-mono">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate">{s.ticker.slice(-16)}</span>
+                        <Badge variant="outline" className="text-[9px]">{reasonLabel}</Badge>
+                      </div>
+                      <div className="text-[10px] text-muted-foreground flex flex-wrap gap-x-3">
+                        <span>YES {s.yes_cents ?? "-"}¢ / NO {s.no_cents ?? "-"}¢</span>
+                        {d.slope_yes !== undefined && <span>sYES {Number(d.slope_yes).toFixed(2)}¢/m</span>}
+                        {d.slope_no !== undefined && <span>sNO {Number(d.slope_no).toFixed(2)}¢/m</span>}
+                        {(d.r2_yes ?? d.r2) !== undefined && <span>R² {Number(d.r2_yes ?? d.r2).toFixed(2)}</span>}
+                        {d.points !== undefined && <span>n={d.points}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {r.recent.length > 0 && (
             <div className="rounded border">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1 border-b">Recent shadow fires</div>
