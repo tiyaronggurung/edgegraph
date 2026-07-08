@@ -65,20 +65,27 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
             .eq("user_id", userId);
           const firedSet = new Set((fired ?? []).map(r => r.ticker));
 
-          // Dynamic stake: base $100, then profit-only sizing after 3 straight wins.
+          // Profit bank seeded at $71 starting 2026-07-08 04:47 UTC.
+          const BANK_SEED_USD = 71;
+          const BANK_CUTOFF_ISO = "2026-07-08T04:47:00Z";
           const { data: allSettled } = await supabaseAdmin
             .from("auto_trade_odds_shadow")
             .select("pnl_usd")
             .eq("user_id", userId)
             .eq("settled", true)
+            .gte("settled_at", BANK_CUTOFF_ISO)
             .order("settled_at", { ascending: false })
             .limit(1000);
-          const bank = Math.max(0, (allSettled ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0));
+          const bank = Math.max(
+            0,
+            BANK_SEED_USD + (allSettled ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0),
+          );
           const { data: recent } = await supabaseAdmin
             .from("auto_trade_odds_shadow")
             .select("pnl_usd, stake_usd")
             .eq("user_id", userId)
             .eq("settled", true)
+            .gte("settled_at", BANK_CUTOFF_ISO)
             .order("settled_at", { ascending: false })
             .limit(UNLOCK_WINDOW);
           const recentArr = (recent ?? []) as Array<{ pnl_usd: number | string | null; stake_usd: number | string | null }>;
