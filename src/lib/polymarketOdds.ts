@@ -18,7 +18,7 @@ export interface PolymarketBtcOdds {
   fetchedAt: number;      // ms epoch
 }
 
-const CACHE_MS = 10_000;
+const CACHE_MS = 2_000;
 let cache: { at: number; slug: string; data: PolymarketBtcOdds | null } | null = null;
 
 /**
