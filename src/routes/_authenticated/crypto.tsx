@@ -25,6 +25,7 @@ import { SkipBucketPanel } from "@/components/crypto/SkipBucketPanel";
 import { LossCapPanel } from "@/components/crypto/LossCapPanel";
 import { FlipRecorderPanel } from "@/components/crypto/FlipRecorderPanel";
 import { OddsShadowTraderPanel } from "@/components/crypto/OddsShadowTraderPanel";
+import { NextStakeBanner } from "@/components/crypto/NextStakeBanner";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
 import { useCalibrationShift } from "@/hooks/useCalibrationShift";
 import { useMarketRegime } from "@/hooks/useMarketRegime";
@@ -1725,7 +1726,10 @@ function AutoTradePanel() {
 
 
   return (
+    <div className="space-y-2">
+    <NextStakeBanner />
     <div className="border border-border rounded-lg bg-card">
+
       <div className="px-4 py-2 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
@@ -2099,6 +2103,7 @@ function AutoTradePanel() {
           </table>
         </div>
       )}
+    </div>
     </div>
   );
 }
