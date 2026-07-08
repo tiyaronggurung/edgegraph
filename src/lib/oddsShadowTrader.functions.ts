@@ -95,7 +95,8 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
     }
     if (skipRows.length) {
       // Cap to prevent bloat.
-      await supabase.from("auto_trade_odds_skip_log").insert(skipRows.slice(0, 20));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await supabase.from("auto_trade_odds_skip_log").insert(skipRows.slice(0, 20) as any);
     }
 
     // 5. Settlement + early exit for open positions.
