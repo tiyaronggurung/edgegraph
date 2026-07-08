@@ -66,6 +66,28 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
             .eq("user_id", userId);
           const firedSet = new Set((fired ?? []).map(r => r.ticker));
 
+          // Dynamic stake: base $100, or 40% of profit bank once unlocked.
+          const { data: allSettled } = await supabaseAdmin
+            .from("auto_trade_odds_shadow")
+            .select("pnl_usd")
+            .eq("user_id", userId)
+            .eq("settled", true)
+            .order("settled_at", { ascending: false })
+            .limit(1000);
+          const bank = (allSettled ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0);
+          const { data: recent } = await supabaseAdmin
+            .from("auto_trade_odds_shadow")
+            .select("pnl_usd")
+            .eq("user_id", userId)
+            .eq("settled", true)
+            .order("settled_at", { ascending: false })
+            .limit(UNLOCK_WINDOW);
+          const recentPnl = (recent ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0);
+          const unlocked = bank >= UNLOCK_PROFIT && recentPnl >= UNLOCK_PROFIT && (recent?.length ?? 0) >= UNLOCK_WINDOW;
+          const dynStake = unlocked
+            ? Math.min(Math.max(bank * PROFIT_STAKE_PCT, BASE_STAKE_USD), MAX_STAKE_USD)
+            : BASE_STAKE_USD;
+
           const skipRows: Array<Record<string, unknown>> = [];
           for (const [tk, atm] of groups) {
             if (firedSet.has(tk)) continue;
@@ -74,7 +96,7 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
               const d = res.decision;
               const limitCents = d.side === "YES" ? d.yes_cents : d.no_cents;
               if (limitCents < 1 || limitCents > 99) continue;
-              const contracts = Math.floor((STAKE_USD * 100) / limitCents);
+              const contracts = Math.floor((dynStake * 100) / limitCents);
               if (contracts < 1) continue;
               const stake = (contracts * limitCents) / 100;
               const { error } = await supabaseAdmin.from("auto_trade_odds_shadow").insert({
