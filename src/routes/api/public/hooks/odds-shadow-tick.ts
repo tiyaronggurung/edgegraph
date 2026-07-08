@@ -83,27 +83,20 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
           );
           const { data: recent } = await supabaseAdmin
             .from("auto_trade_orders")
-            .select("pnl_usd, stake_usd, status")
+            .select("status")
             .eq("user_id", userId)
             .eq("mode", "live")
             .in("status", ["settled_win", "settled_loss"])
             .gte("settled_at", BANK_CUTOFF_ISO)
             .order("settled_at", { ascending: false })
             .limit(UNLOCK_WINDOW);
-          const recentArr = (recent ?? []) as Array<{ pnl_usd: number | string | null; stake_usd: number | string | null; status: string }>;
+          const recentArr = (recent ?? []) as Array<{ status: string }>;
           const unlocked = recentArr.length >= UNLOCK_WINDOW
             && recentArr.every((r) => r.status === "settled_win")
             && bank > 0;
           let dynStake = BASE_STAKE_USD;
           if (unlocked) {
-            const baseStake = Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD);
-            const last = recentArr[0];
-            if (last && Number(last.pnl_usd ?? 0) <= 0) {
-              const doubled = Math.min(Number(last.stake_usd ?? baseStake) * 2, MAX_STAKE_USD);
-              dynStake = bank >= doubled ? doubled : baseStake;
-            } else {
-              dynStake = baseStake;
-            }
+            dynStake = Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD);
           }
 
           const skipRows: Array<Record<string, unknown>> = [];

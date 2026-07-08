@@ -22,7 +22,7 @@ const MIN_SIGMA_DISTANCE_PAPER = 1.0;
 
 // ── Live rails (stricter — real money) ──
 const LIVE_MAX_ORDERS_PER_SESSION = 3;
-const LIVE_MAX_STAKE_USD_PER_ORDER = 150;
+const LIVE_MAX_STAKE_USD_PER_ORDER = 100;
 const LIVE_MIN_SIGMA_DISTANCE = 1.25;
 const LIVE_MIN_EDGE_PTS = 5;
 const LIVE_MIN_SECONDS_TO_CLOSE = 120;
@@ -35,8 +35,6 @@ const LIVE_COOLDOWN_SEC = 90;             // #5 no re-entry on a ticker within N
 const LIVE_PER_SYMBOL_LOSS_CAP_USD = 40;  // #6 per-symbol 24h loss cap → auto-pause that symbol
 const LIVE_LATE_TIGHTEN_SEC = 180;        // #2 tighten SL under this many seconds to expiry
 const LIVE_LATE_SL_FRAC = 0.25;           // #2 tighter SL fraction near expiry (vs LIVE_SL_FRAC)
-const LIVE_MAX_CONVICTION_MULT = 1.5;     // #3 sizing multiplier ceiling
-const LIVE_MIN_CONVICTION_MULT = 0.5;     // #3 sizing multiplier floor
 const LIVE_COINFLIP_BAND = 0.05;          // #4 |ask - 0.5| below this = coinflip zone
 const LIVE_COINFLIP_MIN_SIGMA = 1.5;      // #4 need this much sigma to trade coinflip prices
 
@@ -403,12 +401,8 @@ export async function runAutoTradeCore(
       const limitCents = Math.max(1, Math.min(99, Math.round(
         (m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
       )));
-      // #3 Conviction sizing: scale requested stake by sigma-based conviction, clamped.
-      // Force mode uses full stake (no sizing adjustment).
-      const convictionMult = data.force
-        ? 1
-        : Math.max(LIVE_MIN_CONVICTION_MULT, Math.min(LIVE_MAX_CONVICTION_MULT, m.sigmaDistance / 1.5));
-      const sizedStake = data.stakeUsd * convictionMult;
+      // Flat requested stake only — no martingale, compounding, or conviction upsize.
+      const sizedStake = data.stakeUsd;
       const contracts = Math.max(1, Math.floor((sizedStake * 100) / limitCents));
       const stakeActual = (contracts * limitCents) / 100;
 
@@ -474,7 +468,7 @@ export async function runAutoTradeCore(
                 gateAction: m.gateAction,
                 momentumAlignsWithSide: m.gapAnalysis?.momentumAlignsWithSide,
                 effectiveEdgePts: m.edgePts,
-                convictionMult,
+                convictionMult: 1,
                 minSigma,
                 minEdgePts,
                 equityAdjust: equity?.btcImpact?.edgeAdjustPts ?? null,
@@ -566,7 +560,7 @@ export async function runAutoTradeCore(
           contracts_remaining: filledContracts,
           partial_pnl_usd: 0,
           exit_ladder: DEFAULT_EXIT_LADDER as any,
-          is_martingale: data.isMartingale,
+          is_martingale: false,
           inputs_snapshot: { iocLadder: ladderTelemetry } as any,
 
         })
