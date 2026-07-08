@@ -758,6 +758,75 @@ export type Database = {
           },
         ]
       }
+      auto_trade_odds_shadow: {
+        Row: {
+          contracts: number
+          final_yes_cents: number | null
+          fired_at: string
+          flip_count_at_fire: number
+          id: string
+          limit_cents: number
+          no_cents_at_fire: number
+          pnl_usd: number | null
+          seconds_to_close_at_fire: number
+          settled: boolean
+          settled_at: string | null
+          side: string
+          spot_at_fire: number | null
+          stake_usd: number
+          strike: number
+          ticker: string
+          trigger: string
+          user_id: string
+          won: boolean | null
+          yes_cents_at_fire: number
+        }
+        Insert: {
+          contracts: number
+          final_yes_cents?: number | null
+          fired_at?: string
+          flip_count_at_fire: number
+          id?: string
+          limit_cents: number
+          no_cents_at_fire: number
+          pnl_usd?: number | null
+          seconds_to_close_at_fire: number
+          settled?: boolean
+          settled_at?: string | null
+          side: string
+          spot_at_fire?: number | null
+          stake_usd: number
+          strike: number
+          ticker: string
+          trigger: string
+          user_id: string
+          won?: boolean | null
+          yes_cents_at_fire: number
+        }
+        Update: {
+          contracts?: number
+          final_yes_cents?: number | null
+          fired_at?: string
+          flip_count_at_fire?: number
+          id?: string
+          limit_cents?: number
+          no_cents_at_fire?: number
+          pnl_usd?: number | null
+          seconds_to_close_at_fire?: number
+          settled?: boolean
+          settled_at?: string | null
+          side?: string
+          spot_at_fire?: number | null
+          stake_usd?: number
+          strike?: number
+          ticker?: string
+          trigger?: string
+          user_id?: string
+          won?: boolean | null
+          yes_cents_at_fire?: number
+        }
+        Relationships: []
+      }
       auto_trade_orders: {
         Row: {
           close_time: string
