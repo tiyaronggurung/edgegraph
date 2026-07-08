@@ -1,58 +1,39 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { evaluateAtm, evaluateReentry, atmByTicker, type Row } from "./oddsShadowCore";
+import { replayLadder, type LadderState, type LadderConfig } from "./profitBankLadder";
+import { loadLadderConfig } from "./stakingConfig.functions";
 
-// Odds-Flip Shadow Trader v2 — SHADOW-ONLY.
-// Adds: velocity, spread proxy, multi-tick stability, flip cooldown,
-// early-exit on adverse flip, live calibration, skip-reason log,
-// profit-bankroll staking (play with profit, not principal).
+// Odds-Flip Shadow Trader v2 — staking now driven by Profit Bank Ladder.
+// Base bankroll and profit bank are strictly separated: only realized profit
+// funds Profit Mode. See src/lib/profitBankLadder.ts for the pure engine.
 
-const BASE_STAKE_USD = 100;
-const PROFIT_STAKE_PCT = 0.50; // after 3 wins, stake 50% of profit bank only
-const MAX_STAKE_USD = 500;     // safety cap
-const UNLOCK_WINDOW = 3;       // rolling window size
 // Profit bank seeded at $71 starting 2026-07-08 04:47 UTC. Trades settled
-// before this cutoff are ignored for bank + 3-win unlock streak.
+// before this cutoff are ignored for bank + ladder replay.
 const BANK_SEED_USD = 71;
 const BANK_CUTOFF_ISO = "2026-07-08T04:47:00Z";
 
-async function computeStake(
+async function computeLadder(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   userId: string,
-): Promise<{ stake: number; mode: "base" | "profit"; bank: number }> {
-  // Cumulative PnL since cutoff, plus seed — sourced from LIVE Kalshi orders.
-  const { data: allSettled } = await supabase
+): Promise<{ state: LadderState; config: LadderConfig }> {
+  const config = await loadLadderConfig(supabase, userId);
+  const { data: settled } = await supabase
     .from("auto_trade_orders")
-    .select("pnl_usd")
+    .select("pnl_usd, status, settled_at")
     .eq("user_id", userId)
     .eq("mode", "live")
     .in("status", ["settled_win", "settled_loss"])
     .gte("settled_at", BANK_CUTOFF_ISO)
-    .order("settled_at", { ascending: false })
-    .limit(1000);
-  const bank = Math.max(
-    0,
-    BANK_SEED_USD + (allSettled ?? []).reduce((s: number, r: any) => s + Number(r.pnl_usd ?? 0), 0),
-  );
-
-  // Unlock check: last N settled LIVE trades (since cutoff) are all wins.
-  const { data: recent } = await supabase
-    .from("auto_trade_orders")
-    .select("settled_at, status")
-    .eq("user_id", userId)
-    .eq("mode", "live")
-    .in("status", ["settled_win", "settled_loss"])
-    .gte("settled_at", BANK_CUTOFF_ISO)
-    .order("settled_at", { ascending: false })
-    .limit(UNLOCK_WINDOW);
-  const recentArr = (recent ?? []) as Array<{ status: string }>;
-  const winStreakUnlocked = recentArr.length >= UNLOCK_WINDOW
-    && recentArr.every((r) => r.status === "settled_win");
-
-  if (winStreakUnlocked && bank > 0) {
-    return { stake: Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD), mode: "profit", bank };
-  }
-  return { stake: BASE_STAKE_USD, mode: "base", bank };
+    .order("settled_at", { ascending: true })
+    .limit(2000);
+  const orders = ((settled ?? []) as Array<{ status: string; pnl_usd: number | string }>).map(r => ({
+    won: r.status === "settled_win",
+    pnl_usd: Number(r.pnl_usd) || 0,
+  }));
+  const state = replayLadder(orders, config, BANK_SEED_USD);
+  return { state, config };
 }
 
 
