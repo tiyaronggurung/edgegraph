@@ -850,12 +850,6 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
               });
             } catch { /* shadow log is best-effort */ }
 
-
-
-
-
-            let hedgeFired = false;
-
             if (placeResult.placed > 0 && placeResult.orders[0]) {
               const placed = placeResult.orders[0];
               entries += 1;
