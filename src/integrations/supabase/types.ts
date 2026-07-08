@@ -368,6 +368,8 @@ export type Database = {
           enabled: boolean
           hedge_band_hi: number | null
           hedge_band_lo: number | null
+          ignore_cents_band: boolean
+          ignore_low_r2: boolean
           last_tick_at: string | null
           model_gate_min: number | null
           oscillation_max: number | null
@@ -387,6 +389,8 @@ export type Database = {
           enabled?: boolean
           hedge_band_hi?: number | null
           hedge_band_lo?: number | null
+          ignore_cents_band?: boolean
+          ignore_low_r2?: boolean
           last_tick_at?: string | null
           model_gate_min?: number | null
           oscillation_max?: number | null
@@ -406,6 +410,8 @@ export type Database = {
           enabled?: boolean
           hedge_band_hi?: number | null
           hedge_band_lo?: number | null
+          ignore_cents_band?: boolean
+          ignore_low_r2?: boolean
           last_tick_at?: string | null
           model_gate_min?: number | null
           oscillation_max?: number | null
