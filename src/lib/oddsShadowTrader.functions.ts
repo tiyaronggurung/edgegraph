@@ -311,6 +311,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
       settled: settledCount,
       earlyExits,
       rotations,
+      reentries,
       skipped: skipRows.length,
       scanned: groups.size,
     };
