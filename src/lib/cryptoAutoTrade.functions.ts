@@ -468,7 +468,7 @@ export async function runAutoTradeCore(
                 gateAction: m.gateAction,
                 momentumAlignsWithSide: m.gapAnalysis?.momentumAlignsWithSide,
                 effectiveEdgePts: m.edgePts,
-                convictionMult,
+                convictionMult: 1,
                 minSigma,
                 minEdgePts,
                 equityAdjust: equity?.btcImpact?.edgeAdjustPts ?? null,
