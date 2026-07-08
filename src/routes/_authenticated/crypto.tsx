@@ -36,6 +36,7 @@ import { useTrendlineAnalysis } from "@/hooks/useTrendlineAnalysis";
 import { useCandleMomentum } from "@/hooks/useCandleMomentum";
 import { computeKalshiSentiment } from "@/lib/kalshiSentiment";
 import { KalshiMaintenanceBanner } from "@/components/KalshiMaintenanceBanner";
+import { PolymarketChip } from "@/components/crypto/PolymarketChip";
 
 import { toast } from "sonner";
 
@@ -1464,11 +1465,12 @@ function AutoTradePanel() {
 
       <div className="px-4 py-2 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h2 className="text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <h2 className="text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2 flex-wrap">
             Live Kalshi auto-trade
             <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> AUTO
             </span>
+            <PolymarketChip />
           </h2>
           <p className="text-[11px] text-muted-foreground">
             $20×3/click · entry: EV≥3¢, edge≥5pts, σ≥1.25 · ladder: +6¢ →50%, +12¢ →100%, -15¢ →SL · fallbacks: TP+70%/SL-50%/flip/net-lock · halt 40 orders or -$80/24h
