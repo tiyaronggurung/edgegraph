@@ -10,6 +10,7 @@ import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshi
 import { getPredictionStats, getCalibrationReport, type CalibrationRow } from "@/lib/cryptoPredictions.functions";
 import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, autoExitLivePositions, settleAutoTradeSkipLog, getSkipReport, sellOddsBetOrder, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
 import { recordOddsTape } from "@/lib/oddsTape.functions";
+import { getRecentOddsFlip } from "@/lib/oddsFlipAlert.functions";
 import { diagnoseRecentMisses, studyMissesWithAI, getLatestStudy, setRecommendationFeedback, type StudyRecommendation } from "@/lib/cryptoMisses.functions";
 import { recomputeShadowSim, getShadowSimReport, type ShadowSimGateStat } from "@/lib/cryptoShadowSim.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
@@ -704,6 +705,53 @@ function ModelAccuracyPanel() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function OddsFlipAlert() {
+  const fn = useServerFn(getRecentOddsFlip);
+  const q = useQuery({
+    queryKey: ["odds-flip-alert"],
+    queryFn: () => fn(),
+    refetchInterval: 5_000,
+    staleTime: 3_000,
+  });
+  const lastToastKey = useRef<string | null>(null);
+  useEffect(() => {
+    const r = q.data;
+    if (!r || !r.ok || !r.flipped || !r.crossedAt || !r.toSide) return;
+    const key = `${r.ticker}:${r.crossedAt}`;
+    if (lastToastKey.current === key) return;
+    lastToastKey.current = key;
+    toast.warning(`Kalshi odds FLIPPED → ${r.toSide}`, {
+      description: `${r.fromSide} → ${r.toSide} · YES now ${r.latestYes}¢ / NO ${r.latestNo}¢ · ${r.ticker?.slice(-16) ?? ""}`,
+    });
+  }, [q.data]);
+
+  const r = q.data;
+  if (!r || !r.ok || r.sampled < 3) return null;
+  if (!r.flipped) {
+    return (
+      <div className="mt-1.5 rounded border border-border/50 bg-muted/10 px-2 py-1 text-[10px] font-mono text-muted-foreground flex items-center gap-2">
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+        <span>Odds tape stable · leader <span className="text-foreground">{r.latestSide}</span> · YES {r.latestYes}¢ / NO {r.latestNo}¢ · n={r.sampled}</span>
+      </div>
+    );
+  }
+  const toColor = r.toSide === "YES" ? "text-emerald-300" : "text-red-300";
+  const borderColor = r.toSide === "YES" ? "border-emerald-500/50 bg-emerald-500/10" : "border-red-500/50 bg-red-500/10";
+  return (
+    <div className={`mt-1.5 rounded border px-2 py-1.5 text-[11px] font-mono flex items-center gap-2 ${borderColor}`}>
+      <AlertTriangle className={`h-3 w-3 ${toColor}`} />
+      <span className={`font-semibold ${toColor}`}>SIDE FLIPPED</span>
+      <span className="text-muted-foreground">·</span>
+      <span>{r.fromSide} → <span className={`font-bold ${toColor}`}>{r.toSide}</span></span>
+      <span className="text-muted-foreground">·</span>
+      <span>YES {r.latestYes}¢ / NO {r.latestNo}¢</span>
+      <span className="text-muted-foreground">·</span>
+      <span className="text-muted-foreground truncate">{r.ticker?.slice(-16)}</span>
+      <span className="text-muted-foreground ml-auto">n={r.sampled}</span>
     </div>
   );
 }
@@ -1479,6 +1527,8 @@ function AutoTradePanel() {
           <p className="text-[10px] text-muted-foreground mt-0.5">
             Live 24h: {liveCount24h}/40 orders · realized <span className={liveRealized24h >= 0 ? "text-emerald-400" : "text-red-400"}>{liveRealized24h >= 0 ? "+" : ""}${liveRealized24h.toFixed(2)}</span>
           </p>
+          <OddsFlipAlert />
+
           {skipReport.data && skipReport.data.totalSettled > 0 && (
             <div className="mt-1.5 rounded border border-border/60 bg-muted/10 px-2 py-1.5 text-[10px]">
               <div className="font-mono text-muted-foreground">
