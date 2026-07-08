@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
-import { Bot } from "lucide-react";
+import { Bot, Zap, TrendingUp, TrendingDown } from "lucide-react";
 
 // SHADOW-ONLY. Runs the odds-flip trader every 5s, logs decisions, shows PnL vs actuals.
 // No real orders are placed.
