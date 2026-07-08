@@ -17,16 +17,16 @@ export function OddsShadowTraderPanel() {
   const { data } = useQuery({
     queryKey: ["oddsShadowReport"],
     queryFn: () => report(),
-    refetchInterval: 5_000,
+    refetchInterval: 2_000,
   });
 
   const tickRef = useRef(runTick);
   tickRef.current = runTick;
   useEffect(() => {
-    // Fire every 5s while panel is mounted.
+    // Fire every 2s while panel is mounted (realtime shadow pass).
     const id = setInterval(() => {
       tickRef.current.mutate();
-    }, 5_000);
+    }, 2_000);
     // Kick off immediately.
     tickRef.current.mutate();
     return () => clearInterval(id);
@@ -40,7 +40,7 @@ export function OddsShadowTraderPanel() {
         <div>
           <div className="flex items-center gap-2">
             <Bot className="h-4 w-4" />
-            <h3 className="font-semibold text-sm">Odds-Flip Shadow Trader <span className="text-muted-foreground font-normal">· 5s tick</span></h3>
+            <h3 className="font-semibold text-sm">Odds-Flip Shadow Trader <span className="text-muted-foreground font-normal">· 2s tick</span></h3>
           </div>
           <p className="text-[11px] text-muted-foreground mt-0.5">
             Pure-Kalshi-odds logic. leader_chase (T-4m, stable, 60-90¢) + flip_fade (post-T-10m flip, ≥55¢). Paper only.
