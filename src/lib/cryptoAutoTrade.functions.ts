@@ -653,7 +653,7 @@ export async function runAutoTradeCore(
           partial_pnl_usd: 0,
           exit_ladder: DEFAULT_EXIT_LADDER as any,
           is_martingale: false,
-          inputs_snapshot: { iocLadder: ladderTelemetry } as any,
+          inputs_snapshot: { iocLadder: ladderTelemetry, polymarket: polymarketSnap } as any,
 
         })
         .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
