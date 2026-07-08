@@ -1015,7 +1015,7 @@ export async function autoExitForUser(
     const adverseCents = entry - markCents;
     const sideProbNow = currentModelProbBySide.get(r.ticker);
 
-    let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | "mart_hopeless" | "mart_hardcap" | "odds_flip" | "deep_combo" | null = null;
+    let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | "mart_hopeless" | "mart_hardcap" | "odds_flip" | "deep_combo" | "poly_flip" | null = null;
     // Martingale-specific rules (only apply to martingale-tagged orders).
     if (r.is_martingale === true) {
       const stake = Number(r.stake_usd);
