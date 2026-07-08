@@ -140,9 +140,27 @@ export async function runAutoTradeCore(
         throw new Error(`Kalshi key precheck failed: ${e?.message ?? String(e)}`);
       }
 
+      // ── Profit-Bank Ladder stake (live only) ──
+      // Overrides the caller's stakeUsd with: 25% baseStake + 25% profitBank,
+      // capped by cfg.maxStake and bank×maxProfitExposurePct. This is the
+      // one place where the live trader's bet size is decided; both the
+      // cron path and the manual button flow through here.
+      try {
+        const { computeLiveLadderStake } = await import("./stakingConfig.functions");
+        const ladder = await computeLiveLadderStake(supabase, userId);
+        (data as { stakeUsd: number }).stakeUsd = ladder.stake;
+      } catch (e: any) {
+        // If the ladder read fails, fall through to whatever the caller passed
+        // (already clamped by the input validator's stakeCap = $100 live).
+        // Do NOT block the trade — the outer LIVE_MAX_STAKE_USD_PER_ORDER
+        // cap still applies.
+        // eslint-disable-next-line no-console
+        console.warn("[live-stake] ladder read failed:", e?.message ?? e);
+      }
+
       // ── Balance-aware stake sizing (live only) ──
-      // If Kalshi cash balance < requested stake ($100 default), shrink stake
-      // to the whole remaining balance (rounded down to $1). Skip if balance < $1.
+      // If Kalshi cash balance < requested stake, shrink stake to whole
+      // remaining balance (rounded down to $1). Skip if balance < $1.
       try {
         const { signKalshi: _sign } = await import("./cryptoTrades.functions");
         const path = "/portfolio/balance";
