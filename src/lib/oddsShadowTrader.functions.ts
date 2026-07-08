@@ -91,7 +91,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
 
     for (const [tk, atm] of groups) {
       if (firedSet.has(tk)) continue;
-      const res = evaluateAtm(atm, cal);
+      const res = evaluateAtm(atm, cal, latestTapeAt);
       if (res.decision) {
         const d = res.decision;
         const limitCents = d.side === "YES" ? d.yes_cents : d.no_cents;
