@@ -364,6 +364,51 @@ export type Database = {
           },
         ]
       }
+      auto_odds_staking_config: {
+        Row: {
+          base_stake: number
+          created_at: string
+          loss_reduction_1_pct: number
+          loss_reduction_2_pct: number
+          max_consecutive_losses: number
+          max_profit_exposure_pct: number
+          max_stake: number
+          profit_bank_start_pct: number
+          unlock_wins: number
+          updated_at: string
+          user_id: string
+          win_growth_pct: number
+        }
+        Insert: {
+          base_stake?: number
+          created_at?: string
+          loss_reduction_1_pct?: number
+          loss_reduction_2_pct?: number
+          max_consecutive_losses?: number
+          max_profit_exposure_pct?: number
+          max_stake?: number
+          profit_bank_start_pct?: number
+          unlock_wins?: number
+          updated_at?: string
+          user_id: string
+          win_growth_pct?: number
+        }
+        Update: {
+          base_stake?: number
+          created_at?: string
+          loss_reduction_1_pct?: number
+          loss_reduction_2_pct?: number
+          max_consecutive_losses?: number
+          max_profit_exposure_pct?: number
+          max_stake?: number
+          profit_bank_start_pct?: number
+          unlock_wins?: number
+          updated_at?: string
+          user_id?: string
+          win_growth_pct?: number
+        }
+        Relationships: []
+      }
       auto_odds_studies: {
         Row: {
           applied_tunings: Json
