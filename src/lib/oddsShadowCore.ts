@@ -257,13 +257,13 @@ export function evaluateAtm(
 // Re-entry (pullback) detector — for tickers where price ran hot (≥78¢)
 // and then pulled back into 55–70¢ band with time still on the clock.
 // Returns a Decision that callers should half-stake and tag rotation_index=2.
-export function evaluateReentry(atm: Row[]): Decision | null {
+export function evaluateReentry(atm: Row[], opts: GateOpts = {}): Decision | null {
   if (atm.length < STABILITY_TICKS + 3) return null;
   const last = atm[atm.length - 1];
   const ageMs = Date.now() - new Date(last.snapped_at).getTime();
   if (ageMs > STALE_SECONDS * 1000) return null;
   if (last.seconds_to_close < REENTRY_MIN_TIME) return null;
-  if (regressionChopSkip(atm)) return null;
+  if (regressionChopSkip(atm, opts)) return null;
 
   const curL = leaderOf(last.yes_cents);
   if (curL === "TIE") return null;
@@ -275,7 +275,8 @@ export function evaluateReentry(atm: Row[]): Decision | null {
   }
 
   const nowCents = leaderCents(last);
-  if (nowCents < REENTRY_MIN_BAND || nowCents > REENTRY_MAX_BAND) return null;
+  if (!opts.ignoreCentsBand && (nowCents < REENTRY_MIN_BAND || nowCents > REENTRY_MAX_BAND)) return null;
+
 
   // Max leader-side cents seen at ANY earlier snap (proves the run happened).
   let maxSeen = 0;
