@@ -426,6 +426,73 @@ export async function runAutoTradeCore(
         skipReasons.push(`${m.ticker}: ${m.side} ${limitCents}¢ > 78¢ ceiling — skipped`);
         continue;
       }
+
+      // ── Polymarket assist gate (live only, fail-open) ──
+      // Additional signal: require Polymarket's 5-min BTC Up/Down market to
+      // agree with our Kalshi side (our-side prob ≥ 50%). Fail-open — if
+      // Polymarket is unavailable or the window doesn't overlap, we still
+      // trade. Every check is logged to polymarket_btc_tape for study, and
+      // the snapshot is stored on the order's inputs_snapshot.
+      let polymarketSnap: {
+        upProb: number;
+        downProb: number;
+        ourSideProb: number;
+        agrees: boolean;
+        slug: string;
+        windowStartMs: number;
+        windowEndMs: number;
+      } | null = null;
+      if (isLive) {
+        try {
+          const { getPolymarketBtcUpDown } = await import("./polymarketOdds");
+          const poly = await getPolymarketBtcUpDown();
+          if (poly) {
+            const ourSideProb = m.side === "YES" ? poly.upProb : poly.downProb;
+            const agrees = ourSideProb >= 0.5;
+            polymarketSnap = {
+              upProb: poly.upProb,
+              downProb: poly.downProb,
+              ourSideProb,
+              agrees,
+              slug: poly.slug,
+              windowStartMs: poly.windowStartMs,
+              windowEndMs: poly.windowEndMs,
+            };
+            // Fire-and-forget tape log — never blocks the trade.
+            void (async () => {
+              try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await (supabase as any).from("polymarket_btc_tape").insert({
+                  user_id: userId,
+                  window_start: new Date(poly.windowStartMs).toISOString(),
+                  up_prob: poly.upProb,
+                  down_prob: poly.downProb,
+                  slug: poly.slug,
+                  kalshi_ticker: m.ticker,
+                  kalshi_side: m.side,
+                  kalshi_our_side_cents: limitCents,
+                  agrees,
+                });
+              } catch { /* noop */ }
+            })();
+            if (!agrees) {
+              skipReasons.push(
+                `${m.ticker}: polymarket disagrees — ${m.side === "YES" ? "Up" : "Down"} ${(ourSideProb * 100).toFixed(0)}% < 50%`,
+              );
+              continue;
+            }
+            skipReasons.push(
+              `${m.ticker}: polymarket ${m.side === "YES" ? "Up" : "Down"} ${(ourSideProb * 100).toFixed(0)}% — agrees`,
+            );
+          } else {
+            skipReasons.push(`${m.ticker}: polymarket unavailable — fail-open, trading anyway`);
+          }
+        } catch (e: any) {
+          skipReasons.push(`${m.ticker}: polymarket error (${e?.message?.slice(0, 60) ?? "err"}) — fail-open`);
+        }
+      }
+
+
       // Ladder-sized stake (live) or flat stake (paper). No martingale.
       const sizedStake = data.stakeUsd;
       const contracts = Math.max(1, Math.floor((sizedStake * 100) / limitCents));
@@ -586,7 +653,7 @@ export async function runAutoTradeCore(
           partial_pnl_usd: 0,
           exit_ladder: DEFAULT_EXIT_LADDER as any,
           is_martingale: false,
-          inputs_snapshot: { iocLadder: ladderTelemetry } as any,
+          inputs_snapshot: { iocLadder: ladderTelemetry, polymarket: polymarketSnap } as any,
 
         })
         .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
