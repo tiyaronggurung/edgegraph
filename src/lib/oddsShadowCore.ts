@@ -244,6 +244,7 @@ export function evaluateReentry(atm: Row[]): Decision | null {
   const ageMs = Date.now() - new Date(last.snapped_at).getTime();
   if (ageMs > STALE_SECONDS * 1000) return null;
   if (last.seconds_to_close < REENTRY_MIN_TIME) return null;
+  if (regressionChopSkip(atm)) return null;
 
   const curL = leaderOf(last.yes_cents);
   if (curL === "TIE") return null;
