@@ -37,6 +37,7 @@ import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lova
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
+import { Route as ApiPublicHooksOddsShadowTickRouteImport } from './routes/api/public/hooks/odds-shadow-tick'
 import { Route as ApiPublicHooksCryptoStudyRouteImport } from './routes/api/public/hooks/crypto-study'
 import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
 import { Route as ApiPublicHooksBtcCalibrateRouteImport } from './routes/api/public/hooks/btc-calibrate'
@@ -190,6 +191,12 @@ const ApiPublicHooksRecomputePredictionsRoute =
     path: '/api/public/hooks/recompute-predictions',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksOddsShadowTickRoute =
+  ApiPublicHooksOddsShadowTickRouteImport.update({
+    id: '/api/public/hooks/odds-shadow-tick',
+    path: '/api/public/hooks/odds-shadow-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksCryptoStudyRoute =
   ApiPublicHooksCryptoStudyRouteImport.update({
     id: '/api/public/hooks/crypto-study',
@@ -256,6 +263,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
+  '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -291,6 +299,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
+  '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -328,6 +337,7 @@ export interface FileRoutesById {
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
+  '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -365,6 +375,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/btc-calibrate'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
+    | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
@@ -400,6 +411,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/btc-calibrate'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
+    | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
@@ -436,6 +448,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/btc-calibrate'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
+    | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
@@ -459,6 +472,7 @@ export interface RootRouteChildren {
   ApiPublicHooksBtcCalibrateRoute: typeof ApiPublicHooksBtcCalibrateRoute
   ApiPublicHooksCaptureClosingOddsRoute: typeof ApiPublicHooksCaptureClosingOddsRoute
   ApiPublicHooksCryptoStudyRoute: typeof ApiPublicHooksCryptoStudyRoute
+  ApiPublicHooksOddsShadowTickRoute: typeof ApiPublicHooksOddsShadowTickRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
@@ -663,6 +677,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksRecomputePredictionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/odds-shadow-tick': {
+      id: '/api/public/hooks/odds-shadow-tick'
+      path: '/api/public/hooks/odds-shadow-tick'
+      fullPath: '/api/public/hooks/odds-shadow-tick'
+      preLoaderRoute: typeof ApiPublicHooksOddsShadowTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/crypto-study': {
       id: '/api/public/hooks/crypto-study'
       path: '/api/public/hooks/crypto-study'
@@ -763,6 +784,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksBtcCalibrateRoute: ApiPublicHooksBtcCalibrateRoute,
   ApiPublicHooksCaptureClosingOddsRoute: ApiPublicHooksCaptureClosingOddsRoute,
   ApiPublicHooksCryptoStudyRoute: ApiPublicHooksCryptoStudyRoute,
+  ApiPublicHooksOddsShadowTickRoute: ApiPublicHooksOddsShadowTickRoute,
   ApiPublicHooksRecomputePredictionsRoute:
     ApiPublicHooksRecomputePredictionsRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
