@@ -22,7 +22,7 @@ const MIN_SIGMA_DISTANCE_PAPER = 1.0;
 
 // ── Live rails (stricter — real money) ──
 const LIVE_MAX_ORDERS_PER_SESSION = 3;
-const LIVE_MAX_STAKE_USD_PER_ORDER = 100;
+const LIVE_MAX_STAKE_USD_PER_ORDER = 150; // matches DEFAULT_LADDER_CONFIG.maxStake
 const LIVE_MIN_SIGMA_DISTANCE = 1.25;
 const LIVE_MIN_EDGE_PTS = 5;
 const LIVE_MIN_SECONDS_TO_CLOSE = 120;
