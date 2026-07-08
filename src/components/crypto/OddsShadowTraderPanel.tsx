@@ -40,7 +40,7 @@ export function OddsShadowTraderPanel() {
         <div>
           <div className="flex items-center gap-2">
             <Bot className="h-4 w-4" />
-            <h3 className="font-semibold text-sm">Odds-Flip Shadow Trader <span className="text-muted-foreground font-normal">· 5s tick</span></h3>
+            <h3 className="font-semibold text-sm">Odds-Flip Shadow Trader <span className="text-muted-foreground font-normal">· 2s tick</span></h3>
           </div>
           <p className="text-[11px] text-muted-foreground mt-0.5">
             Pure-Kalshi-odds logic. leader_chase (T-4m, stable, 60-90¢) + flip_fade (post-T-10m flip, ≥55¢). Paper only.
