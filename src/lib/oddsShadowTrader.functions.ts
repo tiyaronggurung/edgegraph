@@ -93,7 +93,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
         const d = res.decision;
         const limitCents = d.side === "YES" ? d.yes_cents : d.no_cents;
         if (limitCents < 1 || limitCents > 99) continue;
-        const contracts = Math.floor((stakeInfo.stake * 100) / limitCents);
+        const contracts = Math.floor((ladder.nextStake * 100) / limitCents);
         if (contracts < 1) continue;
         const stake = (contracts * limitCents) / 100;
         const { error } = await supabase.from("auto_trade_odds_shadow").insert({
@@ -126,7 +126,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
         const rd = evaluateReentry(atm);
         if (rd) {
           const limitCents = rd.side === "YES" ? rd.yes_cents : rd.no_cents;
-          const halfStake = stakeInfo.mode === "profit" ? stakeInfo.stake * 0.5 : 50;
+          const halfStake = ladder.profitBankMode ? ladder.nextStake * 0.5 : 50;
           const contracts = Math.floor((halfStake * 100) / limitCents);
           if (contracts >= 1) {
             const stake = (contracts * limitCents) / 100;
@@ -249,7 +249,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
             const newSide: "YES" | "NO" = row.side === "YES" ? "NO" : "YES";
             const newCents = newSide === "YES" ? last.yes_cents : last.no_cents;
             if (newCents >= 30 && newCents <= 90) {
-              const rotContracts = Math.floor((stakeInfo.stake * 100) / newCents);
+              const rotContracts = Math.floor((ladder.nextStake * 100) / newCents);
               if (rotContracts >= 1) {
                 const rotStake = (rotContracts * newCents) / 100;
                 const { error: insErr } = await supabase.from("auto_trade_odds_shadow").insert({
@@ -427,7 +427,7 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
       bankroll: {
         bank: Math.round(stakeInfo.bank * 100) / 100,
         mode: stakeInfo.mode,
-        nextStake: Math.round(stakeInfo.stake * 100) / 100,
+        nextStake: Math.round(ladder.nextStake * 100) / 100,
         unlockThreshold: 50,
         stakePct: 50,
         winStreak,
