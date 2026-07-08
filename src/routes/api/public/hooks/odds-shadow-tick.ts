@@ -69,10 +69,11 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
           const BANK_SEED_USD = 71;
           const BANK_CUTOFF_ISO = "2026-07-08T04:47:00Z";
           const { data: allSettled } = await supabaseAdmin
-            .from("auto_trade_odds_shadow")
+            .from("auto_trade_orders")
             .select("pnl_usd")
             .eq("user_id", userId)
-            .eq("settled", true)
+            .eq("mode", "live")
+            .in("status", ["settled_win", "settled_loss"])
             .gte("settled_at", BANK_CUTOFF_ISO)
             .order("settled_at", { ascending: false })
             .limit(1000);
@@ -81,16 +82,17 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
             BANK_SEED_USD + (allSettled ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0),
           );
           const { data: recent } = await supabaseAdmin
-            .from("auto_trade_odds_shadow")
-            .select("pnl_usd, stake_usd")
+            .from("auto_trade_orders")
+            .select("pnl_usd, stake_usd, status")
             .eq("user_id", userId)
-            .eq("settled", true)
+            .eq("mode", "live")
+            .in("status", ["settled_win", "settled_loss"])
             .gte("settled_at", BANK_CUTOFF_ISO)
             .order("settled_at", { ascending: false })
             .limit(UNLOCK_WINDOW);
-          const recentArr = (recent ?? []) as Array<{ pnl_usd: number | string | null; stake_usd: number | string | null }>;
+          const recentArr = (recent ?? []) as Array<{ pnl_usd: number | string | null; stake_usd: number | string | null; status: string }>;
           const unlocked = recentArr.length >= UNLOCK_WINDOW
-            && recentArr.every((r) => Number(r.pnl_usd ?? 0) > 0)
+            && recentArr.every((r) => r.status === "settled_win")
             && bank > 0;
           let dynStake = BASE_STAKE_USD;
           if (unlocked) {

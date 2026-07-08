@@ -20,12 +20,13 @@ async function computeStake(
   supabase: any,
   userId: string,
 ): Promise<{ stake: number; mode: "base" | "profit"; bank: number }> {
-  // Cumulative PnL since cutoff, plus seed.
+  // Cumulative PnL since cutoff, plus seed — sourced from LIVE Kalshi orders.
   const { data: allSettled } = await supabase
-    .from("auto_trade_odds_shadow")
+    .from("auto_trade_orders")
     .select("pnl_usd")
     .eq("user_id", userId)
-    .eq("settled", true)
+    .eq("mode", "live")
+    .in("status", ["settled_win", "settled_loss"])
     .gte("settled_at", BANK_CUTOFF_ISO)
     .order("settled_at", { ascending: false })
     .limit(1000);
@@ -34,18 +35,19 @@ async function computeStake(
     BANK_SEED_USD + (allSettled ?? []).reduce((s: number, r: any) => s + Number(r.pnl_usd ?? 0), 0),
   );
 
-  // Unlock check: last N settled trades (since cutoff) are all wins.
+  // Unlock check: last N settled LIVE trades (since cutoff) are all wins.
   const { data: recent } = await supabase
-    .from("auto_trade_odds_shadow")
-    .select("pnl_usd, stake_usd, settled_at")
+    .from("auto_trade_orders")
+    .select("pnl_usd, stake_usd, settled_at, status")
     .eq("user_id", userId)
-    .eq("settled", true)
+    .eq("mode", "live")
+    .in("status", ["settled_win", "settled_loss"])
     .gte("settled_at", BANK_CUTOFF_ISO)
     .order("settled_at", { ascending: false })
     .limit(UNLOCK_WINDOW);
-  const recentArr = (recent ?? []) as Array<{ pnl_usd: number | string | null; stake_usd: number | string | null }>;
+  const recentArr = (recent ?? []) as Array<{ pnl_usd: number | string | null; stake_usd: number | string | null; status: string }>;
   const winStreakUnlocked = recentArr.length >= UNLOCK_WINDOW
-    && recentArr.every((r) => Number(r.pnl_usd ?? 0) > 0);
+    && recentArr.every((r) => r.status === "settled_win");
 
   if (winStreakUnlocked && bank > 0) {
     const baseStake = Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD);
@@ -418,19 +420,20 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const stakeInfo = await computeStake(supabase as any, userId);
 
-    // Win-streak progress (last up-to-3 settled trades post-cutoff).
+    // Win-streak progress from LIVE Kalshi orders post-cutoff.
     const BANK_CUTOFF_ISO_UI = "2026-07-08T04:47:00Z";
     const { data: streakRows } = await supabase
-      .from("auto_trade_odds_shadow")
-      .select("pnl_usd")
+      .from("auto_trade_orders")
+      .select("status, settled_at")
       .eq("user_id", userId)
-      .eq("settled", true)
+      .eq("mode", "live")
+      .in("status", ["settled_win", "settled_loss"])
       .gte("settled_at", BANK_CUTOFF_ISO_UI)
       .order("settled_at", { ascending: false })
       .limit(3);
     let winStreak = 0;
-    for (const r of (streakRows ?? []) as Array<{ pnl_usd: number | string | null }>) {
-      if (Number(r.pnl_usd ?? 0) > 0) winStreak++;
+    for (const r of (streakRows ?? []) as Array<{ status: string }>) {
+      if (r.status === "settled_win") winStreak++;
       else break;
     }
 
