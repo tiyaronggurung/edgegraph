@@ -845,7 +845,7 @@ function AutoTradePanel() {
       "  • edge ≥ 5pts, sigma ≥ 1.25σ, ≥120s to close\n" +
       "  • momentum aligned, equity overlay not blocking\n" +
       "  • not already traded this ticker in 24h\n\n" +
-      "SIZE: $20/order · up to 3 orders this click · $60 max exposure\n" +
+      "SIZE: $100/order · up to 3 orders this click · $300 max exposure\n" +
       "DAILY: halt after 10 orders or realized ≤ -$60 in 24h\n\n" +
       "EXIT (auto, checked every 60s):\n" +
       "  • Take-profit: mark PnL ≥ +70% of stake\n" +
@@ -857,7 +857,7 @@ function AutoTradePanel() {
     if (!ok) return;
     setLiveBusy(true);
     try {
-      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 150, maxOrders: 3 } });
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 100, maxOrders: 3 } });
       if (res.placed > 0) {
         toast.success(`Placed ${res.placed} live order${res.placed === 1 ? "" : "s"} on Kalshi.`);
       } else {
@@ -878,7 +878,7 @@ function AutoTradePanel() {
       const ok = window.confirm(
         "FORCE LIVE orders on Kalshi at current price?\n\n" +
         "Picks the model's top |edge| markets (UP or DOWN) and places\n" +
-        "up to 2 × $20 orders at current Kalshi quotes.\n\n" +
+        "up to 2 × $100 orders at current Kalshi quotes.\n\n" +
         "BYPASSED: edge/σ/momentum/equity/24h-dedupe/loss-cap gates.\n" +
         "ENFORCED: kill switch, key health, 40 orders in 24h,\n" +
         "auto-exit (TP +70% / SL -50% / edge-decay 2¢).\n\n" +
@@ -888,7 +888,7 @@ function AutoTradePanel() {
     }
     setForceBusy(true);
     try {
-      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 150, maxOrders: 2, force: true } });
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 100, maxOrders: 2, force: true } });
       if (res.placed > 0) {
         toast.success(`Forced ${res.placed} order${res.placed === 1 ? "" : "s"}: ${res.orders.map(o => `${o.side === "YES" ? "UP" : "DOWN"} ${o.ticker} @ ${o.limit_cents}¢`).join(", ")}`);
       } else if (!silent) {

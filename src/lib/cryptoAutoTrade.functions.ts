@@ -560,7 +560,7 @@ export async function runAutoTradeCore(
           contracts_remaining: filledContracts,
           partial_pnl_usd: 0,
           exit_ladder: DEFAULT_EXIT_LADDER as any,
-          is_martingale: data.isMartingale,
+          is_martingale: false,
           inputs_snapshot: { iocLadder: ladderTelemetry } as any,
 
         })
