@@ -870,7 +870,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 });
               note = `entered ${placed.ticker} ${placed.side} @ ${entryCents}¢ (${pick.reason})`;
 
-              await logStudy({ entered: true, hedge_fired: hedgeFired, note });
+              await logStudy({ entered: true, hedge_fired: false, note });
             } else {
               // Filter out informational log lines (equity/odds-bet/force headers) so
               // the real failure reason (IOC 0-fill, kalshi order failed, insert
