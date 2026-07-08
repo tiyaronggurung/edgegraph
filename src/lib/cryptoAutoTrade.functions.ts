@@ -419,7 +419,14 @@ export async function runAutoTradeCore(
       const limitCents = Math.max(1, Math.min(99, Math.round(
         (m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
       )));
-      // Flat requested stake only — no martingale, compounding, or conviction upsize.
+      // ── 78¢ ceiling (live only) ──
+      // Above this, one loss costs 5+ wins to claw back. Symmetric with the
+      // shadow trader's guard.
+      if (isLive && limitCents > 78) {
+        skipReasons.push(`${m.ticker}: ${m.side} ${limitCents}¢ > 78¢ ceiling — skipped`);
+        continue;
+      }
+      // Ladder-sized stake (live) or flat stake (paper). No martingale.
       const sizedStake = data.stakeUsd;
       const contracts = Math.max(1, Math.floor((sizedStake * 100) / limitCents));
       const stakeActual = (contracts * limitCents) / 100;
