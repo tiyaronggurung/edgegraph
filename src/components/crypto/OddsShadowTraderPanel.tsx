@@ -17,16 +17,16 @@ export function OddsShadowTraderPanel() {
   const { data } = useQuery({
     queryKey: ["oddsShadowReport"],
     queryFn: () => report(),
-    refetchInterval: 5_000,
+    refetchInterval: 2_000,
   });
 
   const tickRef = useRef(runTick);
   tickRef.current = runTick;
   useEffect(() => {
-    // Fire every 5s while panel is mounted.
+    // Fire every 2s while panel is mounted (realtime shadow pass).
     const id = setInterval(() => {
       tickRef.current.mutate();
-    }, 5_000);
+    }, 2_000);
     // Kick off immediately.
     tickRef.current.mutate();
     return () => clearInterval(id);
