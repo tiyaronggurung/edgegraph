@@ -52,6 +52,9 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
     if (tapeErr) return { ok: false as const, error: tapeErr.message };
 
     const groups = atmByTicker((tape as Row[] | null) ?? []);
+    const latestTapeAt = (tape && tape.length > 0)
+      ? (tape as Row[])[tape.length - 1].snapped_at
+      : undefined;
 
     // 2. Calibration.
     const { data: calRows } = await supabase
