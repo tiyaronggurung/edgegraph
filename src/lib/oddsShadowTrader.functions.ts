@@ -1,58 +1,39 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { evaluateAtm, evaluateReentry, atmByTicker, type Row } from "./oddsShadowCore";
+import { replayLadder, type LadderState, type LadderConfig } from "./profitBankLadder";
+import { loadLadderConfig } from "./stakingConfig.functions";
 
-// Odds-Flip Shadow Trader v2 — SHADOW-ONLY.
-// Adds: velocity, spread proxy, multi-tick stability, flip cooldown,
-// early-exit on adverse flip, live calibration, skip-reason log,
-// profit-bankroll staking (play with profit, not principal).
+// Odds-Flip Shadow Trader v2 — staking now driven by Profit Bank Ladder.
+// Base bankroll and profit bank are strictly separated: only realized profit
+// funds Profit Mode. See src/lib/profitBankLadder.ts for the pure engine.
 
-const BASE_STAKE_USD = 100;
-const PROFIT_STAKE_PCT = 0.50; // after 3 wins, stake 50% of profit bank only
-const MAX_STAKE_USD = 500;     // safety cap
-const UNLOCK_WINDOW = 3;       // rolling window size
 // Profit bank seeded at $71 starting 2026-07-08 04:47 UTC. Trades settled
-// before this cutoff are ignored for bank + 3-win unlock streak.
+// before this cutoff are ignored for bank + ladder replay.
 const BANK_SEED_USD = 71;
 const BANK_CUTOFF_ISO = "2026-07-08T04:47:00Z";
 
-async function computeStake(
+async function computeLadder(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   userId: string,
-): Promise<{ stake: number; mode: "base" | "profit"; bank: number }> {
-  // Cumulative PnL since cutoff, plus seed — sourced from LIVE Kalshi orders.
-  const { data: allSettled } = await supabase
+): Promise<{ state: LadderState; config: LadderConfig }> {
+  const config = await loadLadderConfig(supabase, userId);
+  const { data: settled } = await supabase
     .from("auto_trade_orders")
-    .select("pnl_usd")
+    .select("pnl_usd, status, settled_at")
     .eq("user_id", userId)
     .eq("mode", "live")
     .in("status", ["settled_win", "settled_loss"])
     .gte("settled_at", BANK_CUTOFF_ISO)
-    .order("settled_at", { ascending: false })
-    .limit(1000);
-  const bank = Math.max(
-    0,
-    BANK_SEED_USD + (allSettled ?? []).reduce((s: number, r: any) => s + Number(r.pnl_usd ?? 0), 0),
-  );
-
-  // Unlock check: last N settled LIVE trades (since cutoff) are all wins.
-  const { data: recent } = await supabase
-    .from("auto_trade_orders")
-    .select("settled_at, status")
-    .eq("user_id", userId)
-    .eq("mode", "live")
-    .in("status", ["settled_win", "settled_loss"])
-    .gte("settled_at", BANK_CUTOFF_ISO)
-    .order("settled_at", { ascending: false })
-    .limit(UNLOCK_WINDOW);
-  const recentArr = (recent ?? []) as Array<{ status: string }>;
-  const winStreakUnlocked = recentArr.length >= UNLOCK_WINDOW
-    && recentArr.every((r) => r.status === "settled_win");
-
-  if (winStreakUnlocked && bank > 0) {
-    return { stake: Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD), mode: "profit", bank };
-  }
-  return { stake: BASE_STAKE_USD, mode: "base", bank };
+    .order("settled_at", { ascending: true })
+    .limit(2000);
+  const orders = ((settled ?? []) as Array<{ status: string; pnl_usd: number | string }>).map(r => ({
+    won: r.status === "settled_win",
+    pnl_usd: Number(r.pnl_usd) || 0,
+  }));
+  const state = replayLadder(orders, config, BANK_SEED_USD);
+  return { state, config };
 }
 
 
@@ -101,9 +82,9 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
     let reentries = 0;
     const skipRows: Array<Record<string, unknown>> = [];
 
-    // Compute dynamic stake once per tick — same bankroll basis for every fire this cycle.
+    // Compute ladder state once per tick — same stake basis for every fire this cycle.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const stakeInfo = await computeStake(supabase as any, userId);
+    const { state: ladder, config: ladderCfg } = await computeLadder(supabase as any, userId);
 
     for (const [tk, atm] of groups) {
       if (firedSet.has(tk)) continue;
@@ -112,7 +93,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
         const d = res.decision;
         const limitCents = d.side === "YES" ? d.yes_cents : d.no_cents;
         if (limitCents < 1 || limitCents > 99) continue;
-        const contracts = Math.floor((stakeInfo.stake * 100) / limitCents);
+        const contracts = Math.floor((ladder.nextStake * 100) / limitCents);
         if (contracts < 1) continue;
         const stake = (contracts * limitCents) / 100;
         const { error } = await supabase.from("auto_trade_odds_shadow").insert({
@@ -145,7 +126,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
         const rd = evaluateReentry(atm);
         if (rd) {
           const limitCents = rd.side === "YES" ? rd.yes_cents : rd.no_cents;
-          const halfStake = stakeInfo.mode === "profit" ? stakeInfo.stake * 0.5 : 50;
+          const halfStake = ladder.profitBankMode ? ladder.nextStake * 0.5 : 50;
           const contracts = Math.floor((halfStake * 100) / limitCents);
           if (contracts >= 1) {
             const stake = (contracts * limitCents) / 100;
@@ -268,7 +249,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
             const newSide: "YES" | "NO" = row.side === "YES" ? "NO" : "YES";
             const newCents = newSide === "YES" ? last.yes_cents : last.no_cents;
             if (newCents >= 30 && newCents <= 90) {
-              const rotContracts = Math.floor((stakeInfo.stake * 100) / newCents);
+              const rotContracts = Math.floor((ladder.nextStake * 100) / newCents);
               if (rotContracts >= 1) {
                 const rotStake = (rotContracts * newCents) / 100;
                 const { error: insErr } = await supabase.from("auto_trade_odds_shadow").insert({
@@ -409,11 +390,11 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
       .select("*")
       .eq("user_id", userId);
 
-    // Bankroll / staking info for UI.
+    // Bankroll / staking info for UI — Profit Bank Ladder state.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const stakeInfo = await computeStake(supabase as any, userId);
+    const { state: ladder, config: ladderCfg } = await computeLadder(supabase as any, userId);
 
-    // Win-streak progress from LIVE Kalshi orders post-cutoff.
+    // Win-streak progress from LIVE Kalshi orders post-cutoff (trailing).
     const BANK_CUTOFF_ISO_UI = "2026-07-08T04:47:00Z";
     const { data: streakRows } = await supabase
       .from("auto_trade_orders")
@@ -423,7 +404,7 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
       .in("status", ["settled_win", "settled_loss"])
       .gte("settled_at", BANK_CUTOFF_ISO_UI)
       .order("settled_at", { ascending: false })
-      .limit(3);
+      .limit(ladderCfg.unlockWins);
     let winStreak = 0;
     for (const r of (streakRows ?? []) as Array<{ status: string }>) {
       if (r.status === "settled_win") winStreak++;
@@ -444,13 +425,19 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
         reentries: rows.filter(r => Number(r.rotation_index) === 2).length,
       },
       bankroll: {
-        bank: Math.round(stakeInfo.bank * 100) / 100,
-        mode: stakeInfo.mode,
-        nextStake: Math.round(stakeInfo.stake * 100) / 100,
-        unlockThreshold: 50,
-        stakePct: 50,
+        bank: ladder.profitBank,
+        mode: ladder.profitBankMode ? ("profit" as const) : ("base" as const),
+        nextStake: ladder.nextStake,
+        unlockThreshold: 0,
+        stakePct: Math.round(ladderCfg.profitBankStartPct * 100),
         winStreak,
-        unlockNeeded: 3,
+        unlockNeeded: ladderCfg.unlockWins,
+        consecutiveWins: ladder.consecutiveWins,
+        consecutiveLosses: ladder.consecutiveLosses,
+        highestProfitBank: ladder.highestProfitBank,
+        currentLadderLevel: ladder.currentLadderLevel,
+        maxStake: ladderCfg.maxStake,
+        maxProfitExposurePct: ladderCfg.maxProfitExposurePct,
       },
       byTrigger,
       skipTop,

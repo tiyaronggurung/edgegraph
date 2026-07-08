@@ -6,6 +6,7 @@ import { Shield } from "lucide-react";
 import { adminSetTier } from "@/lib/usage.functions";
 import { usePlan } from "@/hooks/usePlan";
 import { PLANS, type PlanTier } from "@/lib/plans/config";
+import { StakingConfigPanel } from "@/components/crypto/StakingConfigPanel";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -85,6 +86,8 @@ function AdminPanel() {
           ))}
         </div>
       </div>
+
+      <StakingConfigPanel />
     </div>
   );
 }
