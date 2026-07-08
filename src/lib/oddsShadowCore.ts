@@ -45,10 +45,17 @@ function leaderOf(yes: number): "YES" | "NO" | "TIE" {
   return "TIE";
 }
 
+// Toggle bag for bypassing the two most-triggered safety filters.
+// Both default to false — same behavior as before.
+export interface GateOpts {
+  ignoreLowR2?: boolean;
+  ignoreCentsBand?: boolean;
+}
+
 // Strict regression-based chop detector on the 15-min tape.
 // Fits linear regression of yes_cents and no_cents vs time (minutes).
 // Skip if: <8 points, R² of YES < 0.5, YES/NO slopes share sign, or |YES slope| < 0.3¢/min.
-export function regressionChopSkip(atm: Row[]): Skip | null {
+export function regressionChopSkip(atm: Row[], opts: GateOpts = {}): Skip | null {
   if (atm.length < 8) {
     return { reason: "regression_insufficient_points", detail: { points: atm.length } };
   }
@@ -74,7 +81,7 @@ export function regressionChopSkip(atm: Row[]): Skip | null {
   const y = fit(xs, ys);
   const n = fit(xs, ns);
 
-  if (y.r2 < 0.5) {
+  if (y.r2 < 0.5 && !opts.ignoreLowR2) {
     return { reason: "regression_low_r2", detail: { r2_yes: y.r2, slope_yes: y.slope } };
   }
   if (Math.sign(y.slope) === Math.sign(n.slope) && y.slope !== 0 && n.slope !== 0) {
@@ -85,6 +92,7 @@ export function regressionChopSkip(atm: Row[]): Skip | null {
   }
   return null;
 }
+
 
 
 export function atmByTicker(rows: Row[]): Map<string, Row[]> {
@@ -108,6 +116,7 @@ export function evaluateAtm(
   atm: Row[],
   cal: CalMap,
   latestTapeAt?: string,
+  opts: GateOpts = {},
 ): { decision?: Decision; skip?: Skip } {
   if (atm.length < STABILITY_TICKS) return { skip: { reason: "insufficient_history" } };
   const last = atm[atm.length - 1];
@@ -126,9 +135,10 @@ export function evaluateAtm(
     return { skip: { reason: "too_late", seconds_to_close: last.seconds_to_close } };
   }
 
-  // Strict regression chop skip.
-  const chop = regressionChopSkip(atm);
+  // Strict regression chop skip (R² check honors opts.ignoreLowR2).
+  const chop = regressionChopSkip(atm, opts);
   if (chop) return { skip: chop };
+
 
 
   const tElapsed = WINDOW - last.seconds_to_close;
@@ -167,7 +177,8 @@ export function evaluateAtm(
   const fadeCal = cal.flip_fade;
   if (lastFlipIdx > 0 && lastFlipIdx >= atm.length - 2 && tElapsed >= 300) {
     const cents = leaderCents(last);
-    if (cents >= fadeCal.min_cents && cents <= fadeCal.max_cents && velocity >= fadeCal.min_velocity) {
+    const centsOkFade = opts.ignoreCentsBand || (cents >= fadeCal.min_cents && cents <= fadeCal.max_cents);
+    if (centsOkFade && velocity >= fadeCal.min_velocity) {
       return {
         decision: {
           ticker: last.ticker, strike: Number(last.strike), spot: Number(last.spot),
@@ -178,11 +189,12 @@ export function evaluateAtm(
         },
       };
     }
+    const fadeReason = !centsOkFade
+      ? (cents < fadeCal.min_cents ? "cents_below_band" : "cents_above_band")
+      : "velocity_below_min";
     return {
       skip: {
-        reason: cents < fadeCal.min_cents ? "cents_below_band"
-          : cents > fadeCal.max_cents ? "cents_above_band"
-          : "velocity_below_min",
+        reason: fadeReason,
         trigger_candidate: "flip_fade",
         yes_cents: last.yes_cents, no_cents: last.no_cents,
         seconds_to_close: last.seconds_to_close, flip_count: flips,
@@ -210,7 +222,8 @@ export function evaluateAtm(
       };
     }
     const cents = leaderCents(last);
-    if (cents >= chaseCal.min_cents && cents <= chaseCal.max_cents) {
+    const centsOkChase = opts.ignoreCentsBand || (cents >= chaseCal.min_cents && cents <= chaseCal.max_cents);
+    if (centsOkChase) {
       return {
         decision: {
           ticker: last.ticker, strike: Number(last.strike), spot: Number(last.spot),
@@ -232,6 +245,7 @@ export function evaluateAtm(
     };
   }
 
+
   return {
     skip: {
       reason: "too_early",
@@ -243,13 +257,13 @@ export function evaluateAtm(
 // Re-entry (pullback) detector — for tickers where price ran hot (≥78¢)
 // and then pulled back into 55–70¢ band with time still on the clock.
 // Returns a Decision that callers should half-stake and tag rotation_index=2.
-export function evaluateReentry(atm: Row[]): Decision | null {
+export function evaluateReentry(atm: Row[], opts: GateOpts = {}): Decision | null {
   if (atm.length < STABILITY_TICKS + 3) return null;
   const last = atm[atm.length - 1];
   const ageMs = Date.now() - new Date(last.snapped_at).getTime();
   if (ageMs > STALE_SECONDS * 1000) return null;
   if (last.seconds_to_close < REENTRY_MIN_TIME) return null;
-  if (regressionChopSkip(atm)) return null;
+  if (regressionChopSkip(atm, opts)) return null;
 
   const curL = leaderOf(last.yes_cents);
   if (curL === "TIE") return null;
@@ -261,7 +275,8 @@ export function evaluateReentry(atm: Row[]): Decision | null {
   }
 
   const nowCents = leaderCents(last);
-  if (nowCents < REENTRY_MIN_BAND || nowCents > REENTRY_MAX_BAND) return null;
+  if (!opts.ignoreCentsBand && (nowCents < REENTRY_MIN_BAND || nowCents > REENTRY_MAX_BAND)) return null;
+
 
   // Max leader-side cents seen at ANY earlier snap (proves the run happened).
   let maxSeen = 0;

@@ -1,23 +1,60 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef } from "react";
 import { runOddsShadowTick, getOddsShadowReport } from "@/lib/oddsShadowTrader.functions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { supabase } from "@/integrations/supabase/client";
 import { Bot, Zap, TrendingUp, TrendingDown } from "lucide-react";
 
 // SHADOW-ONLY. Runs the odds-flip trader every 5s, logs decisions, shows PnL vs actuals.
 // No real orders are placed.
 
+
+interface GateSettings { ignore_low_r2: boolean; ignore_cents_band: boolean }
+
 export function OddsShadowTraderPanel() {
   const tick = useServerFn(runOddsShadowTick);
   const report = useServerFn(getOddsShadowReport);
+  const qc = useQueryClient();
 
   const runTick = useMutation({ mutationFn: () => tick() });
   const { data } = useQuery({
     queryKey: ["oddsShadowReport"],
     queryFn: () => report(),
     refetchInterval: 2_000,
+  });
+
+  // Filter-bypass toggles (persist to auto_odds_settings).
+  const settingsQ = useQuery<GateSettings>({
+    queryKey: ["oddsFilterToggles"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id;
+      if (!uid) return { ignore_low_r2: false, ignore_cents_band: false };
+      const { data: row } = await supabase
+        .from("auto_odds_settings")
+        .select("ignore_low_r2, ignore_cents_band")
+        .eq("user_id", uid)
+        .maybeSingle();
+      return {
+        ignore_low_r2: Boolean(row?.ignore_low_r2),
+        ignore_cents_band: Boolean(row?.ignore_cents_band),
+      };
+    },
+    staleTime: 30_000,
+  });
+
+  const toggleMut = useMutation({
+    mutationFn: async (patch: Partial<GateSettings>) => {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id;
+      if (!uid) return;
+      // Row exists (created elsewhere in the app); update in place.
+      await supabase.from("auto_odds_settings").update(patch).eq("user_id", uid);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["oddsFilterToggles"] }),
   });
 
   const tickRef = useRef(runTick);
@@ -33,6 +70,8 @@ export function OddsShadowTraderPanel() {
   }, []);
 
   const r = data && data.ok ? data : null;
+  const s = settingsQ.data ?? { ignore_low_r2: false, ignore_cents_band: false };
+
 
   return (
     <Card className="p-4 space-y-3">
@@ -50,6 +89,37 @@ export function OddsShadowTraderPanel() {
           {runTick.isPending ? "ticking…" : runTick.isError ? "err" : "live"}
         </Badge>
       </div>
+
+      {/* Filter-bypass toggles — default OFF (filters active). Flip ON to bet through chop / out-of-band cents. */}
+      <div className="rounded border border-amber-500/30 bg-amber-500/5 p-2 text-[11px] space-y-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="font-semibold">Ignore R² chop filter</div>
+            <div className="text-[10px] text-muted-foreground">Bypass "regression_low_r2" — fire even in choppy tape.</div>
+          </div>
+          <Switch
+            checked={s.ignore_low_r2}
+            onCheckedChange={(v) => toggleMut.mutate({ ignore_low_r2: v })}
+            disabled={toggleMut.isPending}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="font-semibold">Ignore cents-band filter</div>
+            <div className="text-[10px] text-muted-foreground">Bypass "cents_above_band" / "cents_below_band" — fire regardless of calibrated entry range.</div>
+          </div>
+          <Switch
+            checked={s.ignore_cents_band}
+            onCheckedChange={(v) => toggleMut.mutate({ ignore_cents_band: v })}
+            disabled={toggleMut.isPending}
+          />
+        </div>
+        {(s.ignore_low_r2 || s.ignore_cents_band) && (
+          <div className="text-[10px] text-amber-400">⚠ Safety filter bypassed — more fires, more risk.</div>
+        )}
+      </div>
+
+
 
       {r && r.bankroll && (
         <div className={`rounded border p-2 text-[11px] ${r.bankroll.mode === "profit" ? "border-emerald-500/40 bg-emerald-500/5" : ""}`}>

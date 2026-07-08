@@ -102,10 +102,21 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
             dynStake = Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD);
           }
 
+          // Load user's filter-bypass toggles (defaults = filters active).
+          const { data: settingsRow } = await supabaseAdmin
+            .from("auto_odds_settings")
+            .select("ignore_low_r2, ignore_cents_band")
+            .eq("user_id", userId)
+            .maybeSingle();
+          const gateOpts = {
+            ignoreLowR2: Boolean((settingsRow as { ignore_low_r2?: boolean } | null)?.ignore_low_r2),
+            ignoreCentsBand: Boolean((settingsRow as { ignore_cents_band?: boolean } | null)?.ignore_cents_band),
+          };
+
           const skipRows: Array<Record<string, unknown>> = [];
           for (const [tk, atm] of groups) {
             if (firedSet.has(tk)) continue;
-            const res = evaluateAtm(atm, cal, latestTapeAt);
+            const res = evaluateAtm(atm, cal, latestTapeAt, gateOpts);
             if (res.decision) {
               const d = res.decision;
               const limitCents = d.side === "YES" ? d.yes_cents : d.no_cents;
@@ -139,7 +150,7 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
                 });
               }
             } else {
-              const rd = evaluateReentry(atm);
+              const rd = evaluateReentry(atm, gateOpts);
               if (rd) {
                 const limitCents = rd.side === "YES" ? rd.yes_cents : rd.no_cents;
                 const halfStake = unlocked ? dynStake * 0.5 : 50;
