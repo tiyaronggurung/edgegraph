@@ -4,9 +4,47 @@ import { evaluateAtm, atmByTicker, type Row } from "./oddsShadowCore";
 
 // Odds-Flip Shadow Trader v2 — SHADOW-ONLY.
 // Adds: velocity, spread proxy, multi-tick stability, flip cooldown,
-// early-exit on adverse flip, live calibration, skip-reason log.
+// early-exit on adverse flip, live calibration, skip-reason log,
+// profit-bankroll staking (play with profit, not principal).
 
-const STAKE_USD = 50;
+const BASE_STAKE_USD = 100;
+const UNLOCK_PROFIT = 50;      // last-3 settled PnL ≥ +$50 → unlock
+const PROFIT_STAKE_PCT = 0.40; // 40% of rolling profit bank
+const MAX_STAKE_USD = 500;     // safety cap
+const UNLOCK_WINDOW = 3;       // rolling window size
+
+async function computeStake(
+  supabase: { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { eq: (k: string, v: boolean) => { order: (k: string, o: { ascending: boolean }) => { limit: (n: number) => Promise<{ data: Array<{ pnl_usd: number | string | null }> | null }> } } } } } },
+  userId: string,
+): Promise<{ stake: number; mode: "base" | "profit"; bank: number }> {
+  // Cumulative PnL over full history (rolling profit bank).
+  const { data: allSettled } = await supabase
+    .from("auto_trade_odds_shadow")
+    .select("pnl_usd")
+    .eq("user_id", userId)
+    .eq("settled", true)
+    .order("settled_at", { ascending: false })
+    .limit(1000);
+  const bank = (allSettled ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0);
+
+  // Unlock check: last N settled trades cumulative ≥ UNLOCK_PROFIT.
+  const { data: recent } = await supabase
+    .from("auto_trade_odds_shadow")
+    .select("pnl_usd")
+    .eq("user_id", userId)
+    .eq("settled", true)
+    .order("settled_at", { ascending: false })
+    .limit(UNLOCK_WINDOW);
+  const recentPnl = (recent ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0);
+
+  const unlocked = bank >= UNLOCK_PROFIT && recentPnl >= UNLOCK_PROFIT && (recent?.length ?? 0) >= UNLOCK_WINDOW;
+  if (unlocked) {
+    const stake = Math.min(Math.max(bank * PROFIT_STAKE_PCT, BASE_STAKE_USD), MAX_STAKE_USD);
+    return { stake, mode: "profit", bank };
+  }
+  return { stake: BASE_STAKE_USD, mode: "base", bank };
+}
+
 
 export const runOddsShadowTick = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -52,6 +90,10 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
     let inserted = 0;
     const skipRows: Array<Record<string, unknown>> = [];
 
+    // Compute dynamic stake once per tick — same bankroll basis for every fire this cycle.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const stakeInfo = await computeStake(supabase as any, userId);
+
     for (const [tk, atm] of groups) {
       if (firedSet.has(tk)) continue;
       const res = evaluateAtm(atm, cal);
@@ -59,7 +101,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
         const d = res.decision;
         const limitCents = d.side === "YES" ? d.yes_cents : d.no_cents;
         if (limitCents < 1 || limitCents > 99) continue;
-        const contracts = Math.floor((STAKE_USD * 100) / limitCents);
+        const contracts = Math.floor((stakeInfo.stake * 100) / limitCents);
         if (contracts < 1) continue;
         const stake = (contracts * limitCents) / 100;
         const { error } = await supabase.from("auto_trade_odds_shadow").insert({
@@ -257,6 +299,10 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
       .select("*")
       .eq("user_id", userId);
 
+    // Bankroll / staking info for UI.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const stakeInfo = await computeStake(supabase as any, userId);
+
     return {
       ok: true as const,
       totals: {
@@ -267,6 +313,13 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
         winPct: settled.length ? Math.round((wins.length / settled.length) * 1000) / 10 : 0,
         pnlUsd: Math.round(totalPnl * 100) / 100,
         earlyExits: settled.filter(r => r.early_exited).length,
+      },
+      bankroll: {
+        bank: Math.round(stakeInfo.bank * 100) / 100,
+        mode: stakeInfo.mode,
+        nextStake: Math.round(stakeInfo.stake * 100) / 100,
+        unlockThreshold: 50,
+        stakePct: 40,
       },
       byTrigger,
       skipTop,

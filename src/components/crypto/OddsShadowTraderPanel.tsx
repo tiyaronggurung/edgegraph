@@ -51,6 +51,26 @@ export function OddsShadowTraderPanel() {
         </Badge>
       </div>
 
+      {r && r.bankroll && (
+        <div className={`rounded border p-2 text-[11px] ${r.bankroll.mode === "profit" ? "border-emerald-500/40 bg-emerald-500/5" : ""}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Bankroll</span>
+              <Badge variant={r.bankroll.mode === "profit" ? "default" : "outline"} className="text-[9px]">
+                {r.bankroll.mode === "profit" ? "PLAYING WITH PROFIT" : "BASE $100"}
+              </Badge>
+            </div>
+            <div className="font-mono">
+              bank <span className={r.bankroll.bank >= 0 ? "text-emerald-400" : "text-red-400"}>${r.bankroll.bank.toFixed(2)}</span>
+              {" · "}next stake <span className="font-semibold">${r.bankroll.nextStake.toFixed(2)}</span>
+            </div>
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-1">
+            Unlock at ≥${r.bankroll.unlockThreshold} over last 3 trades. Once unlocked, stake = {r.bankroll.stakePct}% of profit bank (min $100, cap $500).
+          </div>
+        </div>
+      )}
+
       {r && (
         <>
           <div className="grid grid-cols-5 gap-2 text-center">
