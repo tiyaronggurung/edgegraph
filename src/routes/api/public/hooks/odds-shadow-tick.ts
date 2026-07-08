@@ -6,7 +6,11 @@ import { evaluateAtm, atmByTicker, type Row } from "@/lib/oddsShadowCore";
 // Guard: requires apikey header matching the Supabase anon key (attached
 // by pg_cron); Lovable Cloud published /api/public/* also bypasses auth.
 
-const STAKE_USD = 50;
+const BASE_STAKE_USD = 100;
+const UNLOCK_PROFIT = 50;
+const PROFIT_STAKE_PCT = 0.40;
+const MAX_STAKE_USD = 500;
+const UNLOCK_WINDOW = 3;
 
 export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
   server: {
