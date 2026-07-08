@@ -1051,6 +1051,22 @@ export async function autoExitForUser(
       exitReason = "odds_flip";
       reasons.push(`${r.ticker}[${r.mode}]: ODDS FLIP — Kalshi ${r.side} ${markCents}¢ vs entry ${entry}¢ (−${entry - markCents}¢)`);
     }
+    // Polymarket flip: crowd on same 5-min window has rotated against us.
+    // Fires only when BOTH: our-side Poly prob < 40% now AND dropped ≥15pts
+    // vs entry snapshot. Same-window guard prevents comparing across expiries.
+    if (!exitReason && polyNow) {
+      const entryPoly = r.inputs_snapshot?.polymarket;
+      const entryOurSide = Number(entryPoly?.ourSideProb);
+      const entryWinStart = Number(entryPoly?.windowStartMs);
+      const nowOurSide = r.side === "YES" ? polyNow.upProb : polyNow.downProb;
+      if (Number.isFinite(entryOurSide) && Number.isFinite(entryWinStart)
+          && entryWinStart === polyNow.windowStartMs
+          && nowOurSide < 0.40
+          && (entryOurSide - nowOurSide) >= 0.15) {
+        exitReason = "poly_flip";
+        reasons.push(`${r.ticker}[${r.mode}]: POLY FLIP — Polymarket ${r.side === "YES" ? "Up" : "Down"} ${(nowOurSide * 100).toFixed(0)}% (entry ${(entryOurSide * 100).toFixed(0)}%, −${((entryOurSide - nowOurSide) * 100).toFixed(0)}pts)`);
+      }
+    }
     if (!exitReason && sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
       exitReason = "flip";
       reasons.push(`${r.ticker}[${r.mode}]: flip — model now ${(sideProbNow * 100).toFixed(0)}% for ${r.side} (< ${LIVE_FLIP_PROB * 100}%)`);
