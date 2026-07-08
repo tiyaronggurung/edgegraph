@@ -12,15 +12,49 @@ import { Bot, Zap, TrendingUp, TrendingDown } from "lucide-react";
 // No real orders are placed.
 
 
+interface GateSettings { ignore_low_r2: boolean; ignore_cents_band: boolean }
+
 export function OddsShadowTraderPanel() {
   const tick = useServerFn(runOddsShadowTick);
   const report = useServerFn(getOddsShadowReport);
+  const qc = useQueryClient();
 
   const runTick = useMutation({ mutationFn: () => tick() });
   const { data } = useQuery({
     queryKey: ["oddsShadowReport"],
     queryFn: () => report(),
     refetchInterval: 2_000,
+  });
+
+  // Filter-bypass toggles (persist to auto_odds_settings).
+  const settingsQ = useQuery<GateSettings>({
+    queryKey: ["oddsFilterToggles"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id;
+      if (!uid) return { ignore_low_r2: false, ignore_cents_band: false };
+      const { data: row } = await supabase
+        .from("auto_odds_settings")
+        .select("ignore_low_r2, ignore_cents_band")
+        .eq("user_id", uid)
+        .maybeSingle();
+      return {
+        ignore_low_r2: Boolean(row?.ignore_low_r2),
+        ignore_cents_band: Boolean(row?.ignore_cents_band),
+      };
+    },
+    staleTime: 30_000,
+  });
+
+  const toggleMut = useMutation({
+    mutationFn: async (patch: Partial<GateSettings>) => {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id;
+      if (!uid) return;
+      // Row exists (created elsewhere in the app); update in place.
+      await supabase.from("auto_odds_settings").update(patch).eq("user_id", uid);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["oddsFilterToggles"] }),
   });
 
   const tickRef = useRef(runTick);
@@ -36,6 +70,8 @@ export function OddsShadowTraderPanel() {
   }, []);
 
   const r = data && data.ok ? data : null;
+  const s = settingsQ.data ?? { ignore_low_r2: false, ignore_cents_band: false };
+
 
   return (
     <Card className="p-4 space-y-3">
