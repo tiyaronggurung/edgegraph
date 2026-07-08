@@ -2103,6 +2103,7 @@ function AutoTradePanel() {
         </div>
       )}
     </div>
+    </div>
   );
 }
 
