@@ -88,6 +88,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
 
     // 4. Evaluate.
     let inserted = 0;
+    let reentries = 0;
     const skipRows: Array<Record<string, unknown>> = [];
 
     // Compute dynamic stake once per tick — same bankroll basis for every fire this cycle.
@@ -121,18 +122,47 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
           entry_velocity_cents: d.velocity,
         });
         if (!error) inserted++;
-      } else if (res.skip) {
-        skipRows.push({
-          user_id: userId,
-          ticker: tk,
-          reason: res.skip.reason,
-          trigger_candidate: res.skip.trigger_candidate ?? null,
-          yes_cents: res.skip.yes_cents ?? null,
-          no_cents: res.skip.no_cents ?? null,
-          seconds_to_close: res.skip.seconds_to_close ?? null,
-          flip_count: res.skip.flip_count ?? null,
-          detail: res.skip.detail ?? null,
-        });
+      } else {
+        // Re-entry (pullback) check — half stake, rotation_index=2, one per ticker.
+        const rd = evaluateReentry(atm);
+        if (rd) {
+          const limitCents = rd.side === "YES" ? rd.yes_cents : rd.no_cents;
+          const halfStake = Math.max(stakeInfo.stake * 0.5, 50);
+          const contracts = Math.floor((halfStake * 100) / limitCents);
+          if (contracts >= 1) {
+            const stake = (contracts * limitCents) / 100;
+            const { error } = await supabase.from("auto_trade_odds_shadow").insert({
+              user_id: userId,
+              ticker: rd.ticker,
+              strike: rd.strike,
+              side: rd.side,
+              trigger: rd.trigger,
+              seconds_to_close_at_fire: rd.seconds_to_close,
+              yes_cents_at_fire: rd.yes_cents,
+              no_cents_at_fire: rd.no_cents,
+              limit_cents: limitCents,
+              contracts,
+              stake_usd: stake,
+              flip_count_at_fire: rd.flip_count,
+              spot_at_fire: rd.spot,
+              entry_velocity_cents: rd.velocity,
+              rotation_index: 2,
+            });
+            if (!error) reentries++;
+          }
+        } else if (res.skip) {
+          skipRows.push({
+            user_id: userId,
+            ticker: tk,
+            reason: res.skip.reason,
+            trigger_candidate: res.skip.trigger_candidate ?? null,
+            yes_cents: res.skip.yes_cents ?? null,
+            no_cents: res.skip.no_cents ?? null,
+            seconds_to_close: res.skip.seconds_to_close ?? null,
+            flip_count: res.skip.flip_count ?? null,
+            detail: res.skip.detail ?? null,
+          });
+        }
       }
     }
     if (skipRows.length) {
