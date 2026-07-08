@@ -2034,6 +2034,48 @@ export type Database = {
         }
         Relationships: []
       }
+      polymarket_btc_tape: {
+        Row: {
+          agrees: boolean | null
+          down_prob: number
+          id: string
+          kalshi_our_side_cents: number | null
+          kalshi_side: string | null
+          kalshi_ticker: string | null
+          slug: string
+          snapped_at: string
+          up_prob: number
+          user_id: string
+          window_start: string
+        }
+        Insert: {
+          agrees?: boolean | null
+          down_prob: number
+          id?: string
+          kalshi_our_side_cents?: number | null
+          kalshi_side?: string | null
+          kalshi_ticker?: string | null
+          slug: string
+          snapped_at?: string
+          up_prob: number
+          user_id: string
+          window_start: string
+        }
+        Update: {
+          agrees?: boolean | null
+          down_prob?: number
+          id?: string
+          kalshi_our_side_cents?: number | null
+          kalshi_side?: string | null
+          kalshi_ticker?: string | null
+          slug?: string
+          snapped_at?: string
+          up_prob?: number
+          user_id?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       prediction_closes: {
         Row: {
           ai_prob: number | null
