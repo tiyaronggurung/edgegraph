@@ -299,6 +299,10 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
       .select("*")
       .eq("user_id", userId);
 
+    // Bankroll / staking info for UI.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const stakeInfo = await computeStake(supabase as any, userId);
+
     return {
       ok: true as const,
       totals: {
@@ -309,6 +313,13 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
         winPct: settled.length ? Math.round((wins.length / settled.length) * 1000) / 10 : 0,
         pnlUsd: Math.round(totalPnl * 100) / 100,
         earlyExits: settled.filter(r => r.early_exited).length,
+      },
+      bankroll: {
+        bank: Math.round(stakeInfo.bank * 100) / 100,
+        mode: stakeInfo.mode,
+        nextStake: Math.round(stakeInfo.stake * 100) / 100,
+        unlockThreshold: 50,
+        stakePct: 40,
       },
       byTrigger,
       skipTop,
