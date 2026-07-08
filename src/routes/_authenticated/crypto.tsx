@@ -21,6 +21,8 @@ import { OddsStudyPanel } from "@/components/crypto/OddsStudyPanel";
 import { IocLadderPanel } from "@/components/crypto/IocLadderPanel";
 import { FlipShadowPanel } from "@/components/crypto/FlipShadowPanel";
 import { TaShadowPanel } from "@/components/crypto/TaShadowPanel";
+import { SkipBucketPanel } from "@/components/crypto/SkipBucketPanel";
+import { LossCapPanel } from "@/components/crypto/LossCapPanel";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
 import { useCalibrationShift } from "@/hooks/useCalibrationShift";
 import { useMarketRegime } from "@/hooks/useMarketRegime";
@@ -2478,6 +2480,10 @@ function CryptoPage() {
           <OddsStudyPanel />
 
           <IocLadderPanel />
+
+          <SkipBucketPanel />
+
+          <LossCapPanel />
 
           <FlipShadowPanel />
 

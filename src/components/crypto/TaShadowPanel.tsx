@@ -3,8 +3,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listAutoTradeOrders } from "@/lib/cryptoAutoTrade.functions";
 import { getTaShadowReport, logTaShadow, settleTaShadow, type TaShadowLogInput } from "@/lib/taShadow.functions";
+import { backfillTaShadow } from "@/lib/lossCapShadow.functions";
 import { useBinanceBtcCandles } from "@/hooks/useBinanceBtcCandles";
 import { getChartVerdict } from "@/lib/ta/chartVerdict";
+import { toast } from "sonner";
 
 // TA Shadow Study — READ-ONLY. Logs TA verdicts alongside every auto-trade
 // order and reports how often TA agrees/disagrees with Kalshi and the model.
@@ -14,6 +16,8 @@ export function TaShadowPanel() {
   const logFn = useServerFn(logTaShadow);
   const settleFn = useServerFn(settleTaShadow);
   const listFn = useServerFn(listAutoTradeOrders);
+  const backfillFn = useServerFn(backfillTaShadow);
+
 
   const { candles1m, candles5m, error: candlesErr } = useBinanceBtcCandles();
 
@@ -32,6 +36,15 @@ export function TaShadowPanel() {
   const settle = useMutation({
     mutationFn: () => settleFn(),
     onSuccess: () => refetch(),
+  });
+
+  const backfill = useMutation({
+    mutationFn: () => backfillFn({ data: { limit: 250 } }),
+    onSuccess: (r) => {
+      toast.success(`Backfill: +${r.inserted} inserted · ${r.skipped} skipped · ${r.errors} errors`);
+      refetch();
+    },
+    onError: (e: any) => toast.error(`Backfill failed: ${e?.message ?? "unknown"}`),
   });
 
   // Auto-log any freshly placed order with the current TA verdict.
@@ -90,6 +103,13 @@ export function TaShadowPanel() {
           TA Shadow Study
         </h2>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => backfill.mutate()}
+            disabled={backfill.isPending}
+            className="text-xs text-amber-400 hover:text-amber-300 disabled:opacity-40"
+          >
+            {backfill.isPending ? "backfilling…" : "backfill 250"}
+          </button>
           <button
             onClick={() => settle.mutate()}
             disabled={settle.isPending}
