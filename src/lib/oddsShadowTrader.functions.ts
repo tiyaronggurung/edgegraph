@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { evaluateAtm, atmByTicker, type Row } from "./oddsShadowCore";
+import { evaluateAtm, evaluateReentry, atmByTicker, type Row } from "./oddsShadowCore";
 
 // Odds-Flip Shadow Trader v2 — SHADOW-ONLY.
 // Adds: velocity, spread proxy, multi-tick stability, flip cooldown,
