@@ -2,7 +2,7 @@
 // No supabase/network here — safe to import from anywhere.
 
 export const WINDOW = 900;
-export const STALE_SECONDS = 20; // tape freshness cutoff (#2 proxy)
+export const STALE_SECONDS = 30; // tape freshness cutoff (#2 proxy) — 30s absorbs cron jitter
 export const FLIP_COOLDOWN_SECONDS = 20; // (#5)
 // Re-entry (pullback) params.
 export const REENTRY_RAN_TO = 78;      // must have run ≥78¢ at some earlier snap
