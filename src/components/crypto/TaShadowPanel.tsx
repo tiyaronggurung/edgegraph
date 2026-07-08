@@ -104,6 +104,13 @@ export function TaShadowPanel() {
         </h2>
         <div className="flex items-center gap-3">
           <button
+            onClick={() => backfill.mutate()}
+            disabled={backfill.isPending}
+            className="text-xs text-amber-400 hover:text-amber-300 disabled:opacity-40"
+          >
+            {backfill.isPending ? "backfilling…" : "backfill 250"}
+          </button>
+          <button
             onClick={() => settle.mutate()}
             disabled={settle.isPending}
             className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-40"
