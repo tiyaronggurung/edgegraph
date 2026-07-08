@@ -52,6 +52,9 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
     if (tapeErr) return { ok: false as const, error: tapeErr.message };
 
     const groups = atmByTicker((tape as Row[] | null) ?? []);
+    const latestTapeAt = (tape && tape.length > 0)
+      ? (tape as Row[])[tape.length - 1].snapped_at
+      : undefined;
 
     // 2. Calibration.
     const { data: calRows } = await supabase
@@ -88,7 +91,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
 
     for (const [tk, atm] of groups) {
       if (firedSet.has(tk)) continue;
-      const res = evaluateAtm(atm, cal);
+      const res = evaluateAtm(atm, cal, latestTapeAt);
       if (res.decision) {
         const d = res.decision;
         const limitCents = d.side === "YES" ? d.yes_cents : d.no_cents;

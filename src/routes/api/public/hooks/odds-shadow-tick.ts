@@ -42,6 +42,9 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
             .gte("snapped_at", new Date(Date.now() - 15 * 60_000).toISOString())
             .order("snapped_at", { ascending: true });
           const groups = atmByTicker((tape as Row[] | null) ?? []);
+          const latestTapeAt = (tape && tape.length > 0)
+            ? (tape as Row[])[tape.length - 1].snapped_at
+            : undefined;
 
           const { data: calRows } = await supabaseAdmin
             .from("auto_odds_calibration")
@@ -102,7 +105,7 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
           const skipRows: Array<Record<string, unknown>> = [];
           for (const [tk, atm] of groups) {
             if (firedSet.has(tk)) continue;
-            const res = evaluateAtm(atm, cal);
+            const res = evaluateAtm(atm, cal, latestTapeAt);
             if (res.decision) {
               const d = res.decision;
               const limitCents = d.side === "YES" ? d.yes_cents : d.no_cents;

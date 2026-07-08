@@ -2,7 +2,7 @@
 // No supabase/network here — safe to import from anywhere.
 
 export const WINDOW = 900;
-export const STALE_SECONDS = 30; // tape freshness cutoff (#2 proxy) — 30s absorbs cron jitter
+export const STALE_SECONDS = 60; // tape freshness cutoff (#2 proxy) — 60s survives ticker rotation + p99 tail
 export const FLIP_COOLDOWN_SECONDS = 20; // (#5)
 // Re-entry (pullback) params.
 export const REENTRY_RAN_TO = 78;      // must have run ≥78¢ at some earlier snap
@@ -107,14 +107,19 @@ export function atmByTicker(rows: Row[]): Map<string, Row[]> {
 export function evaluateAtm(
   atm: Row[],
   cal: CalMap,
+  latestTapeAt?: string,
 ): { decision?: Decision; skip?: Skip } {
   if (atm.length < STABILITY_TICKS) return { skip: { reason: "insufficient_history" } };
   const last = atm[atm.length - 1];
 
-  // (#2) Freshness proxy for liquidity: if latest snap is > STALE_SECONDS old, tape is stale/thin.
+  // (#2) Freshness proxy: if this ticker's latest ATM snap is > STALE_SECONDS old,
+  // fall back to the freshest raw tape snap across all tickers (proves cron is alive).
   const ageMs = Date.now() - new Date(last.snapped_at).getTime();
-  if (ageMs > STALE_SECONDS * 1000) {
-    return { skip: { reason: "tape_stale", detail: { age_ms: ageMs } } };
+  const fallbackAgeMs = latestTapeAt
+    ? Date.now() - new Date(latestTapeAt).getTime()
+    : ageMs;
+  if (ageMs > STALE_SECONDS * 1000 && fallbackAgeMs > STALE_SECONDS * 1000) {
+    return { skip: { reason: "tape_stale", detail: { age_ms: ageMs, fallback_age_ms: fallbackAgeMs } } };
   }
 
   if (last.seconds_to_close <= MIN_TIME_TO_ENTER) {
