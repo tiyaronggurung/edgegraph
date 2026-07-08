@@ -38,26 +38,19 @@ async function computeStake(
   // Unlock check: last N settled LIVE trades (since cutoff) are all wins.
   const { data: recent } = await supabase
     .from("auto_trade_orders")
-    .select("pnl_usd, stake_usd, settled_at, status")
+    .select("settled_at, status")
     .eq("user_id", userId)
     .eq("mode", "live")
     .in("status", ["settled_win", "settled_loss"])
     .gte("settled_at", BANK_CUTOFF_ISO)
     .order("settled_at", { ascending: false })
     .limit(UNLOCK_WINDOW);
-  const recentArr = (recent ?? []) as Array<{ pnl_usd: number | string | null; stake_usd: number | string | null; status: string }>;
+  const recentArr = (recent ?? []) as Array<{ status: string }>;
   const winStreakUnlocked = recentArr.length >= UNLOCK_WINDOW
     && recentArr.every((r) => r.status === "settled_win");
 
   if (winStreakUnlocked && bank > 0) {
-    const baseStake = Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD);
-    // Martingale: if last settled trade was a loss, double previous stake — only if bank covers it.
-    const last = recentArr[0];
-    if (last && Number(last.pnl_usd ?? 0) <= 0) {
-      const doubled = Math.min(Number(last.stake_usd ?? baseStake) * 2, MAX_STAKE_USD);
-      if (bank >= doubled) return { stake: doubled, mode: "profit", bank };
-    }
-    return { stake: baseStake, mode: "profit", bank };
+    return { stake: Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD), mode: "profit", bank };
   }
   return { stake: BASE_STAKE_USD, mode: "base", bank };
 }
