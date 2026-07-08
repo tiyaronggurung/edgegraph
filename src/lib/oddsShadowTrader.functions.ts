@@ -390,11 +390,11 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
       .select("*")
       .eq("user_id", userId);
 
-    // Bankroll / staking info for UI.
+    // Bankroll / staking info for UI — Profit Bank Ladder state.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const stakeInfo = await computeStake(supabase as any, userId);
+    const { state: ladder, config: ladderCfg } = await computeLadder(supabase as any, userId);
 
-    // Win-streak progress from LIVE Kalshi orders post-cutoff.
+    // Win-streak progress from LIVE Kalshi orders post-cutoff (trailing).
     const BANK_CUTOFF_ISO_UI = "2026-07-08T04:47:00Z";
     const { data: streakRows } = await supabase
       .from("auto_trade_orders")
@@ -404,7 +404,7 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
       .in("status", ["settled_win", "settled_loss"])
       .gte("settled_at", BANK_CUTOFF_ISO_UI)
       .order("settled_at", { ascending: false })
-      .limit(3);
+      .limit(ladderCfg.unlockWins);
     let winStreak = 0;
     for (const r of (streakRows ?? []) as Array<{ status: string }>) {
       if (r.status === "settled_win") winStreak++;
@@ -425,13 +425,19 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
         reentries: rows.filter(r => Number(r.rotation_index) === 2).length,
       },
       bankroll: {
-        bank: Math.round(stakeInfo.bank * 100) / 100,
-        mode: stakeInfo.mode,
-        nextStake: Math.round(ladder.nextStake * 100) / 100,
-        unlockThreshold: 50,
-        stakePct: 50,
+        bank: ladder.profitBank,
+        mode: ladder.profitBankMode ? ("profit" as const) : ("base" as const),
+        nextStake: ladder.nextStake,
+        unlockThreshold: 0,
+        stakePct: Math.round(ladderCfg.profitBankStartPct * 100),
         winStreak,
-        unlockNeeded: 3,
+        unlockNeeded: ladderCfg.unlockWins,
+        consecutiveWins: ladder.consecutiveWins,
+        consecutiveLosses: ladder.consecutiveLosses,
+        highestProfitBank: ladder.highestProfitBank,
+        currentLadderLevel: ladder.currentLadderLevel,
+        maxStake: ladderCfg.maxStake,
+        maxProfitExposurePct: ladderCfg.maxProfitExposurePct,
       },
       byTrigger,
       skipTop,
