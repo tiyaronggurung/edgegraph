@@ -120,6 +120,12 @@ export function evaluateAtm(
   if (last.seconds_to_close <= MIN_TIME_TO_ENTER) {
     return { skip: { reason: "too_late", seconds_to_close: last.seconds_to_close } };
   }
+
+  // Strict regression chop skip.
+  const chop = regressionChopSkip(atm);
+  if (chop) return { skip: chop };
+
+
   const tElapsed = WINDOW - last.seconds_to_close;
 
   // Flip history + last flip time.
