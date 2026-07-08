@@ -135,10 +135,10 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
             await supabaseAdmin.from("auto_trade_odds_skip_log").insert(skipRows.slice(0, 10) as any);
           }
 
-          // Settlement + adverse-flip early exit.
+          // Settlement + adverse-flip early exit + optional rotation.
           const { data: open } = await supabaseAdmin
             .from("auto_trade_odds_shadow")
-            .select("id, ticker, side, contracts, limit_cents, fired_at")
+            .select("id, ticker, strike, side, contracts, limit_cents, fired_at, rotation_index, spot_at_fire")
             .eq("user_id", userId)
             .eq("settled", false);
           for (const row of open ?? []) {
@@ -186,6 +186,38 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
                   })
                   .eq("id", row.id);
                 if (!error) earlyExitsTotal++;
+
+                // Flip rotation: 1 max, only if ≥90s left.
+                const rotIdx = Number(row.rotation_index ?? 0);
+                if (!error && rotIdx === 0 && last.seconds_to_close >= 90) {
+                  const newSide: "YES" | "NO" = row.side === "YES" ? "NO" : "YES";
+                  const newCents = newSide === "YES" ? last.yes_cents : last.no_cents;
+                  if (newCents >= 30 && newCents <= 90) {
+                    const rotContracts = Math.floor((dynStake * 100) / newCents);
+                    if (rotContracts >= 1) {
+                      const rotStake = (rotContracts * newCents) / 100;
+                      const { error: insErr } = await supabaseAdmin.from("auto_trade_odds_shadow").insert({
+                        user_id: userId,
+                        ticker: row.ticker as string,
+                        strike: Number(row.strike),
+                        side: newSide,
+                        trigger: "flip_fade",
+                        seconds_to_close_at_fire: last.seconds_to_close,
+                        yes_cents_at_fire: last.yes_cents,
+                        no_cents_at_fire: last.no_cents,
+                        limit_cents: newCents,
+                        contracts: rotContracts,
+                        stake_usd: rotStake,
+                        flip_count_at_fire: 0,
+                        spot_at_fire: Number(row.spot_at_fire ?? 0) || null,
+                        entry_velocity_cents: 0,
+                        rotation_index: 1,
+                        parent_shadow_id: row.id,
+                      });
+                      if (!insErr) rotationsTotal++;
+                    }
+                  }
+                }
               }
             }
           }
