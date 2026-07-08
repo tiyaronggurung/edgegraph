@@ -1110,76 +1110,7 @@ function AutoTradePanel() {
     window.localStorage.setItem("crypto.autoMart.wins", String(martWins));
   }, [martStake, martLosses, martWins]);
 
-  // Watch the last martingale order and adjust stake when it settles.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const lastId = window.localStorage.getItem("crypto.autoMart.lastOrderId");
-    if (!lastId) return;
-    const o = liveOrders.find(x => x.id === lastId);
-    if (!o) return;
-    if (o.status === "settled_win") {
-      // Case A: recovering from a loss ladder → win locks in, reset everything.
-      if (martLosses > 0) {
-        setMartStake(MART_BASE);
-        setMartLosses(0);
-        setMartWins(0);
-        toast.success(`Martingale WIN — loss ladder recovered, stake reset to $${MART_BASE}`);
-      } else {
-        // Case B: paroli upsize — press the winner ONLY if the settled order
-        // cleared the model gate AND we haven't hit the streak cap yet.
-        const sig = Number(o.sigma_distance ?? 0);
-        const edge = Math.abs(Number(o.edge_pts ?? 0));
-        const gatePassed = sig >= MART_PAROLI_MIN_SIGMA && edge >= MART_PAROLI_MIN_EDGE;
-        const nextWins = martWins + 1;
-        if (nextWins >= MART_PAROLI_MAX) {
-          setMartStake(MART_BASE);
-          setMartWins(0);
-          toast.success(`Paroli WIN #${nextWins} — streak cap, locking in & reset to $${MART_BASE}`);
-        } else if (gatePassed) {
-          const mult = MART_PAROLI_STEPS[martWins] ?? 1.0;
-          const nextStake = Math.min(Math.round(martStake * mult), MART_CAP);
-          setMartStake(nextStake);
-          setMartWins(nextWins);
-          toast.success(`Paroli WIN #${nextWins} — pressing to $${nextStake} (σ ${sig.toFixed(2)} · edge ${edge.toFixed(1)}pt)`);
-        } else {
-          setMartStake(MART_BASE);
-          setMartWins(0);
-          toast.success(`Martingale WIN — weak signal (σ ${sig.toFixed(2)} · edge ${edge.toFixed(1)}pt), reset to $${MART_BASE}`);
-        }
-      }
-      window.localStorage.removeItem("crypto.autoMart.lastOrderId");
-    } else if (o.status === "settled_loss") {
-      // Loss always breaks the paroli streak; loss-doubling ladder continues.
-      const nextStake = Math.min(martStake * 2, MART_CAP);
-      const nextLosses = martLosses + 1;
-      if (nextStake !== martStake || martWins !== 0) {
-        setMartStake(nextStake);
-        setMartLosses(nextLosses);
-        setMartWins(0);
-        toast.error(`Martingale LOSS — next stake $${nextStake} (loss #${nextLosses})`);
-      }
-      window.localStorage.removeItem("crypto.autoMart.lastOrderId");
-    }
-  }, [liveOrders, martStake, martLosses, martWins]);
-
-  async function runMartingale(stakeUsd: number): Promise<string | null> {
-    // Removed: martingale/live stake escalation is disabled permanently.
-    return null;
-    try {
-      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd, maxOrders: 1, force: true, isMartingale: true } });
-      if (res.placed > 0 && res.orders?.[0]) {
-        const o = res.orders[0];
-        toast.success(`Martingale $${stakeUsd}: ${o.side === "YES" ? "UP" : "DOWN"} ${o.ticker} @ ${o.limit_cents}¢`);
-        qc.invalidateQueries({ queryKey: ["auto-trade-orders"] });
-        return o.id ?? null;
-      }
-      toast.info(`Martingale skipped: ${res.skipReasons.slice(0, 2).join(" · ") || "no tradeable market"}`);
-      return null;
-    } catch (e: any) {
-      toast.error("Martingale order failed", { description: e?.message ?? String(e) });
-      return null;
-    }
-  }
+  // Auto-Martingale order placement removed — no loss doubling or Paroli upsize.
 
   useEffect(() => {
     // Removed: martingale/live stake escalation is disabled permanently.
@@ -1334,7 +1265,7 @@ function AutoTradePanel() {
       inFlight = true;
       // Optimistically mark this window taken so we can't double-fire during the async call.
       window.localStorage.setItem("crypto.autoMart.lastWindowMs", String(currentWindow));
-      const orderId = await runMartingale(martStake);
+      const orderId = null;
       if (orderId) {
         window.localStorage.setItem("crypto.autoMart.lastOrderId", orderId);
       } else {
