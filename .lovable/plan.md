@@ -1,64 +1,76 @@
-# AI Odds Study → live trade auto-apply
+# Scalp Shadow Log
 
-## What it does
+Goal: measure real hit rate of the two scalp setups we spotted in `btc_odds_tape`, **without** touching auto-trade, buy/ladder, exits, or any live path.
 
-1. **New AI study loop** dedicated to the odds panel. Every hour (piggyback on existing `crypto-study` cron), for each user with ≥30 new `auto_odds_study_log` rows, run Gemini on:
-   - Aggregated stats (flip rate, alignment %, per-bucket)
-   - Last 100 raw snapshots
-   - Last 50 settled auto-odds trades (win/loss + entry odds + which exit fired)
-   - Prior tunings applied and their post-apply win rate
+## Guarantees (what will NOT change)
 
-2. **LLM returns structured JSON** with two blocks:
-   - `findings` — 2-3 sentence summary + flip zones + price↔odds observations (shown in panel)
-   - `tunings` — array of proposed parameter changes, each with `param`, `current`, `suggested`, `rationale`, `confidence` (0-1)
+- No changes to `auto_trade_orders`, exit logic, buy path, ladder path, manual close.
+- No new gates, no new blocking checks anywhere in the live flow.
+- No changes to existing settings tables or their defaults.
+- Auto-odds stake stays $100 flat. Auto-trade gates stay OFF as configured.
+- Purely a read-side observer on data we already collect in `btc_odds_tape`.
 
-3. **Auto-apply gate** — a tuning is applied to live trades ONLY if:
-   - `confidence >= 0.7`
-   - Suggested value is inside a hard-coded safe range (see Safety Caps below)
-   - Change from current is ≤ the per-param max delta
-   - User has `auto_apply_studies = true` in `auto_odds_settings` (default OFF — user must opt in)
-   
-   Otherwise the tuning is stored as "proposed" and shown in the panel with an **Apply** button.
+## What gets built
 
-## Tunable parameters (whitelist)
+### 1. New table `auto_odds_scalp_shadow` (isolated)
 
-Only these can be touched. Everything else in `auto-odds-tick.ts` is off-limits.
+Records hypothetical entries + outcomes. Nothing reads it except the review UI.
 
-| Param | Current | Safe range | Max Δ/study |
-|---|---|---|---|
-| `model_gate_min` | 0.60 | 0.55–0.75 | ±0.03 |
-| `hedge_band_lo` | 0.60 | 0.55–0.65 | ±0.02 |
-| `hedge_band_hi` | 0.68 | 0.63–0.75 | ±0.02 |
-| `tp_cents` | 98 | 95–99 | ±1 |
-| `oscillation_max` | 3 | 2–5 | ±1 |
-| `skip_bucket_lt15s` | false | bool | — |
-| `skip_bucket_15_60s` | false | bool | — |
+```
+id, user_id, ticker, strike, setup_kind ('compression' | 'cliff'),
+entry_side ('YES' | 'NO'), entry_cents, entry_spot, entry_dist_to_strike,
+seconds_to_close_at_entry, entered_at,
+exit_cents, exit_reason ('mean_revert' | 'strike_cross' | 'time_stop' | 'settled'),
+exit_spot, exited_at, pnl_cents, settled_yes (bool),
+created_at
+```
 
-**Never tunable by LLM**: daily loss cap, 2-loss stop, entry size ($100), hedge size ($5), -450/-750 entry band, 2s persistence check.
+RLS: user reads/inserts their own rows only. GRANT to `authenticated` + `service_role`.
 
-## Data model
+### 2. New server function `evaluateScalpShadow` (`src/lib/scalpShadow.functions.ts`)
 
-- Add columns to `auto_odds_settings`: `auto_apply_studies bool default false`, plus the 7 tunables above (nullable — null = use hardcoded default).
-- New table `auto_odds_studies` (user_id, summary, findings jsonb, tunings jsonb, applied_tunings jsonb, model, raw jsonb, created_at). RLS user-scoped.
-- `auto-odds-tick.ts` reads each tunable via `settings.<name> ?? DEFAULT` at the top of the loop.
+- Runs on the same cadence as the odds tape snapshot (piggy-backs — no new cron).
+- Reads the last ~60s of `btc_odds_tape` for the active ticker.
+- Detects entries:
+  - **Cliff**: YES ≤ 12¢ or ≥ 88¢, |spot−strike| ≤ $250, seconds_to_close > 240.
+  - **Compression**: |spot−strike| ≤ $100, seconds_to_close between 60 and 300, |Δyes_cents over last 60s| ≥ 15.
+- Opens one open shadow row per (ticker, setup_kind) at most.
+- Manages exits on later ticks:
+  - Mean revert to fair (spot-implied prob within 5¢) → close.
+  - Strike cross in our favor → close at current mid.
+  - Time stop at seconds_to_close ≤ 60 → close at current mid.
+  - Market settled → close at 100/0.
 
-## UI additions to OddsStudyPanel
+### 3. Wire it in (one call, additive)
 
-- **Run AI Study Now** button (manual trigger, throttled 5min)
-- **Latest study card**: summary, findings, tunings table with confidence bars
-- **Auto-apply toggle** with warning: "AI can adjust gates within safe caps. Never disables loss stops or entry sizes."
-- **Applied tunings log**: last 10 changes with revert button (single click restores prior value)
+The existing odds-tape snapshot server function gets a single extra line at the end:
 
-## Safety / reversibility
+```ts
+await evaluateScalpShadow({ data: { ticker } }).catch(() => {}); // shadow only, never blocks
+```
 
-- Every applied tuning writes an audit row with `prev_value` and `new_value`. Revert = write prev_value back.
-- If user's daily P&L is worse post-apply than a rolling 3-study baseline, the auto-apply toggle **auto-disables itself** and toasts the user.
-- Hard block: LLM output that proposes a value outside the safe range is silently ignored (logged, not applied, not shown as pending).
+Failures are swallowed so nothing upstream is affected.
 
-## Files
+### 4. Small review UI on `/crypto`
 
-- Migration: extend `auto_odds_settings`, create `auto_odds_studies` + `auto_odds_tuning_audit`
-- New: `src/lib/oddsStudy.functions.ts` (`runOddsStudy` server fn, `applyTuning`, `revertTuning`, `getLatestOddsStudy`)
-- Edit: `src/routes/api/public/hooks/crypto-study.ts` — add per-user odds-study branch
-- Edit: `src/routes/api/public/hooks/auto-odds-tick.ts` — read tunables from settings with fallbacks
-- Edit: `src/components/crypto/OddsStudyPanel.tsx` — add study card + toggle + tuning list
+New collapsed panel "Scalp shadow" showing:
+- Open shadow positions (setup, side, entry¢, current mid¢, unrealized).
+- Last 20 closed shadow trades with pnl_cents and exit_reason.
+- Hit rate + avg pnl by setup_kind.
+
+Does not touch any existing panel or component.
+
+## Technical notes
+
+- Migration: `CREATE TABLE` + GRANTs + `ENABLE RLS` + policies in one file.
+- Server function uses `requireSupabaseAuth`.
+- No new secrets, no new connectors, no edge functions.
+- No changes to `auto_odds_settings`, `auto_odds_staking_config`, `auto_trade_*`.
+
+## Rollout
+
+1. Migration + server function + hook-in line.
+2. Verify shadow rows accumulate on `/crypto` for the current 15m window.
+3. Let it run 20-40 windows; review hit rate before we even discuss going live.
+
+Nothing in step 3's output changes code by itself — going live would be a separate approved change.
