@@ -440,6 +440,7 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
       },
       byTrigger,
       skipTop,
+      regressionSkips,
       calibration: cal ?? [],
       recent: rows.slice(0, 25),
     };
