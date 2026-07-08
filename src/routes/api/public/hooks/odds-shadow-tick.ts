@@ -254,7 +254,8 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
         return new Response(JSON.stringify({
           ok: true, users: userIds.length,
           fired: firedTotal, settled: settledTotal,
-          earlyExits: earlyExitsTotal, rotations: rotationsTotal, skipped: skippedTotal,
+          earlyExits: earlyExitsTotal, rotations: rotationsTotal,
+          reentries: reentriesTotal, skipped: skippedTotal,
         }), { headers: { "Content-Type": "application/json" } });
       },
     },
