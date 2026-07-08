@@ -150,7 +150,7 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
                 });
               }
             } else {
-              const rd = evaluateReentry(atm);
+              const rd = evaluateReentry(atm, gateOpts);
               if (rd) {
                 const limitCents = rd.side === "YES" ? rd.yes_cents : rd.no_cents;
                 const halfStake = unlocked ? dynStake * 0.5 : 50;
