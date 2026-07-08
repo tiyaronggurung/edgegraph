@@ -90,6 +90,37 @@ export function OddsShadowTraderPanel() {
         </Badge>
       </div>
 
+      {/* Filter-bypass toggles — default OFF (filters active). Flip ON to bet through chop / out-of-band cents. */}
+      <div className="rounded border border-amber-500/30 bg-amber-500/5 p-2 text-[11px] space-y-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="font-semibold">Ignore R² chop filter</div>
+            <div className="text-[10px] text-muted-foreground">Bypass "regression_low_r2" — fire even in choppy tape.</div>
+          </div>
+          <Switch
+            checked={s.ignore_low_r2}
+            onCheckedChange={(v) => toggleMut.mutate({ ignore_low_r2: v })}
+            disabled={toggleMut.isPending}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="font-semibold">Ignore cents-band filter</div>
+            <div className="text-[10px] text-muted-foreground">Bypass "cents_above_band" / "cents_below_band" — fire regardless of calibrated entry range.</div>
+          </div>
+          <Switch
+            checked={s.ignore_cents_band}
+            onCheckedChange={(v) => toggleMut.mutate({ ignore_cents_band: v })}
+            disabled={toggleMut.isPending}
+          />
+        </div>
+        {(s.ignore_low_r2 || s.ignore_cents_band) && (
+          <div className="text-[10px] text-amber-400">⚠ Safety filter bypassed — more fires, more risk.</div>
+        )}
+      </div>
+
+
+
       {r && r.bankroll && (
         <div className={`rounded border p-2 text-[11px] ${r.bankroll.mode === "profit" ? "border-emerald-500/40 bg-emerald-500/5" : ""}`}>
           <div className="flex items-center justify-between">
