@@ -4,6 +4,11 @@
 export const WINDOW = 900;
 export const STALE_SECONDS = 20; // tape freshness cutoff (#2 proxy)
 export const FLIP_COOLDOWN_SECONDS = 20; // (#5)
+// Re-entry (pullback) params.
+export const REENTRY_RAN_TO = 78;      // must have run ≥78¢ at some earlier snap
+export const REENTRY_MIN_BAND = 55;    // current leader cents floor
+export const REENTRY_MAX_BAND = 70;    // current leader cents ceiling (tighter than first-entry)
+export const REENTRY_MIN_TIME = 120;   // ≥2 min left
 export const STABILITY_TICKS = 3; // (#4) consecutive same-leader snaps
 export const MIN_TIME_TO_ENTER = 30; // don't fire in the final 30s
 
@@ -179,5 +184,61 @@ export function evaluateAtm(
       reason: "too_early",
       seconds_to_close: last.seconds_to_close, flip_count: flips,
     },
+  };
+}
+
+// Re-entry (pullback) detector — for tickers where price ran hot (≥78¢)
+// and then pulled back into 55–70¢ band with time still on the clock.
+// Returns a Decision that callers should half-stake and tag rotation_index=2.
+export function evaluateReentry(atm: Row[]): Decision | null {
+  if (atm.length < STABILITY_TICKS + 3) return null;
+  const last = atm[atm.length - 1];
+  const ageMs = Date.now() - new Date(last.snapped_at).getTime();
+  if (ageMs > STALE_SECONDS * 1000) return null;
+  if (last.seconds_to_close < REENTRY_MIN_TIME) return null;
+
+  const curL = leaderOf(last.yes_cents);
+  if (curL === "TIE") return null;
+  const leaderCents = (r: Row) => (curL === "YES" ? r.yes_cents : r.no_cents);
+
+  // Last STABILITY_TICKS must all agree on curL (pullback has stabilised).
+  for (let i = atm.length - STABILITY_TICKS; i < atm.length; i++) {
+    if (leaderOf(atm[i].yes_cents) !== curL) return null;
+  }
+
+  const nowCents = leaderCents(last);
+  if (nowCents < REENTRY_MIN_BAND || nowCents > REENTRY_MAX_BAND) return null;
+
+  // Max leader-side cents seen at ANY earlier snap (proves the run happened).
+  let maxSeen = 0;
+  for (let i = 0; i < atm.length - 1; i++) {
+    const c = leaderCents(atm[i]);
+    if (c > maxSeen) maxSeen = c;
+  }
+  if (maxSeen < REENTRY_RAN_TO) return null;
+
+  // Velocity: cents change on our leader side over ~25s.
+  const now = new Date(last.snapped_at).getTime();
+  let baseIdx = 0;
+  for (let i = atm.length - 1; i >= 0; i--) {
+    if (now - new Date(atm[i].snapped_at).getTime() >= 25_000) { baseIdx = i; break; }
+  }
+  const velocity = leaderCents(last) - leaderCents(atm[baseIdx]);
+
+  // Flip count over full history (for logging).
+  let flips = 0;
+  let p = leaderOf(atm[0].yes_cents);
+  for (let i = 1; i < atm.length; i++) {
+    const c = leaderOf(atm[i].yes_cents);
+    if (c !== "TIE" && p !== "TIE" && c !== p) flips++;
+    p = c;
+  }
+
+  return {
+    ticker: last.ticker, strike: Number(last.strike), spot: Number(last.spot),
+    side: curL, trigger: "leader_chase",
+    yes_cents: last.yes_cents, no_cents: last.no_cents,
+    seconds_to_close: last.seconds_to_close, flip_count: flips,
+    velocity,
   };
 }
