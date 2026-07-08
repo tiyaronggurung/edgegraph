@@ -1386,6 +1386,63 @@ export type Database = {
           },
         ]
       }
+      big_flip_signals: {
+        Row: {
+          detected_at: string
+          flip_at: string
+          id: number
+          new_no: number
+          new_yes: number
+          passed_rules: boolean
+          prev_no: number
+          prev_yes: number
+          reject_reason: string | null
+          seconds_to_close: number
+          spot: number
+          strike: number
+          ticker: string
+          to_side: string
+          user_id: string
+          yes_delta: number
+        }
+        Insert: {
+          detected_at?: string
+          flip_at: string
+          id?: number
+          new_no: number
+          new_yes: number
+          passed_rules: boolean
+          prev_no: number
+          prev_yes: number
+          reject_reason?: string | null
+          seconds_to_close: number
+          spot: number
+          strike: number
+          ticker: string
+          to_side: string
+          user_id: string
+          yes_delta: number
+        }
+        Update: {
+          detected_at?: string
+          flip_at?: string
+          id?: number
+          new_no?: number
+          new_yes?: number
+          passed_rules?: boolean
+          prev_no?: number
+          prev_yes?: number
+          reject_reason?: string | null
+          seconds_to_close?: number
+          spot?: number
+          strike?: number
+          ticker?: string
+          to_side?: string
+          user_id?: string
+          yes_delta?: number
+        }
+        Relationships: []
+      }
       btc_calibration: {
         Row: {
           actual_rate: number | null

@@ -11,6 +11,7 @@ import { getPredictionStats, getCalibrationReport, type CalibrationRow } from "@
 import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, autoExitLivePositions, settleAutoTradeSkipLog, getSkipReport, sellOddsBetOrder, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
 import { recordOddsTape } from "@/lib/oddsTape.functions";
 import { getRecentOddsFlip } from "@/lib/oddsFlipAlert.functions";
+import { detectBigFlip } from "@/lib/bigFlipDetector.functions";
 import { diagnoseRecentMisses, studyMissesWithAI, getLatestStudy, setRecommendationFeedback, type StudyRecommendation } from "@/lib/cryptoMisses.functions";
 import { recomputeShadowSim, getShadowSimReport, type ShadowSimGateStat } from "@/lib/cryptoShadowSim.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
@@ -752,6 +753,55 @@ function OddsFlipAlert() {
       <span className="text-muted-foreground">·</span>
       <span className="text-muted-foreground truncate">{r.ticker?.slice(-16)}</span>
       <span className="text-muted-foreground ml-auto">n={r.sampled}</span>
+    </div>
+  );
+}
+
+function BigFlipMonitor() {
+  const fn = useServerFn(detectBigFlip);
+  const q = useQuery({
+    queryKey: ["big-flip-monitor"],
+    queryFn: () => fn(),
+    refetchInterval: 3_000,
+    staleTime: 2_000,
+  });
+  const lastToastKey = useRef<string | null>(null);
+  useEffect(() => {
+    const r = q.data;
+    if (!r || !r.ok || !r.passed || !r.flipAt || !r.toSide) return;
+    const key = `${r.ticker}:${r.flipAt}`;
+    if (lastToastKey.current === key) return;
+    lastToastKey.current = key;
+    toast.success(`BIG FLIP → ${r.toSide}`, {
+      description: `${r.prevYes}¢ → ${r.newYes}¢ (Δ${r.yesDelta}) · ${r.secondsToClose}s left · SHADOW ONLY`,
+    });
+  }, [q.data]);
+
+  const r = q.data;
+  if (!r || !r.ok) return null;
+  const fresh = r.flipAt && r.ageSeconds != null && r.ageSeconds < 120;
+
+  if (!r.passed || !fresh) {
+    return (
+      <div className="mt-1 rounded border border-border/50 bg-muted/10 px-2 py-1 text-[10px] font-mono text-muted-foreground flex items-center gap-2">
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+        <span>Big-flip monitor · SHADOW · Δ≥25¢ · {r.rejectReason ? `last rejected: ${r.rejectReason}` : "no signal"}</span>
+      </div>
+    );
+  }
+  const toColor = r.toSide === "YES" ? "text-emerald-300" : "text-red-300";
+  const borderColor = r.toSide === "YES" ? "border-emerald-500/60 bg-emerald-500/15" : "border-red-500/60 bg-red-500/15";
+  return (
+    <div className={`mt-1 rounded border px-2 py-1.5 text-[11px] font-mono flex items-center gap-2 ${borderColor}`}>
+      <Zap className={`h-3 w-3 ${toColor}`} />
+      <span className={`font-semibold ${toColor}`}>BIG FLIP → {r.toSide}</span>
+      <span className="text-muted-foreground">·</span>
+      <span>{r.prevYes}¢→<span className={`font-bold ${toColor}`}>{r.newYes}¢</span> (Δ{r.yesDelta})</span>
+      <span className="text-muted-foreground">·</span>
+      <span>{r.secondsToClose}s</span>
+      <span className="text-muted-foreground">·</span>
+      <span className="text-[10px] uppercase text-muted-foreground">shadow only</span>
+      <span className="text-muted-foreground ml-auto">{r.ageSeconds}s ago</span>
     </div>
   );
 }
@@ -1528,6 +1578,7 @@ function AutoTradePanel() {
             Live 24h: {liveCount24h}/40 orders · realized <span className={liveRealized24h >= 0 ? "text-emerald-400" : "text-red-400"}>{liveRealized24h >= 0 ? "+" : ""}${liveRealized24h.toFixed(2)}</span>
           </p>
           <OddsFlipAlert />
+          <BigFlipMonitor />
 
           {skipReport.data && skipReport.data.totalSettled > 0 && (
             <div className="mt-1.5 rounded border border-border/60 bg-muted/10 px-2 py-1.5 text-[10px]">
