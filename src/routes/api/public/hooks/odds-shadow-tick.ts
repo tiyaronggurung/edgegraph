@@ -116,6 +116,14 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
                 entry_velocity_cents: d.velocity,
               });
               if (!error) firedTotal++;
+              else if ((error as { code?: string })?.code === "23505") {
+                await supabaseAdmin.from("auto_trade_odds_skip_log").insert({
+                  user_id: userId, ticker: d.ticker, reason: "duplicate_window_lock",
+                  trigger_candidate: d.trigger, yes_cents: d.yes_cents, no_cents: d.no_cents,
+                  seconds_to_close: d.seconds_to_close, flip_count: d.flip_count,
+                  detail: { rotation_index: 0, source: "cron" },
+                });
+              }
             } else {
               const rd = evaluateReentry(atm);
               if (rd) {
@@ -142,6 +150,14 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
                     rotation_index: 2,
                   });
                   if (!rErr) reentriesTotal++;
+                  else if ((rErr as { code?: string })?.code === "23505") {
+                    await supabaseAdmin.from("auto_trade_odds_skip_log").insert({
+                      user_id: userId, ticker: rd.ticker, reason: "duplicate_window_lock",
+                      trigger_candidate: rd.trigger, yes_cents: rd.yes_cents, no_cents: rd.no_cents,
+                      seconds_to_close: rd.seconds_to_close, flip_count: rd.flip_count,
+                      detail: { rotation_index: 2, source: "cron" },
+                    });
+                  }
                 }
               } else if (res.skip) {
                 skipRows.push({
@@ -243,6 +259,14 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
                         parent_shadow_id: row.id,
                       });
                       if (!insErr) rotationsTotal++;
+                      else if ((insErr as { code?: string })?.code === "23505") {
+                        await supabaseAdmin.from("auto_trade_odds_skip_log").insert({
+                          user_id: userId, ticker: row.ticker as string, reason: "duplicate_window_lock",
+                          trigger_candidate: "flip_fade", yes_cents: last.yes_cents, no_cents: last.no_cents,
+                          seconds_to_close: last.seconds_to_close,
+                          detail: { rotation_index: 1, source: "cron" },
+                        });
+                      }
                     }
                   }
                 }
