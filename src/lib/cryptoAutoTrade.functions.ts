@@ -792,7 +792,7 @@ export async function autoExitForUser(
   const nowIso = new Date().toISOString();
   const { data: open } = await supabase
     .from("auto_trade_orders")
-    .select("id, ticker, side, mode, stake_usd, contracts, limit_cents, close_time, entry_price_cents, contracts_remaining, partial_pnl_usd, exit_ladder, is_martingale")
+    .select("id, ticker, side, mode, stake_usd, contracts, limit_cents, close_time, entry_price_cents, contracts_remaining, partial_pnl_usd, exit_ladder, is_martingale, inputs_snapshot")
     .eq("user_id", userId)
     .in("mode", ["paper", "live"])
     .eq("status", "placed")
@@ -804,9 +804,19 @@ export async function autoExitForUser(
     stake_usd: number; contracts: number; limit_cents: number; close_time: string;
     entry_price_cents: number | null; contracts_remaining: number | null;
     partial_pnl_usd: number | null; exit_ladder: any; is_martingale: boolean | null;
+    inputs_snapshot: any;
   };
   const rows = (open ?? []) as Row[];
   if (!rows.length) return { exited: 0, reasons: [] };
+
+  // Fresh Polymarket read (once per tick, cached 10s inside the module).
+  // If unavailable, poly_flip is skipped this tick — existing exits still fire.
+  let polyNow: { upProb: number; downProb: number; slug: string; windowStartMs: number; windowEndMs: number } | null = null;
+  try {
+    const { getPolymarketBtcUpDown } = await import("./polymarketOdds");
+    polyNow = await getPolymarketBtcUpDown();
+  } catch { polyNow = null; }
+
 
   // Fresh model read for flip detection.
   const currentModelProbBySide = new Map<string, number>();
