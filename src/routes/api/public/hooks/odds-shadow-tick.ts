@@ -116,6 +116,14 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
                 entry_velocity_cents: d.velocity,
               });
               if (!error) firedTotal++;
+              else if ((error as { code?: string })?.code === "23505") {
+                await supabaseAdmin.from("auto_trade_odds_skip_log").insert({
+                  user_id: userId, ticker: d.ticker, reason: "duplicate_window_lock",
+                  trigger_candidate: d.trigger, yes_cents: d.yes_cents, no_cents: d.no_cents,
+                  seconds_to_close: d.seconds_to_close, flip_count: d.flip_count,
+                  detail: { rotation_index: 0, source: "cron" },
+                });
+              }
             } else {
               const rd = evaluateReentry(atm);
               if (rd) {
