@@ -11,27 +11,36 @@ const BASE_STAKE_USD = 100;
 const PROFIT_STAKE_PCT = 0.50; // after 3 wins, stake 50% of profit bank only
 const MAX_STAKE_USD = 500;     // safety cap
 const UNLOCK_WINDOW = 3;       // rolling window size
+// Profit bank seeded at $71 starting 2026-07-08 04:47 UTC. Trades settled
+// before this cutoff are ignored for bank + 3-win unlock streak.
+const BANK_SEED_USD = 71;
+const BANK_CUTOFF_ISO = "2026-07-08T04:47:00Z";
 
 async function computeStake(
   supabase: any,
   userId: string,
 ): Promise<{ stake: number; mode: "base" | "profit"; bank: number }> {
-  // Cumulative PnL over full history (rolling profit bank).
+  // Cumulative PnL since cutoff, plus seed.
   const { data: allSettled } = await supabase
     .from("auto_trade_odds_shadow")
     .select("pnl_usd")
     .eq("user_id", userId)
     .eq("settled", true)
+    .gte("settled_at", BANK_CUTOFF_ISO)
     .order("settled_at", { ascending: false })
     .limit(1000);
-  const bank = Math.max(0, (allSettled ?? []).reduce((s: number, r: any) => s + Number(r.pnl_usd ?? 0), 0));
+  const bank = Math.max(
+    0,
+    BANK_SEED_USD + (allSettled ?? []).reduce((s: number, r: any) => s + Number(r.pnl_usd ?? 0), 0),
+  );
 
-  // Unlock check: last N settled trades are all wins.
+  // Unlock check: last N settled trades (since cutoff) are all wins.
   const { data: recent } = await supabase
     .from("auto_trade_odds_shadow")
     .select("pnl_usd, stake_usd, settled_at")
     .eq("user_id", userId)
     .eq("settled", true)
+    .gte("settled_at", BANK_CUTOFF_ISO)
     .order("settled_at", { ascending: false })
     .limit(UNLOCK_WINDOW);
   const recentArr = (recent ?? []) as Array<{ pnl_usd: number | string | null; stake_usd: number | string | null }>;
