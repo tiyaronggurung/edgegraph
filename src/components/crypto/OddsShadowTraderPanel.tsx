@@ -53,13 +53,13 @@ export function OddsShadowTraderPanel() {
 
       {r && (
         <>
-          <div className="grid grid-cols-4 gap-2 text-center">
+          <div className="grid grid-cols-5 gap-2 text-center">
             <div className="rounded border p-2">
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Fired</div>
               <div className="text-lg font-semibold">{r.totals.fired}</div>
             </div>
             <div className="rounded border p-2">
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Settled</div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Record</div>
               <div className="text-lg font-semibold">{r.totals.wins}W / {r.totals.losses}L</div>
               <div className="text-[10px] text-muted-foreground">{r.totals.winPct}%</div>
             </div>
@@ -68,6 +68,10 @@ export function OddsShadowTraderPanel() {
               <div className={`text-lg font-semibold ${r.totals.pnlUsd > 0 ? "text-emerald-400" : r.totals.pnlUsd < 0 ? "text-red-400" : ""}`}>
                 ${r.totals.pnlUsd.toFixed(2)}
               </div>
+            </div>
+            <div className="rounded border p-2">
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Early exits</div>
+              <div className="text-lg font-semibold">{r.totals.earlyExits ?? 0}</div>
             </div>
             <div className="rounded border p-2">
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Open</div>
@@ -88,6 +92,33 @@ export function OddsShadowTraderPanel() {
             </div>
           </div>
 
+          {r.calibration && r.calibration.length > 0 && (
+            <div className="rounded border p-2 text-[11px]">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Auto-tuned thresholds</div>
+              <div className="grid grid-cols-2 gap-2 font-mono">
+                {r.calibration.map((c) => (
+                  <div key={c.trigger}>
+                    <span className="text-muted-foreground">{c.trigger}:</span> {c.min_cents}-{c.max_cents}¢ · v≥{c.min_velocity} · n={c.sample_size} · {Math.round(Number(c.win_rate) * 100)}%
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {r.skipTop && r.skipTop.length > 0 && (
+            <div className="rounded border">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1 border-b">Top skip reasons (24h)</div>
+              <div className="px-2 py-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] font-mono">
+                {r.skipTop.map((s) => (
+                  <div key={s.key} className="flex justify-between">
+                    <span className="truncate text-muted-foreground">{s.key}</span>
+                    <span>{s.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {r.recent.length > 0 && (
             <div className="rounded border">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1 border-b">Recent shadow fires</div>
@@ -98,6 +129,7 @@ export function OddsShadowTraderPanel() {
                       {row.side === "YES" ? <TrendingUp className="h-3 w-3 text-emerald-400" /> : <TrendingDown className="h-3 w-3 text-red-400" />}
                       <span className="truncate">{row.ticker.slice(-16)}</span>
                       <Badge variant="outline" className="text-[9px]">{row.trigger === "leader_chase" ? "chase" : "fade"}</Badge>
+                      {row.early_exited && <Badge variant="destructive" className="text-[9px]">exit</Badge>}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">{row.limit_cents}¢×{row.contracts}</span>

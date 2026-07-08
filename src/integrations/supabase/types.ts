@@ -101,6 +101,42 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_odds_calibration: {
+        Row: {
+          last_tuned_at: string
+          max_cents: number
+          min_cents: number
+          min_velocity: number
+          sample_size: number
+          trigger: string
+          updated_at: string
+          user_id: string
+          win_rate: number
+        }
+        Insert: {
+          last_tuned_at?: string
+          max_cents?: number
+          min_cents?: number
+          min_velocity?: number
+          sample_size?: number
+          trigger: string
+          updated_at?: string
+          user_id: string
+          win_rate?: number
+        }
+        Update: {
+          last_tuned_at?: string
+          max_cents?: number
+          min_cents?: number
+          min_velocity?: number
+          sample_size?: number
+          trigger?: string
+          updated_at?: string
+          user_id?: string
+          win_rate?: number
+        }
+        Relationships: []
+      }
       auto_odds_decision_log: {
         Row: {
           actual_entered: boolean
@@ -761,6 +797,11 @@ export type Database = {
       auto_trade_odds_shadow: {
         Row: {
           contracts: number
+          early_exited: boolean
+          entry_velocity_cents: number | null
+          exit_cents: number | null
+          exit_reason: string | null
+          exited_at: string | null
           final_yes_cents: number | null
           fired_at: string
           flip_count_at_fire: number
@@ -783,6 +824,11 @@ export type Database = {
         }
         Insert: {
           contracts: number
+          early_exited?: boolean
+          entry_velocity_cents?: number | null
+          exit_cents?: number | null
+          exit_reason?: string | null
+          exited_at?: string | null
           final_yes_cents?: number | null
           fired_at?: string
           flip_count_at_fire: number
@@ -805,6 +851,11 @@ export type Database = {
         }
         Update: {
           contracts?: number
+          early_exited?: boolean
+          entry_velocity_cents?: number | null
+          exit_cents?: number | null
+          exit_reason?: string | null
+          exited_at?: string | null
           final_yes_cents?: number | null
           fired_at?: string
           flip_count_at_fire?: number
@@ -824,6 +875,48 @@ export type Database = {
           user_id?: string
           won?: boolean | null
           yes_cents_at_fire?: number
+        }
+        Relationships: []
+      }
+      auto_trade_odds_skip_log: {
+        Row: {
+          created_at: string
+          detail: Json | null
+          flip_count: number | null
+          id: number
+          no_cents: number | null
+          reason: string
+          seconds_to_close: number | null
+          ticker: string
+          trigger_candidate: string | null
+          user_id: string
+          yes_cents: number | null
+        }
+        Insert: {
+          created_at?: string
+          detail?: Json | null
+          flip_count?: number | null
+          id?: number
+          no_cents?: number | null
+          reason: string
+          seconds_to_close?: number | null
+          ticker: string
+          trigger_candidate?: string | null
+          user_id: string
+          yes_cents?: number | null
+        }
+        Update: {
+          created_at?: string
+          detail?: Json | null
+          flip_count?: number | null
+          id?: number
+          no_cents?: number | null
+          reason?: string
+          seconds_to_close?: number | null
+          ticker?: string
+          trigger_candidate?: string | null
+          user_id?: string
+          yes_cents?: number | null
         }
         Relationships: []
       }
