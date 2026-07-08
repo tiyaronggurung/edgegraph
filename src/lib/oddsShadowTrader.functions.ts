@@ -157,6 +157,14 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
               rotation_index: 2,
             });
             if (!error) reentries++;
+            else if ((error as { code?: string })?.code === "23505") {
+              await supabase.from("auto_trade_odds_skip_log").insert({
+                user_id: userId, ticker: rd.ticker, reason: "duplicate_window_lock",
+                trigger_candidate: rd.trigger, yes_cents: rd.yes_cents, no_cents: rd.no_cents,
+                seconds_to_close: rd.seconds_to_close, flip_count: rd.flip_count,
+                detail: { rotation_index: 2, source: "browser" },
+              });
+            }
           }
         } else if (res.skip) {
           skipRows.push({
