@@ -33,7 +33,7 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
         if (uErr) return new Response(JSON.stringify({ error: uErr.message }), { status: 500 });
         const userIds = Array.from(new Set((userRows ?? []).map(r => r.user_id).filter(Boolean)));
 
-        let firedTotal = 0, settledTotal = 0, earlyExitsTotal = 0, skippedTotal = 0, rotationsTotal = 0;
+        let firedTotal = 0, settledTotal = 0, earlyExitsTotal = 0, skippedTotal = 0, rotationsTotal = 0, reentriesTotal = 0;
 
         for (const userId of userIds) {
           const { data: tape } = await supabaseAdmin
