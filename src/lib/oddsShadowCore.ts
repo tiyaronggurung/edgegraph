@@ -116,6 +116,7 @@ export function evaluateAtm(
   atm: Row[],
   cal: CalMap,
   latestTapeAt?: string,
+  opts: GateOpts = {},
 ): { decision?: Decision; skip?: Skip } {
   if (atm.length < STABILITY_TICKS) return { skip: { reason: "insufficient_history" } };
   const last = atm[atm.length - 1];
@@ -134,9 +135,10 @@ export function evaluateAtm(
     return { skip: { reason: "too_late", seconds_to_close: last.seconds_to_close } };
   }
 
-  // Strict regression chop skip.
-  const chop = regressionChopSkip(atm);
+  // Strict regression chop skip (R² check honors opts.ignoreLowR2).
+  const chop = regressionChopSkip(atm, opts);
   if (chop) return { skip: chop };
+
 
 
   const tElapsed = WINDOW - last.seconds_to_close;
