@@ -150,6 +150,7 @@ export function OddsShadowTraderPanel() {
                       <span className="truncate">{row.ticker.slice(-16)}</span>
                       <Badge variant="outline" className="text-[9px]">{row.trigger === "leader_chase" ? "chase" : "fade"}</Badge>
                       {row.early_exited && <Badge variant="destructive" className="text-[9px]">exit</Badge>}
+                      {Number(row.rotation_index ?? 0) > 0 && <Badge className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40">rotated</Badge>}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">{row.limit_cents}¢×{row.contracts}</span>
