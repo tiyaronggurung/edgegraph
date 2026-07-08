@@ -792,7 +792,7 @@ export async function autoExitForUser(
   const nowIso = new Date().toISOString();
   const { data: open } = await supabase
     .from("auto_trade_orders")
-    .select("id, ticker, side, mode, stake_usd, contracts, limit_cents, close_time, entry_price_cents, contracts_remaining, partial_pnl_usd, exit_ladder, is_martingale")
+    .select("id, ticker, side, mode, stake_usd, contracts, limit_cents, close_time, entry_price_cents, contracts_remaining, partial_pnl_usd, exit_ladder, is_martingale, inputs_snapshot")
     .eq("user_id", userId)
     .in("mode", ["paper", "live"])
     .eq("status", "placed")
@@ -804,9 +804,19 @@ export async function autoExitForUser(
     stake_usd: number; contracts: number; limit_cents: number; close_time: string;
     entry_price_cents: number | null; contracts_remaining: number | null;
     partial_pnl_usd: number | null; exit_ladder: any; is_martingale: boolean | null;
+    inputs_snapshot: any;
   };
   const rows = (open ?? []) as Row[];
   if (!rows.length) return { exited: 0, reasons: [] };
+
+  // Fresh Polymarket read (once per tick, cached 10s inside the module).
+  // If unavailable, poly_flip is skipped this tick — existing exits still fire.
+  let polyNow: { upProb: number; downProb: number; slug: string; windowStartMs: number; windowEndMs: number } | null = null;
+  try {
+    const { getPolymarketBtcUpDown } = await import("./polymarketOdds");
+    polyNow = await getPolymarketBtcUpDown();
+  } catch { polyNow = null; }
+
 
   // Fresh model read for flip detection.
   const currentModelProbBySide = new Map<string, number>();
@@ -1005,7 +1015,7 @@ export async function autoExitForUser(
     const adverseCents = entry - markCents;
     const sideProbNow = currentModelProbBySide.get(r.ticker);
 
-    let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | "mart_hopeless" | "mart_hardcap" | "odds_flip" | "deep_combo" | null = null;
+    let exitReason: "tp" | "sl" | "edge" | "net" | "flip" | "mart_hopeless" | "mart_hardcap" | "odds_flip" | "deep_combo" | "poly_flip" | null = null;
     // Martingale-specific rules (only apply to martingale-tagged orders).
     if (r.is_martingale === true) {
       const stake = Number(r.stake_usd);
@@ -1040,6 +1050,22 @@ export async function autoExitForUser(
     if (!exitReason && (entry - markCents) >= 20) {
       exitReason = "odds_flip";
       reasons.push(`${r.ticker}[${r.mode}]: ODDS FLIP — Kalshi ${r.side} ${markCents}¢ vs entry ${entry}¢ (−${entry - markCents}¢)`);
+    }
+    // Polymarket flip: crowd on same 5-min window has rotated against us.
+    // Fires only when BOTH: our-side Poly prob < 40% now AND dropped ≥15pts
+    // vs entry snapshot. Same-window guard prevents comparing across expiries.
+    if (!exitReason && polyNow) {
+      const entryPoly = r.inputs_snapshot?.polymarket;
+      const entryOurSide = Number(entryPoly?.ourSideProb);
+      const entryWinStart = Number(entryPoly?.windowStartMs);
+      const nowOurSide = r.side === "YES" ? polyNow.upProb : polyNow.downProb;
+      if (Number.isFinite(entryOurSide) && Number.isFinite(entryWinStart)
+          && entryWinStart === polyNow.windowStartMs
+          && nowOurSide < 0.40
+          && (entryOurSide - nowOurSide) >= 0.15) {
+        exitReason = "poly_flip";
+        reasons.push(`${r.ticker}[${r.mode}]: POLY FLIP — Polymarket ${r.side === "YES" ? "Up" : "Down"} ${(nowOurSide * 100).toFixed(0)}% (entry ${(entryOurSide * 100).toFixed(0)}%, −${((entryOurSide - nowOurSide) * 100).toFixed(0)}pts)`);
+      }
     }
     if (!exitReason && sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
       exitReason = "flip";
