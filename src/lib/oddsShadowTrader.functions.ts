@@ -8,8 +8,7 @@ import { evaluateAtm, evaluateReentry, atmByTicker, type Row } from "./oddsShado
 // profit-bankroll staking (play with profit, not principal).
 
 const BASE_STAKE_USD = 100;
-const UNLOCK_PROFIT = 50;      // last-3 settled PnL ≥ +$50 → unlock
-const PROFIT_STAKE_PCT = 0.40; // 40% of rolling profit bank
+const PROFIT_STAKE_PCT = 0.50; // after 3 wins, stake 50% of profit bank only
 const MAX_STAKE_USD = 500;     // safety cap
 const UNLOCK_WINDOW = 3;       // rolling window size
 
@@ -25,9 +24,9 @@ async function computeStake(
     .eq("settled", true)
     .order("settled_at", { ascending: false })
     .limit(1000);
-  const bank = (allSettled ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0);
+  const bank = Math.max(0, (allSettled ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0));
 
-  // Unlock check: last N settled trades cumulative ≥ UNLOCK_PROFIT.
+  // Unlock check: last N settled trades are all wins.
   const { data: recent } = await supabase
     .from("auto_trade_odds_shadow")
     .select("pnl_usd")
@@ -35,11 +34,11 @@ async function computeStake(
     .eq("settled", true)
     .order("settled_at", { ascending: false })
     .limit(UNLOCK_WINDOW);
-  const recentPnl = (recent ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0);
+  const winStreakUnlocked = (recent?.length ?? 0) >= UNLOCK_WINDOW
+    && (recent ?? []).every((r) => Number(r.pnl_usd ?? 0) > 0);
 
-  const unlocked = bank >= UNLOCK_PROFIT && recentPnl >= UNLOCK_PROFIT && (recent?.length ?? 0) >= UNLOCK_WINDOW;
-  if (unlocked) {
-    const stake = Math.min(Math.max(bank * PROFIT_STAKE_PCT, BASE_STAKE_USD), MAX_STAKE_USD);
+  if (winStreakUnlocked && bank > 0) {
+    const stake = Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD);
     return { stake, mode: "profit", bank };
   }
   return { stake: BASE_STAKE_USD, mode: "base", bank };
@@ -135,7 +134,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
         const rd = evaluateReentry(atm);
         if (rd) {
           const limitCents = rd.side === "YES" ? rd.yes_cents : rd.no_cents;
-          const halfStake = Math.max(stakeInfo.stake * 0.5, 50);
+          const halfStake = stakeInfo.mode === "profit" ? stakeInfo.stake * 0.5 : 50;
           const contracts = Math.floor((halfStake * 100) / limitCents);
           if (contracts >= 1) {
             const stake = (contracts * limitCents) / 100;

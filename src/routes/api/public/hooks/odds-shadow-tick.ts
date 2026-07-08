@@ -7,8 +7,7 @@ import { evaluateAtm, evaluateReentry, atmByTicker, type Row } from "@/lib/oddsS
 // by pg_cron); Lovable Cloud published /api/public/* also bypasses auth.
 
 const BASE_STAKE_USD = 100;
-const UNLOCK_PROFIT = 50;
-const PROFIT_STAKE_PCT = 0.40;
+const PROFIT_STAKE_PCT = 0.50;
 const MAX_STAKE_USD = 500;
 const UNLOCK_WINDOW = 3;
 
@@ -66,7 +65,7 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
             .eq("user_id", userId);
           const firedSet = new Set((fired ?? []).map(r => r.ticker));
 
-          // Dynamic stake: base $100, or 40% of profit bank once unlocked.
+          // Dynamic stake: base $100, then profit-only sizing after 3 straight wins.
           const { data: allSettled } = await supabaseAdmin
             .from("auto_trade_odds_shadow")
             .select("pnl_usd")
@@ -74,7 +73,7 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
             .eq("settled", true)
             .order("settled_at", { ascending: false })
             .limit(1000);
-          const bank = (allSettled ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0);
+          const bank = Math.max(0, (allSettled ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0));
           const { data: recent } = await supabaseAdmin
             .from("auto_trade_odds_shadow")
             .select("pnl_usd")
@@ -82,10 +81,11 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
             .eq("settled", true)
             .order("settled_at", { ascending: false })
             .limit(UNLOCK_WINDOW);
-          const recentPnl = (recent ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0);
-          const unlocked = bank >= UNLOCK_PROFIT && recentPnl >= UNLOCK_PROFIT && (recent?.length ?? 0) >= UNLOCK_WINDOW;
+          const unlocked = (recent?.length ?? 0) >= UNLOCK_WINDOW
+            && (recent ?? []).every((r) => Number(r.pnl_usd ?? 0) > 0)
+            && bank > 0;
           const dynStake = unlocked
-            ? Math.min(Math.max(bank * PROFIT_STAKE_PCT, BASE_STAKE_USD), MAX_STAKE_USD)
+            ? Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD)
             : BASE_STAKE_USD;
 
           const skipRows: Array<Record<string, unknown>> = [];
@@ -128,7 +128,7 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
               const rd = evaluateReentry(atm);
               if (rd) {
                 const limitCents = rd.side === "YES" ? rd.yes_cents : rd.no_cents;
-                const halfStake = Math.max(dynStake * 0.5, 50);
+                const halfStake = unlocked ? dynStake * 0.5 : 50;
                 const rContracts = Math.floor((halfStake * 100) / limitCents);
                 if (rContracts >= 1) {
                   const rStake = (rContracts * limitCents) / 100;
