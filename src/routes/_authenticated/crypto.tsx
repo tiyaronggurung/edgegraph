@@ -2233,7 +2233,10 @@ function CryptoPage() {
 
           <FlipShadowPanel />
 
+          <ScalpShadowPanel />
+
           <TaShadowPanel />
+
 
 
 
