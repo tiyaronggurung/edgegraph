@@ -6,8 +6,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // latest signal so the UI can render a banner. Does NOT place any trades.
 
 const YES_DELTA_MIN = 25;
-const MIN_SECONDS_TO_CLOSE = 180;
+const MIN_SECONDS_TO_CLOSE = 20;
 const NO_OPPOSITE_FLIP_WINDOW_SEC = 300; // 5 min
+const LIVE_STAKE_USD = 20;
 
 export interface BigFlipSignal {
   ok: boolean;
@@ -109,8 +110,9 @@ export const detectBigFlip = createServerFn({ method: "GET" })
       if (priorOpposite) { passed = false; reject = "opposite flip within 5 min"; }
     }
 
-    // Idempotent insert (unique on user+ticker+flip_at).
-    await context.supabase.from("big_flip_signals").insert({
+    // Idempotent insert (unique on user+ticker+flip_at). Only place a live
+    // bet on the FIRST insert for this flip — dup conflict = already handled.
+    const { error: insErr } = await context.supabase.from("big_flip_signals").insert({
       user_id: context.userId,
       ticker,
       strike,
@@ -126,6 +128,41 @@ export const detectBigFlip = createServerFn({ method: "GET" })
       reject_reason: reject,
       flip_at: flipAt,
     });
+    const firstTime = !insErr;
+
+    // LIVE: fire a $20 Kalshi buy on the flipped-to side, first time only.
+    if (passed && firstTime) {
+      try {
+        const { submitKalshiBuy } = await import("./cryptoTrades.functions");
+        const limitCents = toSide === "YES"
+          ? (flipSample.yes_cents as number)
+          : (flipSample.no_cents as number);
+        if (limitCents >= 1 && limitCents <= 99) {
+          const contracts = Math.max(1, Math.floor((LIVE_STAKE_USD * 100) / limitCents));
+          await submitKalshiBuy(context.supabase, context.userId, {
+            ticker,
+            side: toSide,
+            contracts,
+            limitPriceCents: limitCents,
+            strike,
+            spot,
+            stakeUsd: (contracts * limitCents) / 100,
+            inputsSnapshot: {
+              source: "big_flip_detector",
+              yes_delta: big.delta,
+              prev_yes: prevSample.yes_cents,
+              new_yes: flipSample.yes_cents,
+              seconds_to_close: stc,
+              flip_at: flipAt,
+            },
+          });
+        }
+      } catch (e) {
+        // Swallow — signal already logged; do not block the detector loop.
+        console.error("[bigFlipDetector] live order failed:", (e as Error)?.message);
+      }
+    }
+
 
     return {
       ok: true, ticker, toSide,
