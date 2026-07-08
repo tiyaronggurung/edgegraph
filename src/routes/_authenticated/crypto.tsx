@@ -1480,6 +1480,8 @@ function AutoTradePanel() {
           <p className="text-[10px] text-muted-foreground mt-0.5">
             Live 24h: {liveCount24h}/40 orders · realized <span className={liveRealized24h >= 0 ? "text-emerald-400" : "text-red-400"}>{liveRealized24h >= 0 ? "+" : ""}${liveRealized24h.toFixed(2)}</span>
           </p>
+          <OddsFlipAlert />
+
           {skipReport.data && skipReport.data.totalSettled > 0 && (
             <div className="mt-1.5 rounded border border-border/60 bg-muted/10 px-2 py-1.5 text-[10px]">
               <div className="font-mono text-muted-foreground">
