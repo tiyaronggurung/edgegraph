@@ -6,8 +6,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // latest signal so the UI can render a banner. Does NOT place any trades.
 
 const YES_DELTA_MIN = 25;
-const MIN_SECONDS_TO_CLOSE = 180;
+const MIN_SECONDS_TO_CLOSE = 20;
 const NO_OPPOSITE_FLIP_WINDOW_SEC = 300; // 5 min
+const LIVE_STAKE_USD = 20;
 
 export interface BigFlipSignal {
   ok: boolean;
