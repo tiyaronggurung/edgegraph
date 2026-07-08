@@ -50,13 +50,7 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
 
     // 4. Evaluate.
     let inserted = 0;
-    const skipRows: {
-      user_id: string; ticker: string; reason: string;
-      trigger_candidate: string | null;
-      yes_cents: number | null; no_cents: number | null;
-      seconds_to_close: number | null; flip_count: number | null;
-      detail: Record<string, unknown> | null;
-    }[] = [];
+    const skipRows: Array<Record<string, unknown>> = [];
 
     for (const [tk, atm] of groups) {
       if (firedSet.has(tk)) continue;
