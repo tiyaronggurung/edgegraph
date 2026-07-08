@@ -808,7 +808,9 @@ export type Database = {
           id: string
           limit_cents: number
           no_cents_at_fire: number
+          parent_shadow_id: string | null
           pnl_usd: number | null
+          rotation_index: number
           seconds_to_close_at_fire: number
           settled: boolean
           settled_at: string | null
@@ -835,7 +837,9 @@ export type Database = {
           id?: string
           limit_cents: number
           no_cents_at_fire: number
+          parent_shadow_id?: string | null
           pnl_usd?: number | null
+          rotation_index?: number
           seconds_to_close_at_fire: number
           settled?: boolean
           settled_at?: string | null
@@ -862,7 +866,9 @@ export type Database = {
           id?: string
           limit_cents?: number
           no_cents_at_fire?: number
+          parent_shadow_id?: string | null
           pnl_usd?: number | null
+          rotation_index?: number
           seconds_to_close_at_fire?: number
           settled?: boolean
           settled_at?: string | null
@@ -876,7 +882,15 @@ export type Database = {
           won?: boolean | null
           yes_cents_at_fire?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "auto_trade_odds_shadow_parent_shadow_id_fkey"
+            columns: ["parent_shadow_id"]
+            isOneToOne: false
+            referencedRelation: "auto_trade_odds_shadow"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       auto_trade_odds_skip_log: {
         Row: {
