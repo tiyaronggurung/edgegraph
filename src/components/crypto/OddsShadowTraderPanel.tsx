@@ -1,13 +1,16 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef } from "react";
 import { runOddsShadowTick, getOddsShadowReport } from "@/lib/oddsShadowTrader.functions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Zap, TrendingUp, TrendingDown } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { supabase } from "@/integrations/supabase/client";
+import { Bot } from "lucide-react";
 
 // SHADOW-ONLY. Runs the odds-flip trader every 5s, logs decisions, shows PnL vs actuals.
 // No real orders are placed.
+
 
 export function OddsShadowTraderPanel() {
   const tick = useServerFn(runOddsShadowTick);
