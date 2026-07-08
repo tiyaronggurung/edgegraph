@@ -82,9 +82,9 @@ export const runOddsShadowTick = createServerFn({ method: "POST" })
     let reentries = 0;
     const skipRows: Array<Record<string, unknown>> = [];
 
-    // Compute dynamic stake once per tick — same bankroll basis for every fire this cycle.
+    // Compute ladder state once per tick — same stake basis for every fire this cycle.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const stakeInfo = await computeStake(supabase as any, userId);
+    const { state: ladder, config: ladderCfg } = await computeLadder(supabase as any, userId);
 
     for (const [tk, atm] of groups) {
       if (firedSet.has(tk)) continue;
