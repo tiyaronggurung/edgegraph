@@ -296,6 +296,69 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_odds_scalp_shadow: {
+        Row: {
+          created_at: string
+          entered_at: string
+          entry_cents: number
+          entry_dist_to_strike: number
+          entry_side: string
+          entry_spot: number
+          exit_cents: number | null
+          exit_reason: string | null
+          exit_spot: number | null
+          exited_at: string | null
+          id: string
+          pnl_cents: number | null
+          seconds_to_close_at_entry: number
+          settled_yes: boolean | null
+          setup_kind: string
+          strike: number
+          ticker: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entered_at?: string
+          entry_cents: number
+          entry_dist_to_strike: number
+          entry_side: string
+          entry_spot: number
+          exit_cents?: number | null
+          exit_reason?: string | null
+          exit_spot?: number | null
+          exited_at?: string | null
+          id?: string
+          pnl_cents?: number | null
+          seconds_to_close_at_entry: number
+          settled_yes?: boolean | null
+          setup_kind: string
+          strike: number
+          ticker: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entered_at?: string
+          entry_cents?: number
+          entry_dist_to_strike?: number
+          entry_side?: string
+          entry_spot?: number
+          exit_cents?: number | null
+          exit_reason?: string | null
+          exit_spot?: number | null
+          exited_at?: string | null
+          id?: string
+          pnl_cents?: number | null
+          seconds_to_close_at_entry?: number
+          settled_yes?: boolean | null
+          setup_kind?: string
+          strike?: number
+          ticker?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       auto_odds_settings: {
         Row: {
           auto_apply_studies: boolean
