@@ -2485,6 +2485,8 @@ function CryptoPage() {
 
           <FlipRecorderPanel />
 
+          <OddsShadowTraderPanel />
+
           <SkipBucketPanel />
 
           <LossCapPanel />
