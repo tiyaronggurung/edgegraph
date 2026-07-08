@@ -177,7 +177,8 @@ export function evaluateAtm(
   const fadeCal = cal.flip_fade;
   if (lastFlipIdx > 0 && lastFlipIdx >= atm.length - 2 && tElapsed >= 300) {
     const cents = leaderCents(last);
-    if (cents >= fadeCal.min_cents && cents <= fadeCal.max_cents && velocity >= fadeCal.min_velocity) {
+    const centsOkFade = opts.ignoreCentsBand || (cents >= fadeCal.min_cents && cents <= fadeCal.max_cents);
+    if (centsOkFade && velocity >= fadeCal.min_velocity) {
       return {
         decision: {
           ticker: last.ticker, strike: Number(last.strike), spot: Number(last.spot),
@@ -188,11 +189,12 @@ export function evaluateAtm(
         },
       };
     }
+    const fadeReason = !centsOkFade
+      ? (cents < fadeCal.min_cents ? "cents_below_band" : "cents_above_band")
+      : "velocity_below_min";
     return {
       skip: {
-        reason: cents < fadeCal.min_cents ? "cents_below_band"
-          : cents > fadeCal.max_cents ? "cents_above_band"
-          : "velocity_below_min",
+        reason: fadeReason,
         trigger_candidate: "flip_fade",
         yes_cents: last.yes_cents, no_cents: last.no_cents,
         seconds_to_close: last.seconds_to_close, flip_count: flips,
@@ -220,7 +222,8 @@ export function evaluateAtm(
       };
     }
     const cents = leaderCents(last);
-    if (cents >= chaseCal.min_cents && cents <= chaseCal.max_cents) {
+    const centsOkChase = opts.ignoreCentsBand || (cents >= chaseCal.min_cents && cents <= chaseCal.max_cents);
+    if (centsOkChase) {
       return {
         decision: {
           ticker: last.ticker, strike: Number(last.strike), spot: Number(last.spot),
@@ -241,6 +244,7 @@ export function evaluateAtm(
       },
     };
   }
+
 
   return {
     skip: {
