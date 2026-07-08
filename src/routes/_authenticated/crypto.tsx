@@ -1163,6 +1163,8 @@ function AutoTradePanel() {
   }, [liveOrders, martStake, martLosses, martWins]);
 
   async function runMartingale(stakeUsd: number): Promise<string | null> {
+    // Removed: martingale/live stake escalation is disabled permanently.
+    return null;
     try {
       const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd, maxOrders: 1, force: true, isMartingale: true } });
       if (res.placed > 0 && res.orders?.[0]) {
@@ -1180,6 +1182,8 @@ function AutoTradePanel() {
   }
 
   useEffect(() => {
+    // Removed: martingale/live stake escalation is disabled permanently.
+    return;
     if (!autoMart) return;
     if (typeof window === "undefined") return;
     let cancelled = false;
