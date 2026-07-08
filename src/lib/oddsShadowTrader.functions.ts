@@ -420,19 +420,20 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const stakeInfo = await computeStake(supabase as any, userId);
 
-    // Win-streak progress (last up-to-3 settled trades post-cutoff).
+    // Win-streak progress from LIVE Kalshi orders post-cutoff.
     const BANK_CUTOFF_ISO_UI = "2026-07-08T04:47:00Z";
     const { data: streakRows } = await supabase
-      .from("auto_trade_odds_shadow")
-      .select("pnl_usd")
+      .from("auto_trade_orders")
+      .select("status, settled_at")
       .eq("user_id", userId)
-      .eq("settled", true)
+      .eq("mode", "live")
+      .in("status", ["settled_win", "settled_loss"])
       .gte("settled_at", BANK_CUTOFF_ISO_UI)
       .order("settled_at", { ascending: false })
       .limit(3);
     let winStreak = 0;
-    for (const r of (streakRows ?? []) as Array<{ pnl_usd: number | string | null }>) {
-      if (Number(r.pnl_usd ?? 0) > 0) winStreak++;
+    for (const r of (streakRows ?? []) as Array<{ status: string }>) {
+      if (r.status === "settled_win") winStreak++;
       else break;
     }
 
