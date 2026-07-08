@@ -13,7 +13,7 @@ const MAX_STAKE_USD = 500;     // safety cap
 const UNLOCK_WINDOW = 3;       // rolling window size
 
 async function computeStake(
-  supabase: { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { eq: (k: string, v: boolean) => { order: (k: string, o: { ascending: boolean }) => { limit: (n: number) => Promise<{ data: Array<{ pnl_usd: number | string | null }> | null }> } } } } } },
+  supabase: any,
   userId: string,
 ): Promise<{ stake: number; mode: "base" | "profit"; bank: number }> {
   // Cumulative PnL over full history (rolling profit bank).
@@ -24,22 +24,29 @@ async function computeStake(
     .eq("settled", true)
     .order("settled_at", { ascending: false })
     .limit(1000);
-  const bank = Math.max(0, (allSettled ?? []).reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0));
+  const bank = Math.max(0, (allSettled ?? []).reduce((s: number, r: any) => s + Number(r.pnl_usd ?? 0), 0));
 
   // Unlock check: last N settled trades are all wins.
   const { data: recent } = await supabase
     .from("auto_trade_odds_shadow")
-    .select("pnl_usd")
+    .select("pnl_usd, stake_usd, settled_at")
     .eq("user_id", userId)
     .eq("settled", true)
     .order("settled_at", { ascending: false })
     .limit(UNLOCK_WINDOW);
-  const winStreakUnlocked = (recent?.length ?? 0) >= UNLOCK_WINDOW
-    && (recent ?? []).every((r) => Number(r.pnl_usd ?? 0) > 0);
+  const recentArr = (recent ?? []) as Array<{ pnl_usd: number | string | null; stake_usd: number | string | null }>;
+  const winStreakUnlocked = recentArr.length >= UNLOCK_WINDOW
+    && recentArr.every((r) => Number(r.pnl_usd ?? 0) > 0);
 
   if (winStreakUnlocked && bank > 0) {
-    const stake = Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD);
-    return { stake, mode: "profit", bank };
+    const baseStake = Math.min(bank * PROFIT_STAKE_PCT, MAX_STAKE_USD);
+    // Martingale: if last settled trade was a loss, double previous stake — only if bank covers it.
+    const last = recentArr[0];
+    if (last && Number(last.pnl_usd ?? 0) <= 0) {
+      const doubled = Math.min(Number(last.stake_usd ?? baseStake) * 2, MAX_STAKE_USD);
+      if (bank >= doubled) return { stake: doubled, mode: "profit", bank };
+    }
+    return { stake: baseStake, mode: "profit", bank };
   }
   return { stake: BASE_STAKE_USD, mode: "base", bank };
 }
