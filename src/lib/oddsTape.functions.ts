@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { evaluateScalpShadow } from "@/lib/scalpShadow.functions";
 
 const SnapshotSchema = z.object({
   ticker: z.string().min(1).max(64),
@@ -30,5 +31,15 @@ export const recordOddsTape = createServerFn({ method: "POST" })
     }));
     const { error } = await context.supabase.from("btc_odds_tape").insert(rows);
     if (error) return { ok: false as const, error: error.message };
+
+    // Shadow-only observer. Failures MUST NOT affect the tape response.
+    const uniqueTickers = Array.from(new Set(data.snapshots.map((s) => s.ticker)));
+    await Promise.all(
+      uniqueTickers.map((ticker) =>
+        evaluateScalpShadow({ data: { ticker } }).catch(() => undefined),
+      ),
+    );
+
     return { ok: true as const, inserted: rows.length };
   });
+
