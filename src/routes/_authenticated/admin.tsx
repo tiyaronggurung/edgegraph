@@ -86,6 +86,8 @@ function AdminPanel() {
           ))}
         </div>
       </div>
+
+      <StakingConfigPanel />
     </div>
   );
 }
