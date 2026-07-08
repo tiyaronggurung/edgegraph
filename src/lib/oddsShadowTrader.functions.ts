@@ -345,6 +345,7 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
         winPct: settled.length ? Math.round((wins.length / settled.length) * 1000) / 10 : 0,
         pnlUsd: Math.round(totalPnl * 100) / 100,
         earlyExits: settled.filter(r => r.early_exited).length,
+        rotations: rows.filter(r => Number(r.rotation_index ?? 0) > 0).length,
       },
       bankroll: {
         bank: Math.round(stakeInfo.bank * 100) / 100,
