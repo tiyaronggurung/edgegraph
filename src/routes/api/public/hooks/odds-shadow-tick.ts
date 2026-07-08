@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { evaluateAtm, atmByTicker, type Row } from "@/lib/oddsShadowCore";
+import { evaluateAtm, evaluateReentry, atmByTicker, type Row } from "@/lib/oddsShadowCore";
 
 // Public cron endpoint — pg_cron hits this so the shadow trader keeps
 // running when no browser tab is open. Uses service-role admin client.
