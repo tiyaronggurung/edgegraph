@@ -448,7 +448,7 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
         mode: stakeInfo.mode,
         nextStake: Math.round(stakeInfo.stake * 100) / 100,
         unlockThreshold: 50,
-        stakePct: 40,
+        stakePct: 50,
         winStreak,
         unlockNeeded: 3,
       },
