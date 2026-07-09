@@ -41,6 +41,9 @@ import { useCandleMomentum } from "@/hooks/useCandleMomentum";
 import { computeKalshiSentiment } from "@/lib/kalshiSentiment";
 import { KalshiMaintenanceBanner } from "@/components/KalshiMaintenanceBanner";
 import { PolymarketChip } from "@/components/crypto/PolymarketChip";
+import { useTripleWindowTracker } from "@/hooks/useTripleWindowTracker";
+import { listTripleWindows, type TripleWindowRow } from "@/lib/polymarketTripleWindow.functions";
+
 
 import { toast } from "sonner";
 
