@@ -371,6 +371,7 @@ export type Database = {
           ignore_cents_band: boolean
           ignore_low_r2: boolean
           last_tick_at: string | null
+          max_entry_cents: number
           model_gate_min: number | null
           oscillation_max: number | null
           shadow_flip_enabled: boolean
@@ -392,6 +393,7 @@ export type Database = {
           ignore_cents_band?: boolean
           ignore_low_r2?: boolean
           last_tick_at?: string | null
+          max_entry_cents?: number
           model_gate_min?: number | null
           oscillation_max?: number | null
           shadow_flip_enabled?: boolean
@@ -413,6 +415,7 @@ export type Database = {
           ignore_cents_band?: boolean
           ignore_low_r2?: boolean
           last_tick_at?: string | null
+          max_entry_cents?: number
           model_gate_min?: number | null
           oscillation_max?: number | null
           shadow_flip_enabled?: boolean
