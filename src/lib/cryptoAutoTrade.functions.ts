@@ -494,13 +494,13 @@ export async function runAutoTradeCore(
         }
       }
       const limitCents = Math.max(1, Math.min(99, Math.round(
-        (m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
+        (side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
       )));
       // ── Max-entry ceiling (live only, configurable) ──
       // Above this, one loss costs many wins to claw back. Default 78¢ —
       // user can raise up to 95¢ via the Odds Shadow Trader panel.
       if (isLive && limitCents > liveMaxEntryCents) {
-        skipReasons.push(`${m.ticker}: ${m.side} ${limitCents}¢ > ${liveMaxEntryCents}¢ ceiling — skipped`);
+        skipReasons.push(`${m.ticker}: ${side} ${limitCents}¢ > ${liveMaxEntryCents}¢ ceiling — skipped`);
         continue;
       }
 
@@ -521,7 +521,7 @@ export async function runAutoTradeCore(
           const { getPolymarketBtcUpDown } = await import("./polymarketOdds");
           const poly = await getPolymarketBtcUpDown();
           if (poly) {
-            const ourSideProb = m.side === "YES" ? poly.upProb : poly.downProb;
+            const ourSideProb = side === "YES" ? poly.upProb : poly.downProb;
             const agrees = ourSideProb >= 0.5;
             polymarketSnap = {
               upProb: poly.upProb,
@@ -543,7 +543,7 @@ export async function runAutoTradeCore(
                   down_prob: poly.downProb,
                   slug: poly.slug,
                   kalshi_ticker: m.ticker,
-                  kalshi_side: m.side,
+                  kalshi_side: side,
                   kalshi_our_side_cents: limitCents,
                   agrees,
                 });
@@ -556,8 +556,7 @@ export async function runAutoTradeCore(
       }
 
 
-      // Ladder-sized stake (live) or flat stake (paper). No martingale.
-      const sizedStake = data.stakeUsd;
+      // Stake for this plan entry (primary = ladder stake, probe = $10/$20).
       const contracts = Math.max(1, Math.floor((sizedStake * 100) / limitCents));
       const stakeActual = (contracts * limitCents) / 100;
 
