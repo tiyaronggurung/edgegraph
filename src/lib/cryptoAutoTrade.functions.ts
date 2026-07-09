@@ -606,7 +606,7 @@ export async function runAutoTradeCore(
             const out = await submitKalshiBuy(supabase, userId, {
               ticker: m.ticker,
               eventTicker: m.eventTicker ?? undefined,
-              side: m.side,
+              side: side,
               contracts: attemptContracts,
               limitPriceCents: attemptCents,
               strike: m.strike,
