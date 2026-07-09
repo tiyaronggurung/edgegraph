@@ -619,10 +619,49 @@ function TradeLog() {
   );
 }
 
+function fmtProb(p: number | null | undefined): string {
+  if (p == null || !Number.isFinite(p)) return "—";
+  return (p * 100).toFixed(1) + "¢";
+}
+function buildTripleWindowTooltip(r: TripleWindowRow): string {
+  const win = (label: string, o: number | null, c: number | null, avg: number | null, mn: number | null, mx: number | null, n: number | null, tr: string | null, cv: string | null, cs: number | null) => {
+    const strengthPct = cs != null ? Math.round(cs * 100) + "%" : "—";
+    return `${label}: open ${fmtProb(o)} → close ${fmtProb(c)} · avg ${fmtProb(avg)} · min ${fmtProb(mn)} / max ${fmtProb(mx)} · n=${n ?? 0} · trend ${tr ?? "—"} · chart ${cv ?? "—"} (${strengthPct})`;
+  };
+  const combined = r.combined_dir
+    ? `${r.combined_dir} · conf ${r.combined_conf != null ? Math.round(r.combined_conf * 100) + "%" : "—"}`
+    : "—";
+  return [
+    "Polymarket 5m Up/Down + Binance chart · 3-window shadow log",
+    "",
+    win("W1 (T-15→T-10)", r.w1_open_prob, r.w1_close_prob, r.w1_avg_prob, r.w1_min_prob, r.w1_max_prob, r.w1_samples, r.w1_trendline_dir, r.w1_chart_verdict, r.w1_chart_strength),
+    win("W2 (T-10→T-5) ", r.w2_open_prob, r.w2_close_prob, r.w2_avg_prob, r.w2_min_prob, r.w2_max_prob, r.w2_samples, r.w2_trendline_dir, r.w2_chart_verdict, r.w2_chart_strength),
+    win("W3 (T-5→T-0)  ", r.w3_open_prob, r.w3_close_prob, r.w3_avg_prob, r.w3_min_prob, r.w3_max_prob, r.w3_samples, r.w3_trendline_dir, r.w3_chart_verdict, r.w3_chart_strength),
+    "",
+    `Combined: ${combined} · 1m trend ${r.trendline_1m ?? "—"} · 5m trend ${r.trendline_5m ?? "—"}`,
+  ].join("\n");
+}
+
 function ModelAccuracyPanel() {
   const fn = useServerFn(getPredictionStats);
   const q = useQuery({ queryKey: ["btc-pred-stats"], queryFn: () => fn(), refetchInterval: 60_000 });
   const s = q.data;
+
+  const listTripleFn = useServerFn(listTripleWindows);
+  const tickers = useMemo(() => (s?.recent ?? []).map(r => r.ticker), [s]);
+  const twQ = useQuery({
+    queryKey: ["btc-triple-window", tickers.join(",")],
+    queryFn: () => listTripleFn({ data: { tickers } }),
+    enabled: tickers.length > 0,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  });
+  const twMap = useMemo(() => {
+    const m = new Map<string, TripleWindowRow>();
+    for (const row of twQ.data?.rows ?? []) m.set(row.kalshi_ticker, row);
+    return m;
+  }, [twQ.data]);
+
 
   const pct = (n: number) => (n * 100).toFixed(1) + "%";
   const Cell = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
