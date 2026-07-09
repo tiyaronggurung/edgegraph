@@ -443,12 +443,9 @@ export async function runAutoTradeCore(
         continue;
       }
 
-      // ── Polymarket assist gate (live only, fail-open) ──
-      // Additional signal: require Polymarket's 5-min BTC Up/Down market to
-      // agree with our Kalshi side (our-side prob ≥ 50%). Fail-open — if
-      // Polymarket is unavailable or the window doesn't overlap, we still
-      // trade. Every check is logged to polymarket_btc_tape for study, and
-      // the snapshot is stored on the order's inputs_snapshot.
+      // ── Polymarket telemetry (live only, non-blocking) ──
+      // Record Polymarket's 5-min BTC Up/Down snapshot for study only.
+      // It must never block an odds-bet entry or add a misleading skip reason.
       let polymarketSnap: {
         upProb: number;
         downProb: number;
@@ -491,20 +488,9 @@ export async function runAutoTradeCore(
                 });
               } catch { /* noop */ }
             })();
-            if (!agrees) {
-              skipReasons.push(
-                `${m.ticker}: polymarket disagrees — ${m.side === "YES" ? "Up" : "Down"} ${(ourSideProb * 100).toFixed(0)}% < 50%`,
-              );
-              continue;
-            }
-            skipReasons.push(
-              `${m.ticker}: polymarket ${m.side === "YES" ? "Up" : "Down"} ${(ourSideProb * 100).toFixed(0)}% — agrees`,
-            );
-          } else {
-            skipReasons.push(`${m.ticker}: polymarket unavailable — fail-open, trading anyway`);
           }
         } catch (e: any) {
-          skipReasons.push(`${m.ticker}: polymarket error (${e?.message?.slice(0, 60) ?? "err"}) — fail-open`);
+          void e;
         }
       }
 
