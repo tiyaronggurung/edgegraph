@@ -195,6 +195,10 @@ export interface PredictionStatsResult {
     wasCorrect: boolean | null;
     settlePrice: number | null;
     closeTime: string;
+    liveSide: "YES" | "NO" | null;
+    flipCount: number;
+    chartVerdict: "YES" | "NO" | "neutral" | null;
+    chartStrength: number | null;
   }>;
 }
 
