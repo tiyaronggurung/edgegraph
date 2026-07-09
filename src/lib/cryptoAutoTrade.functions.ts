@@ -463,10 +463,11 @@ export async function runAutoTradeCore(
       let kalshiSide: "YES" | "NO" | null = null;
       if (yp >= KALSHI_LEAN_THRESHOLD) kalshiSide = "YES";
       else if (yp <= 1 - KALSHI_LEAN_THRESHOLD) kalshiSide = "NO";
-      // Probe side = raw model direction (P(YES) vs 0.5), NOT the value-pick
-      // m.side (which is p−yesPrice and behaves as a coinflip in backtest).
-      // Raw direction historically calls BTC move ~87% correctly.
-      const rawModelSide: "YES" | "NO" = m.modelYesProb >= 0.5 ? "YES" : "NO";
+      // Probe side = LIVE model direction (raw P(YES) + chart verdict + anchor
+      // drift, may flip mid-window). Falls back to raw P(YES) direction on
+      // older market feeds that pre-date liveSide. Historically ~87% accurate.
+      const rawModelSide: "YES" | "NO" =
+        m.liveSide ?? (m.modelYesProb >= 0.5 ? "YES" : "NO");
       if (kalshiSide === null || kalshiSide === rawModelSide) {
         // Coinflip zone or agreement → single bet on Kalshi lean (or model
         // value-pick when Kalshi is in the coinflip zone, preserving today's
@@ -481,7 +482,8 @@ export async function runAutoTradeCore(
           ? MODEL_PROBE_STAKE_HIGH
           : MODEL_PROBE_STAKE_LOW;
         plan.push({ m, side: rawModelSide, stakeUsd: probeStake, kind: "model_probe" });
-        skipReasons.push(`${m.ticker}: disagree — Kalshi leans ${kalshiSide} @ ${(yp * 100).toFixed(0)}¢, raw model P(YES) ${(m.modelYesProb * 100).toFixed(0)}% picks ${rawModelSide} (edge ${rawEdgePts.toFixed(1)}pts) → $${data.stakeUsd} ${kalshiSide} primary + $${probeStake} ${rawModelSide} probe`);
+        const flipTag = m.liveFlipped ? " (chart-flipped)" : "";
+        skipReasons.push(`${m.ticker}: disagree — Kalshi leans ${kalshiSide} @ ${(yp * 100).toFixed(0)}¢, live model picks ${rawModelSide}${flipTag} (edge ${rawEdgePts.toFixed(1)}pts) → $${data.stakeUsd} ${kalshiSide} primary + $${probeStake} ${rawModelSide} probe`);
       }
     }
 
