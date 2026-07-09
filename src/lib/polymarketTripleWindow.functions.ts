@@ -91,4 +91,38 @@ export interface TripleWindowRow {
   trendline_5m: string | null;
   combined_dir: string | null;
   combined_conf: number | null;
+  actual_outcome: string | null;
+  expiration_value: number | null;
+  settled_at: string | null;
 }
+
+// Fetch Kalshi's authoritative settlement and write it into the shadow row.
+// Idempotent — skips write if already settled. Called from client on final
+// flush AND from the /api/public/hooks/backfill-triple-window cron.
+export const settleTripleWindow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ ticker: z.string() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: existing } = await context.supabase
+      .from("btc_polymarket_triple_window")
+      .select("actual_outcome")
+      .eq("kalshi_ticker", data.ticker)
+      .maybeSingle();
+    if (!existing) return { ok: false, reason: "no shadow row" };
+    if (existing.actual_outcome) return { ok: true, reason: "already settled" };
+
+    const { fetchKalshiSettlement } = await import("./kalshiSettle");
+    const s = await fetchKalshiSettlement(data.ticker);
+    if (!s || !s.finalized || !s.result) return { ok: false, reason: "not finalized" };
+
+    const { error } = await context.supabase
+      .from("btc_polymarket_triple_window")
+      .update({
+        actual_outcome: s.result.toUpperCase(),
+        expiration_value: s.expirationValue,
+        settled_at: new Date().toISOString(),
+      })
+      .eq("kalshi_ticker", data.ticker);
+    if (error) throw new Error(error.message);
+    return { ok: true, result: s.result, expirationValue: s.expirationValue };
+  });
