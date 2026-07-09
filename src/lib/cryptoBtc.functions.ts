@@ -759,6 +759,31 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
       }
     })();
 
+    // ── Chart verdict (global, once per request) ───────────────────────────
+    // Feed the same 1m candles + a 5-bucket 5m aggregation into the existing
+    // TA verdict engine. Used ONLY for the live-side flip logic below; the
+    // locked snapshot side is not touched.
+    const candles5m: BtcCandle[] = (() => {
+      if (recent.length < 5) return [];
+      const buckets: BtcCandle[] = [];
+      for (let i = 0; i + 5 <= recent.length; i += 5) {
+        const g = recent.slice(i, i + 5);
+        buckets.push({
+          t: g[0].t,
+          o: g[0].o,
+          h: Math.max(...g.map(c => c.h)),
+          l: Math.min(...g.map(c => c.l)),
+          c: g[g.length - 1].c,
+          v: g.reduce((a, c) => a + c.v, 0),
+        });
+      }
+      return buckets;
+    })();
+    const chartVerdict = (() => {
+      try { return getChartVerdict(recent, candles5m); }
+      catch (e) { console.warn("chart verdict failed:", e); return null; }
+    })();
+
     // Apply regime knobs to σ and drift before they feed the diffusion model.
     const sigma = sigmaRaw * (regimeState?.sigmaMult ?? 1);
     const drift = Math.max(-0.005, Math.min(0.005, driftRaw + (regimeState?.driftBiasPerMin ?? 0)));
