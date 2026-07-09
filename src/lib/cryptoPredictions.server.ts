@@ -177,14 +177,20 @@ export interface PredictionStatsResult {
   }>;
 }
 
+// Fresh-start cutoff: model accuracy panel (Tracked / Correct / Win rate 7d /
+// Win rate 24h / Awaiting settle) ignores anything with close_time before
+// this instant. Set to today 00:00 UTC. Change to bring history back.
+const STATS_RESET_ISO = "2026-07-09T00:00:00Z";
+
 export async function computePredictionStats(): Promise<PredictionStatsResult> {
   const since7d = new Date(Date.now() - 7 * 86400_000).toISOString();
   const since24h = new Date(Date.now() - 86400_000).toISOString();
+  const cutoff = since7d > STATS_RESET_ISO ? since7d : STATS_RESET_ISO;
 
   const { data: rows } = await supabaseAdmin
     .from("btc_model_predictions")
     .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time")
-    .gte("close_time", since7d)
+    .gte("close_time", cutoff)
     .order("close_time", { ascending: false })
     .limit(500);
 
