@@ -742,7 +742,7 @@ function ModelAccuracyPanel() {
                         ? null
                         : (r.side === rawSide ? r.wasCorrect : !r.wasCorrect);
                       return (
-                      <tr key={r.ticker} className="border-t border-border">
+                      <tr key={r.ticker} className="border-t border-border transition-all duration-150 ease-out hover:bg-primary/10 hover:shadow-[inset_2px_0_0_hsl(var(--primary))] hover:scale-[1.005] hover:relative hover:z-10">
                         <td className="p-2">{new Date(r.closeTime).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
                         <td className="p-2 font-mono">{r.ticker}</td>
                         <td className="p-2"><span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(r.side)}</span></td>
