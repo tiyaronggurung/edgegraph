@@ -831,9 +831,12 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         const cal = applyCalib ? applyCalib(p, secondsToClose, calibState) : { p, deltaPts: 0, bucket: "ge600", active: false };
         p = cal.p;
 
-        // Locked side: first snapshot picks UP/DOWN for the window.
+        // Locked side: first snapshot picks UP/DOWN for the window based on
+        // the MODEL's own directional probability, not on value-vs-Kalshi.
+        // Kalshi's next-window strike ≡ BTC price at window open (anchor), so
+        // p >= 0.5 means "model says BTC finishes above the open" → YES.
         const lockedPre = lockedSides.get(m.ticker);
-        const tentativeSide: "YES" | "NO" = lockedPre ?? ((p - yesPrice) >= 0 ? "YES" : "NO");
+        const tentativeSide: "YES" | "NO" = lockedPre ?? (p >= 0.5 ? "YES" : "NO");
 
         // (c) Asymmetric blend toward market in the final 2 minutes — only when
         // model trails market on the locked side, never when we're MORE confident
