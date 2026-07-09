@@ -17,6 +17,7 @@ export interface SnapshotInput {
   secondsToClose: number;
   sigmaMinEffective?: number;
   theoryYesProb?: number;
+  anchorZ?: number;
 }
 
 export function timeBucketOf(secondsToClose: number): string {
