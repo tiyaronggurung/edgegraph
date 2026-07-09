@@ -110,6 +110,15 @@ export interface BtcMarket {
   // analysis by drift magnitude; NOT blended into modelYesProb (probAboveCond
   // already accounts for anchor drift analytically).
   anchorZ: number;
+  // ── Two-phase side model ───────────────────────────────────────────────────
+  // `side` above is the LOCKED first-snapshot pick (never changes; used for
+  // model-accuracy tracking). `liveSide` is the current best directional call
+  // for THIS tick — may flip mid-window when chart verdict + anchor drift +
+  // model all agree on the opposite direction. Auto-trader probe uses liveSide.
+  liveSide: "YES" | "NO";
+  liveFlipped: boolean;         // true if liveSide != locked side this tick
+  chartVerdict: "YES" | "NO" | "neutral";
+  chartStrength: number;        // 0..1 confidence from combined 1m+5m verdict
 }
 
 
