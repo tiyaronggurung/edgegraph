@@ -59,9 +59,17 @@ export function useTripleWindowTracker(markets: ActiveMarket[]): void {
     async function tick() {
       const now = Date.now();
       let upProb: number | null = null;
+      let downMid: number | null = null;
+      let lastTrade: number | null = null;
+      let rawUpMid: number | null = null;
       try {
         const o = await fetchPoly();
-        if (o) upProb = o.upProb;
+        if (o) {
+          upProb = o.effectiveUpProb;   // A: use blended prob, not raw Up mid
+          rawUpMid = o.upProb;
+          downMid = o.downMid;
+          lastTrade = o.lastTrade > 0 ? o.lastTrade : null;
+        }
       } catch { /* ignore */ }
       if (cancelled) return;
 
