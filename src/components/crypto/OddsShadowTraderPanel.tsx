@@ -12,7 +12,7 @@ import { Bot, Zap, TrendingUp, TrendingDown } from "lucide-react";
 // No real orders are placed.
 
 
-interface GateSettings { ignore_low_r2: boolean; ignore_cents_band: boolean }
+interface GateSettings { ignore_low_r2: boolean; ignore_cents_band: boolean; max_entry_cents: number }
 
 export function OddsShadowTraderPanel() {
   const tick = useServerFn(runOddsShadowTick);
@@ -29,18 +29,19 @@ export function OddsShadowTraderPanel() {
   // Filter-bypass toggles (persist to auto_odds_settings).
   const settingsQ = useQuery<GateSettings>({
     queryKey: ["oddsFilterToggles"],
-    queryFn: async () => {
+    queryFn: async (): Promise<GateSettings> => {
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user?.id;
-      if (!uid) return { ignore_low_r2: false, ignore_cents_band: false };
+      if (!uid) return { ignore_low_r2: false, ignore_cents_band: false, max_entry_cents: 78 };
       const { data: row } = await supabase
         .from("auto_odds_settings")
-        .select("ignore_low_r2, ignore_cents_band")
+        .select("ignore_low_r2, ignore_cents_band, max_entry_cents")
         .eq("user_id", uid)
         .maybeSingle();
       return {
         ignore_low_r2: Boolean(row?.ignore_low_r2),
         ignore_cents_band: Boolean(row?.ignore_cents_band),
+        max_entry_cents: Number((row as { max_entry_cents?: number } | null)?.max_entry_cents ?? 78),
       };
     },
     staleTime: 30_000,
@@ -70,7 +71,7 @@ export function OddsShadowTraderPanel() {
   }, []);
 
   const r = data && data.ok ? data : null;
-  const s = settingsQ.data ?? { ignore_low_r2: false, ignore_cents_band: false };
+  const s = settingsQ.data ?? { ignore_low_r2: false, ignore_cents_band: false, max_entry_cents: 78 };
 
 
   return (
@@ -112,6 +113,25 @@ export function OddsShadowTraderPanel() {
             checked={s.ignore_cents_band}
             onCheckedChange={(v) => toggleMut.mutate({ ignore_cents_band: v })}
             disabled={toggleMut.isPending}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 pt-1.5 border-t border-amber-500/20">
+          <div>
+            <div className="font-semibold">Max entry price (live)</div>
+            <div className="text-[10px] text-muted-foreground">Live bot refuses to buy above this cents cap. Default 78¢ · range 50–95.</div>
+          </div>
+          <input
+            type="number"
+            min={50}
+            max={95}
+            step={1}
+            value={s.max_entry_cents}
+            onChange={(e) => {
+              const n = Math.max(50, Math.min(95, Math.round(Number(e.target.value) || 78)));
+              toggleMut.mutate({ max_entry_cents: n });
+            }}
+            disabled={toggleMut.isPending}
+            className="w-16 rounded border bg-background px-2 py-1 text-right font-mono text-[11px]"
           />
         </div>
         {(s.ignore_low_r2 || s.ignore_cents_band) && (
