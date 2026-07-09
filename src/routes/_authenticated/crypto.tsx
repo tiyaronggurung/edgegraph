@@ -816,7 +816,7 @@ function BigFlipMonitor() {
     return (
       <div className="mt-1 rounded border border-border/50 bg-muted/10 px-2 py-1 text-[10px] font-mono text-muted-foreground flex items-center gap-2">
         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
-        <span>Big-flip monitor · SHADOW · Δ≥25¢ · {r.rejectReason ? `last rejected: ${r.rejectReason}` : "no signal"}</span>
+        <span>Big-flip monitor · LIVE $20 · 24/7 cron · Δ≥25¢ · {r.rejectReason ? `last rejected: ${r.rejectReason}` : "no signal"}</span>
       </div>
     );
   }
