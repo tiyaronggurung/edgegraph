@@ -1,0 +1,1 @@
+ALTER TABLE public.btc_model_predictions ADD COLUMN IF NOT EXISTS anchor_z double precision;

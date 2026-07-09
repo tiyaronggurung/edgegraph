@@ -1502,6 +1502,7 @@ export type Database = {
       }
       btc_model_predictions: {
         Row: {
+          anchor_z: number | null
           close_time: string
           created_at: string
           edge_pts: number
@@ -1524,6 +1525,7 @@ export type Database = {
           was_correct: boolean | null
         }
         Insert: {
+          anchor_z?: number | null
           close_time: string
           created_at?: string
           edge_pts: number
@@ -1546,6 +1548,7 @@ export type Database = {
           was_correct?: boolean | null
         }
         Update: {
+          anchor_z?: number | null
           close_time?: string
           created_at?: string
           edge_pts?: number
