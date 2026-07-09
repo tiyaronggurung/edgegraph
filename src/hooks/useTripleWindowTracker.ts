@@ -7,7 +7,7 @@ import { useBinanceBtcTicks } from "./useBinanceBtcTicks";
 import { computeTrendlineAnalysis } from "./useTrendlineAnalysis";
 import { useChartVerdict } from "./useChartVerdict";
 import { fetchPolymarketBtcOdds } from "@/lib/polymarketOdds.functions";
-import { upsertTripleWindow } from "@/lib/polymarketTripleWindow.functions";
+import { upsertTripleWindow, settleTripleWindow } from "@/lib/polymarketTripleWindow.functions";
 
 export interface ActiveMarket {
   ticker: string;
