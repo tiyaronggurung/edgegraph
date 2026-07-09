@@ -754,9 +754,16 @@ function ModelAccuracyPanel() {
                                   ·📈{r.chartVerdict === "YES" ? "↑" : "↓"}
                                 </span>
                               )}
+                              {twMap.get(r.ticker) && (
+                                <span
+                                  className="ml-1 text-[10px] text-cyan-400 cursor-help border border-cyan-500/40 rounded-full px-1 leading-none"
+                                  title={buildTripleWindowTooltip(twMap.get(r.ticker)!)}
+                                >ⓘ</span>
+                              )}
                             </span>
                           ) : <span className="text-muted-foreground">—</span>}
                         </td>
+
                         <td className="p-2 text-right">{fmt$(r.strike)}</td>
                         <td className="p-2 text-right">{(r.modelProb * 100).toFixed(1)}%</td>
                         <td className="p-2 text-right">{(r.marketYesPrice * 100).toFixed(0)}</td>
