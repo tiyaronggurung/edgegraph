@@ -2360,6 +2360,8 @@ function CryptoPage() {
 
           <OddsShadowTraderPanel />
 
+          <ManualTradesPanel />
+
           <SkipBucketPanel />
 
           <LossCapPanel />
