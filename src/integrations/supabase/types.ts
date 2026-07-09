@@ -1623,6 +1623,129 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_polymarket_triple_window: {
+        Row: {
+          actual_outcome: string | null
+          combined_conf: number | null
+          combined_dir: string | null
+          created_at: string
+          id: string
+          kalshi_ticker: string
+          market_close_ms: number
+          market_open_ms: number
+          trendline_1m: string | null
+          trendline_5m: string | null
+          updated_at: string
+          w1_avg_prob: number | null
+          w1_chart_strength: number | null
+          w1_chart_verdict: string | null
+          w1_close_prob: number | null
+          w1_max_prob: number | null
+          w1_min_prob: number | null
+          w1_open_prob: number | null
+          w1_samples: number | null
+          w1_trendline_dir: string | null
+          w2_avg_prob: number | null
+          w2_chart_strength: number | null
+          w2_chart_verdict: string | null
+          w2_close_prob: number | null
+          w2_max_prob: number | null
+          w2_min_prob: number | null
+          w2_open_prob: number | null
+          w2_samples: number | null
+          w2_trendline_dir: string | null
+          w3_avg_prob: number | null
+          w3_chart_strength: number | null
+          w3_chart_verdict: string | null
+          w3_close_prob: number | null
+          w3_max_prob: number | null
+          w3_min_prob: number | null
+          w3_open_prob: number | null
+          w3_samples: number | null
+          w3_trendline_dir: string | null
+        }
+        Insert: {
+          actual_outcome?: string | null
+          combined_conf?: number | null
+          combined_dir?: string | null
+          created_at?: string
+          id?: string
+          kalshi_ticker: string
+          market_close_ms: number
+          market_open_ms: number
+          trendline_1m?: string | null
+          trendline_5m?: string | null
+          updated_at?: string
+          w1_avg_prob?: number | null
+          w1_chart_strength?: number | null
+          w1_chart_verdict?: string | null
+          w1_close_prob?: number | null
+          w1_max_prob?: number | null
+          w1_min_prob?: number | null
+          w1_open_prob?: number | null
+          w1_samples?: number | null
+          w1_trendline_dir?: string | null
+          w2_avg_prob?: number | null
+          w2_chart_strength?: number | null
+          w2_chart_verdict?: string | null
+          w2_close_prob?: number | null
+          w2_max_prob?: number | null
+          w2_min_prob?: number | null
+          w2_open_prob?: number | null
+          w2_samples?: number | null
+          w2_trendline_dir?: string | null
+          w3_avg_prob?: number | null
+          w3_chart_strength?: number | null
+          w3_chart_verdict?: string | null
+          w3_close_prob?: number | null
+          w3_max_prob?: number | null
+          w3_min_prob?: number | null
+          w3_open_prob?: number | null
+          w3_samples?: number | null
+          w3_trendline_dir?: string | null
+        }
+        Update: {
+          actual_outcome?: string | null
+          combined_conf?: number | null
+          combined_dir?: string | null
+          created_at?: string
+          id?: string
+          kalshi_ticker?: string
+          market_close_ms?: number
+          market_open_ms?: number
+          trendline_1m?: string | null
+          trendline_5m?: string | null
+          updated_at?: string
+          w1_avg_prob?: number | null
+          w1_chart_strength?: number | null
+          w1_chart_verdict?: string | null
+          w1_close_prob?: number | null
+          w1_max_prob?: number | null
+          w1_min_prob?: number | null
+          w1_open_prob?: number | null
+          w1_samples?: number | null
+          w1_trendline_dir?: string | null
+          w2_avg_prob?: number | null
+          w2_chart_strength?: number | null
+          w2_chart_verdict?: string | null
+          w2_close_prob?: number | null
+          w2_max_prob?: number | null
+          w2_min_prob?: number | null
+          w2_open_prob?: number | null
+          w2_samples?: number | null
+          w2_trendline_dir?: string | null
+          w3_avg_prob?: number | null
+          w3_chart_strength?: number | null
+          w3_chart_verdict?: string | null
+          w3_close_prob?: number | null
+          w3_max_prob?: number | null
+          w3_min_prob?: number | null
+          w3_open_prob?: number | null
+          w3_samples?: number | null
+          w3_trendline_dir?: string | null
+        }
+        Relationships: []
+      }
       crypto_gate_shadow_sim: {
         Row: {
           created_at: string
