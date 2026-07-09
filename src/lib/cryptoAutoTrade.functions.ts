@@ -976,7 +976,17 @@ export async function autoExitForUser(
     if (!claimed) { reasons.push(`${r.ticker}: ladder claim lost`); continue; }
 
     const sellCents = Math.max(1, Math.min(99, markCents));
-    const fill = await trySell(r, toSell, sellCents, hardFloorHit ? "hard-floor" : `ladder-${tier.kind}`);
+    let fill = await trySell(r, toSell, sellCents, hardFloorHit ? "hard-floor" : `ladder-${tier.kind}`);
+
+    // Bold/strict: on SL/hard-floor IOC 0-fill, chase price down once at
+    // mark-2¢ so a moving book doesn't leave the exit hanging until next tick.
+    if (!fill && (tier.kind === "sl" || hardFloorHit)) {
+      const chaseCents = Math.max(1, Math.min(99, markCents - 2));
+      if (chaseCents < sellCents) {
+        fill = await trySell(r, toSell, chaseCents, hardFloorHit ? "hard-floor-chase" : `ladder-sl-chase`);
+        if (fill) reasons.push(`${r.ticker}: SL chase filled @ ${chaseCents}¢ after 0-fill @ ${sellCents}¢`);
+      }
+    }
 
     if (!fill) {
       await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", r.id);
