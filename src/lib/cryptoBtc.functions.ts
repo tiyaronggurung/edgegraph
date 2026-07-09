@@ -3,6 +3,7 @@
 // Optional override: POST market context to CRYPTO_MODEL_URL and use returned {prob}.
 import { createServerFn } from "@tanstack/react-start";
 import { computeGapAnalysis, computeRequiredEdgePts, evaluateGate } from "./cryptoBtcGate";
+import { getChartVerdict } from "./ta/chartVerdict";
 
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
 const COINBASE = "https://api.exchange.coinbase.com";
