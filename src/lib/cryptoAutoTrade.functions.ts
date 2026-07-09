@@ -728,7 +728,7 @@ export async function runAutoTradeCore(
 
     return {
       sessionId, mode: data.mode,
-      attempted: candidates.length,
+      attempted: plan.length,
       placed: placed.length,
       skipped: skipReasons.length,
       skipReasons: skipReasons.slice(0, 20),
