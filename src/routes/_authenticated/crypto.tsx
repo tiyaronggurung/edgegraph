@@ -2041,6 +2041,19 @@ function CryptoPage() {
   const q = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 2_000, staleTime: 1_000 });
   const cfg = useQuery({ queryKey: ["kalshi-cfg"], queryFn: () => cfgFn(), staleTime: 60_000 });
 
+  // 3-window Polymarket/Binance shadow tracker — display-only, feeds no model.
+  const activeMarketsForTracker = useMemo(() => {
+    return (q.data?.markets ?? [])
+      .filter(m => m.closeTime && m.secondsToClose > 0 && m.secondsToClose <= 15 * 60 + 60)
+      .map(m => {
+        const closeMs = new Date(m.closeTime!).getTime();
+        const openMs = m.openTime ? new Date(m.openTime).getTime() : closeMs - 15 * 60_000;
+        return { ticker: m.ticker, openMs, closeMs };
+      });
+  }, [q.data]);
+  useTripleWindowTracker(activeMarketsForTracker);
+
+
   // Record ATM odds snapshot every marketsQ refetch for post-hoc analysis.
   // Fires once per new q.dataUpdatedAt; skips if no active window.
   const recordTapeFn = useServerFn(recordOddsTape);
