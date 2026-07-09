@@ -18,6 +18,9 @@ export interface SnapshotInput {
   sigmaMinEffective?: number;
   theoryYesProb?: number;
   anchorZ?: number;
+  liveSide?: "YES" | "NO";
+  chartVerdict?: "YES" | "NO" | "neutral";
+  chartStrength?: number;
 }
 
 export function timeBucketOf(secondsToClose: number): string {
