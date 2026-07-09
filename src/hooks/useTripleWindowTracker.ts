@@ -81,7 +81,9 @@ export function useTripleWindowTracker(markets: ActiveMarket[]): void {
       for (const m of marketsRef.current) {
         if (now < m.openMs) continue;
         // Give a 60s grace period after close for the final flush.
-        if (now > m.closeMs + 60_000) continue;
+        // Keep the market in the loop for 5 min post-close so we can retry
+        // Kalshi settlement (usually finalized within 30s but occasionally slower).
+        if (now > m.closeMs + 5 * 60_000) continue;
 
         let st = state.current.get(m.ticker);
         if (!st) {
