@@ -149,6 +149,12 @@ export function useTripleWindowTracker(markets: ActiveMarket[]): void {
             combined_conf: combinedConf,
           }});
         } catch { /* silent — shadow log is best-effort */ }
+
+        // Final flush → try to record Kalshi settlement. Retries next tick if
+        // the market isn't finalized yet (Kalshi usually takes 5–30s post-close).
+        if (now > m.closeMs) {
+          try { await settleFn({ data: { ticker: m.ticker } }); } catch { /* ignore */ }
+        }
       }
     }
 
@@ -156,5 +162,5 @@ export function useTripleWindowTracker(markets: ActiveMarket[]): void {
     const id = setInterval(tick, 2_000);
     tick();
     return () => { cancelled = true; clearInterval(id); };
-  }, [fetchPoly, upsertFn]);
+  }, [fetchPoly, upsertFn, settleFn]);
 }
