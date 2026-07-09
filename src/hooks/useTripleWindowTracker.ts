@@ -157,6 +157,15 @@ export function useTripleWindowTracker(markets: ActiveMarket[]): void {
             trendline_5m: trend5m,
             combined_dir: combinedDir,
             combined_conf: combinedConf,
+            enrichment: {
+              phase,
+              raw_up_mid: rawUpMid,
+              down_mid: downMid,
+              last_trade: lastTrade,
+              effective_up_prob: upProb,
+              source: "client",
+              at: now,
+            },
           }});
         } catch { /* silent — shadow log is best-effort */ }
 
