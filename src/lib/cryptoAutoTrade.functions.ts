@@ -448,16 +448,48 @@ export async function runAutoTradeCore(
       } catch { /* fall back to 78 */ }
     }
 
-    const placed: AutoTradeOrderRow[] = [];
+    // ── Expand each candidate into 1 primary + optional model-side probe ──
+    // Primary side = whichever leg Kalshi prices as favorite. If model
+    // disagrees with Kalshi's lean, also fire a small model-side probe.
+    type PlanEntry = {
+      m: typeof candidates[number];
+      side: "YES" | "NO";
+      stakeUsd: number;
+      kind: "primary" | "kalshi_primary_disagree" | "model_probe";
+    };
+    const plan: PlanEntry[] = [];
     for (const m of candidates) {
-      if (!data.force && freshProbBySide.size > 0) {
-        const p = freshProbBySide.get(`${m.ticker}|${m.side}`);
+      const yp = m.yesPrice;
+      let kalshiSide: "YES" | "NO" | null = null;
+      if (yp >= KALSHI_LEAN_THRESHOLD) kalshiSide = "YES";
+      else if (yp <= 1 - KALSHI_LEAN_THRESHOLD) kalshiSide = "NO";
+      if (kalshiSide === null || kalshiSide === m.side) {
+        // Coinflip zone or agreement → keep model-picked side, single bet.
+        plan.push({ m, side: m.side, stakeUsd: data.stakeUsd, kind: "primary" });
+      } else {
+        // Disagreement → primary on Kalshi lean, small probe on model side.
+        plan.push({ m, side: kalshiSide, stakeUsd: data.stakeUsd, kind: "kalshi_primary_disagree" });
+        const probeStake = m.edgeAbs >= MODEL_PROBE_STRONG_EDGE_PTS
+          ? MODEL_PROBE_STAKE_HIGH
+          : MODEL_PROBE_STAKE_LOW;
+        plan.push({ m, side: m.side, stakeUsd: probeStake, kind: "model_probe" });
+        skipReasons.push(`${m.ticker}: disagree — Kalshi leans ${kalshiSide} @ ${(yp * 100).toFixed(0)}¢, model picks ${m.side} (edge ${m.edgeAbs.toFixed(1)}pts) → $${data.stakeUsd} ${kalshiSide} primary + $${probeStake} ${m.side} probe`);
+      }
+    }
+
+    const placed: AutoTradeOrderRow[] = [];
+    for (const entry of plan) {
+      const { m, side, stakeUsd: sizedStake, kind } = entry;
+      if (!data.force && freshProbBySide.size > 0 && kind !== "kalshi_primary_disagree") {
+        // Skip the model-direction recheck for the Kalshi-primary leg on
+        // disagreement — by definition the model doesn't back that side.
+        const p = freshProbBySide.get(`${m.ticker}|${side}`);
         if (p === undefined) {
-          skipReasons.push(`${m.ticker}: entry-recheck — ${m.side} no longer in fresh market list`);
+          skipReasons.push(`${m.ticker}: entry-recheck — ${side} no longer in fresh market list`);
           continue;
         }
         if (p < LIVE_FLIP_PROB) {
-          skipReasons.push(`${m.ticker}: entry-recheck — model now ${(p * 100).toFixed(0)}% for ${m.side} (< ${LIVE_FLIP_PROB * 100}%)`);
+          skipReasons.push(`${m.ticker}: entry-recheck — model now ${(p * 100).toFixed(0)}% for ${side} (< ${LIVE_FLIP_PROB * 100}%)`);
           continue;
         }
       }
