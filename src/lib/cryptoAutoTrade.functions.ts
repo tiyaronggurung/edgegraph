@@ -939,7 +939,8 @@ export async function autoExitForUser(
   // Backtest against 131 settled live trades: floor at 25¢ saved $228 on 8 big
   // losses and cost only $130 across 112 wins (1 win of 112 ever touched 25¢).
   // Runs BEFORE ladder logic so it always wins over per-order exit tiers.
-  const HARD_FLOOR_CENTS = 25;
+  // Bold/strict floor: was 25¢ — bumped so a crash exits at 35 instead of 1.
+  const HARD_FLOOR_CENTS = 35;
 
   for (const mk of marked) {
     const { r, markCents, entry, remaining } = mk;
