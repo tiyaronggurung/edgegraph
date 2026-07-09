@@ -150,13 +150,8 @@ export function useTripleWindowTracker(markets: ActiveMarket[]): void {
         } catch { /* silent — shadow log is best-effort */ }
       }
     }
-    // Type helper so TS knows the shape passed above.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    type stats0 = {
-      open_prob: number | null; close_prob: number | null; avg_prob: number | null;
-      min_prob: number | null; max_prob: number | null; samples: number;
-      trendline_dir: string | null; chart_verdict: string | null; chart_strength: number | null;
-    };
+
+
     const id = setInterval(tick, 2_000);
     tick();
     return () => { cancelled = true; clearInterval(id); };
