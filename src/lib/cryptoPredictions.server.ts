@@ -97,6 +97,7 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         snapshot_seconds_to_close: input.secondsToClose,
         sigma_at_snapshot: input.sigmaMinEffective ?? null,
         theory_yes_prob: input.theoryYesProb ?? null,
+        anchor_z: input.anchorZ ?? null,
         time_bucket: timeBucketOf(input.secondsToClose),
       }).eq("id", existing.id);
     }
