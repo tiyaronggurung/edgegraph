@@ -68,7 +68,8 @@ export const syncManualKalshiTrades = createServerFn({ method: "POST" })
       if (existingSet.has(f.trade_id)) continue;
       const priceCents =
         f.side === "yes" ? (f.yes_price ?? 0) : (f.no_price ?? 0);
-      const contracts = f.count;
+      const contracts = Number((f as any).count ?? (f as any).contracts ?? 0);
+      if (!contracts) continue; // skip fills missing size — NOT NULL on contracts
       const costUsd = (priceCents * contracts) / 100;
       rows.push({
         user_id: userId,
