@@ -12,7 +12,7 @@ import { Bot, Zap, TrendingUp, TrendingDown } from "lucide-react";
 // No real orders are placed.
 
 
-interface GateSettings { ignore_low_r2: boolean; ignore_cents_band: boolean }
+interface GateSettings { ignore_low_r2: boolean; ignore_cents_band: boolean; max_entry_cents: number }
 
 export function OddsShadowTraderPanel() {
   const tick = useServerFn(runOddsShadowTick);
