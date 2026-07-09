@@ -954,6 +954,39 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
             const denom = windowOpen * sigmaEff * Math.sqrt(elapsedMin);
             return denom > 0 ? (spot - windowOpen) / denom : 0;
           })(),
+          ...(() => {
+            // Live-side calculation: locked side stays put; live side can flip
+            // when chart verdict + anchor drift + raw model all agree on the
+            // opposite direction AND we're past the early-window / not-too-late gates.
+            const rawDir: "YES" | "NO" = p >= 0.5 ? "YES" : "NO";
+            const cvDir = chartVerdict?.combined.direction ?? "neutral";
+            const cvConf = chartVerdict?.combined.confidence ?? 0;
+            const elapsedMin = 15 - minsRemaining;
+            const anchorZ = (() => {
+              const em = Math.max(0.5, elapsedMin);
+              const denom = windowOpen * sigmaEff * Math.sqrt(em);
+              return denom > 0 ? (spot - windowOpen) / denom : 0;
+            })();
+            const zSign: "YES" | "NO" | null =
+              anchorZ > 0.5 ? "YES" : anchorZ < -0.5 ? "NO" : null;
+            // Flip gates: raw model must disagree with locked, chart must
+            // strongly agree with raw model, anchor drift must agree, and we
+            // must be past 3 min but with >=90s left.
+            const canFlip =
+              !!lockedPre &&
+              rawDir !== lockedPre &&
+              cvDir === rawDir && cvConf >= 0.5 &&
+              zSign === rawDir &&
+              elapsedMin >= 3 &&
+              secondsToClose >= 90;
+            const liveSide: "YES" | "NO" = canFlip ? rawDir : side;
+            return {
+              liveSide,
+              liveFlipped: liveSide !== side,
+              chartVerdict: cvDir as "YES" | "NO" | "neutral",
+              chartStrength: cvConf,
+            };
+          })(),
         });
       }
     }
