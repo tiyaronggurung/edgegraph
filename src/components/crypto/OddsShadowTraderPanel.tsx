@@ -29,18 +29,19 @@ export function OddsShadowTraderPanel() {
   // Filter-bypass toggles (persist to auto_odds_settings).
   const settingsQ = useQuery<GateSettings>({
     queryKey: ["oddsFilterToggles"],
-    queryFn: async () => {
+    queryFn: async (): Promise<GateSettings> => {
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user?.id;
-      if (!uid) return { ignore_low_r2: false, ignore_cents_band: false };
+      if (!uid) return { ignore_low_r2: false, ignore_cents_band: false, max_entry_cents: 78 };
       const { data: row } = await supabase
         .from("auto_odds_settings")
-        .select("ignore_low_r2, ignore_cents_band")
+        .select("ignore_low_r2, ignore_cents_band, max_entry_cents")
         .eq("user_id", uid)
         .maybeSingle();
       return {
         ignore_low_r2: Boolean(row?.ignore_low_r2),
         ignore_cents_band: Boolean(row?.ignore_cents_band),
+        max_entry_cents: Number((row as { max_entry_cents?: number } | null)?.max_entry_cents ?? 78),
       };
     },
     staleTime: 30_000,
