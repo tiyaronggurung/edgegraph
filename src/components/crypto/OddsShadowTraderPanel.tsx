@@ -115,6 +115,25 @@ export function OddsShadowTraderPanel() {
             disabled={toggleMut.isPending}
           />
         </div>
+        <div className="flex items-center justify-between gap-3 pt-1.5 border-t border-amber-500/20">
+          <div>
+            <div className="font-semibold">Max entry price (live)</div>
+            <div className="text-[10px] text-muted-foreground">Live bot refuses to buy above this cents cap. Default 78¢ · range 50–95.</div>
+          </div>
+          <input
+            type="number"
+            min={50}
+            max={95}
+            step={1}
+            value={s.max_entry_cents}
+            onChange={(e) => {
+              const n = Math.max(50, Math.min(95, Math.round(Number(e.target.value) || 78)));
+              toggleMut.mutate({ max_entry_cents: n });
+            }}
+            disabled={toggleMut.isPending}
+            className="w-16 rounded border bg-background px-2 py-1 text-right font-mono text-[11px]"
+          />
+        </div>
         {(s.ignore_low_r2 || s.ignore_cents_band) && (
           <div className="text-[10px] text-amber-400">⚠ Safety filter bypassed — more fires, more risk.</div>
         )}
