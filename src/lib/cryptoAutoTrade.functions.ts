@@ -48,7 +48,9 @@ export type ExitLadderTier = {
   label: string;
 };
 export const DEFAULT_EXIT_LADDER: ExitLadderTier[] = [
-  { kind: "sl", priceDeltaCents: -15, exitFraction: 1.0, label: "SL -15¢" },
+  // Bold/strict exit: SL tightened -15¢ → -8¢ so we bail on the first real
+  // adverse move instead of riding a full crash to zero. TP unchanged.
+  { kind: "sl", priceDeltaCents: -8,  exitFraction: 1.0, label: "SL -8¢" },
   { kind: "tp", priceDeltaCents: +12, exitFraction: 1.0, label: "TP +12¢" },
   { kind: "tp", priceDeltaCents: +6,  exitFraction: 0.5, label: "Partial TP +6¢" },
 ];
