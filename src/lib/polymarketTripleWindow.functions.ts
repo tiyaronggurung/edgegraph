@@ -54,6 +54,7 @@ export const upsertTripleWindow = createServerFn({ method: "POST" })
       trendline_5m: data.trendline_5m,
       combined_dir: data.combined_dir,
       combined_conf: data.combined_conf,
+      enrichment_json: data.enrichment ?? null,
     };
     const { error } = await context.supabase
       .from("btc_polymarket_triple_window")
