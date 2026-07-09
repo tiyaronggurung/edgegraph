@@ -1076,11 +1076,18 @@ export async function autoExitForUser(
       }
     }
 
-    // Kalshi-odds flip: the market itself moved ≥20¢ against our side vs entry
-    // (independent of our model). Strong crowd signal we picked the wrong side.
-    if (!exitReason && (entry - markCents) >= 20) {
+    // Kalshi-odds flip: the market moved ≥12¢ against our side vs entry
+    // (independent of our model). Tightened from 20¢ → 12¢ so we bail on
+    // the crowd rotation before a full crash.
+    if (!exitReason && (entry - markCents) >= 12) {
       exitReason = "odds_flip";
       reasons.push(`${r.ticker}[${r.mode}]: ODDS FLIP — Kalshi ${r.side} ${markCents}¢ vs entry ${entry}¢ (−${entry - markCents}¢)`);
+    }
+    // Late-window emergency: <180s left AND our side ≤ 40¢ → force close now.
+    // Prevents rides into settlement when price has clearly rotated against us.
+    if (!exitReason && secondsLeft < LIVE_LATE_TIGHTEN_SEC && markCents <= 40) {
+      exitReason = "sl";
+      reasons.push(`${r.ticker}[${r.mode}]: LATE EMERGENCY — ${secondsLeft.toFixed(0)}s left, mark ${markCents}¢ ≤ 40¢`);
     }
     // Polymarket flip: crowd on same 5-min window has rotated against us.
     // Fires only when BOTH: our-side Poly prob < 40% now AND dropped ≥15pts
