@@ -1629,6 +1629,7 @@ export type Database = {
           combined_conf: number | null
           combined_dir: string | null
           created_at: string
+          enrichment_json: Json | null
           expiration_value: number | null
           id: string
           kalshi_ticker: string
@@ -1671,6 +1672,7 @@ export type Database = {
           combined_conf?: number | null
           combined_dir?: string | null
           created_at?: string
+          enrichment_json?: Json | null
           expiration_value?: number | null
           id?: string
           kalshi_ticker: string
@@ -1713,6 +1715,7 @@ export type Database = {
           combined_conf?: number | null
           combined_dir?: string | null
           created_at?: string
+          enrichment_json?: Json | null
           expiration_value?: number | null
           id?: string
           kalshi_ticker?: string
