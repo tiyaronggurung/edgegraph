@@ -18,6 +18,9 @@ export interface SnapshotInput {
   sigmaMinEffective?: number;
   theoryYesProb?: number;
   anchorZ?: number;
+  liveSide?: "YES" | "NO";
+  chartVerdict?: "YES" | "NO" | "neutral";
+  chartStrength?: number;
 }
 
 export function timeBucketOf(secondsToClose: number): string {
@@ -56,7 +59,7 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
   try {
     const { data: existing } = await supabaseAdmin
       .from("btc_model_predictions")
-      .select("id, snapshot_seconds_to_close, outcome, side")
+      .select("id, snapshot_seconds_to_close, outcome, side, live_side, flip_count")
       .eq("ticker", input.ticker)
       .maybeSingle();
 
@@ -81,6 +84,9 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         sigma_at_snapshot: input.sigmaMinEffective ?? null,
         theory_yes_prob: input.theoryYesProb ?? null,
         anchor_z: input.anchorZ ?? null,
+        live_side: input.liveSide ?? input.side,
+        chart_verdict: input.chartVerdict ?? null,
+        chart_strength: input.chartStrength ?? null,
         time_bucket: timeBucketOf(input.secondsToClose),
       });
       return;
@@ -89,6 +95,11 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
     if (input.secondsToClose < (existing.snapshot_seconds_to_close ?? 1e9)) {
       // IMPORTANT: do NOT touch `side` — original pick is locked. Refresh only
       // the transient telemetry so exit signals can see live drift.
+      // Live-side flip tracking: increment counter if the incoming liveSide
+      // differs from what we last stored.
+      const prevLive = (existing.live_side as string | null) ?? (existing.side as string);
+      const nextLive = input.liveSide ?? prevLive;
+      const flipped = nextLive !== prevLive;
       await supabaseAdmin.from("btc_model_predictions").update({
         model_prob: input.modelProb,
         market_yes_price: input.marketYesPrice,
@@ -98,7 +109,14 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         sigma_at_snapshot: input.sigmaMinEffective ?? null,
         theory_yes_prob: input.theoryYesProb ?? null,
         anchor_z: input.anchorZ ?? null,
+        live_side: nextLive,
+        chart_verdict: input.chartVerdict ?? null,
+        chart_strength: input.chartStrength ?? null,
         time_bucket: timeBucketOf(input.secondsToClose),
+        ...(flipped ? {
+          flip_count: Number(existing.flip_count ?? 0) + 1,
+          flipped_at: new Date().toISOString(),
+        } : {}),
       }).eq("id", existing.id);
     }
   } catch (e) {
@@ -177,6 +195,10 @@ export interface PredictionStatsResult {
     wasCorrect: boolean | null;
     settlePrice: number | null;
     closeTime: string;
+    liveSide: "YES" | "NO" | null;
+    flipCount: number;
+    chartVerdict: "YES" | "NO" | "neutral" | null;
+    chartStrength: number | null;
   }>;
 }
 
@@ -192,7 +214,7 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
 
   const { data: rows } = await supabaseAdmin
     .from("btc_model_predictions")
-    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time")
+    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, live_side, flip_count, chart_verdict, chart_strength")
     .gte("close_time", cutoff)
     .order("close_time", { ascending: false })
     .limit(500);
@@ -231,6 +253,10 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
       wasCorrect: (r.was_correct as boolean | null) ?? null,
       settlePrice: r.settle_price != null ? Number(r.settle_price) : null,
       closeTime: r.close_time as string,
+      liveSide: (r.live_side as "YES" | "NO" | null) ?? null,
+      flipCount: Number(r.flip_count ?? 0),
+      chartVerdict: (r.chart_verdict as "YES" | "NO" | "neutral" | null) ?? null,
+      chartStrength: r.chart_strength != null ? Number(r.chart_strength) : null,
     })),
   };
 }

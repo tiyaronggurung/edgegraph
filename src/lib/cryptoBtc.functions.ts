@@ -3,6 +3,7 @@
 // Optional override: POST market context to CRYPTO_MODEL_URL and use returned {prob}.
 import { createServerFn } from "@tanstack/react-start";
 import { computeGapAnalysis, computeRequiredEdgePts, evaluateGate } from "./cryptoBtcGate";
+import { getChartVerdict } from "./ta/chartVerdict";
 
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
 const COINBASE = "https://api.exchange.coinbase.com";
@@ -109,6 +110,15 @@ export interface BtcMarket {
   // analysis by drift magnitude; NOT blended into modelYesProb (probAboveCond
   // already accounts for anchor drift analytically).
   anchorZ: number;
+  // ── Two-phase side model ───────────────────────────────────────────────────
+  // `side` above is the LOCKED first-snapshot pick (never changes; used for
+  // model-accuracy tracking). `liveSide` is the current best directional call
+  // for THIS tick — may flip mid-window when chart verdict + anchor drift +
+  // model all agree on the opposite direction. Auto-trader probe uses liveSide.
+  liveSide: "YES" | "NO";
+  liveFlipped: boolean;         // true if liveSide != locked side this tick
+  chartVerdict: "YES" | "NO" | "neutral";
+  chartStrength: number;        // 0..1 confidence from combined 1m+5m verdict
 }
 
 
@@ -749,6 +759,31 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
       }
     })();
 
+    // ── Chart verdict (global, once per request) ───────────────────────────
+    // Feed the same 1m candles + a 5-bucket 5m aggregation into the existing
+    // TA verdict engine. Used ONLY for the live-side flip logic below; the
+    // locked snapshot side is not touched.
+    const candles5m: BtcCandle[] = (() => {
+      if (recent.length < 5) return [];
+      const buckets: BtcCandle[] = [];
+      for (let i = 0; i + 5 <= recent.length; i += 5) {
+        const g = recent.slice(i, i + 5);
+        buckets.push({
+          t: g[0].t,
+          o: g[0].o,
+          h: Math.max(...g.map(c => c.h)),
+          l: Math.min(...g.map(c => c.l)),
+          c: g[g.length - 1].c,
+          v: g.reduce((a, c) => a + c.v, 0),
+        });
+      }
+      return buckets;
+    })();
+    const chartVerdict = (() => {
+      try { return getChartVerdict(recent, candles5m); }
+      catch (e) { console.warn("chart verdict failed:", e); return null; }
+    })();
+
     // Apply regime knobs to σ and drift before they feed the diffusion model.
     const sigma = sigmaRaw * (regimeState?.sigmaMult ?? 1);
     const drift = Math.max(-0.005, Math.min(0.005, driftRaw + (regimeState?.driftBiasPerMin ?? 0)));
@@ -919,6 +954,39 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
             const denom = windowOpen * sigmaEff * Math.sqrt(elapsedMin);
             return denom > 0 ? (spot - windowOpen) / denom : 0;
           })(),
+          ...(() => {
+            // Live-side calculation: locked side stays put; live side can flip
+            // when chart verdict + anchor drift + raw model all agree on the
+            // opposite direction AND we're past the early-window / not-too-late gates.
+            const rawDir: "YES" | "NO" = p >= 0.5 ? "YES" : "NO";
+            const cvDir = chartVerdict?.combined.direction ?? "neutral";
+            const cvConf = chartVerdict?.combined.confidence ?? 0;
+            const elapsedMin = 15 - minsRemaining;
+            const anchorZ = (() => {
+              const em = Math.max(0.5, elapsedMin);
+              const denom = windowOpen * sigmaEff * Math.sqrt(em);
+              return denom > 0 ? (spot - windowOpen) / denom : 0;
+            })();
+            const zSign: "YES" | "NO" | null =
+              anchorZ > 0.5 ? "YES" : anchorZ < -0.5 ? "NO" : null;
+            // Flip gates: raw model must disagree with locked, chart must
+            // strongly agree with raw model, anchor drift must agree, and we
+            // must be past 3 min but with >=90s left.
+            const canFlip =
+              !!lockedPre &&
+              rawDir !== lockedPre &&
+              cvDir === rawDir && cvConf >= 0.5 &&
+              zSign === rawDir &&
+              elapsedMin >= 3 &&
+              secondsToClose >= 90;
+            const liveSide: "YES" | "NO" = canFlip ? rawDir : side;
+            return {
+              liveSide,
+              liveFlipped: liveSide !== side,
+              chartVerdict: cvDir as "YES" | "NO" | "neutral",
+              chartStrength: cvConf,
+            };
+          })(),
         });
       }
     }
@@ -948,6 +1016,9 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               sigmaMinEffective: m.sigmaMinEffective,
               theoryYesProb: m.theoryYesProb,
               anchorZ: m.anchorZ,
+              liveSide: m.liveSide,
+              chartVerdict: m.chartVerdict,
+              chartStrength: m.chartStrength,
             })),
         );
         await settleDuePredictions();
