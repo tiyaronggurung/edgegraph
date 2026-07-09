@@ -673,21 +673,34 @@ function ModelAccuracyPanel() {
                     <tr>
                       <th className="text-left p-2">Closed</th>
                       <th className="text-left p-2">Ticker</th>
-                      <th className="text-left p-2">Model pick</th>
+                      <th className="text-left p-2" title="Locked side = model value-pick (p − yesPrice). Historically ~50% (coinflip).">Value pick</th>
+                      <th className="text-left p-2" title="Raw model direction: P(YES) ≥ 50%? Historically ~87% correct on BTC move.">Raw dir</th>
                       <th className="text-right p-2">Strike</th>
                       <th className="text-right p-2">Model%</th>
                       <th className="text-right p-2">Market¢</th>
                       <th className="text-right p-2">Edge</th>
                       <th className="text-right p-2">Settle</th>
-                      <th className="text-center p-2">Result</th>
+                      <th className="text-center p-2" title="Result of the Value pick (locked side)">Result</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {s.recent.map((r) => (
+                    {s.recent.map((r) => {
+                      const rawSide: "YES" | "NO" = r.modelProb >= 0.5 ? "YES" : "NO";
+                      // Raw dir wins if settle direction matches rawSide's direction.
+                      // We infer from wasCorrect + side agreement: raw wins iff (side===rawSide ? wasCorrect : !wasCorrect).
+                      const rawCorrect: boolean | null = r.wasCorrect == null
+                        ? null
+                        : (r.side === rawSide ? r.wasCorrect : !r.wasCorrect);
+                      return (
                       <tr key={r.ticker} className="border-t border-border">
                         <td className="p-2">{new Date(r.closeTime).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
                         <td className="p-2 font-mono">{r.ticker}</td>
                         <td className="p-2"><span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(r.side)}</span></td>
+                        <td className="p-2">
+                          <span className={rawSide === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(rawSide)}</span>
+                          {rawCorrect === true && <span className="ml-1 text-[10px] text-emerald-400">✓</span>}
+                          {rawCorrect === false && <span className="ml-1 text-[10px] text-red-400">✗</span>}
+                        </td>
                         <td className="p-2 text-right">{fmt$(r.strike)}</td>
                         <td className="p-2 text-right">{(r.modelProb * 100).toFixed(1)}%</td>
                         <td className="p-2 text-right">{(r.marketYesPrice * 100).toFixed(0)}</td>
@@ -699,7 +712,8 @@ function ModelAccuracyPanel() {
                           {r.wasCorrect === null && <span className="text-muted-foreground">pending</span>}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
