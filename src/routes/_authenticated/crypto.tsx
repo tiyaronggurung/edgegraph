@@ -772,10 +772,41 @@ function BigFlipMonitor() {
     const key = `${r.ticker}:${r.flipAt}`;
     if (lastToastKey.current === key) return;
     lastToastKey.current = key;
-    toast.success(`BIG FLIP → ${r.toSide}`, {
-      description: `${r.prevYes}¢ → ${r.newYes}¢ (Δ${r.yesDelta}) · ${r.secondsToClose}s left · SHADOW ONLY`,
+    toast.success(`🚨 BIG FLIP → ${r.toSide} · LIVE $20`, {
+      description: `${r.prevYes}¢ → ${r.newYes}¢ (Δ${r.yesDelta}) · ${r.secondsToClose}s left`,
     });
+    try { playOrderPlaced(); } catch { /* noop */ }
   }, [q.data]);
+
+  // Realtime: catch flips fired by the server cron while the page is idle.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id;
+      if (!uid || !active) return;
+      const channel = supabase
+        .channel(`big-flip-signals-${uid}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "big_flip_signals", filter: `user_id=eq.${uid}` },
+          (payload) => {
+            const row = payload.new as { ticker: string; to_side: string; prev_yes: number; new_yes: number; yes_delta: number; seconds_to_close: number; passed_rules: boolean; flip_at: string };
+            if (!row.passed_rules) return;
+            const key = `${row.ticker}:${row.flip_at}`;
+            if (lastToastKey.current === key) return;
+            lastToastKey.current = key;
+            toast.success(`🚨 BIG FLIP → ${row.to_side} · LIVE $20`, {
+              description: `${row.prev_yes}¢ → ${row.new_yes}¢ (Δ${row.yes_delta}) · ${row.seconds_to_close}s left`,
+            });
+            try { playOrderPlaced(); } catch { /* noop */ }
+          },
+        )
+        .subscribe();
+      return () => { supabase.removeChannel(channel); };
+    })();
+    return () => { active = false; };
+  }, []);
 
   const r = q.data;
   if (!r || !r.ok) return null;
@@ -785,7 +816,7 @@ function BigFlipMonitor() {
     return (
       <div className="mt-1 rounded border border-border/50 bg-muted/10 px-2 py-1 text-[10px] font-mono text-muted-foreground flex items-center gap-2">
         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
-        <span>Big-flip monitor · SHADOW · Δ≥25¢ · {r.rejectReason ? `last rejected: ${r.rejectReason}` : "no signal"}</span>
+        <span>Big-flip monitor · LIVE $20 · 24/7 cron · Δ≥25¢ · {r.rejectReason ? `last rejected: ${r.rejectReason}` : "no signal"}</span>
       </div>
     );
   }

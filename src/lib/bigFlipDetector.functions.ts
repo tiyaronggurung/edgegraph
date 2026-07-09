@@ -2,12 +2,16 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // Detects "big flips": one-tick YES delta >= 25c with confirming conditions.
-// Shadow-log only. Writes qualifying flips to big_flip_signals and returns the
-// latest signal so the UI can render a banner. Does NOT place any trades.
+// Writes qualifying flips to big_flip_signals AND places a live $20 Kalshi
+// buy on the first insert. Runs from:
+//   - the /crypto page via detectBigFlip (client polling, per-user)
+//   - a server cron via /api/public/hooks/big-flip-tick (24/7, all users)
 
 const YES_DELTA_MIN = 25;
 const MIN_SECONDS_TO_CLOSE = 20;
-const NO_OPPOSITE_FLIP_WINDOW_SEC = 300; // 5 min
+// Short cooldown so a fade-then-flip-back sequence can bet on each leg.
+// Prevents duplicate fires on the same tick but allows genuine re-flips.
+const SAME_TICKER_COOLDOWN_SEC = 20;
 const LIVE_STAKE_USD = 20;
 
 export interface BigFlipSignal {
@@ -32,144 +36,142 @@ const empty: BigFlipSignal = {
   flipAt: null, passed: false, rejectReason: null, ageSeconds: null,
 };
 
+// Shared detection body. `supabase` may be a user-scoped client (RLS) or the
+// admin client (cron). Returns the signal; ALSO inserts into big_flip_signals
+// and fires a live Kalshi buy on first insert when rules pass.
+export async function runBigFlipForUser(
+  supabase: any,
+  userId: string,
+): Promise<BigFlipSignal> {
+  const { data: latestRow } = await supabase
+    .from("btc_odds_tape")
+    .select("ticker")
+    .eq("user_id", userId)
+    .order("snapped_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!latestRow?.ticker) return empty;
+  const ticker = latestRow.ticker as string;
+
+  const { data: rows } = await supabase
+    .from("btc_odds_tape")
+    .select("yes_cents,no_cents,spot,strike,seconds_to_close,snapped_at")
+    .eq("user_id", userId)
+    .eq("ticker", ticker)
+    .order("snapped_at", { ascending: false })
+    .limit(40);
+  const samples = (rows ?? []).slice().reverse();
+  if (samples.length < 2) return { ...empty, ok: true, ticker };
+
+  // Most recent one-tick move >= 25c.
+  let big: { i: number; delta: number } | null = null;
+  for (let i = 1; i < samples.length; i++) {
+    const prev = samples[i - 1].yes_cents as number;
+    const cur = samples[i].yes_cents as number;
+    const d = cur - prev;
+    if (Math.abs(d) >= YES_DELTA_MIN) big = { i, delta: d };
+  }
+  if (!big) {
+    const last = samples[samples.length - 1];
+    return {
+      ok: true, ticker, toSide: null,
+      prevYes: null, newYes: last.yes_cents as number,
+      yesDelta: null, spot: last.spot as number, strike: last.strike as number,
+      secondsToClose: last.seconds_to_close as number,
+      flipAt: null, passed: false, rejectReason: null, ageSeconds: null,
+    };
+  }
+
+  const flipSample = samples[big.i];
+  const prevSample = samples[big.i - 1];
+  const toSide: "YES" | "NO" = big.delta > 0 ? "YES" : "NO";
+  const spot = flipSample.spot as number;
+  const strike = flipSample.strike as number;
+  const stc = flipSample.seconds_to_close as number;
+  const flipAt = flipSample.snapped_at as string;
+  const ageSeconds = Math.floor((Date.now() - new Date(flipAt).getTime()) / 1000);
+
+  let passed = true;
+  let reject: string | null = null;
+  if (toSide === "YES" && spot <= strike) { passed = false; reject = "spot not above strike for YES flip"; }
+  else if (toSide === "NO" && spot >= strike) { passed = false; reject = "spot not below strike for NO flip"; }
+  else if (stc < MIN_SECONDS_TO_CLOSE) { passed = false; reject = `only ${stc}s to close`; }
+  else {
+    // 20s cooldown across ANY prior flip on this ticker — allows re-flips
+    // but not duplicate fires on the same tick.
+    const cutoff = new Date(new Date(flipAt).getTime() - SAME_TICKER_COOLDOWN_SEC * 1000).toISOString();
+    const { data: prior } = await supabase
+      .from("big_flip_signals")
+      .select("flip_at")
+      .eq("user_id", userId)
+      .eq("ticker", ticker)
+      .gte("flip_at", cutoff)
+      .lt("flip_at", flipAt)
+      .limit(1);
+    if ((prior ?? []).length > 0) { passed = false; reject = "cooldown: prior flip within 20s"; }
+  }
+
+  const { error: insErr } = await supabase.from("big_flip_signals").insert({
+    user_id: userId,
+    ticker,
+    strike,
+    spot,
+    prev_yes: prevSample.yes_cents as number,
+    new_yes: flipSample.yes_cents as number,
+    prev_no: prevSample.no_cents as number,
+    new_no: flipSample.no_cents as number,
+    yes_delta: big.delta,
+    to_side: toSide,
+    seconds_to_close: stc,
+    passed_rules: passed,
+    reject_reason: reject,
+    flip_at: flipAt,
+  });
+  const firstTime = !insErr;
+
+  if (passed && firstTime) {
+    try {
+      const { submitKalshiBuy } = await import("./cryptoTrades.functions");
+      const limitCents = toSide === "YES"
+        ? (flipSample.yes_cents as number)
+        : (flipSample.no_cents as number);
+      if (limitCents >= 1 && limitCents <= 99) {
+        const contracts = Math.max(1, Math.floor((LIVE_STAKE_USD * 100) / limitCents));
+        await submitKalshiBuy(supabase, userId, {
+          ticker,
+          side: toSide,
+          contracts,
+          limitPriceCents: limitCents,
+          strike,
+          spot,
+          stakeUsd: (contracts * limitCents) / 100,
+          inputsSnapshot: {
+            source: "big_flip_detector",
+            yes_delta: big.delta,
+            prev_yes: prevSample.yes_cents,
+            new_yes: flipSample.yes_cents,
+            seconds_to_close: stc,
+            flip_at: flipAt,
+          },
+        });
+      }
+    } catch (e) {
+      console.error("[bigFlipDetector] live order failed:", (e as Error)?.message);
+    }
+  }
+
+  return {
+    ok: true, ticker, toSide,
+    prevYes: prevSample.yes_cents as number,
+    newYes: flipSample.yes_cents as number,
+    yesDelta: big.delta,
+    spot, strike, secondsToClose: stc,
+    flipAt, passed, rejectReason: reject, ageSeconds,
+  };
+}
+
 export const detectBigFlip = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<BigFlipSignal> => {
-    // Get last row for the user's active ticker.
-    const { data: latestRow } = await context.supabase
-      .from("btc_odds_tape")
-      .select("ticker")
-      .eq("user_id", context.userId)
-      .order("snapped_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (!latestRow?.ticker) return empty;
-    const ticker = latestRow.ticker as string;
-
-    // Pull last 40 samples on this ticker (~ last 2 min at ~3s cadence).
-    const { data: rows } = await context.supabase
-      .from("btc_odds_tape")
-      .select("yes_cents,no_cents,spot,strike,seconds_to_close,snapped_at")
-      .eq("user_id", context.userId)
-      .eq("ticker", ticker)
-      .order("snapped_at", { ascending: false })
-      .limit(40);
-    const samples = (rows ?? []).slice().reverse();
-    if (samples.length < 2) return { ...empty, ok: true, ticker };
-
-    // Scan pairwise for the most recent big one-tick move.
-    let big: { i: number; delta: number } | null = null;
-    for (let i = 1; i < samples.length; i++) {
-      const prev = samples[i - 1].yes_cents as number;
-      const cur = samples[i].yes_cents as number;
-      const d = cur - prev;
-      if (Math.abs(d) >= YES_DELTA_MIN) big = { i, delta: d };
-    }
-    if (!big) {
-      const last = samples[samples.length - 1];
-      return {
-        ok: true, ticker, toSide: null,
-        prevYes: null, newYes: last.yes_cents as number,
-        yesDelta: null, spot: last.spot as number, strike: last.strike as number,
-        secondsToClose: last.seconds_to_close as number,
-        flipAt: null, passed: false, rejectReason: null, ageSeconds: null,
-      };
-    }
-
-    const flipSample = samples[big.i];
-    const prevSample = samples[big.i - 1];
-    const toSide: "YES" | "NO" = big.delta > 0 ? "YES" : "NO";
-    const spot = flipSample.spot as number;
-    const strike = flipSample.strike as number;
-    const stc = flipSample.seconds_to_close as number;
-    const flipAt = flipSample.snapped_at as string;
-    const ageSeconds = Math.floor((Date.now() - new Date(flipAt).getTime()) / 1000);
-
-    // Rules gate.
-    let passed = true;
-    let reject: string | null = null;
-    // 1. delta magnitude — already >= 25 by construction.
-    // 2. spot on new leader's side of strike.
-    if (toSide === "YES" && spot <= strike) { passed = false; reject = "spot not above strike for YES flip"; }
-    else if (toSide === "NO" && spot >= strike) { passed = false; reject = "spot not below strike for NO flip"; }
-    // 3. seconds to close.
-    else if (stc < MIN_SECONDS_TO_CLOSE) { passed = false; reject = `only ${stc}s to close`; }
-    // 4. no opposite flip on this ticker in prior 5 min.
-    else {
-      const cutoff = new Date(new Date(flipAt).getTime() - NO_OPPOSITE_FLIP_WINDOW_SEC * 1000).toISOString();
-      const { data: prior } = await context.supabase
-        .from("big_flip_signals")
-        .select("to_side, flip_at")
-        .eq("user_id", context.userId)
-        .eq("ticker", ticker)
-        .gte("flip_at", cutoff)
-        .lt("flip_at", flipAt)
-        .order("flip_at", { ascending: false })
-        .limit(1);
-      const priorOpposite = (prior ?? []).some(p => (p.to_side as string) !== toSide);
-      if (priorOpposite) { passed = false; reject = "opposite flip within 5 min"; }
-    }
-
-    // Idempotent insert (unique on user+ticker+flip_at). Only place a live
-    // bet on the FIRST insert for this flip — dup conflict = already handled.
-    const { error: insErr } = await context.supabase.from("big_flip_signals").insert({
-      user_id: context.userId,
-      ticker,
-      strike,
-      spot,
-      prev_yes: prevSample.yes_cents as number,
-      new_yes: flipSample.yes_cents as number,
-      prev_no: prevSample.no_cents as number,
-      new_no: flipSample.no_cents as number,
-      yes_delta: big.delta,
-      to_side: toSide,
-      seconds_to_close: stc,
-      passed_rules: passed,
-      reject_reason: reject,
-      flip_at: flipAt,
-    });
-    const firstTime = !insErr;
-
-    // LIVE: fire a $20 Kalshi buy on the flipped-to side, first time only.
-    if (passed && firstTime) {
-      try {
-        const { submitKalshiBuy } = await import("./cryptoTrades.functions");
-        const limitCents = toSide === "YES"
-          ? (flipSample.yes_cents as number)
-          : (flipSample.no_cents as number);
-        if (limitCents >= 1 && limitCents <= 99) {
-          const contracts = Math.max(1, Math.floor((LIVE_STAKE_USD * 100) / limitCents));
-          await submitKalshiBuy(context.supabase, context.userId, {
-            ticker,
-            side: toSide,
-            contracts,
-            limitPriceCents: limitCents,
-            strike,
-            spot,
-            stakeUsd: (contracts * limitCents) / 100,
-            inputsSnapshot: {
-              source: "big_flip_detector",
-              yes_delta: big.delta,
-              prev_yes: prevSample.yes_cents,
-              new_yes: flipSample.yes_cents,
-              seconds_to_close: stc,
-              flip_at: flipAt,
-            },
-          });
-        }
-      } catch (e) {
-        // Swallow — signal already logged; do not block the detector loop.
-        console.error("[bigFlipDetector] live order failed:", (e as Error)?.message);
-      }
-    }
-
-
-    return {
-      ok: true, ticker, toSide,
-      prevYes: prevSample.yes_cents as number,
-      newYes: flipSample.yes_cents as number,
-      yesDelta: big.delta,
-      spot, strike, secondsToClose: stc,
-      flipAt, passed, rejectReason: reject, ageSeconds,
-    };
+    return runBigFlipForUser(context.supabase, context.userId);
   });
