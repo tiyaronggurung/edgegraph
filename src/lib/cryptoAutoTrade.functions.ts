@@ -48,7 +48,9 @@ export type ExitLadderTier = {
   label: string;
 };
 export const DEFAULT_EXIT_LADDER: ExitLadderTier[] = [
-  { kind: "sl", priceDeltaCents: -15, exitFraction: 1.0, label: "SL -15¢" },
+  // Bold/strict exit: SL tightened -15¢ → -8¢ so we bail on the first real
+  // adverse move instead of riding a full crash to zero. TP unchanged.
+  { kind: "sl", priceDeltaCents: -8,  exitFraction: 1.0, label: "SL -8¢" },
   { kind: "tp", priceDeltaCents: +12, exitFraction: 1.0, label: "TP +12¢" },
   { kind: "tp", priceDeltaCents: +6,  exitFraction: 0.5, label: "Partial TP +6¢" },
 ];
@@ -937,7 +939,8 @@ export async function autoExitForUser(
   // Backtest against 131 settled live trades: floor at 25¢ saved $228 on 8 big
   // losses and cost only $130 across 112 wins (1 win of 112 ever touched 25¢).
   // Runs BEFORE ladder logic so it always wins over per-order exit tiers.
-  const HARD_FLOOR_CENTS = 25;
+  // Bold/strict floor: was 25¢ — bumped so a crash exits at 35 instead of 1.
+  const HARD_FLOOR_CENTS = 35;
 
   for (const mk of marked) {
     const { r, markCents, entry, remaining } = mk;
@@ -973,7 +976,17 @@ export async function autoExitForUser(
     if (!claimed) { reasons.push(`${r.ticker}: ladder claim lost`); continue; }
 
     const sellCents = Math.max(1, Math.min(99, markCents));
-    const fill = await trySell(r, toSell, sellCents, hardFloorHit ? "hard-floor" : `ladder-${tier.kind}`);
+    let fill = await trySell(r, toSell, sellCents, hardFloorHit ? "hard-floor" : `ladder-${tier.kind}`);
+
+    // Bold/strict: on SL/hard-floor IOC 0-fill, chase price down once at
+    // mark-2¢ so a moving book doesn't leave the exit hanging until next tick.
+    if (!fill && (tier.kind === "sl" || hardFloorHit)) {
+      const chaseCents = Math.max(1, Math.min(99, markCents - 2));
+      if (chaseCents < sellCents) {
+        fill = await trySell(r, toSell, chaseCents, hardFloorHit ? "hard-floor-chase" : `ladder-sl-chase`);
+        if (fill) reasons.push(`${r.ticker}: SL chase filled @ ${chaseCents}¢ after 0-fill @ ${sellCents}¢`);
+      }
+    }
 
     if (!fill) {
       await supabase.from("auto_trade_orders").update({ status: "placed" }).eq("id", r.id);
@@ -1063,11 +1076,18 @@ export async function autoExitForUser(
       }
     }
 
-    // Kalshi-odds flip: the market itself moved ≥20¢ against our side vs entry
-    // (independent of our model). Strong crowd signal we picked the wrong side.
-    if (!exitReason && (entry - markCents) >= 20) {
+    // Kalshi-odds flip: the market moved ≥12¢ against our side vs entry
+    // (independent of our model). Tightened from 20¢ → 12¢ so we bail on
+    // the crowd rotation before a full crash.
+    if (!exitReason && (entry - markCents) >= 12) {
       exitReason = "odds_flip";
       reasons.push(`${r.ticker}[${r.mode}]: ODDS FLIP — Kalshi ${r.side} ${markCents}¢ vs entry ${entry}¢ (−${entry - markCents}¢)`);
+    }
+    // Late-window emergency: <180s left AND our side ≤ 40¢ → force close now.
+    // Prevents rides into settlement when price has clearly rotated against us.
+    if (!exitReason && secondsLeft < LIVE_LATE_TIGHTEN_SEC && markCents <= 40) {
+      exitReason = "sl";
+      reasons.push(`${r.ticker}[${r.mode}]: LATE EMERGENCY — ${secondsLeft.toFixed(0)}s left, mark ${markCents}¢ ≤ 40¢`);
     }
     // Polymarket flip: crowd on same 5-min window has rotated against us.
     // Fires only when BOTH: our-side Poly prob < 40% now AND dropped ≥15pts
