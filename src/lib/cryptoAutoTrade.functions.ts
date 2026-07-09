@@ -38,6 +38,17 @@ const LIVE_LATE_SL_FRAC = 0.25;           // #2 tighter SL fraction near expiry 
 const LIVE_COINFLIP_BAND = 0.05;          // #4 |ask - 0.5| below this = coinflip zone
 const LIVE_COINFLIP_MIN_SIGMA = 1.5;      // #4 need this much sigma to trade coinflip prices
 
+// ── Kalshi-leaned primary + model-side disagreement probe ──
+// Primary bet follows the leg Kalshi prices as favorite (yesPrice ≥ threshold
+// → YES, ≤ 1-threshold → NO). Model gates still evaluate on the model-picked
+// side (m.side) upstream; we just flip the side we actually submit for the
+// primary. If the model disagrees with Kalshi's lean, we also fire a small
+// probe on the model side ($10, or $20 when model edge is strong).
+const KALSHI_LEAN_THRESHOLD = 0.55;       // yesPrice ≥ 0.55 → Kalshi leans YES; ≤ 0.45 → NO
+const MODEL_PROBE_STAKE_LOW = 10;
+const MODEL_PROBE_STAKE_HIGH = 20;
+const MODEL_PROBE_STRONG_EDGE_PTS = 6;    // model edge ≥ this → probe with HIGH stake
+
 // ── Odds-ladder exit tiers (price deltas in Kalshi ¢) ──
 // Each order snapshots this at entry so changing defaults never affects live positions.
 // Priority order: stop-loss first (safety), then most-aggressive TP, then partial.
@@ -437,27 +448,59 @@ export async function runAutoTradeCore(
       } catch { /* fall back to 78 */ }
     }
 
-    const placed: AutoTradeOrderRow[] = [];
+    // ── Expand each candidate into 1 primary + optional model-side probe ──
+    // Primary side = whichever leg Kalshi prices as favorite. If model
+    // disagrees with Kalshi's lean, also fire a small model-side probe.
+    type PlanEntry = {
+      m: typeof candidates[number];
+      side: "YES" | "NO";
+      stakeUsd: number;
+      kind: "primary" | "kalshi_primary_disagree" | "model_probe";
+    };
+    const plan: PlanEntry[] = [];
     for (const m of candidates) {
-      if (!data.force && freshProbBySide.size > 0) {
-        const p = freshProbBySide.get(`${m.ticker}|${m.side}`);
+      const yp = m.yesPrice;
+      let kalshiSide: "YES" | "NO" | null = null;
+      if (yp >= KALSHI_LEAN_THRESHOLD) kalshiSide = "YES";
+      else if (yp <= 1 - KALSHI_LEAN_THRESHOLD) kalshiSide = "NO";
+      if (kalshiSide === null || kalshiSide === m.side) {
+        // Coinflip zone or agreement → keep model-picked side, single bet.
+        plan.push({ m, side: m.side, stakeUsd: data.stakeUsd, kind: "primary" });
+      } else {
+        // Disagreement → primary on Kalshi lean, small probe on model side.
+        plan.push({ m, side: kalshiSide, stakeUsd: data.stakeUsd, kind: "kalshi_primary_disagree" });
+        const probeStake = m.edgeAbs >= MODEL_PROBE_STRONG_EDGE_PTS
+          ? MODEL_PROBE_STAKE_HIGH
+          : MODEL_PROBE_STAKE_LOW;
+        plan.push({ m, side: m.side, stakeUsd: probeStake, kind: "model_probe" });
+        skipReasons.push(`${m.ticker}: disagree — Kalshi leans ${kalshiSide} @ ${(yp * 100).toFixed(0)}¢, model picks ${m.side} (edge ${m.edgeAbs.toFixed(1)}pts) → $${data.stakeUsd} ${kalshiSide} primary + $${probeStake} ${m.side} probe`);
+      }
+    }
+
+    const placed: AutoTradeOrderRow[] = [];
+    for (const entry of plan) {
+      const { m, side, stakeUsd: sizedStake, kind } = entry;
+      if (!data.force && freshProbBySide.size > 0 && kind !== "kalshi_primary_disagree") {
+        // Skip the model-direction recheck for the Kalshi-primary leg on
+        // disagreement — by definition the model doesn't back that side.
+        const p = freshProbBySide.get(`${m.ticker}|${side}`);
         if (p === undefined) {
-          skipReasons.push(`${m.ticker}: entry-recheck — ${m.side} no longer in fresh market list`);
+          skipReasons.push(`${m.ticker}: entry-recheck — ${side} no longer in fresh market list`);
           continue;
         }
         if (p < LIVE_FLIP_PROB) {
-          skipReasons.push(`${m.ticker}: entry-recheck — model now ${(p * 100).toFixed(0)}% for ${m.side} (< ${LIVE_FLIP_PROB * 100}%)`);
+          skipReasons.push(`${m.ticker}: entry-recheck — model now ${(p * 100).toFixed(0)}% for ${side} (< ${LIVE_FLIP_PROB * 100}%)`);
           continue;
         }
       }
       const limitCents = Math.max(1, Math.min(99, Math.round(
-        (m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
+        (side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
       )));
       // ── Max-entry ceiling (live only, configurable) ──
       // Above this, one loss costs many wins to claw back. Default 78¢ —
       // user can raise up to 95¢ via the Odds Shadow Trader panel.
       if (isLive && limitCents > liveMaxEntryCents) {
-        skipReasons.push(`${m.ticker}: ${m.side} ${limitCents}¢ > ${liveMaxEntryCents}¢ ceiling — skipped`);
+        skipReasons.push(`${m.ticker}: ${side} ${limitCents}¢ > ${liveMaxEntryCents}¢ ceiling — skipped`);
         continue;
       }
 
@@ -478,7 +521,7 @@ export async function runAutoTradeCore(
           const { getPolymarketBtcUpDown } = await import("./polymarketOdds");
           const poly = await getPolymarketBtcUpDown();
           if (poly) {
-            const ourSideProb = m.side === "YES" ? poly.upProb : poly.downProb;
+            const ourSideProb = side === "YES" ? poly.upProb : poly.downProb;
             const agrees = ourSideProb >= 0.5;
             polymarketSnap = {
               upProb: poly.upProb,
@@ -500,7 +543,7 @@ export async function runAutoTradeCore(
                   down_prob: poly.downProb,
                   slug: poly.slug,
                   kalshi_ticker: m.ticker,
-                  kalshi_side: m.side,
+                  kalshi_side: side,
                   kalshi_our_side_cents: limitCents,
                   agrees,
                 });
@@ -513,8 +556,7 @@ export async function runAutoTradeCore(
       }
 
 
-      // Ladder-sized stake (live) or flat stake (paper). No martingale.
-      const sizedStake = data.stakeUsd;
+      // Stake for this plan entry (primary = ladder stake, probe = $10/$20).
       const contracts = Math.max(1, Math.floor((sizedStake * 100) / limitCents));
       const stakeActual = (contracts * limitCents) / 100;
 
@@ -564,7 +606,7 @@ export async function runAutoTradeCore(
             const out = await submitKalshiBuy(supabase, userId, {
               ticker: m.ticker,
               eventTicker: m.eventTicker ?? undefined,
-              side: m.side,
+              side: side,
               contracts: attemptContracts,
               limitPriceCents: attemptCents,
               strike: m.strike,
@@ -653,7 +695,7 @@ export async function runAutoTradeCore(
           mode: isLive ? "live" : "paper",
           ticker: m.ticker,
           event_ticker: m.eventTicker,
-          side: m.side,
+          side: side,
           stake_usd: stakeFilled,
           limit_cents: limitCents,
           contracts: filledContracts,
@@ -673,7 +715,7 @@ export async function runAutoTradeCore(
           partial_pnl_usd: 0,
           exit_ladder: DEFAULT_EXIT_LADDER as any,
           is_martingale: false,
-          inputs_snapshot: { iocLadder: ladderTelemetry, polymarket: polymarketSnap } as any,
+          inputs_snapshot: { iocLadder: ladderTelemetry, polymarket: polymarketSnap, planKind: kind, modelSide: m.side, kalshiLeanYesPrice: m.yesPrice } as any,
 
         })
         .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
@@ -686,7 +728,7 @@ export async function runAutoTradeCore(
 
     return {
       sessionId, mode: data.mode,
-      attempted: candidates.length,
+      attempted: plan.length,
       placed: placed.length,
       skipped: skipReasons.length,
       skipReasons: skipReasons.slice(0, 20),
