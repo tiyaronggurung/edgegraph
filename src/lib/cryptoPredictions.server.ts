@@ -100,7 +100,7 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
       const prevLive = (existing.live_side as string | null) ?? (existing.side as string);
       const nextLive = input.liveSide ?? prevLive;
       const flipped = nextLive !== prevLive;
-      const patch: Record<string, unknown> = {
+      await supabaseAdmin.from("btc_model_predictions").update({
         model_prob: input.modelProb,
         market_yes_price: input.marketYesPrice,
         edge_pts: input.edgePts,
@@ -113,12 +113,11 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         chart_verdict: input.chartVerdict ?? null,
         chart_strength: input.chartStrength ?? null,
         time_bucket: timeBucketOf(input.secondsToClose),
-      };
-      if (flipped) {
-        patch.flip_count = Number(existing.flip_count ?? 0) + 1;
-        patch.flipped_at = new Date().toISOString();
-      }
-      await supabaseAdmin.from("btc_model_predictions").update(patch).eq("id", existing.id);
+        ...(flipped ? {
+          flip_count: Number(existing.flip_count ?? 0) + 1,
+          flipped_at: new Date().toISOString(),
+        } : {}),
+      }).eq("id", existing.id);
     }
   } catch (e) {
     console.warn("snapshotPrediction failed:", e);
