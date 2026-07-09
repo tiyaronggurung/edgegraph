@@ -2067,6 +2067,69 @@ export type Database = {
         }
         Relationships: []
       }
+      manual_kalshi_trades: {
+        Row: {
+          action: string
+          contracts: number
+          cost_usd: number | null
+          created_at: string
+          event_ticker: string | null
+          filled_at: string
+          id: string
+          kalshi_order_id: string | null
+          kalshi_trade_id: string
+          pnl_usd: number | null
+          price_cents: number
+          raw: Json | null
+          settle_price: number | null
+          settled: boolean
+          side: string
+          ticker: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          contracts: number
+          cost_usd?: number | null
+          created_at?: string
+          event_ticker?: string | null
+          filled_at: string
+          id?: string
+          kalshi_order_id?: string | null
+          kalshi_trade_id: string
+          pnl_usd?: number | null
+          price_cents: number
+          raw?: Json | null
+          settle_price?: number | null
+          settled?: boolean
+          side: string
+          ticker: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          contracts?: number
+          cost_usd?: number | null
+          created_at?: string
+          event_ticker?: string | null
+          filled_at?: string
+          id?: string
+          kalshi_order_id?: string | null
+          kalshi_trade_id?: string
+          pnl_usd?: number | null
+          price_cents?: number
+          raw?: Json | null
+          settle_price?: number | null
+          settled?: boolean
+          side?: string
+          ticker?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       patterns: {
         Row: {
           best_use: string | null
