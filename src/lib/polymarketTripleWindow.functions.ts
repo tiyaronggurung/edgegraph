@@ -27,6 +27,7 @@ const UpsertInput = z.object({
   trendline_5m: z.string().nullable(),
   combined_dir: z.string().nullable(),
   combined_conf: z.number().nullable(),
+  enrichment: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
 export const upsertTripleWindow = createServerFn({ method: "POST" })
