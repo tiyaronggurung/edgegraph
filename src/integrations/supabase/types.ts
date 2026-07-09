@@ -1503,11 +1503,16 @@ export type Database = {
       btc_model_predictions: {
         Row: {
           anchor_z: number | null
+          chart_strength: number | null
+          chart_verdict: string | null
           close_time: string
           created_at: string
           edge_pts: number
           event_ticker: string | null
+          flip_count: number
+          flipped_at: string | null
           id: string
+          live_side: string | null
           market_yes_price: number
           model_prob: number
           outcome: string | null
@@ -1526,11 +1531,16 @@ export type Database = {
         }
         Insert: {
           anchor_z?: number | null
+          chart_strength?: number | null
+          chart_verdict?: string | null
           close_time: string
           created_at?: string
           edge_pts: number
           event_ticker?: string | null
+          flip_count?: number
+          flipped_at?: string | null
           id?: string
+          live_side?: string | null
           market_yes_price: number
           model_prob: number
           outcome?: string | null
@@ -1549,11 +1559,16 @@ export type Database = {
         }
         Update: {
           anchor_z?: number | null
+          chart_strength?: number | null
+          chart_verdict?: string | null
           close_time?: string
           created_at?: string
           edge_pts?: number
           event_ticker?: string | null
+          flip_count?: number
+          flipped_at?: string | null
           id?: string
+          live_side?: string | null
           market_yes_price?: number
           model_prob?: number
           outcome?: string | null
