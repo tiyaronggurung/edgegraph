@@ -403,6 +403,22 @@ export async function runAutoTradeCore(
       }
     }
 
+    // Configurable max-entry ceiling (live only). Read once per run from
+    // auto_odds_settings; default 78¢ if unset. Panel exposes this so the
+    // user can raise/lower the recovery-ratio cutoff without a redeploy.
+    let liveMaxEntryCents = 78;
+    if (isLive) {
+      try {
+        const { data: settingsRow } = await (supabase as any)
+          .from("auto_odds_settings")
+          .select("max_entry_cents")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const raw = Number((settingsRow as { max_entry_cents?: number } | null)?.max_entry_cents);
+        if (Number.isFinite(raw) && raw >= 50 && raw <= 95) liveMaxEntryCents = raw;
+      } catch { /* fall back to 78 */ }
+    }
+
     const placed: AutoTradeOrderRow[] = [];
     for (const m of candidates) {
       if (!data.force && freshProbBySide.size > 0) {
@@ -419,11 +435,11 @@ export async function runAutoTradeCore(
       const limitCents = Math.max(1, Math.min(99, Math.round(
         (m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
       )));
-      // ── 78¢ ceiling (live only) ──
-      // Above this, one loss costs 5+ wins to claw back. Symmetric with the
-      // shadow trader's guard.
-      if (isLive && limitCents > 78) {
-        skipReasons.push(`${m.ticker}: ${m.side} ${limitCents}¢ > 78¢ ceiling — skipped`);
+      // ── Max-entry ceiling (live only, configurable) ──
+      // Above this, one loss costs many wins to claw back. Default 78¢ —
+      // user can raise up to 95¢ via the Odds Shadow Trader panel.
+      if (isLive && limitCents > liveMaxEntryCents) {
+        skipReasons.push(`${m.ticker}: ${m.side} ${limitCents}¢ > ${liveMaxEntryCents}¢ ceiling — skipped`);
         continue;
       }
 
