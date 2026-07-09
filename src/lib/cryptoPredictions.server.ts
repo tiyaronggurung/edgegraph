@@ -59,7 +59,7 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
   try {
     const { data: existing } = await supabaseAdmin
       .from("btc_model_predictions")
-      .select("id, snapshot_seconds_to_close, outcome, side")
+      .select("id, snapshot_seconds_to_close, outcome, side, live_side, flip_count")
       .eq("ticker", input.ticker)
       .maybeSingle();
 
@@ -84,6 +84,9 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         sigma_at_snapshot: input.sigmaMinEffective ?? null,
         theory_yes_prob: input.theoryYesProb ?? null,
         anchor_z: input.anchorZ ?? null,
+        live_side: input.liveSide ?? input.side,
+        chart_verdict: input.chartVerdict ?? null,
+        chart_strength: input.chartStrength ?? null,
         time_bucket: timeBucketOf(input.secondsToClose),
       });
       return;
@@ -92,7 +95,12 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
     if (input.secondsToClose < (existing.snapshot_seconds_to_close ?? 1e9)) {
       // IMPORTANT: do NOT touch `side` — original pick is locked. Refresh only
       // the transient telemetry so exit signals can see live drift.
-      await supabaseAdmin.from("btc_model_predictions").update({
+      // Live-side flip tracking: increment counter if the incoming liveSide
+      // differs from what we last stored.
+      const prevLive = (existing.live_side as string | null) ?? (existing.side as string);
+      const nextLive = input.liveSide ?? prevLive;
+      const flipped = nextLive !== prevLive;
+      const patch: Record<string, unknown> = {
         model_prob: input.modelProb,
         market_yes_price: input.marketYesPrice,
         edge_pts: input.edgePts,
@@ -101,8 +109,16 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         sigma_at_snapshot: input.sigmaMinEffective ?? null,
         theory_yes_prob: input.theoryYesProb ?? null,
         anchor_z: input.anchorZ ?? null,
+        live_side: nextLive,
+        chart_verdict: input.chartVerdict ?? null,
+        chart_strength: input.chartStrength ?? null,
         time_bucket: timeBucketOf(input.secondsToClose),
-      }).eq("id", existing.id);
+      };
+      if (flipped) {
+        patch.flip_count = Number(existing.flip_count ?? 0) + 1;
+        patch.flipped_at = new Date().toISOString();
+      }
+      await supabaseAdmin.from("btc_model_predictions").update(patch).eq("id", existing.id);
     }
   } catch (e) {
     console.warn("snapshotPrediction failed:", e);
