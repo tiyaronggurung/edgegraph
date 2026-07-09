@@ -141,14 +141,30 @@ export async function runAutoTradeCore(
       }
 
       // ── Profit-Bank Ladder stake (live only) ──
-      // Overrides the caller's stakeUsd with: 25% baseStake + 25% profitBank,
-      // capped by cfg.maxStake and bank×maxProfitExposurePct. This is the
-      // one place where the live trader's bet size is decided; both the
-      // cron path and the manual button flow through here.
+      // Single source of truth: same replayLadder state machine the
+      // NextStakeBanner reads via getOddsShadowReport. Banner-displayed
+      // "Next stake" == the amount we fire here.
       try {
-        const { computeLiveLadderStake } = await import("./stakingConfig.functions");
-        const ladder = await computeLiveLadderStake(supabase, userId);
-        (data as { stakeUsd: number }).stakeUsd = ladder.stake;
+        const { loadLadderConfig } = await import("./stakingConfig.functions");
+        const { replayLadder } = await import("./profitBankLadder");
+        const LIVE_BANK_SEED_USD = 71;
+        const LIVE_BANK_CUTOFF_ISO = "2026-07-08T04:47:00Z";
+        const cfg = await loadLadderConfig(supabase, userId);
+        const { data: settled } = await supabase
+          .from("auto_trade_orders")
+          .select("pnl_usd, status, settled_at")
+          .eq("user_id", userId)
+          .eq("mode", "live")
+          .in("status", ["settled_win", "settled_loss"])
+          .gte("settled_at", LIVE_BANK_CUTOFF_ISO)
+          .order("settled_at", { ascending: true })
+          .limit(2000);
+        const orders = ((settled ?? []) as Array<{ status: string; pnl_usd: number | string }>).map(r => ({
+          won: r.status === "settled_win",
+          pnl_usd: Number(r.pnl_usd) || 0,
+        }));
+        const ladder = replayLadder(orders, cfg, LIVE_BANK_SEED_USD);
+        (data as { stakeUsd: number }).stakeUsd = ladder.nextStake;
       } catch (e: any) {
         // If the ladder read fails, fall through to whatever the caller passed
         // (already clamped by the input validator's stakeCap = $100 live).
