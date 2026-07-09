@@ -253,6 +253,10 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
       wasCorrect: (r.was_correct as boolean | null) ?? null,
       settlePrice: r.settle_price != null ? Number(r.settle_price) : null,
       closeTime: r.close_time as string,
+      liveSide: (r.live_side as "YES" | "NO" | null) ?? null,
+      flipCount: Number(r.flip_count ?? 0),
+      chartVerdict: (r.chart_verdict as "YES" | "NO" | "neutral" | null) ?? null,
+      chartStrength: r.chart_strength != null ? Number(r.chart_strength) : null,
     })),
   };
 }
