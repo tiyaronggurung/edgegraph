@@ -20,6 +20,8 @@ export interface PolymarketBtcOdds {
   lastTrade: number;      // 0..1 · last trade price of Up token (0 if none)
   upTokenId: string;
   fetchedAt: number;
+  downMid: number | null; // 0..1 · live CLOB midpoint of Down token (null if unavailable)
+  effectiveUpProb: number; // 0..1 · blended Up prob using both sides of the book
 }
 
 const WINDOW_META_CACHE_MS = 60_000; // token IDs stable within a window
