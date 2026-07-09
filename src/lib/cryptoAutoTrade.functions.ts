@@ -463,17 +463,25 @@ export async function runAutoTradeCore(
       let kalshiSide: "YES" | "NO" | null = null;
       if (yp >= KALSHI_LEAN_THRESHOLD) kalshiSide = "YES";
       else if (yp <= 1 - KALSHI_LEAN_THRESHOLD) kalshiSide = "NO";
-      if (kalshiSide === null || kalshiSide === m.side) {
-        // Coinflip zone or agreement → keep model-picked side, single bet.
-        plan.push({ m, side: m.side, stakeUsd: data.stakeUsd, kind: "primary" });
+      // Probe side = raw model direction (P(YES) vs 0.5), NOT the value-pick
+      // m.side (which is p−yesPrice and behaves as a coinflip in backtest).
+      // Raw direction historically calls BTC move ~87% correctly.
+      const rawModelSide: "YES" | "NO" = m.modelYesProb >= 0.5 ? "YES" : "NO";
+      if (kalshiSide === null || kalshiSide === rawModelSide) {
+        // Coinflip zone or agreement → single bet on Kalshi lean (or model
+        // value-pick when Kalshi is in the coinflip zone, preserving today's
+        // fallback behavior).
+        const singleSide = kalshiSide ?? m.side;
+        plan.push({ m, side: singleSide, stakeUsd: data.stakeUsd, kind: "primary" });
       } else {
-        // Disagreement → primary on Kalshi lean, small probe on model side.
+        // Disagreement → primary on Kalshi lean, small probe on raw model dir.
         plan.push({ m, side: kalshiSide, stakeUsd: data.stakeUsd, kind: "kalshi_primary_disagree" });
-        const probeStake = m.edgeAbs >= MODEL_PROBE_STRONG_EDGE_PTS
+        const rawEdgePts = Math.abs(m.modelYesProb - yp) * 100;
+        const probeStake = rawEdgePts >= MODEL_PROBE_STRONG_EDGE_PTS
           ? MODEL_PROBE_STAKE_HIGH
           : MODEL_PROBE_STAKE_LOW;
-        plan.push({ m, side: m.side, stakeUsd: probeStake, kind: "model_probe" });
-        skipReasons.push(`${m.ticker}: disagree — Kalshi leans ${kalshiSide} @ ${(yp * 100).toFixed(0)}¢, model picks ${m.side} (edge ${m.edgeAbs.toFixed(1)}pts) → $${data.stakeUsd} ${kalshiSide} primary + $${probeStake} ${m.side} probe`);
+        plan.push({ m, side: rawModelSide, stakeUsd: probeStake, kind: "model_probe" });
+        skipReasons.push(`${m.ticker}: disagree — Kalshi leans ${kalshiSide} @ ${(yp * 100).toFixed(0)}¢, raw model P(YES) ${(m.modelYesProb * 100).toFixed(0)}% picks ${rawModelSide} (edge ${rawEdgePts.toFixed(1)}pts) → $${data.stakeUsd} ${kalshiSide} primary + $${probeStake} ${rawModelSide} probe`);
       }
     }
 
