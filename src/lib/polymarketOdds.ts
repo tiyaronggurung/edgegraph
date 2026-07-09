@@ -20,6 +20,8 @@ export interface PolymarketBtcOdds {
   lastTrade: number;      // 0..1 · last trade price of Up token (0 if none)
   upTokenId: string;
   fetchedAt: number;
+  downMid: number | null; // 0..1 · live CLOB midpoint of Down token (null if unavailable)
+  effectiveUpProb: number; // 0..1 · blended Up prob using both sides of the book
 }
 
 const WINDOW_META_CACHE_MS = 60_000; // token IDs stable within a window
@@ -105,11 +107,14 @@ export async function getPolymarketBtcUpDown(
     return priceCache.data;
   }
 
-  // Parallel: midpoint, book (for best bid/ask), last trade price.
-  const [midJ, bookJ, priceJ] = await Promise.all([
+  // Parallel: Up mid, Up book, Up last-trade, Down mid.
+  // Down mid is the second real signal — when the Up book sits flat at 0.505
+  // because nobody's quoting Up, the Down side often carries the lean.
+  const [midJ, bookJ, priceJ, downMidJ] = await Promise.all([
     fetchJson(`https://clob.polymarket.com/midpoint?token_id=${meta.upTokenId}`),
     fetchJson(`https://clob.polymarket.com/book?token_id=${meta.upTokenId}`),
     fetchJson(`https://clob.polymarket.com/price?token_id=${meta.upTokenId}&side=BUY`),
+    fetchJson(`https://clob.polymarket.com/midpoint?token_id=${meta.downTokenId}`),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -123,6 +128,9 @@ export async function getPolymarketBtcUpDown(
   const bestAsk = asks.length ? Number(asks[asks.length - 1]?.price) : meta.gammaBestAsk;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lastTrade = Number((priceJ as any)?.price ?? 0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const downMidRaw = Number((downMidJ as any)?.mid);
+  const downMid = Number.isFinite(downMidRaw) && downMidRaw > 0 ? clamp01(downMidRaw) : null;
 
   const upProb = Number.isFinite(mid) && mid > 0 ? clamp01(mid)
     : Number.isFinite(bestBid) && Number.isFinite(bestAsk) && bestBid > 0 && bestAsk > 0
@@ -132,6 +140,14 @@ export async function getPolymarketBtcUpDown(
     priceCache = { at: nowMs, key: meta.upTokenId, data: null };
     return null;
   }
+
+  // Effective Up prob: average of Up-mid and (1 - Down-mid) when Down side is
+  // available. When both books quote actively, they must sum to ~1; if one
+  // sits stale at 0.505 while the other leans, the blend pulls toward the
+  // active side. Falls back to Up-mid alone when Down mid is unavailable.
+  const effectiveUpProb = downMid != null
+    ? clamp01((upProb + (1 - downMid)) / 2)
+    : upProb;
 
   const data: PolymarketBtcOdds = {
     upProb,
@@ -144,6 +160,8 @@ export async function getPolymarketBtcUpDown(
     lastTrade: Number.isFinite(lastTrade) ? clamp01(lastTrade) : 0,
     upTokenId: meta.upTokenId,
     fetchedAt: nowMs,
+    downMid,
+    effectiveUpProb,
   };
   priceCache = { at: nowMs, key: meta.upTokenId, data };
   return data;

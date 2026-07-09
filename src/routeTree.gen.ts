@@ -36,6 +36,7 @@ import { Route as AuthenticatedAnalysisIdRouteImport } from './routes/_authentic
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
+import { Route as ApiPublicHooksTripleWindowTickRouteImport } from './routes/api/public/hooks/triple-window-tick'
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
 import { Route as ApiPublicHooksOddsShadowTickRouteImport } from './routes/api/public/hooks/odds-shadow-tick'
 import { Route as ApiPublicHooksCryptoStudyRouteImport } from './routes/api/public/hooks/crypto-study'
@@ -187,6 +188,12 @@ const LovableEmailQueueProcessRoute =
     path: '/lovable/email/queue/process',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksTripleWindowTickRoute =
+  ApiPublicHooksTripleWindowTickRouteImport.update({
+    id: '/api/public/hooks/triple-window-tick',
+    path: '/api/public/hooks/triple-window-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksRecomputePredictionsRoute =
   ApiPublicHooksRecomputePredictionsRouteImport.update({
     id: '/api/public/hooks/recompute-predictions',
@@ -281,6 +288,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
+  '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
@@ -319,6 +327,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
+  '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
@@ -359,6 +368,7 @@ export interface FileRoutesById {
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
+  '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
@@ -399,6 +409,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
+    | '/api/public/hooks/triple-window-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
@@ -437,6 +448,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
+    | '/api/public/hooks/triple-window-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
@@ -476,6 +488,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
+    | '/api/public/hooks/triple-window-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
@@ -502,6 +515,7 @@ export interface RootRouteChildren {
   ApiPublicHooksCryptoStudyRoute: typeof ApiPublicHooksCryptoStudyRoute
   ApiPublicHooksOddsShadowTickRoute: typeof ApiPublicHooksOddsShadowTickRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
+  ApiPublicHooksTripleWindowTickRoute: typeof ApiPublicHooksTripleWindowTickRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
   LovableEmailTransactionalSendRoute: typeof LovableEmailTransactionalSendRoute
@@ -698,6 +712,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/triple-window-tick': {
+      id: '/api/public/hooks/triple-window-tick'
+      path: '/api/public/hooks/triple-window-tick'
+      fullPath: '/api/public/hooks/triple-window-tick'
+      preLoaderRoute: typeof ApiPublicHooksTripleWindowTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/recompute-predictions': {
       id: '/api/public/hooks/recompute-predictions'
       path: '/api/public/hooks/recompute-predictions'
@@ -832,6 +853,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksOddsShadowTickRoute: ApiPublicHooksOddsShadowTickRoute,
   ApiPublicHooksRecomputePredictionsRoute:
     ApiPublicHooksRecomputePredictionsRoute,
+  ApiPublicHooksTripleWindowTickRoute: ApiPublicHooksTripleWindowTickRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
   LovableEmailTransactionalSendRoute: LovableEmailTransactionalSendRoute,

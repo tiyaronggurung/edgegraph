@@ -27,6 +27,7 @@ const UpsertInput = z.object({
   trendline_5m: z.string().nullable(),
   combined_dir: z.string().nullable(),
   combined_conf: z.number().nullable(),
+  enrichment: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
 export const upsertTripleWindow = createServerFn({ method: "POST" })
@@ -53,6 +54,7 @@ export const upsertTripleWindow = createServerFn({ method: "POST" })
       trendline_5m: data.trendline_5m,
       combined_dir: data.combined_dir,
       combined_conf: data.combined_conf,
+      enrichment_json: (data.enrichment ?? null) as never,
     };
     const { error } = await context.supabase
       .from("btc_polymarket_triple_window")
