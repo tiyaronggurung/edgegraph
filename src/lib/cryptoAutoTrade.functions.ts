@@ -38,6 +38,17 @@ const LIVE_LATE_SL_FRAC = 0.25;           // #2 tighter SL fraction near expiry 
 const LIVE_COINFLIP_BAND = 0.05;          // #4 |ask - 0.5| below this = coinflip zone
 const LIVE_COINFLIP_MIN_SIGMA = 1.5;      // #4 need this much sigma to trade coinflip prices
 
+// ── Kalshi-leaned primary + model-side disagreement probe ──
+// Primary bet follows the leg Kalshi prices as favorite (yesPrice ≥ threshold
+// → YES, ≤ 1-threshold → NO). Model gates still evaluate on the model-picked
+// side (m.side) upstream; we just flip the side we actually submit for the
+// primary. If the model disagrees with Kalshi's lean, we also fire a small
+// probe on the model side ($10, or $20 when model edge is strong).
+const KALSHI_LEAN_THRESHOLD = 0.55;       // yesPrice ≥ 0.55 → Kalshi leans YES; ≤ 0.45 → NO
+const MODEL_PROBE_STAKE_LOW = 10;
+const MODEL_PROBE_STAKE_HIGH = 20;
+const MODEL_PROBE_STRONG_EDGE_PTS = 6;    // model edge ≥ this → probe with HIGH stake
+
 // ── Odds-ladder exit tiers (price deltas in Kalshi ¢) ──
 // Each order snapshots this at entry so changing defaults never affects live positions.
 // Priority order: stop-loss first (safety), then most-aggressive TP, then partial.
