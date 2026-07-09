@@ -43,6 +43,7 @@ interface State {
 export function useTripleWindowTracker(markets: ActiveMarket[]): void {
   const fetchPoly = useServerFn(fetchPolymarketBtcOdds);
   const upsertFn = useServerFn(upsertTripleWindow);
+  const settleFn = useServerFn(settleTripleWindow);
   const { ticks } = useBinanceBtcTicks();
   const cv = useChartVerdict();
   const state = useRef<Map<string, State>>(new Map());
