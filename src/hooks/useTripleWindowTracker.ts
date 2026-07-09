@@ -7,7 +7,7 @@ import { useBinanceBtcTicks } from "./useBinanceBtcTicks";
 import { computeTrendlineAnalysis } from "./useTrendlineAnalysis";
 import { useChartVerdict } from "./useChartVerdict";
 import { fetchPolymarketBtcOdds } from "@/lib/polymarketOdds.functions";
-import { upsertTripleWindow } from "@/lib/polymarketTripleWindow.functions";
+import { upsertTripleWindow, settleTripleWindow } from "@/lib/polymarketTripleWindow.functions";
 
 export interface ActiveMarket {
   ticker: string;
@@ -43,6 +43,7 @@ interface State {
 export function useTripleWindowTracker(markets: ActiveMarket[]): void {
   const fetchPoly = useServerFn(fetchPolymarketBtcOdds);
   const upsertFn = useServerFn(upsertTripleWindow);
+  const settleFn = useServerFn(settleTripleWindow);
   const { ticks } = useBinanceBtcTicks();
   const cv = useChartVerdict();
   const state = useRef<Map<string, State>>(new Map());
@@ -80,7 +81,9 @@ export function useTripleWindowTracker(markets: ActiveMarket[]): void {
       for (const m of marketsRef.current) {
         if (now < m.openMs) continue;
         // Give a 60s grace period after close for the final flush.
-        if (now > m.closeMs + 60_000) continue;
+        // Keep the market in the loop for 5 min post-close so we can retry
+        // Kalshi settlement (usually finalized within 30s but occasionally slower).
+        if (now > m.closeMs + 5 * 60_000) continue;
 
         let st = state.current.get(m.ticker);
         if (!st) {
@@ -148,6 +151,12 @@ export function useTripleWindowTracker(markets: ActiveMarket[]): void {
             combined_conf: combinedConf,
           }});
         } catch { /* silent — shadow log is best-effort */ }
+
+        // Final flush → try to record Kalshi settlement. Retries next tick if
+        // the market isn't finalized yet (Kalshi usually takes 5–30s post-close).
+        if (now > m.closeMs) {
+          try { await settleFn({ data: { ticker: m.ticker } }); } catch { /* ignore */ }
+        }
       }
     }
 
@@ -155,5 +164,5 @@ export function useTripleWindowTracker(markets: ActiveMarket[]): void {
     const id = setInterval(tick, 2_000);
     tick();
     return () => { cancelled = true; clearInterval(id); };
-  }, [fetchPoly, upsertFn]);
+  }, [fetchPoly, upsertFn, settleFn]);
 }

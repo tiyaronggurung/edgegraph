@@ -1629,10 +1629,12 @@ export type Database = {
           combined_conf: number | null
           combined_dir: string | null
           created_at: string
+          expiration_value: number | null
           id: string
           kalshi_ticker: string
           market_close_ms: number
           market_open_ms: number
+          settled_at: string | null
           trendline_1m: string | null
           trendline_5m: string | null
           updated_at: string
@@ -1669,10 +1671,12 @@ export type Database = {
           combined_conf?: number | null
           combined_dir?: string | null
           created_at?: string
+          expiration_value?: number | null
           id?: string
           kalshi_ticker: string
           market_close_ms: number
           market_open_ms: number
+          settled_at?: string | null
           trendline_1m?: string | null
           trendline_5m?: string | null
           updated_at?: string
@@ -1709,10 +1713,12 @@ export type Database = {
           combined_conf?: number | null
           combined_dir?: string | null
           created_at?: string
+          expiration_value?: number | null
           id?: string
           kalshi_ticker?: string
           market_close_ms?: number
           market_open_ms?: number
+          settled_at?: string | null
           trendline_1m?: string | null
           trendline_5m?: string | null
           updated_at?: string

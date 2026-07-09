@@ -42,6 +42,7 @@ import { Route as ApiPublicHooksCryptoStudyRouteImport } from './routes/api/publ
 import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
 import { Route as ApiPublicHooksBtcCalibrateRouteImport } from './routes/api/public/hooks/btc-calibrate'
 import { Route as ApiPublicHooksBigFlipTickRouteImport } from './routes/api/public/hooks/big-flip-tick'
+import { Route as ApiPublicHooksBackfillTripleWindowRouteImport } from './routes/api/public/hooks/backfill-triple-window'
 import { Route as ApiPublicHooksBackfillOutcomesRouteImport } from './routes/api/public/hooks/backfill-outcomes'
 import { Route as ApiPublicHooksAutoTradeRouteImport } from './routes/api/public/hooks/auto-trade'
 import { Route as ApiPublicHooksAutoOddsTickRouteImport } from './routes/api/public/hooks/auto-odds-tick'
@@ -222,6 +223,12 @@ const ApiPublicHooksBigFlipTickRoute =
     path: '/api/public/hooks/big-flip-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksBackfillTripleWindowRoute =
+  ApiPublicHooksBackfillTripleWindowRouteImport.update({
+    id: '/api/public/hooks/backfill-triple-window',
+    path: '/api/public/hooks/backfill-triple-window',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksBackfillOutcomesRoute =
   ApiPublicHooksBackfillOutcomesRouteImport.update({
     id: '/api/public/hooks/backfill-outcomes',
@@ -267,6 +274,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
+  '/api/public/hooks/backfill-triple-window': typeof ApiPublicHooksBackfillTripleWindowRoute
   '/api/public/hooks/big-flip-tick': typeof ApiPublicHooksBigFlipTickRoute
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
@@ -304,6 +312,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
+  '/api/public/hooks/backfill-triple-window': typeof ApiPublicHooksBackfillTripleWindowRoute
   '/api/public/hooks/big-flip-tick': typeof ApiPublicHooksBigFlipTickRoute
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
@@ -343,6 +352,7 @@ export interface FileRoutesById {
   '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
+  '/api/public/hooks/backfill-triple-window': typeof ApiPublicHooksBackfillTripleWindowRoute
   '/api/public/hooks/big-flip-tick': typeof ApiPublicHooksBigFlipTickRoute
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
@@ -382,6 +392,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/auto-odds-tick'
     | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
+    | '/api/public/hooks/backfill-triple-window'
     | '/api/public/hooks/big-flip-tick'
     | '/api/public/hooks/btc-calibrate'
     | '/api/public/hooks/capture-closing-odds'
@@ -419,6 +430,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/auto-odds-tick'
     | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
+    | '/api/public/hooks/backfill-triple-window'
     | '/api/public/hooks/big-flip-tick'
     | '/api/public/hooks/btc-calibrate'
     | '/api/public/hooks/capture-closing-odds'
@@ -457,6 +469,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/auto-odds-tick'
     | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
+    | '/api/public/hooks/backfill-triple-window'
     | '/api/public/hooks/big-flip-tick'
     | '/api/public/hooks/btc-calibrate'
     | '/api/public/hooks/capture-closing-odds'
@@ -482,6 +495,7 @@ export interface RootRouteChildren {
   ApiPublicHooksAutoOddsTickRoute: typeof ApiPublicHooksAutoOddsTickRoute
   ApiPublicHooksAutoTradeRoute: typeof ApiPublicHooksAutoTradeRoute
   ApiPublicHooksBackfillOutcomesRoute: typeof ApiPublicHooksBackfillOutcomesRoute
+  ApiPublicHooksBackfillTripleWindowRoute: typeof ApiPublicHooksBackfillTripleWindowRoute
   ApiPublicHooksBigFlipTickRoute: typeof ApiPublicHooksBigFlipTickRoute
   ApiPublicHooksBtcCalibrateRoute: typeof ApiPublicHooksBtcCalibrateRoute
   ApiPublicHooksCaptureClosingOddsRoute: typeof ApiPublicHooksCaptureClosingOddsRoute
@@ -726,6 +740,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksBigFlipTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/backfill-triple-window': {
+      id: '/api/public/hooks/backfill-triple-window'
+      path: '/api/public/hooks/backfill-triple-window'
+      fullPath: '/api/public/hooks/backfill-triple-window'
+      preLoaderRoute: typeof ApiPublicHooksBackfillTripleWindowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/backfill-outcomes': {
       id: '/api/public/hooks/backfill-outcomes'
       path: '/api/public/hooks/backfill-outcomes'
@@ -802,6 +823,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksAutoOddsTickRoute: ApiPublicHooksAutoOddsTickRoute,
   ApiPublicHooksAutoTradeRoute: ApiPublicHooksAutoTradeRoute,
   ApiPublicHooksBackfillOutcomesRoute: ApiPublicHooksBackfillOutcomesRoute,
+  ApiPublicHooksBackfillTripleWindowRoute:
+    ApiPublicHooksBackfillTripleWindowRoute,
   ApiPublicHooksBigFlipTickRoute: ApiPublicHooksBigFlipTickRoute,
   ApiPublicHooksBtcCalibrateRoute: ApiPublicHooksBtcCalibrateRoute,
   ApiPublicHooksCaptureClosingOddsRoute: ApiPublicHooksCaptureClosingOddsRoute,

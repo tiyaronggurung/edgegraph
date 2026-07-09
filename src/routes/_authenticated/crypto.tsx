@@ -631,6 +631,12 @@ function buildTripleWindowTooltip(r: TripleWindowRow): string {
   const combined = r.combined_dir
     ? `${r.combined_dir} · conf ${r.combined_conf != null ? Math.round(r.combined_conf * 100) + "%" : "—"}`
     : "—";
+  let resultLine = "Result: pending";
+  if (r.actual_outcome) {
+    const ev = r.expiration_value != null ? ` @ $${Number(r.expiration_value).toLocaleString()}` : "";
+    const hit = r.combined_dir && r.combined_dir === r.actual_outcome ? "✓ HIT" : r.combined_dir ? "✗ MISS" : "—";
+    resultLine = `Result: ${r.actual_outcome}${ev} · Combined ${hit}`;
+  }
   return [
     "Polymarket 5m Up/Down + Binance chart · 3-window shadow log",
     "",
@@ -639,6 +645,7 @@ function buildTripleWindowTooltip(r: TripleWindowRow): string {
     win("W3 (T-5→T-0)  ", r.w3_open_prob, r.w3_close_prob, r.w3_avg_prob, r.w3_min_prob, r.w3_max_prob, r.w3_samples, r.w3_trendline_dir, r.w3_chart_verdict, r.w3_chart_strength),
     "",
     `Combined: ${combined} · 1m trend ${r.trendline_1m ?? "—"} · 5m trend ${r.trendline_5m ?? "—"}`,
+    resultLine,
   ].join("\n");
 }
 
