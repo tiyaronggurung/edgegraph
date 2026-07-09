@@ -71,7 +71,7 @@ export function OddsShadowTraderPanel() {
   }, []);
 
   const r = data && data.ok ? data : null;
-  const s = settingsQ.data ?? { ignore_low_r2: false, ignore_cents_band: false };
+  const s = settingsQ.data ?? { ignore_low_r2: false, ignore_cents_band: false, max_entry_cents: 78 };
 
 
   return (
