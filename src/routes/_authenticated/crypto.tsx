@@ -702,6 +702,19 @@ function ModelAccuracyPanel() {
                           {rawCorrect === true && <span className="ml-1 text-[10px] text-emerald-400">✓</span>}
                           {rawCorrect === false && <span className="ml-1 text-[10px] text-red-400">✗</span>}
                         </td>
+                        <td className="p-2">
+                          {r.liveSide ? (
+                            <span className={r.liveSide === "YES" ? "text-emerald-400" : "text-red-400"}>
+                              {dirLabel(r.liveSide)}
+                              {r.flipCount > 0 && <span className="ml-1 text-[10px] text-amber-400" title={`flipped ${r.flipCount}x`}>⟳{r.flipCount}</span>}
+                              {r.chartVerdict && r.chartVerdict !== "neutral" && (
+                                <span className="ml-1 text-[9px] text-muted-foreground" title={`chart ${r.chartVerdict} · strength ${((r.chartStrength ?? 0) * 100).toFixed(0)}%`}>
+                                  ·📈{r.chartVerdict === "YES" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </span>
+                          ) : <span className="text-muted-foreground">—</span>}
+                        </td>
                         <td className="p-2 text-right">{fmt$(r.strike)}</td>
                         <td className="p-2 text-right">{(r.modelProb * 100).toFixed(1)}%</td>
                         <td className="p-2 text-right">{(r.marketYesPrice * 100).toFixed(0)}</td>
