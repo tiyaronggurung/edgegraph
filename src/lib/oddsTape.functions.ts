@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { evaluateScalpShadow } from "@/lib/scalpShadow.functions";
+import { autoExitForUser } from "@/lib/cryptoAutoTrade.functions";
 
 const SnapshotSchema = z.object({
   ticker: z.string().min(1).max(64),
@@ -15,6 +16,13 @@ const SnapshotSchema = z.object({
 const InputSchema = z.object({
   snapshots: z.array(SnapshotSchema).min(1).max(50),
 });
+
+// Per-user in-memory guard so a slow Kalshi IOC doesn't stack overlapping
+// sweeps when the client ticks every ~3s. Worker instance-local — fine
+// because the same user's ticks land on the same warm instance in practice,
+// and worst case is one duplicate sweep, which is idempotent (claim via
+// status='closing' single-flight already handles that).
+const inFlightExit = new Set<string>();
 
 export const recordOddsTape = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -40,6 +48,17 @@ export const recordOddsTape = createServerFn({ method: "POST" })
       ),
     );
 
+    // Fast exit sweep: piggy-back on every tape tick (~3s cadence) so we
+    // exit at Kalshi-quote speed instead of waiting for the 1-min cron.
+    // Fire-and-forget; overlap-guarded per user; never blocks the response.
+    if (!inFlightExit.has(context.userId)) {
+      inFlightExit.add(context.userId);
+      autoExitForUser(context.supabase, context.userId)
+        .catch(() => undefined)
+        .finally(() => inFlightExit.delete(context.userId));
+    }
+
     return { ok: true as const, inserted: rows.length };
   });
+
 
