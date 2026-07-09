@@ -909,6 +909,11 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           gateReason,
           thresholdParts: { base: tBase, calib: tCalib, time: tTime, spread: tSpread, regime: tRegime, whale: tWhale },
           gapAnalysis,
+          anchorZ: (() => {
+            const elapsedMin = Math.max(0.5, 15 - minsRemaining);
+            const denom = windowOpen * sigmaEff * Math.sqrt(elapsedMin);
+            return denom > 0 ? (spot - windowOpen) / denom : 0;
+          })(),
         });
       }
     }
