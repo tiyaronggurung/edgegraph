@@ -104,6 +104,11 @@ export interface BtcMarket {
     momentumAlignsWithSide: boolean; // true = momentum helps locked side win
     verdict: string;           // one-liner: "spot $83 below strike; NO needs −$83 in 128s (0.29σ); momentum +0.4 fights NO"
   };
+  // Anchor-drift z-score: how many sigmas BTC has moved from window open.
+  // Positive = spot above open, negative = below. Telemetry for accuracy
+  // analysis by drift magnitude; NOT blended into modelYesProb (probAboveCond
+  // already accounts for anchor drift analytically).
+  anchorZ: number;
 }
 
 
