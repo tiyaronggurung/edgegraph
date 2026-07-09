@@ -28,6 +28,7 @@ import { SkipBucketPanel } from "@/components/crypto/SkipBucketPanel";
 import { LossCapPanel } from "@/components/crypto/LossCapPanel";
 import { FlipRecorderPanel } from "@/components/crypto/FlipRecorderPanel";
 import { OddsShadowTraderPanel } from "@/components/crypto/OddsShadowTraderPanel";
+import { ManualTradesPanel } from "@/components/crypto/ManualTradesPanel";
 import { NextStakeBanner } from "@/components/crypto/NextStakeBanner";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
 import { useCalibrationShift } from "@/hooks/useCalibrationShift";
