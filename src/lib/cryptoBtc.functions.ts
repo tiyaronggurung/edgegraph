@@ -947,6 +947,7 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               secondsToClose: m.secondsToClose,
               sigmaMinEffective: m.sigmaMinEffective,
               theoryYesProb: m.theoryYesProb,
+              anchorZ: m.anchorZ,
             })),
         );
         await settleDuePredictions();
