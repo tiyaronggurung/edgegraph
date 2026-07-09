@@ -123,9 +123,7 @@ export function useTripleWindowTracker(markets: ActiveMarket[]): void {
           trendline_dir: w.trendline,
           chart_verdict: w.chartVerdict,
           chart_strength: w.chartStrength,
-        })) as [
-          typeof stats0, typeof stats0, typeof stats0
-        ];
+        }));
         // Combined signal: prefer latest window with data (W3 > W2 > W1).
         let combinedDir: string | null = null;
         let combinedConf: number | null = null;
@@ -137,6 +135,7 @@ export function useTripleWindowTracker(markets: ActiveMarket[]): void {
             break;
           }
         }
+
         try {
           await upsertFn({ data: {
             ticker: m.ticker,
