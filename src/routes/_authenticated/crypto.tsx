@@ -796,6 +796,153 @@ function ModelAccuracyPanel() {
   );
 }
 
+// ============================================================
+// Model Bet: $25 flat auto-bet that fires ONCE per new model
+// prediction, on the exact Value-pick side (r.side). No gates,
+// no reverse, no confidence filter, no martingale.
+// Mutually exclusive with Auto-Odds and Auto-Martingale — turning
+// this ON forces the other two OFF via a shared mutex event.
+// ============================================================
+const MODEL_BET_STAKE = 25;
+const MODEL_BET_LS_ENABLED = "crypto.modelBet";
+const MODEL_BET_LS_TICKERS = "crypto.modelBet.tickers";
+const AUTO_BET_MUTEX_EVENT = "crypto.autoBet.mutex";
+
+function ModelBetPanel() {
+  const runFn = useServerFn(runAutoTrade);
+  const statsFn = useServerFn(getPredictionStats);
+  const statsQ = useQuery({ queryKey: ["btc-pred-stats"], queryFn: () => statsFn(), refetchInterval: 60_000 });
+
+  const [enabled, setEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(MODEL_BET_LS_ENABLED) === "on";
+  });
+  const [firing, setFiring] = useState(false);
+  const [lastFired, setLastFired] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(MODEL_BET_LS_ENABLED, enabled ? "on" : "off");
+  }, [enabled]);
+
+  const toggleOn = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("crypto.autoOdds", "off");
+      window.localStorage.setItem("crypto.autoMart", "off");
+      window.dispatchEvent(new CustomEvent(AUTO_BET_MUTEX_EVENT, { detail: "modelBet" }));
+    }
+    setEnabled(true);
+    toast.success(`Model Bet ON · $${MODEL_BET_STAKE} per prediction (Value pick side)`);
+  };
+  const toggleOff = () => {
+    setEnabled(false);
+    toast.info("Model Bet OFF");
+  };
+
+  useEffect(() => {
+    const onMutex = (e: Event) => {
+      const which = (e as CustomEvent).detail;
+      if (which && which !== "modelBet" && typeof window !== "undefined") {
+        if (window.localStorage.getItem(MODEL_BET_LS_ENABLED) === "on") {
+          window.localStorage.setItem(MODEL_BET_LS_ENABLED, "off");
+        }
+        setEnabled(false);
+      }
+    };
+    window.addEventListener(AUTO_BET_MUTEX_EVENT, onMutex as EventListener);
+    return () => window.removeEventListener(AUTO_BET_MUTEX_EVENT, onMutex as EventListener);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    let inFlight = false;
+
+    const readProcessed = (): string[] => {
+      try {
+        const raw = window.localStorage.getItem(MODEL_BET_LS_TICKERS);
+        return raw ? JSON.parse(raw) : [];
+      } catch { return []; }
+    };
+    const writeProcessed = (arr: string[]) => {
+      try { window.localStorage.setItem(MODEL_BET_LS_TICKERS, JSON.stringify(arr.slice(-100))); } catch { /* ignore */ }
+    };
+
+    const tick = async () => {
+      if (cancelled || inFlight) return;
+      const s = statsQ.data;
+      if (!s) return;
+      const now = Date.now();
+      const processed = new Set(readProcessed());
+      const candidates = s.recent.filter(r =>
+        !r.outcome &&
+        new Date(r.closeTime).getTime() > now &&
+        !processed.has(r.ticker)
+      );
+      if (candidates.length === 0) return;
+      candidates.sort((a, b) => new Date(a.closeTime).getTime() - new Date(b.closeTime).getTime());
+      const pick = candidates[0];
+      inFlight = true;
+      setFiring(true);
+      processed.add(pick.ticker);
+      writeProcessed(Array.from(processed));
+      try {
+        const res = await runFn({ data: {
+          mode: "live",
+          confirm: "I_UNDERSTAND_LIVE",
+          stakeUsd: MODEL_BET_STAKE,
+          maxOrders: 1,
+          force: true,
+          forceTicker: pick.ticker,
+          forceSide: pick.side,
+        } });
+        if (res.placed > 0 && res.orders?.[0]) {
+          const o = res.orders[0];
+          toast.success(`Model Bet $${MODEL_BET_STAKE}: ${pick.side === "YES" ? "UP" : "DOWN"} ${pick.ticker} @ ${o.limit_cents}¢`);
+          setLastFired(`${pick.ticker} ${pick.side} @ ${o.limit_cents}¢`);
+        } else {
+          const realReasons = (res.skipReasons ?? []).filter((r: string) => !/^(equity:|force:)/i.test(r));
+          toast.info(`Model Bet skipped ${pick.ticker}: ${(realReasons.length ? realReasons : res.skipReasons ?? []).slice(0, 2).join(" · ") || "no fill"}`);
+        }
+      } catch (e: any) {
+        toast.error(`Model Bet failed ${pick.ticker}`, { description: e?.message ?? String(e) });
+      } finally {
+        inFlight = false;
+        setFiring(false);
+      }
+    };
+
+    tick();
+    const h = setInterval(tick, 5_000);
+    return () => { cancelled = true; clearInterval(h); };
+  }, [enabled, statsQ.data, runFn]);
+
+  return (
+    <div className="border border-border rounded-lg bg-card">
+      <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={enabled ? toggleOff : toggleOn}
+            className={`text-xs font-semibold px-3 py-1.5 rounded border flex items-center gap-1.5 ${enabled ? "border-sky-500/50 bg-sky-500/15 text-sky-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${enabled ? "bg-sky-400 animate-pulse" : "bg-muted-foreground"}`} />
+            {enabled ? `Model Bet ON · $${MODEL_BET_STAKE}` : `Model Bet OFF · $${MODEL_BET_STAKE}`}
+          </button>
+          <span className="text-[11px] text-muted-foreground">
+            Auto-fires on every new model prediction · Value pick side · one bet per ticker
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          {firing && <Loader2 className="h-3 w-3 animate-spin" />}
+          {lastFired && <span>last: {lastFired}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function OddsFlipAlert() {
   const fn = useServerFn(getRecentOddsFlip);
   const q = useQuery({
