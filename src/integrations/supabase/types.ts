@@ -2283,6 +2283,66 @@ export type Database = {
         }
         Relationships: []
       }
+      martingale_recovery_state: {
+        Row: {
+          accepted_deficit_usd: number
+          base_stake_usd: number
+          consec_recovery_losses: number
+          created_at: string
+          deficit_usd: number
+          enabled: boolean
+          initial_deficit_usd: number
+          last_shadow_id: string | null
+          max_consec_recovery_losses: number
+          max_stake_usd: number
+          recovery_wins_completed: number
+          session_loss_cap_usd: number
+          session_loss_usd: number
+          session_started_at: string
+          stopped_reason: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accepted_deficit_usd?: number
+          base_stake_usd?: number
+          consec_recovery_losses?: number
+          created_at?: string
+          deficit_usd?: number
+          enabled?: boolean
+          initial_deficit_usd?: number
+          last_shadow_id?: string | null
+          max_consec_recovery_losses?: number
+          max_stake_usd?: number
+          recovery_wins_completed?: number
+          session_loss_cap_usd?: number
+          session_loss_usd?: number
+          session_started_at?: string
+          stopped_reason?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accepted_deficit_usd?: number
+          base_stake_usd?: number
+          consec_recovery_losses?: number
+          created_at?: string
+          deficit_usd?: number
+          enabled?: boolean
+          initial_deficit_usd?: number
+          last_shadow_id?: string | null
+          max_consec_recovery_losses?: number
+          max_stake_usd?: number
+          recovery_wins_completed?: number
+          session_loss_cap_usd?: number
+          session_loss_usd?: number
+          session_started_at?: string
+          stopped_reason?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       patterns: {
         Row: {
           best_use: string | null
