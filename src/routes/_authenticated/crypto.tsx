@@ -1544,11 +1544,41 @@ function AutoTradePanel() {
   }, []);
 
 
-  // Mutual exclusion: turning on Auto-Odds disables Auto-Martingale.
+  // Mutual exclusion: turning on Auto-Odds disables Auto-Martingale + Model Bet.
   useEffect(() => {
-    if (autoOdds && autoMart) setAutoMart(false);
+    if (!autoOdds) return;
+    if (autoMart) setAutoMart(false);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("crypto.modelBet", "off");
+      window.dispatchEvent(new CustomEvent("crypto.autoBet.mutex", { detail: "autoOdds" }));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOdds]);
+
+  // Mutual exclusion: turning on Auto-Martingale disables Auto-Odds + Model Bet.
+  useEffect(() => {
+    if (!autoMart) return;
+    if (autoOdds) setAutoOdds(false);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("crypto.modelBet", "off");
+      window.dispatchEvent(new CustomEvent("crypto.autoBet.mutex", { detail: "autoMart" }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoMart]);
+
+  // Listen for Model Bet turning ON — sync self OFF.
+  useEffect(() => {
+    const onMutex = (e: Event) => {
+      const which = (e as CustomEvent).detail;
+      if (which === "modelBet") {
+        if (autoOdds) setAutoOdds(false);
+        if (autoMart) setAutoMart(false);
+      }
+    };
+    window.addEventListener("crypto.autoBet.mutex", onMutex as EventListener);
+    return () => window.removeEventListener("crypto.autoBet.mutex", onMutex as EventListener);
+  }, [autoOdds, autoMart]);
+
 
   // Auto-Odds safety stop: two consecutive losing odds-bet trades turns Auto-Odds off.
   useEffect(() => {
