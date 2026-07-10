@@ -2448,6 +2448,8 @@ function CryptoPage() {
 
           <EquityMomentumPanel />
 
+          <MartingaleRecoveryPanel />
+
           <AutoTradePanel />
 
           <OddsStudyPanel />
@@ -2458,7 +2460,7 @@ function CryptoPage() {
 
           <OddsShadowTraderPanel />
 
-          <MartingaleRecoveryPanel />
+
 
 
           <ManualTradesPanel />
