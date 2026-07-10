@@ -2593,6 +2593,10 @@ function CryptoPage() {
 
           <ModelAccuracyPanel />
 
+          <ModelBetPanel />
+
+
+
           <EquityMomentumPanel />
 
           <MartingaleRecoveryPanel />
