@@ -59,11 +59,9 @@ export const setRecoveryEnabled = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const cur = await loadOrInit(supabase as ReturnType<typeof getSb>, userId);
-    const patch: Record<string, unknown> = { enabled: data.enabled };
-    if (data.enabled) {
-      // Clear any stop reason when re-enabling.
-      patch.stopped_reason = null;
-    }
+    const patch = data.enabled
+      ? { enabled: true, stopped_reason: null }
+      : { enabled: false };
     const { data: upd } = await supabase
       .from("martingale_recovery_state")
       .update(patch)
