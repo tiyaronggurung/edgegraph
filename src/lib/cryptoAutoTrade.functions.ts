@@ -475,16 +475,15 @@ export async function runAutoTradeCore(
         const singleSide = kalshiSide ?? m.side;
         plan.push({ m, side: singleSide, stakeUsd: data.stakeUsd, kind: "primary" });
       } else {
-        // Disagreement → primary on Kalshi lean, small probe on raw model dir.
+        // Disagreement → primary on Kalshi lean only. Model-side probe
+        // DISABLED per user request (was betting the reverse side and
+        // losing). Do not re-enable without explicit user approval.
         plan.push({ m, side: kalshiSide, stakeUsd: data.stakeUsd, kind: "kalshi_primary_disagree" });
         const rawEdgePts = Math.abs(m.modelYesProb - yp) * 100;
-        const probeStake = rawEdgePts >= MODEL_PROBE_STRONG_EDGE_PTS
-          ? MODEL_PROBE_STAKE_HIGH
-          : MODEL_PROBE_STAKE_LOW;
-        plan.push({ m, side: rawModelSide, stakeUsd: probeStake, kind: "model_probe" });
         const flipTag = m.liveFlipped ? " (chart-flipped)" : "";
-        skipReasons.push(`${m.ticker}: disagree — Kalshi leans ${kalshiSide} @ ${(yp * 100).toFixed(0)}¢, live model picks ${rawModelSide}${flipTag} (edge ${rawEdgePts.toFixed(1)}pts) → $${data.stakeUsd} ${kalshiSide} primary + $${probeStake} ${rawModelSide} probe`);
+        skipReasons.push(`${m.ticker}: disagree — Kalshi leans ${kalshiSide} @ ${(yp * 100).toFixed(0)}¢, live model picks ${rawModelSide}${flipTag} (edge ${rawEdgePts.toFixed(1)}pts) → $${data.stakeUsd} ${kalshiSide} only (probe disabled)`);
       }
+
     }
 
     const placed: AutoTradeOrderRow[] = [];
