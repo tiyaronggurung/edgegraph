@@ -944,6 +944,28 @@ function ModelBetPanel() {
             <span className={`h-1.5 w-1.5 rounded-full ${enabled ? "bg-sky-400 animate-pulse" : "bg-muted-foreground"}`} />
             {enabled ? `Model Bet ON · $${stake}` : `Model Bet OFF · $${stake}`}
           </button>
+          <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span className="uppercase tracking-wider">Stake $</span>
+            <input
+              type="number"
+              min={MODEL_BET_MIN_STAKE}
+              max={MODEL_BET_MAX_STAKE}
+              step={1}
+              value={stakeInput}
+              onChange={(e) => setStakeInput(e.target.value)}
+              onBlur={() => {
+                const n = Number(stakeInput);
+                if (Number.isFinite(n) && n >= MODEL_BET_MIN_STAKE && n <= MODEL_BET_MAX_STAKE) {
+                  setStake(n);
+                  setStakeInput(String(n));
+                } else {
+                  setStakeInput(String(stake));
+                }
+              }}
+              disabled={enabled}
+              className="w-16 bg-background border border-border rounded px-1.5 py-0.5 font-mono text-xs disabled:opacity-50"
+            />
+          </label>
           <span className="text-[11px] text-muted-foreground">
             Auto-fires on every new model prediction · Value pick side · one bet per ticker
           </span>
