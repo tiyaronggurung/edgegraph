@@ -163,7 +163,8 @@ export async function runAutoTradeCore(
       // Single source of truth: same replayLadder state machine the
       // NextStakeBanner reads via getOddsShadowReport. Banner-displayed
       // "Next stake" == the amount we fire here.
-      try {
+      // Skip when caller opts out (Model Bet uses flat $10, not the ladder).
+      if (!data.skipLadder) try {
         const { loadLadderConfig } = await import("./stakingConfig.functions");
         const { replayLadder } = await import("./profitBankLadder");
         const LIVE_BANK_SEED_USD = 71;
