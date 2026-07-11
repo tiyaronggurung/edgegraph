@@ -2219,6 +2219,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
             <thead className="sticky top-0 bg-card border-b border-border">
               <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
                 <th className="px-3 py-2">Placed</th>
+                <th className="px-3 py-2">Source</th>
                 <th className="px-3 py-2">Ticker</th>
                 <th className="px-3 py-2">Side</th>
                 <th className="px-3 py-2 text-right">Stake</th>
@@ -2228,6 +2229,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2 text-right">PnL</th>
               </tr>
+
             </thead>
             <tbody>
               {liveOrders.map((o: AutoTradeOrderRow) => {
