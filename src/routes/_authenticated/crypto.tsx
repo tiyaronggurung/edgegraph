@@ -1291,7 +1291,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
     if (!ok) return;
     setLiveBusy(true);
     try {
-      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 100, maxOrders: 3 } });
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 10, maxOrders: 3 } });
       if (res.placed > 0) {
         toast.success(`Placed ${res.placed} live order${res.placed === 1 ? "" : "s"} on Kalshi.`);
       } else {
