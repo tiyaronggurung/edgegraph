@@ -2274,9 +2274,17 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
         </div>
       )}
     </div>
+
+    <div className="border border-border rounded-lg bg-card">
+      <div className="px-4 py-2 border-b border-border">
+        <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Trade log · manual + model-bet <span className="ml-1 text-[10px] text-muted-foreground/70">(crypto_trades)</span></h3>
+      </div>
+      <TradeLog />
+    </div>
     </div>
   );
 }
+
 
 function KalshiBalanceBadge() {
   const balFn = useServerFn(checkKalshiBalance);
