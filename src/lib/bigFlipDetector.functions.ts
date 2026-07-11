@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // Detects "big flips": one-tick YES delta >= 25c with confirming conditions.
-// Writes qualifying flips to big_flip_signals AND places a live $20 Kalshi
+// Writes qualifying flips to big_flip_signals AND places a live $5 Kalshi
 // buy on the first insert. Runs from:
 //   - the /crypto page via detectBigFlip (client polling, per-user)
 //   - a server cron via /api/public/hooks/big-flip-tick (24/7, all users)
@@ -12,7 +12,7 @@ const MIN_SECONDS_TO_CLOSE = 20;
 // Short cooldown so a fade-then-flip-back sequence can bet on each leg.
 // Prevents duplicate fires on the same tick but allows genuine re-flips.
 const SAME_TICKER_COOLDOWN_SEC = 20;
-const LIVE_STAKE_USD = 20;
+const LIVE_STAKE_USD = 5;
 
 export interface BigFlipSignal {
   ok: boolean;
