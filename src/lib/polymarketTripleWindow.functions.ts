@@ -65,7 +65,7 @@ export const upsertTripleWindow = createServerFn({ method: "POST" })
 
 export const listTripleWindows = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ tickers: z.array(z.string()).max(200) }).parse(d))
+  .inputValidator((d: unknown) => z.object({ tickers: z.array(z.string()).max(1000) }).parse(d))
   .handler(async ({ data, context }) => {
     if (data.tickers.length === 0) return { rows: [] as TripleWindowRow[] };
     const { data: rows, error } = await context.supabase
