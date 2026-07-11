@@ -710,7 +710,7 @@ function ModelAccuracyPanel() {
               sub={s.settled ? (s.winRate >= 0.5 ? "above coin flip" : "below coin flip") : ""}
             />
             <Cell
-              label="Win rate (24h)"
+              label="Win rate (12h)"
               value={s.byWindow.last24h.settled ? pct(s.byWindow.last24h.winRate) : "—"}
               sub={`${s.byWindow.last24h.correct}/${s.byWindow.last24h.settled}`}
             />
