@@ -1092,7 +1092,7 @@ function BigFlipMonitor() {
   );
 }
 
-function AutoTradePanel() {
+function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
   const qc = useQueryClient();
   const listFn = useServerFn(listAutoTradeOrders);
   const settleFn = useServerFn(settleAutoTradeOrders);
