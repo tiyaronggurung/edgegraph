@@ -920,7 +920,9 @@ function ModelBetPanel() {
           force: true,
           forceTicker: pick.ticker,
           forceSide: pick.side,
+          maxEntryCents: 79,
         } });
+
         if (res.placed > 0 && res.orders?.[0]) {
           const o = res.orders[0];
           toast.success(`Model Bet $${stake}: ${pick.side === "YES" ? "UP" : "DOWN"} ${pick.ticker} @ ${o.limit_cents}¢`);
