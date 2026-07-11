@@ -1554,7 +1554,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
   //   Phase 4 (final ≤15s): fire on side closest to [-750, -450].
   // Fires once per 15m window. Mutually exclusive with Auto-Martingale.
   // ============================================================
-  const AUTO_ODDS_STAKE = 100;
+  const AUTO_ODDS_STAKE = 10;
   const [autoOdds, setAutoOdds] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("crypto.autoOdds") === "on";
