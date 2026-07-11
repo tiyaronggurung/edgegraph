@@ -190,6 +190,7 @@ export interface PredictionStatsResult {
   correct: number;
   winRate: number;
   byWindow: {
+    last12h: { settled: number; correct: number; winRate: number };
     last24h: { settled: number; correct: number; winRate: number };
     last7d: { settled: number; correct: number; winRate: number };
   };
@@ -218,7 +219,8 @@ const STATS_RESET_ISO = "2026-07-09T00:00:00Z";
 
 export async function computePredictionStats(): Promise<PredictionStatsResult> {
   const since7d = new Date(Date.now() - 7 * 86400_000).toISOString();
-  const since24h = new Date(Date.now() - 12 * 3600_000).toISOString(); // 12h window (field name kept for compat)
+  const since24h = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const since12h = new Date(Date.now() - 12 * 3600_000).toISOString();
   const cutoff = since7d > STATS_RESET_ISO ? since7d : STATS_RESET_ISO;
 
   const { data: rows } = await supabaseAdmin
@@ -233,6 +235,8 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
   const correctAll = settledAll.filter(r => r.was_correct).length;
   const in24 = settledAll.filter(r => (r.close_time as string) >= since24h);
   const correct24 = in24.filter(r => r.was_correct).length;
+  const in12 = settledAll.filter(r => (r.close_time as string) >= since12h);
+  const correct12 = in12.filter(r => r.was_correct).length;
 
   return {
     total: all.length,
@@ -240,6 +244,11 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
     correct: correctAll,
     winRate: settledAll.length ? correctAll / settledAll.length : 0,
     byWindow: {
+      last12h: {
+        settled: in12.length,
+        correct: correct12,
+        winRate: in12.length ? correct12 / in12.length : 0,
+      },
       last24h: {
         settled: in24.length,
         correct: correct24,
