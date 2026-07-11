@@ -820,8 +820,20 @@ function ModelBetPanel() {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(MODEL_BET_LS_ENABLED) === "on";
   });
+  const [stake, setStake] = useState<number>(() => {
+    if (typeof window === "undefined") return MODEL_BET_DEFAULT_STAKE;
+    const raw = window.localStorage.getItem(MODEL_BET_LS_STAKE);
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n >= MODEL_BET_MIN_STAKE && n <= MODEL_BET_MAX_STAKE ? n : MODEL_BET_DEFAULT_STAKE;
+  });
+  const [stakeInput, setStakeInput] = useState<string>(String(stake));
   const [firing, setFiring] = useState(false);
   const [lastFired, setLastFired] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(MODEL_BET_LS_STAKE, String(stake));
+  }, [stake]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
