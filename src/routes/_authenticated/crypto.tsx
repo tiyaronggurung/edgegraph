@@ -916,6 +916,7 @@ function ModelBetPanel() {
           forceTicker: pick.ticker,
           forceSide: pick.side,
           maxEntryCents: 79,
+          skipLadder: true,
         } });
 
         if (res.placed > 0 && res.orders?.[0]) {
