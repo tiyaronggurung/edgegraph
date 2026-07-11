@@ -435,15 +435,3 @@ export const getOddsShadowReport = createServerFn({ method: "GET" })
     };
   });
 
-function aggByTrigger(rows: Array<Record<string, unknown>>, trig: string) {
-  const filtered = rows.filter(r => r.trigger === trig);
-  const settled = filtered.filter(r => r.settled);
-  const wins = settled.filter(r => r.won);
-  const pnl = settled.reduce((s, r) => s + Number(r.pnl_usd ?? 0), 0);
-  return {
-    fired: filtered.length,
-    settled: settled.length,
-    wins: wins.length,
-    pnl: Math.round(pnl * 100) / 100,
-  };
-}
