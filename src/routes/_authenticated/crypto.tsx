@@ -1092,7 +1092,7 @@ function BigFlipMonitor() {
   );
 }
 
-function AutoTradePanel() {
+function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
   const qc = useQueryClient();
   const listFn = useServerFn(listAutoTradeOrders);
   const settleFn = useServerFn(settleAutoTradeOrders);
@@ -1876,7 +1876,9 @@ function AutoTradePanel() {
   return (
     <div className="space-y-2">
     <NextStakeBanner />
+    <OpenPositions markets={markets} />
     <div className="border border-border rounded-lg bg-card">
+
 
       <div className="px-4 py-2 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div>
@@ -2217,6 +2219,7 @@ function AutoTradePanel() {
             <thead className="sticky top-0 bg-card border-b border-border">
               <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
                 <th className="px-3 py-2">Placed</th>
+                <th className="px-3 py-2">Source</th>
                 <th className="px-3 py-2">Ticker</th>
                 <th className="px-3 py-2">Side</th>
                 <th className="px-3 py-2 text-right">Stake</th>
@@ -2226,13 +2229,27 @@ function AutoTradePanel() {
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2 text-right">PnL</th>
               </tr>
+
             </thead>
             <tbody>
               {liveOrders.map((o: AutoTradeOrderRow) => {
                 const statusColor = o.status === "settled_win" ? "text-emerald-400" : o.status === "settled_loss" ? "text-red-400" : o.status === "placed" ? "text-amber-400" : "text-muted-foreground";
+                const snap = (o as unknown as { inputs_snapshot?: Record<string, unknown> | null }).inputs_snapshot ?? null;
+                const originRaw = (snap && typeof snap === "object" && typeof (snap as { origin?: unknown }).origin === "string")
+                  ? (snap as { origin: string }).origin
+                  : null;
+                const isMg = (o as unknown as { is_martingale?: boolean }).is_martingale === true;
+                const source = originRaw === "model_bet" ? { label: "model-bet", cls: "border-sky-500/40 bg-sky-500/10 text-sky-300" }
+                  : originRaw === "auto_odds" || originRaw === "odds_bet" ? { label: "auto-odds", cls: "border-violet-500/40 bg-violet-500/10 text-violet-300" }
+                  : isMg ? { label: "martingale", cls: "border-amber-500/40 bg-amber-500/10 text-amber-300" }
+                  : originRaw ? { label: originRaw, cls: "border-border bg-muted/20 text-muted-foreground" }
+                  : { label: "auto", cls: "border-border bg-muted/20 text-muted-foreground" };
                 return (
                   <tr key={o.id} className="border-b border-border/40 hover:bg-muted/20">
                     <td className="px-3 py-1.5 font-mono text-muted-foreground">{fmtTime(o.created_at)}</td>
+                    <td className="px-3 py-1.5">
+                      <span className={`inline-block text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded border ${source.cls}`}>{source.label}</span>
+                    </td>
                     <td className="px-3 py-1.5 font-mono">{o.ticker}</td>
                     <td className={"px-3 py-1.5 font-semibold " + (o.side === "YES" ? "text-emerald-400" : "text-red-400")}>{dirLabel(o.side)}</td>
                     <td className="px-3 py-1.5 text-right font-mono">${Number(o.stake_usd).toFixed(2)}</td>
@@ -2251,14 +2268,23 @@ function AutoTradePanel() {
                   </tr>
                 );
               })}
+
             </tbody>
           </table>
         </div>
       )}
     </div>
+
+    <div className="border border-border rounded-lg bg-card">
+      <div className="px-4 py-2 border-b border-border">
+        <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Trade log · manual + model-bet <span className="ml-1 text-[10px] text-muted-foreground/70">(crypto_trades)</span></h3>
+      </div>
+      <TradeLog />
+    </div>
     </div>
   );
 }
+
 
 function KalshiBalanceBadge() {
   const balFn = useServerFn(checkKalshiBalance);
@@ -2631,7 +2657,6 @@ function CryptoPage() {
       {data && (
         <>
           <TopPick markets={data.markets} />
-          <OpenPositions markets={data.markets} />
           <div className="space-y-2">
             {data.markets.length === 0 && <div className="border border-border rounded-lg bg-card p-6 text-center text-sm text-muted-foreground">No open BTC 15-min markets right now.</div>}
             {data.markets.map(m => <MarketRow key={m.ticker} m={m} candles={data.candles} sizing={sizing} onPlace={setPending} live={live} />)}
@@ -2653,7 +2678,7 @@ function CryptoPage() {
 
           <MartingaleRecoveryPanel />
 
-          <AutoTradePanel />
+          <AutoTradePanel markets={data.markets} />
 
           <OddsStudyPanel />
 
@@ -2678,13 +2703,6 @@ function CryptoPage() {
 
           <TaShadowPanel />
 
-
-
-
-          <div>
-            <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Trade log</h2>
-            <TradeLog />
-          </div>
         </>
       )}
 
