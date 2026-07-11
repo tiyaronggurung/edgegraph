@@ -1,40 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { evaluateAtm, evaluateReentry, atmByTicker, type Row } from "./oddsShadowCore";
-import { replayLadder, type LadderState, type LadderConfig } from "./profitBankLadder";
-import { loadLadderConfig } from "./stakingConfig.functions";
+import { computeLadder, aggByTrigger, BANK_CUTOFF_ISO } from "./oddsShadowTrader.server";
 
 // Odds-Flip Shadow Trader v2 — staking now driven by Profit Bank Ladder.
 // Base bankroll and profit bank are strictly separated: only realized profit
 // funds Profit Mode. See src/lib/profitBankLadder.ts for the pure engine.
 
-// Profit bank seeded at $71 starting 2026-07-08 04:47 UTC. Trades settled
-// before this cutoff are ignored for bank + ladder replay.
-const BANK_SEED_USD = 71;
-const BANK_CUTOFF_ISO = "2026-07-08T04:47:00Z";
 
-async function computeLadder(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
-  userId: string,
-): Promise<{ state: LadderState; config: LadderConfig }> {
-  const config = await loadLadderConfig(supabase, userId);
-  const { data: settled } = await supabase
-    .from("auto_trade_orders")
-    .select("pnl_usd, status, settled_at")
-    .eq("user_id", userId)
-    .eq("mode", "live")
-    .in("status", ["settled_win", "settled_loss"])
-    .gte("settled_at", BANK_CUTOFF_ISO)
-    .order("settled_at", { ascending: true })
-    .limit(2000);
-  const orders = ((settled ?? []) as Array<{ status: string; pnl_usd: number | string }>).map(r => ({
-    won: r.status === "settled_win",
-    pnl_usd: Number(r.pnl_usd) || 0,
-  }));
-  const state = replayLadder(orders, config, BANK_SEED_USD);
-  return { state, config };
-}
 
 
 export const runOddsShadowTick = createServerFn({ method: "POST" })
