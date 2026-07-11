@@ -218,7 +218,7 @@ const STATS_RESET_ISO = "2026-07-09T00:00:00Z";
 
 export async function computePredictionStats(): Promise<PredictionStatsResult> {
   const since7d = new Date(Date.now() - 7 * 86400_000).toISOString();
-  const since24h = new Date(Date.now() - 86400_000).toISOString();
+  const since24h = new Date(Date.now() - 12 * 3600_000).toISOString(); // 12h window (field name kept for compat)
   const cutoff = since7d > STATS_RESET_ISO ? since7d : STATS_RESET_ISO;
 
   const { data: rows } = await supabaseAdmin
