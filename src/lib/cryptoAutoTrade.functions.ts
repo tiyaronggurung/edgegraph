@@ -106,14 +106,16 @@ export type RunAutoTradeInput = {
   stakeUsd: number;
   forceTicker: string | undefined;
   forceSide: "YES" | "NO" | undefined;
+  maxEntryCents: number | undefined;
 };
 
 export const runAutoTrade = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { mode?: "paper" | "live"; maxOrders?: number; stakeUsd?: number; confirm?: string; force?: boolean; isMartingale?: boolean; forceTicker?: string; forceSide?: "YES" | "NO" } | undefined) => {
+  .inputValidator((data: { mode?: "paper" | "live"; maxOrders?: number; stakeUsd?: number; confirm?: string; force?: boolean; isMartingale?: boolean; forceTicker?: string; forceSide?: "YES" | "NO"; maxEntryCents?: number } | undefined) => {
     const mode: "paper" | "live" = data?.mode === "live" ? "live" : "paper";
     const sessionCap = mode === "live" ? LIVE_MAX_ORDERS_PER_SESSION : MAX_ORDERS_PER_SESSION_PAPER;
     const stakeCap = mode === "live" ? LIVE_MAX_STAKE_USD_PER_ORDER : MAX_STAKE_USD_PER_ORDER_PAPER;
+    const rawMax = Number(data?.maxEntryCents);
     return {
       mode,
       confirm: data?.confirm ?? "",
@@ -123,8 +125,10 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       stakeUsd: Math.min(stakeCap, Math.max(1, data?.stakeUsd ?? stakeCap)),
       forceTicker: typeof data?.forceTicker === "string" && data.forceTicker.length > 0 ? data.forceTicker : undefined,
       forceSide: data?.forceSide === "YES" || data?.forceSide === "NO" ? data.forceSide : undefined,
+      maxEntryCents: Number.isFinite(rawMax) && rawMax >= 50 && rawMax <= 95 ? rawMax : undefined,
     } satisfies RunAutoTradeInput;
   })
+
   .handler(async ({ data, context }): Promise<AutoTradeRunResult> =>
     runAutoTradeCore(context.supabase as SupabaseClient, context.userId, data),
   );
