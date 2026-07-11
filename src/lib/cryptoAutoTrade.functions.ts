@@ -106,7 +106,7 @@ export type RunAutoTradeInput = {
   stakeUsd: number;
   forceTicker: string | undefined;
   forceSide: "YES" | "NO" | undefined;
-  maxEntryCents: number | undefined;
+  maxEntryCents?: number | undefined;
 };
 
 export const runAutoTrade = createServerFn({ method: "POST" })
