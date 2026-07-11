@@ -147,14 +147,22 @@ export async function settleDuePredictions(): Promise<{ settled: number }> {
       .select("id, ticker, strike, side, close_time")
       .is("outcome", null)
       .lt("close_time", new Date(Date.now() - 30_000).toISOString())
-      .limit(50);
+      .order("close_time", { ascending: true })
+      .limit(200);
 
     if (!due?.length) return { settled: 0 };
-    let settled = 0;
-    for (const r of due) {
+
+    // Fetch settle prices in parallel (Coinbase can handle it) so a batch of
+    // 200 doesn't take 200×latency serially.
+    const results = await Promise.all(due.map(async (r) => {
       const closeSec = Math.floor(new Date(r.close_time as string).getTime() / 1000);
       const settle = await priceAt(closeSec);
-      if (settle == null) continue;
+      return { r, settle };
+    }));
+
+    let settled = 0;
+    await Promise.all(results.map(async ({ r, settle }) => {
+      if (settle == null) return;
       const outcome: "YES" | "NO" = settle >= Number(r.strike) ? "YES" : "NO";
       const wasCorrect = outcome === r.side;
       await supabaseAdmin
@@ -167,13 +175,14 @@ export async function settleDuePredictions(): Promise<{ settled: number }> {
         })
         .eq("id", r.id);
       settled++;
-    }
+    }));
     return { settled };
   } catch (e) {
     console.warn("settleDuePredictions failed:", e);
     return { settled: 0 };
   }
 }
+
 
 export interface PredictionStatsResult {
   total: number;

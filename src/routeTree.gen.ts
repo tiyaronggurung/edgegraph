@@ -37,6 +37,7 @@ import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lova
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as ApiPublicHooksTripleWindowTickRouteImport } from './routes/api/public/hooks/triple-window-tick'
+import { Route as ApiPublicHooksSettleBtcPredictionsRouteImport } from './routes/api/public/hooks/settle-btc-predictions'
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
 import { Route as ApiPublicHooksOddsShadowTickRouteImport } from './routes/api/public/hooks/odds-shadow-tick'
 import { Route as ApiPublicHooksMartingaleTickRouteImport } from './routes/api/public/hooks/martingale-tick'
@@ -195,6 +196,12 @@ const ApiPublicHooksTripleWindowTickRoute =
     path: '/api/public/hooks/triple-window-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksSettleBtcPredictionsRoute =
+  ApiPublicHooksSettleBtcPredictionsRouteImport.update({
+    id: '/api/public/hooks/settle-btc-predictions',
+    path: '/api/public/hooks/settle-btc-predictions',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksRecomputePredictionsRoute =
   ApiPublicHooksRecomputePredictionsRouteImport.update({
     id: '/api/public/hooks/recompute-predictions',
@@ -296,6 +303,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
+  '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -336,6 +344,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
+  '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -378,6 +387,7 @@ export interface FileRoutesById {
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
+  '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -420,6 +430,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
+    | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/triple-window-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
@@ -460,6 +471,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
+    | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/triple-window-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
@@ -501,6 +513,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
+    | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/triple-window-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
@@ -529,6 +542,7 @@ export interface RootRouteChildren {
   ApiPublicHooksMartingaleTickRoute: typeof ApiPublicHooksMartingaleTickRoute
   ApiPublicHooksOddsShadowTickRoute: typeof ApiPublicHooksOddsShadowTickRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
+  ApiPublicHooksSettleBtcPredictionsRoute: typeof ApiPublicHooksSettleBtcPredictionsRoute
   ApiPublicHooksTripleWindowTickRoute: typeof ApiPublicHooksTripleWindowTickRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
@@ -733,6 +747,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksTripleWindowTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/settle-btc-predictions': {
+      id: '/api/public/hooks/settle-btc-predictions'
+      path: '/api/public/hooks/settle-btc-predictions'
+      fullPath: '/api/public/hooks/settle-btc-predictions'
+      preLoaderRoute: typeof ApiPublicHooksSettleBtcPredictionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/recompute-predictions': {
       id: '/api/public/hooks/recompute-predictions'
       path: '/api/public/hooks/recompute-predictions'
@@ -875,6 +896,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksOddsShadowTickRoute: ApiPublicHooksOddsShadowTickRoute,
   ApiPublicHooksRecomputePredictionsRoute:
     ApiPublicHooksRecomputePredictionsRoute,
+  ApiPublicHooksSettleBtcPredictionsRoute:
+    ApiPublicHooksSettleBtcPredictionsRoute,
   ApiPublicHooksTripleWindowTickRoute: ApiPublicHooksTripleWindowTickRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
