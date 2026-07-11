@@ -797,14 +797,17 @@ function ModelAccuracyPanel() {
 }
 
 // ============================================================
-// Model Bet: $25 flat auto-bet that fires ONCE per new model
-// prediction, on the exact Value-pick side (r.side). No gates,
-// no reverse, no confidence filter, no martingale.
+// Model Bet: flat auto-bet ($10 default, user-editable) that fires
+// ONCE per new model prediction, on the exact Value-pick side (r.side).
+// No gates, no reverse, no confidence filter, no martingale.
 // Mutually exclusive with Auto-Odds and Auto-Martingale — turning
 // this ON forces the other two OFF via a shared mutex event.
 // ============================================================
-const MODEL_BET_STAKE = 25;
+const MODEL_BET_DEFAULT_STAKE = 10;
+const MODEL_BET_MIN_STAKE = 1;
+const MODEL_BET_MAX_STAKE = 500;
 const MODEL_BET_LS_ENABLED = "crypto.modelBet";
+const MODEL_BET_LS_STAKE = "crypto.modelBet.stake";
 const MODEL_BET_LS_TICKERS = "crypto.modelBet.tickers";
 const AUTO_BET_MUTEX_EVENT = "crypto.autoBet.mutex";
 
