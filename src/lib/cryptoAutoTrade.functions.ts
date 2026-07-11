@@ -494,6 +494,15 @@ export async function runAutoTradeCore(
     const plan: PlanEntry[] = [];
     for (const m of candidates) {
       const yp = m.yesPrice;
+
+      // Model-bet mode: Kalshi-lean override is OFF. Always follow the
+      // model's value-pick side (m.side). No disagreement branch, no probe.
+      if (autoButtonType === "model_bet") {
+        plan.push({ m, side: m.side, stakeUsd: data.stakeUsd, kind: "primary" });
+        continue;
+      }
+
+      // Odds-bet mode: original Kalshi-leaned primary logic.
       let kalshiSide: "YES" | "NO" | null = null;
       if (yp >= KALSHI_LEAN_THRESHOLD) kalshiSide = "YES";
       else if (yp <= 1 - KALSHI_LEAN_THRESHOLD) kalshiSide = "NO";
@@ -519,6 +528,7 @@ export async function runAutoTradeCore(
       }
 
     }
+
 
     const placed: AutoTradeOrderRow[] = [];
     for (const entry of plan) {
