@@ -1395,6 +1395,30 @@ export type Database = {
           },
         ]
       }
+      big_flip_killswitch: {
+        Row: {
+          halted: boolean
+          halted_at: string | null
+          reason: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          halted?: boolean
+          halted_at?: string | null
+          reason?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          halted?: boolean
+          halted_at?: string | null
+          reason?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       big_flip_signals: {
         Row: {
           detected_at: string
