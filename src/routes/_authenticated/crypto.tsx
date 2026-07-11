@@ -1028,7 +1028,7 @@ function BigFlipMonitor() {
     const key = `${r.ticker}:${r.flipAt}`;
     if (lastToastKey.current === key) return;
     lastToastKey.current = key;
-    toast.success(`🚨 BIG FLIP → ${r.toSide} · LIVE $20`, {
+    toast.success(`🚨 BIG FLIP → ${r.toSide} · LIVE $5`, {
       description: `${r.prevYes}¢ → ${r.newYes}¢ (Δ${r.yesDelta}) · ${r.secondsToClose}s left`,
     });
     try { playOrderPlaced(); } catch { /* noop */ }
@@ -1052,7 +1052,7 @@ function BigFlipMonitor() {
             const key = `${row.ticker}:${row.flip_at}`;
             if (lastToastKey.current === key) return;
             lastToastKey.current = key;
-            toast.success(`🚨 BIG FLIP → ${row.to_side} · LIVE $20`, {
+            toast.success(`🚨 BIG FLIP → ${row.to_side} · LIVE $5`, {
               description: `${row.prev_yes}¢ → ${row.new_yes}¢ (Δ${row.yes_delta}) · ${row.seconds_to_close}s left`,
             });
             try { playOrderPlaced(); } catch { /* noop */ }
@@ -1072,7 +1072,7 @@ function BigFlipMonitor() {
     return (
       <div className="mt-1 rounded border border-border/50 bg-muted/10 px-2 py-1 text-[10px] font-mono text-muted-foreground flex items-center gap-2">
         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
-        <span>Big-flip monitor · LIVE $20 · 24/7 cron · Δ≥25¢ · {r.rejectReason ? `last rejected: ${r.rejectReason}` : "no signal"}</span>
+        <span>Big-flip monitor · LIVE $5 · 24/7 cron · Δ≥25¢ · {r.rejectReason ? `last rejected: ${r.rejectReason}` : "no signal"}</span>
       </div>
     );
   }

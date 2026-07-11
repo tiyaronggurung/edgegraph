@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// Server-side cron: runs the big-flip detector + live $20 auto-buy for every
+// Server-side cron: runs the big-flip detector + live $5 auto-buy for every
 // user with Kalshi creds set and recent tape activity. Fires 24/7 regardless
 // of whether the browser is open. Public route — no auth header required
 // (cron calls it with the anon apikey; verification is by shared design of
