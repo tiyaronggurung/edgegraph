@@ -381,6 +381,7 @@ export type Database = {
           tp_cents: number | null
           updated_at: string
           user_id: string
+          vp_no_only: boolean
         }
         Insert: {
           auto_apply_studies?: boolean
@@ -403,6 +404,7 @@ export type Database = {
           tp_cents?: number | null
           updated_at?: string
           user_id: string
+          vp_no_only?: boolean
         }
         Update: {
           auto_apply_studies?: boolean
@@ -425,6 +427,7 @@ export type Database = {
           tp_cents?: number | null
           updated_at?: string
           user_id?: string
+          vp_no_only?: boolean
         }
         Relationships: [
           {

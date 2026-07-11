@@ -295,6 +295,19 @@ export async function runAutoTradeCore(
     const result = await computeBtcMarkets();
     const skipReasons: string[] = [];
 
+    // "NO-side only" filter — when ON, auto-trade skips any candidate whose
+    // value-pick side is YES. Backtest on 903 settled BTC predictions showed
+    // VP=NO subset delivers +3.8% ROI vs +1.8% blind. Default OFF.
+    let vpNoOnly = false;
+    try {
+      const { data: vpRow } = await (supabase as any)
+        .from("auto_odds_settings")
+        .select("vp_no_only")
+        .eq("user_id", userId)
+        .maybeSingle();
+      vpNoOnly = Boolean((vpRow as { vp_no_only?: boolean } | null)?.vp_no_only);
+    } catch { /* default false */ }
+
     // ── Equity-momentum overlay (SPY/QQQ/ES/NQ leading indicator) ──
     // Strong opposite move blocks; otherwise adjust the per-candidate effective edge.
     // YES = UP (risk_on aligned), NO = DOWN (risk_off aligned).
@@ -369,6 +382,10 @@ export async function runAutoTradeCore(
           return { m, effectiveEdge: m.edgeAbs + aligned, equityAdj: aligned };
         })
         .filter(({ m, effectiveEdge, equityAdj }) => {
+          if (vpNoOnly && m.side === "YES") {
+            const r = "vp_no_only: value-pick YES filtered (NO-only toggle ON)";
+            skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
+          }
           if (m.gateAction !== "BET") { const r = `gate ${m.gateAction}`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (m.sigmaDistance < minSigma) { const r = `sigDist ${m.sigmaDistance.toFixed(2)}σ < ${minSigma}σ`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (!m.gapAnalysis.momentumAlignsWithSide) { const r = `momentum fights ${m.side}`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
