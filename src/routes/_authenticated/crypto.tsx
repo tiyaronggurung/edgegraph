@@ -2237,6 +2237,18 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
               {ethGate ? "ETH gate ON" : "ETH gate OFF"}
             </button>
           )}
+          <button
+            onClick={toggleVpNoOnly}
+            className={`text-[10px] font-semibold px-2 py-1.5 rounded border flex items-center gap-1 ${vpNoOnly ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+            title={vpNoOnly
+              ? "NO-only ON: auto-trade skips YES value-picks. Backtest: +3.8% ROI on 514/903 bets (vs +1.8% blind)."
+              : "NO-only OFF: auto-trade fires both YES and NO value-picks (default)."}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${vpNoOnly ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground"}`} />
+            {vpNoOnly ? "NO-only ON" : "NO-only OFF"}
+          </button>
+
+
 
 
 
