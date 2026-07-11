@@ -13,6 +13,11 @@ const MIN_SECONDS_TO_CLOSE = 20;
 // Prevents duplicate fires on the same tick but allows genuine re-flips.
 const SAME_TICKER_COOLDOWN_SEC = 20;
 const LIVE_STAKE_USD = 10;
+// Killswitch: if there are >= LOSS_HALT_THRESHOLD losing big-flip trades
+// within the last LOSS_HALT_WINDOW_COUNT distinct 15-min windows that had
+// a big-flip trade, halt auto-trading until the user re-enables it.
+const LOSS_HALT_THRESHOLD = 4;
+const LOSS_HALT_WINDOW_COUNT = 10;
 
 export interface BigFlipSignal {
   ok: boolean;
