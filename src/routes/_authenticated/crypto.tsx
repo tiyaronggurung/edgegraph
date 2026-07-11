@@ -652,17 +652,26 @@ function buildTripleWindowTooltip(r: TripleWindowRow): string {
 
 function ModelAccuracyPanel() {
   const fn = useServerFn(getPredictionStats);
-  const q = useQuery({ queryKey: ["btc-pred-stats"], queryFn: () => fn(), refetchInterval: 60_000 });
+  const q = useQuery({
+    queryKey: ["btc-pred-stats"],
+    queryFn: () => fn(),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+  });
   const s = q.data;
 
   const listTripleFn = useServerFn(listTripleWindows);
+  // Only refetch triple-window when the SET of tickers changes, not on every stats poll.
   const tickers = useMemo(() => (s?.recent ?? []).map(r => r.ticker), [s]);
+  const tickersKey = useMemo(() => [...tickers].sort().join(","), [tickers]);
   const twQ = useQuery({
-    queryKey: ["btc-triple-window", tickers.join(",")],
+    queryKey: ["btc-triple-window", tickersKey],
     queryFn: () => listTripleFn({ data: { tickers } }),
     enabled: tickers.length > 0,
-    refetchInterval: 30_000,
-    staleTime: 15_000,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
   });
   const twMap = useMemo(() => {
     const m = new Map<string, TripleWindowRow>();
