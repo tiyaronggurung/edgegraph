@@ -1312,7 +1312,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
       const ok = window.confirm(
         "FORCE LIVE orders on Kalshi at current price?\n\n" +
         "Picks the model's top |edge| markets (UP or DOWN) and places\n" +
-        "up to 2 × $100 orders at current Kalshi quotes.\n\n" +
+        "up to 2 × $10 orders at current Kalshi quotes.\n\n" +
         "BYPASSED: edge/σ/momentum/equity/24h-dedupe/loss-cap gates.\n" +
         "ENFORCED: kill switch, key health, 40 orders in 24h,\n" +
         "auto-exit (TP +70% / SL -50% / edge-decay 2¢).\n\n" +
@@ -1322,7 +1322,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
     }
     setForceBusy(true);
     try {
-      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 100, maxOrders: 2, force: true } });
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 10, maxOrders: 2, force: true } });
       if (res.placed > 0) {
         toast.success(`Forced ${res.placed} order${res.placed === 1 ? "" : "s"}: ${res.orders.map(o => `${o.side === "YES" ? "UP" : "DOWN"} ${o.ticker} @ ${o.limit_cents}¢`).join(", ")}`);
       } else if (!silent) {
