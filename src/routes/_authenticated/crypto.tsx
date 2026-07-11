@@ -847,7 +847,7 @@ function ModelBetPanel() {
       window.dispatchEvent(new CustomEvent(AUTO_BET_MUTEX_EVENT, { detail: "modelBet" }));
     }
     setEnabled(true);
-    toast.success(`Model Bet ON · $${MODEL_BET_STAKE} per prediction (Value pick side)`);
+    toast.success(`Model Bet ON · $${stake} per prediction (Value pick side)`);
   };
   const toggleOff = () => {
     setEnabled(false);
@@ -906,7 +906,7 @@ function ModelBetPanel() {
         const res = await runFn({ data: {
           mode: "live",
           confirm: "I_UNDERSTAND_LIVE",
-          stakeUsd: MODEL_BET_STAKE,
+          stakeUsd: stake,
           maxOrders: 1,
           force: true,
           forceTicker: pick.ticker,
@@ -914,7 +914,7 @@ function ModelBetPanel() {
         } });
         if (res.placed > 0 && res.orders?.[0]) {
           const o = res.orders[0];
-          toast.success(`Model Bet $${MODEL_BET_STAKE}: ${pick.side === "YES" ? "UP" : "DOWN"} ${pick.ticker} @ ${o.limit_cents}¢`);
+          toast.success(`Model Bet $${stake}: ${pick.side === "YES" ? "UP" : "DOWN"} ${pick.ticker} @ ${o.limit_cents}¢`);
           setLastFired(`${pick.ticker} ${pick.side} @ ${o.limit_cents}¢`);
         } else {
           const realReasons = (res.skipReasons ?? []).filter((r: string) => !/^(equity:|force:)/i.test(r));
@@ -942,7 +942,7 @@ function ModelBetPanel() {
             className={`text-xs font-semibold px-3 py-1.5 rounded border flex items-center gap-1.5 ${enabled ? "border-sky-500/50 bg-sky-500/15 text-sky-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
           >
             <span className={`h-1.5 w-1.5 rounded-full ${enabled ? "bg-sky-400 animate-pulse" : "bg-muted-foreground"}`} />
-            {enabled ? `Model Bet ON · $${MODEL_BET_STAKE}` : `Model Bet OFF · $${MODEL_BET_STAKE}`}
+            {enabled ? `Model Bet ON · $${stake}` : `Model Bet OFF · $${stake}`}
           </button>
           <span className="text-[11px] text-muted-foreground">
             Auto-fires on every new model prediction · Value pick side · one bet per ticker
