@@ -1876,7 +1876,9 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
   return (
     <div className="space-y-2">
     <NextStakeBanner />
+    <OpenPositions markets={markets} />
     <div className="border border-border rounded-lg bg-card">
+
 
       <div className="px-4 py-2 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div>
