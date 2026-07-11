@@ -107,11 +107,12 @@ export type RunAutoTradeInput = {
   forceTicker: string | undefined;
   forceSide: "YES" | "NO" | undefined;
   maxEntryCents?: number | undefined;
+  skipLadder?: boolean;
 };
 
 export const runAutoTrade = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { mode?: "paper" | "live"; maxOrders?: number; stakeUsd?: number; confirm?: string; force?: boolean; isMartingale?: boolean; forceTicker?: string; forceSide?: "YES" | "NO"; maxEntryCents?: number } | undefined) => {
+  .inputValidator((data: { mode?: "paper" | "live"; maxOrders?: number; stakeUsd?: number; confirm?: string; force?: boolean; isMartingale?: boolean; forceTicker?: string; forceSide?: "YES" | "NO"; maxEntryCents?: number; skipLadder?: boolean } | undefined) => {
     const mode: "paper" | "live" = data?.mode === "live" ? "live" : "paper";
     const sessionCap = mode === "live" ? LIVE_MAX_ORDERS_PER_SESSION : MAX_ORDERS_PER_SESSION_PAPER;
     const stakeCap = mode === "live" ? LIVE_MAX_STAKE_USD_PER_ORDER : MAX_STAKE_USD_PER_ORDER_PAPER;
@@ -126,6 +127,7 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       forceTicker: typeof data?.forceTicker === "string" && data.forceTicker.length > 0 ? data.forceTicker : undefined,
       forceSide: data?.forceSide === "YES" || data?.forceSide === "NO" ? data.forceSide : undefined,
       maxEntryCents: Number.isFinite(rawMax) && rawMax >= 50 && rawMax <= 95 ? rawMax : undefined,
+      skipLadder: data?.skipLadder === true,
     } satisfies RunAutoTradeInput;
   })
 
@@ -161,7 +163,8 @@ export async function runAutoTradeCore(
       // Single source of truth: same replayLadder state machine the
       // NextStakeBanner reads via getOddsShadowReport. Banner-displayed
       // "Next stake" == the amount we fire here.
-      try {
+      // Skip when caller opts out (Model Bet uses flat $10, not the ladder).
+      if (!data.skipLadder) try {
         const { loadLadderConfig } = await import("./stakingConfig.functions");
         const { replayLadder } = await import("./profitBankLadder");
         const LIVE_BANK_SEED_USD = 71;
