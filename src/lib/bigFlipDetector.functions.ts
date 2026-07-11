@@ -135,6 +135,78 @@ export async function runBigFlipForUser(
   const firstTime = !insErr;
 
   if (passed && firstTime) {
+    // Killswitch check: if user has manually halted, or if the recent
+    // loss rate crossed the threshold, block the order and (auto-)halt.
+    const { data: ks } = await supabase
+      .from("big_flip_killswitch")
+      .select("halted,reason")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (ks?.halted) {
+      return {
+        ok: true, ticker, toSide,
+        prevYes: prevSample.yes_cents as number,
+        newYes: flipSample.yes_cents as number,
+        yesDelta: big.delta,
+        spot, strike, secondsToClose: stc,
+        flipAt, passed: false,
+        rejectReason: `auto-trade halted: ${ks.reason ?? "killswitch on"}`,
+        ageSeconds,
+      };
+    }
+
+    // Evaluate loss count over the last N distinct 15-min windows that had
+    // a big-flip trade. Look at settled trades tagged source=big_flip_detector.
+    try {
+      const { data: recent } = await supabase
+        .from("crypto_trades")
+        .select("created_at,pnl_usd,outcome,inputs_snapshot,status")
+        .eq("user_id", userId)
+        .not("pnl_usd", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      const bigFlipSettled = (recent ?? []).filter((r: any) =>
+        r?.inputs_snapshot?.source === "big_flip_detector"
+      );
+      // Bucket trades into 15-min windows, walk newest-first, take the last
+      // LOSS_HALT_WINDOW_COUNT distinct windows, count windows with any loss.
+      const windows = new Map<number, { hasLoss: boolean }>();
+      for (const r of bigFlipSettled) {
+        const t = new Date(r.created_at as string).getTime();
+        const bucket = Math.floor(t / (15 * 60 * 1000));
+        const isLoss = (r.pnl_usd != null && Number(r.pnl_usd) < 0)
+          || r.outcome === "loss";
+        if (!windows.has(bucket)) windows.set(bucket, { hasLoss: isLoss });
+        else if (isLoss) windows.get(bucket)!.hasLoss = true;
+        if (windows.size >= LOSS_HALT_WINDOW_COUNT) break;
+      }
+      const losingWindows = [...windows.values()].filter((w) => w.hasLoss).length;
+      if (losingWindows >= LOSS_HALT_THRESHOLD) {
+        const reason = `${losingWindows} losing windows in last ${windows.size} (auto-halt)`;
+        await supabase
+          .from("big_flip_killswitch")
+          .upsert({
+            user_id: userId,
+            halted: true,
+            halted_at: new Date().toISOString(),
+            reason,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "user_id" });
+        return {
+          ok: true, ticker, toSide,
+          prevYes: prevSample.yes_cents as number,
+          newYes: flipSample.yes_cents as number,
+          yesDelta: big.delta,
+          spot, strike, secondsToClose: stc,
+          flipAt, passed: false,
+          rejectReason: `auto-trade halted: ${reason}`,
+          ageSeconds,
+        };
+      }
+    } catch (e) {
+      console.error("[bigFlipDetector] killswitch eval failed:", (e as Error)?.message);
+    }
+
     try {
       const { submitKalshiBuy } = await import("./cryptoTrades.functions");
       const limitCents = toSide === "YES"
