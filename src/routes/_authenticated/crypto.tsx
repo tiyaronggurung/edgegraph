@@ -1501,6 +1501,41 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
     window.localStorage.setItem("crypto.autoMart.ethGate", ethGate ? "on" : "off");
   }, [ethGate]);
 
+  // Server-side "NO-side only" auto-trade filter — persisted to auto_odds_settings.vp_no_only.
+  // When ON, auto-trader skips value-picks whose side = YES. Backtest: +3.8% ROI vs +1.8% blind.
+  const [vpNoOnly, setVpNoOnly] = useState<boolean>(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        const uid = u?.user?.id;
+        if (!uid || cancelled) return;
+        const { data: row } = await supabase
+          .from("auto_odds_settings")
+          .select("vp_no_only")
+          .eq("user_id", uid)
+          .maybeSingle();
+        if (!cancelled) setVpNoOnly(Boolean((row as { vp_no_only?: boolean } | null)?.vp_no_only));
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const toggleVpNoOnly = async () => {
+    const next = !vpNoOnly;
+    setVpNoOnly(next);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u?.user?.id;
+      if (!uid) return;
+      await supabase.from("auto_odds_settings").upsert(
+        { user_id: uid, vp_no_only: next },
+        { onConflict: "user_id" },
+      );
+    } catch { /* non-fatal */ }
+  };
+
+
 
 
 
