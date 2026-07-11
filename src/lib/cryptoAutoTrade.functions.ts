@@ -441,16 +441,21 @@ export async function runAutoTradeCore(
     // user can raise/lower the recovery-ratio cutoff without a redeploy.
     let liveMaxEntryCents = 78;
     if (isLive) {
-      try {
-        const { data: settingsRow } = await (supabase as any)
-          .from("auto_odds_settings")
-          .select("max_entry_cents")
-          .eq("user_id", userId)
-          .maybeSingle();
-        const raw = Number((settingsRow as { max_entry_cents?: number } | null)?.max_entry_cents);
-        if (Number.isFinite(raw) && raw >= 50 && raw <= 95) liveMaxEntryCents = raw;
-      } catch { /* fall back to 78 */ }
+      if (data.maxEntryCents != null) {
+        liveMaxEntryCents = data.maxEntryCents;
+      } else {
+        try {
+          const { data: settingsRow } = await (supabase as any)
+            .from("auto_odds_settings")
+            .select("max_entry_cents")
+            .eq("user_id", userId)
+            .maybeSingle();
+          const raw = Number((settingsRow as { max_entry_cents?: number } | null)?.max_entry_cents);
+          if (Number.isFinite(raw) && raw >= 50 && raw <= 95) liveMaxEntryCents = raw;
+        } catch { /* fall back to 78 */ }
+      }
     }
+
 
     // ── Expand each candidate into 1 primary + optional model-side probe ──
     // Primary side = whichever leg Kalshi prices as favorite. If model
