@@ -1,0 +1,1 @@
+ALTER TABLE public.auto_odds_settings ADD COLUMN IF NOT EXISTS vp_no_only boolean NOT NULL DEFAULT false;
