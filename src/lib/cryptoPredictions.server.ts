@@ -183,7 +183,6 @@ export async function settleDuePredictions(): Promise<{ settled: number }> {
   }
 }
 
-}
 
 export interface PredictionStatsResult {
   total: number;
