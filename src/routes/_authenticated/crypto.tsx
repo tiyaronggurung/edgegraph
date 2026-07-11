@@ -1291,7 +1291,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
     if (!ok) return;
     setLiveBusy(true);
     try {
-      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 100, maxOrders: 3 } });
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 10, maxOrders: 3 } });
       if (res.placed > 0) {
         toast.success(`Placed ${res.placed} live order${res.placed === 1 ? "" : "s"} on Kalshi.`);
       } else {
@@ -1312,7 +1312,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
       const ok = window.confirm(
         "FORCE LIVE orders on Kalshi at current price?\n\n" +
         "Picks the model's top |edge| markets (UP or DOWN) and places\n" +
-        "up to 2 × $100 orders at current Kalshi quotes.\n\n" +
+        "up to 2 × $10 orders at current Kalshi quotes.\n\n" +
         "BYPASSED: edge/σ/momentum/equity/24h-dedupe/loss-cap gates.\n" +
         "ENFORCED: kill switch, key health, 40 orders in 24h,\n" +
         "auto-exit (TP +70% / SL -50% / edge-decay 2¢).\n\n" +
@@ -1322,7 +1322,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
     }
     setForceBusy(true);
     try {
-      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 100, maxOrders: 2, force: true } });
+      const res = await runFn({ data: { mode: "live", confirm: "I_UNDERSTAND_LIVE", stakeUsd: 10, maxOrders: 2, force: true } });
       if (res.placed > 0) {
         toast.success(`Forced ${res.placed} order${res.placed === 1 ? "" : "s"}: ${res.orders.map(o => `${o.side === "YES" ? "UP" : "DOWN"} ${o.ticker} @ ${o.limit_cents}¢`).join(", ")}`);
       } else if (!silent) {
@@ -1554,7 +1554,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
   //   Phase 4 (final ≤15s): fire on side closest to [-750, -450].
   // Fires once per 15m window. Mutually exclusive with Auto-Martingale.
   // ============================================================
-  const AUTO_ODDS_STAKE = 100;
+  const AUTO_ODDS_STAKE = 10;
   const [autoOdds, setAutoOdds] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("crypto.autoOdds") === "on";
