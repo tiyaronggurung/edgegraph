@@ -460,21 +460,26 @@ export async function runAutoTradeCore(
     // auto_odds_settings; default 78¢ if unset. Panel exposes this so the
     // user can raise/lower the recovery-ratio cutoff without a redeploy.
     let liveMaxEntryCents = 78;
-    if (isLive) {
-      if (data.maxEntryCents != null) {
+    // auto_button_type controls whether the Kalshi-lean primary override runs.
+    // "odds_bet" → override active (follow Kalshi favorite leg).
+    // "model_bet" → override OFF, always use model's value-pick side.
+    let autoButtonType: "odds_bet" | "model_bet" = "odds_bet";
+    try {
+      const { data: settingsRow } = await (supabase as any)
+        .from("auto_odds_settings")
+        .select("max_entry_cents, auto_button_type")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const raw = Number((settingsRow as { max_entry_cents?: number } | null)?.max_entry_cents);
+      if (isLive && data.maxEntryCents != null) {
         liveMaxEntryCents = data.maxEntryCents;
-      } else {
-        try {
-          const { data: settingsRow } = await (supabase as any)
-            .from("auto_odds_settings")
-            .select("max_entry_cents")
-            .eq("user_id", userId)
-            .maybeSingle();
-          const raw = Number((settingsRow as { max_entry_cents?: number } | null)?.max_entry_cents);
-          if (Number.isFinite(raw) && raw >= 50 && raw <= 95) liveMaxEntryCents = raw;
-        } catch { /* fall back to 78 */ }
+      } else if (isLive && Number.isFinite(raw) && raw >= 50 && raw <= 95) {
+        liveMaxEntryCents = raw;
       }
-    }
+      const bt = (settingsRow as { auto_button_type?: string } | null)?.auto_button_type;
+      if (bt === "model_bet") autoButtonType = "model_bet";
+    } catch { /* fall back to defaults */ }
+
 
 
     // ── Expand each candidate into 1 primary + optional model-side probe ──
@@ -489,6 +494,15 @@ export async function runAutoTradeCore(
     const plan: PlanEntry[] = [];
     for (const m of candidates) {
       const yp = m.yesPrice;
+
+      // Model-bet mode: Kalshi-lean override is OFF. Always follow the
+      // model's value-pick side (m.side). No disagreement branch, no probe.
+      if (autoButtonType === "model_bet") {
+        plan.push({ m, side: m.side, stakeUsd: data.stakeUsd, kind: "primary" });
+        continue;
+      }
+
+      // Odds-bet mode: original Kalshi-leaned primary logic.
       let kalshiSide: "YES" | "NO" | null = null;
       if (yp >= KALSHI_LEAN_THRESHOLD) kalshiSide = "YES";
       else if (yp <= 1 - KALSHI_LEAN_THRESHOLD) kalshiSide = "NO";
@@ -514,6 +528,7 @@ export async function runAutoTradeCore(
       }
 
     }
+
 
     const placed: AutoTradeOrderRow[] = [];
     for (const entry of plan) {
