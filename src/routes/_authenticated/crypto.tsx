@@ -1064,15 +1064,57 @@ function BigFlipMonitor() {
     return () => { active = false; };
   }, []);
 
+  // Killswitch state (auto-halt after too many losing 15-min windows).
+  const [ks, setKs] = useState<{ halted: boolean; reason: string | null } | null>(null);
+  const refreshKs = async () => {
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
+    if (!uid) return;
+    const { data } = await supabase
+      .from("big_flip_killswitch")
+      .select("halted,reason")
+      .eq("user_id", uid)
+      .maybeSingle();
+    setKs({ halted: !!data?.halted, reason: data?.reason ?? null });
+  };
+  useEffect(() => { refreshKs(); const t = setInterval(refreshKs, 5_000); return () => clearInterval(t); }, []);
+  const reEnable = async () => {
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
+    if (!uid) return;
+    await supabase.from("big_flip_killswitch").upsert({
+      user_id: uid, halted: false, reason: null, updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+    toast.success("Big-flip auto-trade re-enabled");
+    refreshKs();
+  };
+
   const r = q.data;
   if (!r || !r.ok) return null;
   const fresh = r.flipAt && r.ageSeconds != null && r.ageSeconds < 120;
+
+  if (ks?.halted) {
+    return (
+      <div className="mt-1 rounded border border-red-500/60 bg-red-500/15 px-2 py-1.5 text-[11px] font-mono flex items-center gap-2">
+        <AlertTriangle className="h-3 w-3 text-red-300" />
+        <span className="font-semibold text-red-300">AUTO-TRADE HALTED</span>
+        <span className="text-muted-foreground">·</span>
+        <span className="text-muted-foreground truncate">{ks.reason ?? "killswitch on"}</span>
+        <button
+          onClick={reEnable}
+          className="ml-auto rounded border border-red-400/60 px-2 py-0.5 text-[10px] uppercase text-red-200 hover:bg-red-500/20"
+        >
+          Re-enable
+        </button>
+      </div>
+    );
+  }
 
   if (!r.passed || !fresh) {
     return (
       <div className="mt-1 rounded border border-border/50 bg-muted/10 px-2 py-1 text-[10px] font-mono text-muted-foreground flex items-center gap-2">
         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
-        <span>Big-flip monitor · LIVE $10 · 24/7 cron · Δ≥25¢ · {r.rejectReason ? `last rejected: ${r.rejectReason}` : "no signal"}</span>
+        <span>Big-flip monitor · LIVE $10 · 24/7 cron · Δ≥25¢ · halt after 4 losing 15m windows of last 10 · {r.rejectReason ? `last rejected: ${r.rejectReason}` : "no signal"}</span>
       </div>
     );
   }
