@@ -2234,9 +2234,22 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
             <tbody>
               {liveOrders.map((o: AutoTradeOrderRow) => {
                 const statusColor = o.status === "settled_win" ? "text-emerald-400" : o.status === "settled_loss" ? "text-red-400" : o.status === "placed" ? "text-amber-400" : "text-muted-foreground";
+                const snap = (o as unknown as { inputs_snapshot?: Record<string, unknown> | null }).inputs_snapshot ?? null;
+                const originRaw = (snap && typeof snap === "object" && typeof (snap as { origin?: unknown }).origin === "string")
+                  ? (snap as { origin: string }).origin
+                  : null;
+                const isMg = (o as unknown as { is_martingale?: boolean }).is_martingale === true;
+                const source = originRaw === "model_bet" ? { label: "model-bet", cls: "border-sky-500/40 bg-sky-500/10 text-sky-300" }
+                  : originRaw === "auto_odds" || originRaw === "odds_bet" ? { label: "auto-odds", cls: "border-violet-500/40 bg-violet-500/10 text-violet-300" }
+                  : isMg ? { label: "martingale", cls: "border-amber-500/40 bg-amber-500/10 text-amber-300" }
+                  : originRaw ? { label: originRaw, cls: "border-border bg-muted/20 text-muted-foreground" }
+                  : { label: "auto", cls: "border-border bg-muted/20 text-muted-foreground" };
                 return (
                   <tr key={o.id} className="border-b border-border/40 hover:bg-muted/20">
                     <td className="px-3 py-1.5 font-mono text-muted-foreground">{fmtTime(o.created_at)}</td>
+                    <td className="px-3 py-1.5">
+                      <span className={`inline-block text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded border ${source.cls}`}>{source.label}</span>
+                    </td>
                     <td className="px-3 py-1.5 font-mono">{o.ticker}</td>
                     <td className={"px-3 py-1.5 font-semibold " + (o.side === "YES" ? "text-emerald-400" : "text-red-400")}>{dirLabel(o.side)}</td>
                     <td className="px-3 py-1.5 text-right font-mono">${Number(o.stake_usd).toFixed(2)}</td>
@@ -2255,6 +2268,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
                   </tr>
                 );
               })}
+
             </tbody>
           </table>
         </div>
