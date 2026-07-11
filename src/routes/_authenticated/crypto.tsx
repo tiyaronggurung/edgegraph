@@ -797,14 +797,17 @@ function ModelAccuracyPanel() {
 }
 
 // ============================================================
-// Model Bet: $25 flat auto-bet that fires ONCE per new model
-// prediction, on the exact Value-pick side (r.side). No gates,
-// no reverse, no confidence filter, no martingale.
+// Model Bet: flat auto-bet ($10 default, user-editable) that fires
+// ONCE per new model prediction, on the exact Value-pick side (r.side).
+// No gates, no reverse, no confidence filter, no martingale.
 // Mutually exclusive with Auto-Odds and Auto-Martingale — turning
 // this ON forces the other two OFF via a shared mutex event.
 // ============================================================
-const MODEL_BET_STAKE = 25;
+const MODEL_BET_DEFAULT_STAKE = 10;
+const MODEL_BET_MIN_STAKE = 1;
+const MODEL_BET_MAX_STAKE = 500;
 const MODEL_BET_LS_ENABLED = "crypto.modelBet";
+const MODEL_BET_LS_STAKE = "crypto.modelBet.stake";
 const MODEL_BET_LS_TICKERS = "crypto.modelBet.tickers";
 const AUTO_BET_MUTEX_EVENT = "crypto.autoBet.mutex";
 
@@ -817,8 +820,20 @@ function ModelBetPanel() {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(MODEL_BET_LS_ENABLED) === "on";
   });
+  const [stake, setStake] = useState<number>(() => {
+    if (typeof window === "undefined") return MODEL_BET_DEFAULT_STAKE;
+    const raw = window.localStorage.getItem(MODEL_BET_LS_STAKE);
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n >= MODEL_BET_MIN_STAKE && n <= MODEL_BET_MAX_STAKE ? n : MODEL_BET_DEFAULT_STAKE;
+  });
+  const [stakeInput, setStakeInput] = useState<string>(String(stake));
   const [firing, setFiring] = useState(false);
   const [lastFired, setLastFired] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(MODEL_BET_LS_STAKE, String(stake));
+  }, [stake]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -832,7 +847,7 @@ function ModelBetPanel() {
       window.dispatchEvent(new CustomEvent(AUTO_BET_MUTEX_EVENT, { detail: "modelBet" }));
     }
     setEnabled(true);
-    toast.success(`Model Bet ON · $${MODEL_BET_STAKE} per prediction (Value pick side)`);
+    toast.success(`Model Bet ON · $${stake} per prediction (Value pick side)`);
   };
   const toggleOff = () => {
     setEnabled(false);
@@ -891,7 +906,7 @@ function ModelBetPanel() {
         const res = await runFn({ data: {
           mode: "live",
           confirm: "I_UNDERSTAND_LIVE",
-          stakeUsd: MODEL_BET_STAKE,
+          stakeUsd: stake,
           maxOrders: 1,
           force: true,
           forceTicker: pick.ticker,
@@ -899,7 +914,7 @@ function ModelBetPanel() {
         } });
         if (res.placed > 0 && res.orders?.[0]) {
           const o = res.orders[0];
-          toast.success(`Model Bet $${MODEL_BET_STAKE}: ${pick.side === "YES" ? "UP" : "DOWN"} ${pick.ticker} @ ${o.limit_cents}¢`);
+          toast.success(`Model Bet $${stake}: ${pick.side === "YES" ? "UP" : "DOWN"} ${pick.ticker} @ ${o.limit_cents}¢`);
           setLastFired(`${pick.ticker} ${pick.side} @ ${o.limit_cents}¢`);
         } else {
           const realReasons = (res.skipReasons ?? []).filter((r: string) => !/^(equity:|force:)/i.test(r));
@@ -927,8 +942,30 @@ function ModelBetPanel() {
             className={`text-xs font-semibold px-3 py-1.5 rounded border flex items-center gap-1.5 ${enabled ? "border-sky-500/50 bg-sky-500/15 text-sky-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
           >
             <span className={`h-1.5 w-1.5 rounded-full ${enabled ? "bg-sky-400 animate-pulse" : "bg-muted-foreground"}`} />
-            {enabled ? `Model Bet ON · $${MODEL_BET_STAKE}` : `Model Bet OFF · $${MODEL_BET_STAKE}`}
+            {enabled ? `Model Bet ON · $${stake}` : `Model Bet OFF · $${stake}`}
           </button>
+          <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span className="uppercase tracking-wider">Stake $</span>
+            <input
+              type="number"
+              min={MODEL_BET_MIN_STAKE}
+              max={MODEL_BET_MAX_STAKE}
+              step={1}
+              value={stakeInput}
+              onChange={(e) => setStakeInput(e.target.value)}
+              onBlur={() => {
+                const n = Number(stakeInput);
+                if (Number.isFinite(n) && n >= MODEL_BET_MIN_STAKE && n <= MODEL_BET_MAX_STAKE) {
+                  setStake(n);
+                  setStakeInput(String(n));
+                } else {
+                  setStakeInput(String(stake));
+                }
+              }}
+              disabled={enabled}
+              className="w-16 bg-background border border-border rounded px-1.5 py-0.5 font-mono text-xs disabled:opacity-50"
+            />
+          </label>
           <span className="text-[11px] text-muted-foreground">
             Auto-fires on every new model prediction · Value pick side · one bet per ticker
           </span>
