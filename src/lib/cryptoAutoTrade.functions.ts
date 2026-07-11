@@ -495,9 +495,11 @@ export async function runAutoTradeCore(
     for (const m of candidates) {
       const yp = m.yesPrice;
 
-      // Model-bet mode: Kalshi-lean override is OFF. Always follow the
-      // model's value-pick side (m.side). No disagreement branch, no probe.
-      if (autoButtonType === "model_bet") {
+      // Model-bet mode OR any caller-forced side (Model Bet UI passes
+      // forceSide): Kalshi-lean override is OFF. Always follow the model's
+      // value-pick side (m.side, already set to forceSide upstream). No
+      // disagreement branch, no probe. Kalshi lean applies to Odds-Bet only.
+      if (autoButtonType === "model_bet" || data.forceSide) {
         plan.push({ m, side: m.side, stakeUsd: data.stakeUsd, kind: "primary" });
         continue;
       }
