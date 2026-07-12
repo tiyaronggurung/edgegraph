@@ -1033,6 +1033,27 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
     void (async () => {
       try {
         const { snapshotPrediction, settleDuePredictions } = await import("./cryptoPredictions.server");
+        const { buildJumpFeatures } = await import("./cryptoJumpBuilder.server");
+        const snapshotTs = new Date();
+        // Build jump features once per market (all share same snapshot ts).
+        const jumpByTicker = new Map<string, unknown>();
+        await Promise.all(
+          markets
+            .filter(m => m.closeTime && m.secondsToClose > 0)
+            .map(async m => {
+              try {
+                const jf = await buildJumpFeatures({
+                  snapshotTs,
+                  strike: m.strike,
+                  side: m.side,
+                  sigmaMinPct: m.sigmaMinEffective ?? 0,
+                });
+                jumpByTicker.set(m.ticker, jf);
+              } catch {
+                // ignore; jumpFeatures stays undefined
+              }
+            }),
+        );
         await Promise.all(
           markets
             .filter(m => m.closeTime && m.secondsToClose > 0)
@@ -1055,8 +1076,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               chartStrength: m.chartStrength,
               physicsProb: m.physicsProb,
               independentProb: m.independentProb,
+              jumpFeatures: jumpByTicker.get(m.ticker),
             })),
-
         );
         await settleDuePredictions();
       } catch (e) {
