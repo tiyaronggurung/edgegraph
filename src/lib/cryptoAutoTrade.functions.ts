@@ -500,7 +500,13 @@ export async function runAutoTradeCore(
       // value-pick side (m.side, already set to forceSide upstream). No
       // disagreement branch, no probe. Kalshi lean applies to Odds-Bet only.
       if (autoButtonType === "model_bet" || data.forceSide) {
-        plan.push({ m, side: m.side, stakeUsd: data.stakeUsd, kind: "primary" });
+        // Always follow the LIVE model direction (raw P(YES) + chart/anchor),
+        // not the first-snapshot m.side which can be stale/inverted. When a
+        // caller passes forceSide (Model Bet UI), honor it verbatim.
+        const modelSide: "YES" | "NO" = data.forceSide
+          ? m.side
+          : (m.liveSide ?? (m.modelYesProb >= 0.5 ? "YES" : "NO"));
+        plan.push({ m, side: modelSide, stakeUsd: data.stakeUsd, kind: "primary" });
         continue;
       }
 
