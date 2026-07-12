@@ -949,6 +949,11 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           sigmaDistance: sigDist,
           sigmaMinEffective: sigmaEff,
           theoryYesProb: pBase,
+          // Physics = pure diffusion (line ~856); independent = physics + options
+          // + micro but before calibration and the near-expiry market blend.
+          physicsProb: pDiffusion,
+          independentProb: adj.p,
+
           requiredEdgePts,
           gateAction,
           gateReason,
