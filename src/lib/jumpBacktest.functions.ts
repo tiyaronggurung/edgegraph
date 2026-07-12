@@ -366,6 +366,9 @@ export const runJumpPolicyBacktest = createServerFn({ method: "POST" })
         won: !!r.was_correct,
         jumpRatio: jf.extra?.jumpRatio15s ?? jf.extra?.jumpRatio30s ?? null,
         contested: !!jf.extra?.contested,
+        sourceQuality: jf.source_quality === "primary" ? "primary"
+          : jf.source_quality === "odds_tape_fallback" ? "odds_tape_fallback"
+          : "unknown",
       });
     }
 
