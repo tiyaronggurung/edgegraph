@@ -1527,6 +1527,54 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_isotonic_fit: {
+        Row: {
+          brier_test: number | null
+          brier_train: number | null
+          code_version: string | null
+          data_cutoff: string | null
+          fitted_at: string
+          id: string
+          logloss_test: number | null
+          logloss_train: number | null
+          n_test: number
+          n_train: number
+          pins: Json
+          scope: string
+          time_bucket: string | null
+        }
+        Insert: {
+          brier_test?: number | null
+          brier_train?: number | null
+          code_version?: string | null
+          data_cutoff?: string | null
+          fitted_at?: string
+          id?: string
+          logloss_test?: number | null
+          logloss_train?: number | null
+          n_test: number
+          n_train: number
+          pins: Json
+          scope: string
+          time_bucket?: string | null
+        }
+        Update: {
+          brier_test?: number | null
+          brier_train?: number | null
+          code_version?: string | null
+          data_cutoff?: string | null
+          fitted_at?: string
+          id?: string
+          logloss_test?: number | null
+          logloss_train?: number | null
+          n_test?: number
+          n_train?: number
+          pins?: Json
+          scope?: string
+          time_bucket?: string | null
+        }
+        Relationships: []
+      }
       btc_model_predictions: {
         Row: {
           anchor_z: number | null
@@ -1539,10 +1587,13 @@ export type Database = {
           flip_count: number
           flipped_at: string | null
           id: string
+          independent_prob: number | null
+          jump_features: Json | null
           live_side: string | null
           market_yes_price: number
           model_prob: number
           outcome: string | null
+          physics_prob: number | null
           settle_price: number | null
           settled_at: string | null
           side: string
@@ -1567,10 +1618,13 @@ export type Database = {
           flip_count?: number
           flipped_at?: string | null
           id?: string
+          independent_prob?: number | null
+          jump_features?: Json | null
           live_side?: string | null
           market_yes_price: number
           model_prob: number
           outcome?: string | null
+          physics_prob?: number | null
           settle_price?: number | null
           settled_at?: string | null
           side: string
@@ -1595,10 +1649,13 @@ export type Database = {
           flip_count?: number
           flipped_at?: string | null
           id?: string
+          independent_prob?: number | null
+          jump_features?: Json | null
           live_side?: string | null
           market_yes_price?: number
           model_prob?: number
           outcome?: string | null
+          physics_prob?: number | null
           settle_price?: number | null
           settled_at?: string | null
           side?: string
