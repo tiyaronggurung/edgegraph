@@ -205,7 +205,7 @@ export async function persistFits(fits: IsotonicFit[], dataCutoff?: string): Pro
   const rows = fits.map(f => ({
     scope: f.scope,
     time_bucket: f.timeBucket,
-    pins: f.pins,
+    pins: f.pins as unknown as import("@/integrations/supabase/types").Json,
     n_train: f.nTrain,
     n_test: f.nTest,
     brier_train: f.brierTrain,
@@ -218,6 +218,7 @@ export async function persistFits(fits: IsotonicFit[], dataCutoff?: string): Pro
   if (error) throw new Error(error.message);
   return rows.length;
 }
+
 
 /** Load the most recent global + bucket fits. Latest per (scope, time_bucket). */
 export async function loadLatestFits(): Promise<IsotonicFit[]> {
