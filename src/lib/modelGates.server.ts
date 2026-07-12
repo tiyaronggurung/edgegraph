@@ -38,14 +38,30 @@ export interface GateResult {
   note: string;
 }
 
-const CONF_MIN = 0.88;
-const CONF_MIN_AFTER_2L = 0.90;
-const EDGE_MIN = 0.08;
-const MAX_ENTRY_PRICE = 0.98;      // never chase — no headroom left
+// Time-aware confidence ladder — the closer to close, the noisier signals get.
+// Base = >60s, mid = 30–60s, near-expiry = ≤30s. After 2 consecutive losses,
+// CONF_MIN_AFTER_2L acts as an override floor via Math.max on top of the ladder.
+const CONF_MIN_BASE = 0.80;             // secondsToClose > 60
+const CONF_MIN_MID = 0.85;              // 30 < secondsToClose ≤ 60
+const CONF_MIN_NEAR = 0.90;             // secondsToClose ≤ 30
+const CONF_LADDER_MID_SECS = 60;
+const CONF_LADDER_NEAR_SECS = 30;
+const CONF_MIN_AFTER_2L = 0.90;         // override floor after 2L
+const EDGE_MIN = 0.08;                  // signed edge on selected side
+const MAX_ENTRY_PRICE = 0.98;           // never chase — no headroom left
 const MAX_ENTRY_AFTER_2L = 0.70;
 const PAUSE_AFTER_3L_MS = 30 * 60_000;
-const ROUND_LEVEL_TICKS = 15;      // ±$15 of a $500 mark
+const ROUND_LEVEL_TICKS = 15;           // ±$15 of a $500 mark
 const ROUND_LEVEL_MIN_PROB = 0.78;
+
+/** Base confidence floor by seconds-to-close. See ladder constants above. */
+function confMinForSeconds(secs: number): number {
+  if (!Number.isFinite(secs)) return CONF_MIN_BASE;
+  if (secs <= CONF_LADDER_NEAR_SECS) return CONF_MIN_NEAR;
+  if (secs <= CONF_LADDER_MID_SECS) return CONF_MIN_MID;
+  return CONF_MIN_BASE;
+}
+
 
 
 // Sigma-zone gate.
