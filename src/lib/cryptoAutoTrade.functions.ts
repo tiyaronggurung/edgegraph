@@ -480,6 +480,12 @@ export async function runAutoTradeCore(
       if (bt === "model_bet") autoButtonType = "model_bet";
     } catch { /* fall back to defaults */ }
 
+    // Model Bet entries are capped at 75¢ regardless of user setting.
+    if (autoButtonType === "model_bet" && isLive) {
+      liveMaxEntryCents = Math.min(liveMaxEntryCents, 75);
+    }
+
+
 
 
     // ── Expand each candidate into 1 primary + optional model-side probe ──
