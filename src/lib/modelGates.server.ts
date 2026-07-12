@@ -38,13 +38,15 @@ export interface GateResult {
   note: string;
 }
 
-const CONF_MIN = 0.72;
-const CONF_MIN_AFTER_2L = 0.75;
+const CONF_MIN = 0.88;
+const CONF_MIN_AFTER_2L = 0.90;
 const EDGE_MIN = 0.08;
+const MAX_ENTRY_PRICE = 0.98;      // never chase — no headroom left
 const MAX_ENTRY_AFTER_2L = 0.70;
 const PAUSE_AFTER_3L_MS = 30 * 60_000;
 const ROUND_LEVEL_TICKS = 15;      // ±$15 of a $500 mark
 const ROUND_LEVEL_MIN_PROB = 0.78;
+
 
 // Sigma-zone gate.
 const NEAR_EXPIRY_SECS = 45;
