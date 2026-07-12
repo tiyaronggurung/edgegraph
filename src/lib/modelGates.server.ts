@@ -203,7 +203,10 @@ export async function runModelGates(
       note: "streak-3L-pause",
     };
   }
-  const confMin = streak.consecLosses >= 2 ? CONF_MIN_AFTER_2L : CONF_MIN;
+  // Time-aware confidence floor; 2L override raises it further.
+  const ladderMin = confMinForSeconds(m.secondsToClose);
+  const confMin = streak.consecLosses >= 2 ? Math.max(ladderMin, CONF_MIN_AFTER_2L) : ladderMin;
+
   const askForSide = m.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || 1 - m.yesPrice);
   if (streak.consecLosses >= 2 && askForSide > MAX_ENTRY_AFTER_2L) {
     return {
