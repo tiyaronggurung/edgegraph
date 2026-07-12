@@ -67,16 +67,12 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
               forceTicker: undefined,
               forceSide: undefined,
               maxEntryCents: undefined,
-              maxOrders: undefined,
+              maxOrders: 5,
             });
             results.push({
               userId: u.id,
-              placed: Array.isArray((res as { placed?: unknown[] }).placed)
-                ? (res as { placed: unknown[] }).placed.length
-                : 0,
-              skipped: Array.isArray((res as { skipped?: unknown[] }).skipped)
-                ? (res as { skipped: unknown[] }).skipped.length
-                : 0,
+              placed: res.placed ?? 0,
+              skipped: res.skipped ?? 0,
             });
           } catch (e) {
             const msg = (e as Error)?.message ?? String(e);
