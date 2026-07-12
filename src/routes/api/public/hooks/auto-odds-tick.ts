@@ -927,7 +927,12 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                   order_id: placed.id,
                   entry_side: placed.side,
                   entry_odds: centsToAmerican(entryCents),
-                });
+                  // Conviction-decay shadow: snapshot at entry (read-only).
+                  entry_model_prob: modelSideP,
+                  entry_ask_cents: entryCents,
+                  entered_at: new Date().toISOString(),
+                } as any);
+
               note = `entered ${placed.ticker} ${placed.side} @ ${entryCents}¢ (${pick.reason})`;
 
               await logStudy({ entered: true, hedge_fired: false, note });
