@@ -195,22 +195,100 @@ export async function runModelGates(
     };
   }
 
-  // 2. Confidence + edge
-  if (adjustedSideProb < confMin) {
+  // ── Sigma-zone gate ────────────────────────────────────────────────────────
+  // Signed side-adjusted σ-distance. Fails closed on missing/invalid sigma
+  // because this path is auto-only (paper/manual never reach this gate).
+  const absSigDist = Number(m.sigmaDistance);
+  if (!Number.isFinite(absSigDist) || absSigDist <= 0) {
     return {
       allow: false, ...baseResult,
-      skipReason: `conf: prob ${(adjustedSideProb * 100).toFixed(0)}% < ${(confMin * 100).toFixed(0)}% (raw ${(rawProb * 100).toFixed(0)}%, corr ${corr.toFixed(2)})`,
-      note: "conf-low",
+      skipReason: "sigzone: sigma missing/invalid",
+      note: "sigzone-no-sigma",
     };
   }
-  const edge = adjustedSideProb - askForSide;
+  // sig sign: +1 when spot > strike (YES is "ahead"), −1 when spot < strike.
+  const signedSigDist = absSigDist * Math.sign(m.spot - m.strike);
+  const sideSigDist = m.side === "YES" ? signedSigDist : -signedSigDist;
+  const selectedSideAhead = sideSigDist >= 0;
+
+  // Near-expiry compression: cap effective prob when the model is extremely
+  // confident at-the-money with almost no time left. That "99¢ market, 30s
+  // to close, $97 to strike" pattern loses ~half the time in the log.
+  let effectiveSideProb = adjustedSideProb;
+  let compressed = false;
+  if (
+    m.secondsToClose <= NEAR_EXPIRY_SECS &&
+    adjustedSideProb >= NEAR_EXPIRY_PROB_TRIGGER &&
+    absSigDist < ZONE_A_MAX
+  ) {
+    effectiveSideProb = NEAR_EXPIRY_EFFECTIVE_CAP;
+    compressed = true;
+  }
+
+  // Zone rules only bite when the selected side is BEHIND (sideSigDist < 0),
+  // i.e. price is on the wrong side of the strike relative to the pick.
+  if (!selectedSideAhead) {
+    if (absSigDist >= ZONE_B_MAX) {
+      // Zone C: deep-behind pick. Requires very strong evidence.
+      if (effectiveSideProb < ZONE_C_BEHIND_MIN_PROB) {
+        return {
+          allow: false, ...baseResult,
+          skipReason: `sigzone: C-behind ${absSigDist.toFixed(1)}σ prob ${(effectiveSideProb * 100).toFixed(0)}% < ${ZONE_C_BEHIND_MIN_PROB * 100}%`,
+          note: "sigzone-C-behind-weak",
+        };
+      }
+      const signedEdgeC = effectiveSideProb - askForSide;
+      if (signedEdgeC < ZONE_C_BEHIND_MIN_EDGE) {
+        return {
+          allow: false, ...baseResult,
+          skipReason: `sigzone: C-behind edge ${(signedEdgeC * 100).toFixed(1)}¢ < ${ZONE_C_BEHIND_MIN_EDGE * 100}¢`,
+          note: "sigzone-C-behind-no-edge",
+        };
+      }
+    } else if (absSigDist >= ZONE_A_MAX) {
+      // Zone B: boundary. 44.7% observed at 90+ conf on behind picks.
+      if (effectiveSideProb < ZONE_B_BEHIND_MIN_PROB) {
+        return {
+          allow: false, ...baseResult,
+          skipReason: `sigzone: B-behind ${absSigDist.toFixed(2)}σ prob ${(effectiveSideProb * 100).toFixed(0)}% < ${ZONE_B_BEHIND_MIN_PROB * 100}%`,
+          note: "sigzone-B-behind-weak",
+        };
+      }
+      const signedEdgeB = effectiveSideProb - askForSide;
+      if (signedEdgeB < ZONE_B_BEHIND_MIN_EDGE) {
+        return {
+          allow: false, ...baseResult,
+          skipReason: `sigzone: B-behind edge ${(signedEdgeB * 100).toFixed(1)}¢ < ${ZONE_B_BEHIND_MIN_EDGE * 100}¢`,
+          note: "sigzone-B-behind-no-edge",
+        };
+      }
+    }
+    // Zone A behind: fall through to base gates.
+  }
+
+  // Near-expiry compression skip surfaces here: with effective=0.85 vs an
+  // ask that's typically 0.95+, signed edge is negative → skip below.
+  if (compressed) {
+    // Advertise the compression in note; downstream gates use effectiveSideProb.
+  }
+
+  // 2. Confidence + edge (uses effectiveSideProb — compression applies here).
+  if (effectiveSideProb < confMin) {
+    return {
+      allow: false, ...baseResult,
+      skipReason: `conf: prob ${(effectiveSideProb * 100).toFixed(0)}% < ${(confMin * 100).toFixed(0)}% (raw ${(rawProb * 100).toFixed(0)}%, corr ${corr.toFixed(2)}${compressed ? ", nearexp-compressed" : ""})`,
+      note: compressed ? "conf-low-compressed" : "conf-low",
+    };
+  }
+  const edge = effectiveSideProb - askForSide;
   if (edge < EDGE_MIN) {
     return {
       allow: false, ...baseResult,
-      skipReason: `edge: prob-ask ${(edge * 100).toFixed(1)}¢ < ${EDGE_MIN * 100}¢`,
-      note: "edge-low",
+      skipReason: `edge: prob-ask ${(edge * 100).toFixed(1)}¢ < ${EDGE_MIN * 100}¢${compressed ? " (nearexp-compressed)" : ""}`,
+      note: compressed ? "edge-low-compressed" : "edge-low",
     };
   }
+
 
   // 4. Regime
   const regime = await checkRegime(supabase, userId, m.ticker);
