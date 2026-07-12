@@ -1259,6 +1259,9 @@ export async function autoExitForUser(
           .update({ inputs_snapshot: rest })
           .eq("id", r.id);
       }
+    }
+
+
 
     if (!exitReason && sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
       exitReason = "flip";
