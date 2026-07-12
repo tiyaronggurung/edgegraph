@@ -324,6 +324,46 @@ export async function runAutoTradeCore(
     const minSeconds = isLive ? LIVE_MIN_SECONDS_TO_CLOSE : 90;
     const minEdgePts = isLive ? LIVE_MIN_EDGE_PTS : 0;
 
+    // ── Model Bet quality gates (isotonic + confidence/edge + streak + regime) ──
+    // Additive skip-only filter, applied ONLY on live model_bet path and only
+    // when force is off. Never sizes, never buys. Result is a per-ticker+side
+    // map consulted inside the existing filter chain below.
+    const modelGateResults = new Map<string, { allow: boolean; skipReason?: string; note: string }>();
+    let modelGateActive = false;
+    if (isLive && !data.force) {
+      try {
+        const { data: btRow } = await (supabase as any)
+          .from("auto_odds_settings")
+          .select("auto_button_type")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if ((btRow as { auto_button_type?: string } | null)?.auto_button_type === "model_bet") {
+          modelGateActive = true;
+          const { runModelGates } = await import("./modelGates.server");
+          await Promise.all(
+            result.markets.map(async mm => {
+              try {
+                const g = await runModelGates(supabase, userId, {
+                  ticker: mm.ticker, side: mm.side, modelYesProb: mm.modelYesProb,
+                  yesAsk: mm.yesAsk, noAsk: mm.noAsk, yesPrice: mm.yesPrice,
+                  strike: mm.strike, spot: mm.spot,
+                  secondsToClose: mm.secondsToClose, sigmaDistance: mm.sigmaDistance,
+                });
+                modelGateResults.set(`${mm.ticker}|${mm.side}`, {
+                  allow: g.allow, skipReason: g.skipReason, note: g.note,
+                });
+              } catch (e: any) {
+                // Fail-open: gate error must not block trading; existing gates still run.
+                modelGateResults.set(`${mm.ticker}|${mm.side}`, {
+                  allow: true, note: `gate-err: ${e?.message?.slice(0, 40) ?? "err"}`,
+                });
+              }
+            }),
+          );
+        }
+      } catch { /* no settings row → gate off, existing behavior */ }
+    }
+
     let candidates;
     if (data.force) {
       // Force mode: bypass entry gates (edge/sigma/momentum/time/dedupe/equity-block).
