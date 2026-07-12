@@ -7,14 +7,34 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthLayout,
 });
 
+const AUTH_GRACE_KEY = "eg.auth.lastSeenAt";
+const AUTH_GRACE_MS = 24 * 60 * 60 * 1000; // 24h — never auto-logout inside this window
+
 function AuthLayout() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
+
+  // Stamp the "last seen authenticated" time whenever we have a live user.
   useEffect(() => {
-    if (!loading && !user) {
-      const here = window.location.pathname + window.location.search;
-      nav({ to: "/login", search: { redirect: here } });
+    if (user && typeof window !== "undefined") {
+      try { localStorage.setItem(AUTH_GRACE_KEY, String(Date.now())); } catch { /* ignore */ }
     }
+  }, [user]);
+
+  useEffect(() => {
+    if (loading || user) return;
+    // No live session — but if we saw one within the last 24h, do NOT redirect.
+    // Supabase auto-refresh will re-hydrate the session in the background.
+    let withinGrace = false;
+    try {
+      const raw = localStorage.getItem(AUTH_GRACE_KEY);
+      const t = raw ? Number(raw) : 0;
+      withinGrace = Number.isFinite(t) && t > 0 && Date.now() - t < AUTH_GRACE_MS;
+    } catch { /* ignore */ }
+    if (withinGrace) return;
+
+    const here = window.location.pathname + window.location.search;
+    nav({ to: "/login", search: { redirect: here } });
   }, [user, loading, nav]);
 
   if (loading) {
@@ -24,7 +44,18 @@ function AuthLayout() {
       </div>
     );
   }
-  if (!user) return null;
+  if (!user) {
+    // Inside 24h grace: keep rendering the shell so the user isn't kicked out.
+    // Individual server calls that 401 will surface their own errors, but the
+    // UI stays put until Supabase silently refreshes the token.
+    let withinGrace = false;
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem(AUTH_GRACE_KEY) : null;
+      const t = raw ? Number(raw) : 0;
+      withinGrace = Number.isFinite(t) && t > 0 && Date.now() - t < AUTH_GRACE_MS;
+    } catch { /* ignore */ }
+    if (!withinGrace) return null;
+  }
 
   return (
     <div className="min-h-screen overflow-x-hidden">
