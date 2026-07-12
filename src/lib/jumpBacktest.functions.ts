@@ -67,6 +67,12 @@ export interface JumpBacktestResponse {
   snapshotResults: PolicyResult[];  // snapshot-level (secondary/correlated view)
   pocket88: PolicyResult[];         // high-confidence pocket, window-level
   walkForward: WalkForwardSlice[];  // [train, test]
+  sourceSplit: {                    // primary vs fallback vs combined, window-level, "all" segment
+    primary: PolicyResult[];
+    fallback: PolicyResult[];
+    combined: PolicyResult[];
+    counts: { primary: number; fallback: number; unknown: number };
+  };
   perDay: Array<{ day: string; policy: Policy; n_trades: number; pnl_usd: number; win_rate: number; brier: number }>;
   foldSplitKey: string;
 }
@@ -100,7 +106,7 @@ function sigmaInflationMult(jumpRatio: number | null): number {
   return 2.0;
 }
 
-interface JF { available?: boolean; extra?: { jumpRatio15s?: number | null; jumpRatio30s?: number | null; contested?: boolean; sideMovementBps?: number | null; } }
+interface JF { available?: boolean; source_quality?: "primary" | "odds_tape_fallback" | "none"; extra?: { jumpRatio15s?: number | null; jumpRatio30s?: number | null; contested?: boolean; sideMovementBps?: number | null; } }
 
 interface SimRow {
   id: string;
@@ -117,6 +123,7 @@ interface SimRow {
   won: boolean;
   jumpRatio: number | null;
   contested: boolean;
+  sourceQuality: "primary" | "odds_tape_fallback" | "unknown";
 }
 
 function applyPolicy(policy: Policy, r: SimRow): { accept: boolean; prob: number } {
@@ -365,6 +372,9 @@ export const runJumpPolicyBacktest = createServerFn({ method: "POST" })
         won: !!r.was_correct,
         jumpRatio: jf.extra?.jumpRatio15s ?? jf.extra?.jumpRatio30s ?? null,
         contested: !!jf.extra?.contested,
+        sourceQuality: jf.source_quality === "primary" ? "primary"
+          : jf.source_quality === "odds_tape_fallback" ? "odds_tape_fallback"
+          : "unknown",
       });
     }
 
@@ -457,6 +467,28 @@ export const runJumpPolicyBacktest = createServerFn({ method: "POST" })
       }
     }
 
+    // Source-split (window-level, "all" segment): primary vs odds-tape fallback vs combined.
+    const primaryRows = simRows.filter(r => r.sourceQuality === "primary");
+    const fallbackRows = simRows.filter(r => r.sourceQuality === "odds_tape_fallback");
+    const unknownRows = simRows.filter(r => r.sourceQuality === "unknown");
+    const buildSourceTable = (label: string, rowsIn: SimRow[]): PolicyResult[] => {
+      if (!rowsIn.length) return [];
+      const baseUnits = windowUnits("A_baseline", rowsIn);
+      const base = summarize("A_baseline", label, baseUnits, undefined, true);
+      const out: PolicyResult[] = [base];
+      for (const p of POLICIES) {
+        if (p === "A_baseline") continue;
+        out.push(summarize(p, label, windowUnits(p, rowsIn), { pnl_usd: base.pnl_usd, brier: base.brier }, true));
+      }
+      return out;
+    };
+    const sourceSplit = {
+      primary: buildSourceTable("primary", primaryRows),
+      fallback: buildSourceTable("fallback", fallbackRows),
+      combined: buildSourceTable("combined", simRows),
+      counts: { primary: primaryRows.length, fallback: fallbackRows.length, unknown: unknownRows.length },
+    };
+
     const windowCount = new Set(simRows.map(r => r.windowKey)).size;
     return {
       totalRows: all.length,
@@ -469,6 +501,7 @@ export const runJumpPolicyBacktest = createServerFn({ method: "POST" })
       snapshotResults,
       pocket88,
       walkForward,
+      sourceSplit,
       perDay,
       foldSplitKey: "ticker|strike|close_time",
     } satisfies JumpBacktestResponse;
