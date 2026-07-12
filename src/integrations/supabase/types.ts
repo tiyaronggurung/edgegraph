@@ -137,6 +137,75 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_odds_conviction_exit_shadow: {
+        Row: {
+          created_at: string
+          current_bid_cents: number | null
+          current_prob: number | null
+          entry_ask_cents: number | null
+          entry_prob: number | null
+          hypothetical_exit_pnl: number | null
+          id: string
+          order_id: string
+          prob_drop: number | null
+          seconds_since_entry: number | null
+          seconds_to_close: number | null
+          settled_outcome: string | null
+          settled_pnl: number | null
+          signed_edge_now: number | null
+          tick_at: string
+          ticker: string
+          user_id: string
+          would_exit_010: boolean | null
+          would_exit_015: boolean | null
+          would_exit_020: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          current_bid_cents?: number | null
+          current_prob?: number | null
+          entry_ask_cents?: number | null
+          entry_prob?: number | null
+          hypothetical_exit_pnl?: number | null
+          id?: string
+          order_id: string
+          prob_drop?: number | null
+          seconds_since_entry?: number | null
+          seconds_to_close?: number | null
+          settled_outcome?: string | null
+          settled_pnl?: number | null
+          signed_edge_now?: number | null
+          tick_at?: string
+          ticker: string
+          user_id: string
+          would_exit_010?: boolean | null
+          would_exit_015?: boolean | null
+          would_exit_020?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          current_bid_cents?: number | null
+          current_prob?: number | null
+          entry_ask_cents?: number | null
+          entry_prob?: number | null
+          hypothetical_exit_pnl?: number | null
+          id?: string
+          order_id?: string
+          prob_drop?: number | null
+          seconds_since_entry?: number | null
+          seconds_to_close?: number | null
+          settled_outcome?: string | null
+          settled_pnl?: number | null
+          signed_edge_now?: number | null
+          tick_at?: string
+          ticker?: string
+          user_id?: string
+          would_exit_010?: boolean | null
+          would_exit_015?: boolean | null
+          would_exit_020?: boolean | null
+        }
+        Relationships: []
+      }
       auto_odds_decision_log: {
         Row: {
           actual_entered: boolean
@@ -635,6 +704,9 @@ export type Database = {
         Row: {
           closed_reason: string | null
           created_at: string
+          entered_at: string | null
+          entry_ask_cents: number | null
+          entry_model_prob: number | null
           entry_odds: number | null
           entry_side: string
           id: string
@@ -649,6 +721,9 @@ export type Database = {
         Insert: {
           closed_reason?: string | null
           created_at?: string
+          entered_at?: string | null
+          entry_ask_cents?: number | null
+          entry_model_prob?: number | null
           entry_odds?: number | null
           entry_side: string
           id?: string
@@ -663,6 +738,9 @@ export type Database = {
         Update: {
           closed_reason?: string | null
           created_at?: string
+          entered_at?: string | null
+          entry_ask_cents?: number | null
+          entry_model_prob?: number | null
           entry_odds?: number | null
           entry_side?: string
           id?: string
