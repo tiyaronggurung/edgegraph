@@ -88,6 +88,11 @@ export interface BtcMarket {
   // Pricing study: pure random-walk fair value (diffusion + options blend, BEFORE
   // microstructure/calibration). Compare vs market YES ¢ to see Kalshi mispricing.
   theoryYesProb: number;
+  // Phase 1 · probability decomposition. These stay untouched by market blend
+  // and calibration so we can measure independent model skill vs. market copy.
+  physicsProb: number;      // diffusion + drift only, no options/micro/calib/blend
+  independentProb: number;  // physics + options + micro, no market blend, no calib
+
   // ── PHASE 1 · STEP 5 — Edge gate ─────────────────────────────────────────
   requiredEdgePts: number;   // dynamic threshold edge must clear to BET
   gateAction: "BET" | "PASS";
