@@ -792,6 +792,17 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             } catch { /* history is best-effort */ }
 
             // Shadow-log the decision. Best-effort — never blocks the trade.
+            //
+            // SHADOW VETO TRACKING (read-only; never gates entry):
+            // signed_edge = model_side_prob − entry_ask_prob, computed on the
+            // SELECTED contract side (never absolute-valued). The three
+            // *_would_skip flags mark rows a signed-edge-veto policy WOULD
+            // have blocked, so we can compare vs the unchanged baseline in
+            // the SignedEdgeVetoPanel. No live path reads these columns.
+            const entryAskProb = entryCents2 / 100;
+            const signedEdge = (typeof modelSideP === "number" && Number.isFinite(modelSideP))
+              ? modelSideP - entryAskProb
+              : null;
             try {
               await supabaseAdmin.from("auto_odds_decision_log").insert({
                 user_id: userId,
@@ -805,6 +816,16 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 model_side_prob: modelSideP,
                 market_side_prob: marketSideProb,
                 entry_price_cents: entryCents2,
+                entry_ask_prob: entryAskProb,
+                signed_edge: signedEdge,
+                sigma_distance: (atm2?.sigmaDistance ?? atm.sigmaDistance) ?? null,
+                // odds-band gate ([-750, -370]) already passed by the time we
+                // reach this insert (checked ~line 412 + 2s persistence @627).
+                odds_band_eligible: true,
+                // Shadow veto flags — never read by decision code.
+                signed_edge_veto_003_would_skip: signedEdge != null ? signedEdge < 0.03 : null,
+                signed_edge_veto_005_would_skip: signedEdge != null ? signedEdge < 0.05 : null,
+                signed_edge_veto_008_would_skip: signedEdge != null ? signedEdge < 0.08 : null,
                 edge: edgeVal,
                 expected_value: ev,
                 stake_used: dynStake,
@@ -846,7 +867,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 max_probability_last_10min: hist.maxP,
                 min_probability_last_10min: hist.minP,
                 history_samples_count: hist.samples,
-                note: `edge ${(edgeVal*100).toFixed(1)}% · EV $${ev.toFixed(1)} · σ≈${sigmaProxy.toFixed(2)} · tPen ${timePenalty} · conf ${confidence.toFixed(1)} (${confidenceTier}) · stab ${hist.stability?.toFixed(0) ?? "?"} · flips ${hist.flips ?? "?"}`,
+                note: `edge ${(edgeVal*100).toFixed(1)}% · sEdge ${signedEdge != null ? (signedEdge*100).toFixed(1)+"pts" : "n/a"} · EV $${ev.toFixed(1)} · σ≈${sigmaProxy.toFixed(2)} · tPen ${timePenalty} · conf ${confidence.toFixed(1)} (${confidenceTier}) · stab ${hist.stability?.toFixed(0) ?? "?"} · flips ${hist.flips ?? "?"}`,
               });
             } catch { /* shadow log is best-effort */ }
 
