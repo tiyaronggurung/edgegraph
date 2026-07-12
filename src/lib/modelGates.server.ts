@@ -2,13 +2,17 @@
 // buys. Called from cryptoAutoTrade.functions.ts BEFORE the existing filter
 // chain, only when running LIVE + model_bet. All other paths untouched.
 //
-// Four gates, in order:
+// Gates, in order:
 //   1. Isotonic recalibration → adjusts modelProb by btc_calibration bucket.
-//   2. Confidence + edge → adjustedProb ≥ 0.72 AND edge over market ≥ 0.08.
+//   2. Near-expiry compression → caps effectiveProb when close+ITM+seconds low.
 //   3. Streak → after 2L raises bar; after 3L pauses 30 min.
-//   4. Regime → skip news spikes, dead-chop, and round-level proximity.
+//   4. Sigma-zone → signed side-adjusted σ-distance rules (Zone A/B/C).
+//   5. Confidence + edge → effectiveSideProb ≥ CONF_MIN AND signed edge ≥ EDGE_MIN.
+//   6. Regime → skip news spikes, dead-chop, and round-level proximity.
 //
+// Fail-closed on missing/invalid sigma (this path is auto-only).
 // Returns { allow, skipReason, adjustedProb, note }.
+
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SB = any;
