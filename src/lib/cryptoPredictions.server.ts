@@ -21,7 +21,16 @@ export interface SnapshotInput {
   liveSide?: "YES" | "NO";
   chartVerdict?: "YES" | "NO" | "neutral";
   chartStrength?: number;
+  // Phase 1: probability decomposition. Physics = diffusion+drift only.
+  // Independent = physics + options + micro, but no Kalshi market blend and
+  // no calibration. Both stored for the ablation report; gates ignore them.
+  physicsProb?: number;
+  independentProb?: number;
+  // Phase 1A: jump-detection feature snapshot. Populated when the client
+  // supplies a 1s spot buffer; otherwise null. Read-only; not gated on yet.
+  jumpFeatures?: unknown;
 }
+
 
 export function timeBucketOf(secondsToClose: number): string {
   if (secondsToClose <= 30) return "30s";
