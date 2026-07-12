@@ -299,7 +299,8 @@ function recordSpotTick(median: number, ticks: VenueSpotTick[]): void {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       await supabaseAdmin
         .from("btc_spot_ticks")
-        .upsert(rows, { onConflict: "source,observed_at_sec", ignoreDuplicates: true });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .upsert(rows as any, { onConflict: "source,observed_at_sec", ignoreDuplicates: true });
     } catch {
       // Swallow — this is shadow data collection; must never impact scoring.
     }
