@@ -1234,6 +1234,32 @@ export async function autoExitForUser(
       exitReason = "sl";
       reasons.push(`${r.ticker}[${r.mode}][model_bet]: ×0.30 SL — mark ${markCents}¢ ≤ ${Math.floor(entry * 0.30)}¢ (entry ${entry}¢)`);
     }
+    // Model-Bet time-based force exit: mark ≤ 25¢ sustained for ≥3 min.
+    // Tracks first sub-25¢ tick in inputs_snapshot.sub25SinceMs; clears on recovery.
+    if (!exitReason && isModelBetUser) {
+      const snap = (r.inputs_snapshot ?? {}) as Record<string, unknown>;
+      const since = Number(snap.sub25SinceMs);
+      if (markCents <= 25) {
+        if (Number.isFinite(since)) {
+          const heldMs = Date.now() - since;
+          if (heldMs >= 180_000) {
+            exitReason = "sl";
+            reasons.push(`${r.ticker}[${r.mode}][model_bet]: FORCE — mark ${markCents}¢ ≤ 25¢ for ${Math.floor(heldMs / 1000)}s`);
+          }
+        } else {
+          await supabase
+            .from("auto_trade_orders")
+            .update({ inputs_snapshot: { ...snap, sub25SinceMs: Date.now() } })
+            .eq("id", r.id);
+        }
+      } else if (Number.isFinite(since)) {
+        const { sub25SinceMs: _drop, ...rest } = snap;
+        await supabase
+          .from("auto_trade_orders")
+          .update({ inputs_snapshot: rest })
+          .eq("id", r.id);
+      }
+
     if (!exitReason && sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
       exitReason = "flip";
       reasons.push(`${r.ticker}[${r.mode}]: flip — model now ${(sideProbNow * 100).toFixed(0)}% for ${r.side} (< ${LIVE_FLIP_PROB * 100}%)`);
