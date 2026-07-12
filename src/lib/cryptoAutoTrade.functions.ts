@@ -422,6 +422,13 @@ export async function runAutoTradeCore(
           return { m, effectiveEdge: m.edgeAbs + aligned, equityAdj: aligned };
         })
         .filter(({ m, effectiveEdge, equityAdj }) => {
+          if (modelGateActive) {
+            const g = modelGateResults.get(`${m.ticker}|${m.side}`);
+            if (g && !g.allow) {
+              const r = g.skipReason ?? "model-gate skip";
+              skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
+            }
+          }
           if (vpNoOnly && m.side === "YES") {
             const r = "vp_no_only: value-pick YES filtered (NO-only toggle ON)";
             skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
