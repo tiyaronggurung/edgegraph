@@ -2774,6 +2774,8 @@ function CryptoPage() {
 
           <JumpBacktestPanel />
 
+          <JumpRecommendationCard />
+
 
 
 
