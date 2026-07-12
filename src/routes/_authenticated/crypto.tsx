@@ -2764,6 +2764,10 @@ function CryptoPage() {
 
           <ModelScorecardPanel />
 
+          <DailyPerformancePanel />
+
+
+
           <CalibrationReportPanel />
 
           <ModelStudyPanel />
