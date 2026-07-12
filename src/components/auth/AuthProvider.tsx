@@ -24,7 +24,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       setLoading(false);
     });
-    return () => subscription.unsubscribe();
+
+    // Keep the session alive forever: whenever the tab regains focus or the
+    // network comes back (e.g. laptop wake from sleep), force a refresh so
+    // an expired access token gets rotated immediately instead of failing
+    // the next request and bouncing the user to /login.
+    const refresh = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      supabase.auth.refreshSession().catch(() => undefined);
+    };
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", refresh);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, []);
 
   return (
