@@ -67,6 +67,12 @@ export interface JumpBacktestResponse {
   snapshotResults: PolicyResult[];  // snapshot-level (secondary/correlated view)
   pocket88: PolicyResult[];         // high-confidence pocket, window-level
   walkForward: WalkForwardSlice[];  // [train, test]
+  sourceSplit: {                    // primary vs fallback vs combined, window-level, "all" segment
+    primary: PolicyResult[];
+    fallback: PolicyResult[];
+    combined: PolicyResult[];
+    counts: { primary: number; fallback: number; unknown: number };
+  };
   perDay: Array<{ day: string; policy: Policy; n_trades: number; pnl_usd: number; win_rate: number; brier: number }>;
   foldSplitKey: string;
 }
