@@ -201,44 +201,102 @@ async function fetchBtcCandles(): Promise<BtcCandle[]> {
 
 // BRTI-style consolidated spot: median of Coinbase, Binance, Kraken mids.
 // Closes the basis gap with Kalshi's settlement index.
-async function fetchConsolidatedSpot(fallback: number): Promise<number> {
-  const sources = await Promise.allSettled([
-    fetch("https://api.exchange.coinbase.com/products/BTC-USD/ticker", { headers: { "User-Agent": "edgegraph/1.0" } })
-      .then(r => r.json()).then((j: any) => Number(j.price)),
-    fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT")
-      .then(r => r.json()).then((j: any) => Number(j.price)),
-    fetch("https://api.kraken.com/0/public/Ticker?pair=XBTUSD")
-      .then(r => r.json()).then((j: any) => {
-        const k = Object.values(j.result ?? {})[0] as any;
-        return Number(k?.c?.[0]);
-      }),
+export interface VenueSpotTick {
+  source: "coinbase" | "binance" | "kraken";
+  spot: number;
+  sourceTimestampMs: number | null; // exchange-reported time; null when venue doesn't provide one
+}
+async function fetchConsolidatedSpot(fallback: number): Promise<{ median: number; ticks: VenueSpotTick[] }> {
+  const sources = await Promise.allSettled<VenueSpotTick>([
+    (async () => {
+      const j: any = await fetch(
+        "https://api.exchange.coinbase.com/products/BTC-USD/ticker",
+        { headers: { "User-Agent": "edgegraph/1.0" } },
+      ).then(r => r.json());
+      const t = j?.time ? Date.parse(j.time) : NaN;
+      return { source: "coinbase", spot: Number(j.price), sourceTimestampMs: Number.isFinite(t) ? t : null };
+    })(),
+    (async () => {
+      // /ticker/24hr returns closeTime; /ticker/price does not.
+      const j: any = await fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT").then(r => r.json());
+      const t = Number(j?.closeTime);
+      return { source: "binance", spot: Number(j.lastPrice ?? j.price), sourceTimestampMs: Number.isFinite(t) && t > 0 ? t : null };
+    })(),
+    (async () => {
+      const j: any = await fetch("https://api.kraken.com/0/public/Ticker?pair=XBTUSD").then(r => r.json());
+      const k = Object.values(j.result ?? {})[0] as any;
+      return { source: "kraken", spot: Number(k?.c?.[0]), sourceTimestampMs: null };
+    })(),
   ]);
-  const vals = sources
-    .map(s => s.status === "fulfilled" ? s.value : NaN)
-    .filter(v => Number.isFinite(v) && v > 0)
-    .sort((a, b) => a - b);
-  if (!vals.length) return fallback;
+  const ticks: VenueSpotTick[] = sources
+    .map(s => s.status === "fulfilled" ? s.value : null)
+    .filter((t): t is VenueSpotTick => !!t && Number.isFinite(t.spot) && t.spot > 0);
+  const vals = ticks.map(t => t.spot).sort((a, b) => a - b);
+  if (!vals.length) return { median: fallback, ticks: [] };
   const mid = Math.floor(vals.length / 2);
-  return vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
+  const median = vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
+  return { median, ticks };
 }
 
-// Fire-and-forget: append the current consolidated spot to btc_spot_ticks so
-// the jump-feature builder has a 120s rolling window without adding an HTTP
-// round-trip to the scoring hot path. Retention is handled by pg_cron.
-function recordSpotTick(spot: number): void {
-  if (!(spot > 0) || !Number.isFinite(spot)) return;
-  const nowIso = new Date().toISOString();
-  const nowSec = Math.floor(Date.now() / 1000);
+// Best-effort per-source last-seen exchange timestamp (in ms) to flag
+// out-of-order arrivals. Lives in Worker isolate memory; survives inside
+// one invocation and often across warm reuses — not a durable ordering
+// guarantee, but useful for data-quality reporting.
+const lastVenueTsMs = new Map<string, number>();
+
+// Fire-and-forget: append per-venue ticks + the consolidated median to
+// btc_spot_ticks so the jump-feature builder has a rolling window without
+// adding an HTTP round-trip to the scoring hot path. Retention: pg_cron.
+function recordSpotTick(median: number, ticks: VenueSpotTick[]): void {
+  if (!(median > 0) || !Number.isFinite(median)) return;
+  const receivedMs = Date.now();
+  const receivedIso = new Date(receivedMs).toISOString();
+  const receivedSec = Math.floor(receivedMs / 1000);
+  const rows: Array<Record<string, unknown>> = [];
+
+  for (const t of ticks) {
+    if (!(t.spot > 0)) continue;
+    const srcTsIso = t.sourceTimestampMs ? new Date(t.sourceTimestampMs).toISOString() : null;
+    const latencyMs = t.sourceTimestampMs ? Math.max(0, receivedMs - t.sourceTimestampMs) : null;
+    // Out-of-order iff we have a source ts AND it's older than the last one we saw for this venue.
+    let outOfOrder = false;
+    if (t.sourceTimestampMs) {
+      const prev = lastVenueTsMs.get(t.source);
+      if (prev != null && t.sourceTimestampMs < prev) outOfOrder = true;
+      else lastVenueTsMs.set(t.source, t.sourceTimestampMs);
+    }
+    rows.push({
+      observed_at: srcTsIso ?? receivedIso,
+      observed_at_sec: t.sourceTimestampMs ? Math.floor(t.sourceTimestampMs / 1000) : receivedSec,
+      source_timestamp: srcTsIso,
+      received_at: receivedIso,
+      latency_ms: latencyMs,
+      spot: t.spot,
+      source: t.source,
+      out_of_order: outOfOrder,
+    });
+  }
+
+  // Also persist the consolidated median for backward compatibility with
+  // existing readers that key off source='consolidated'.
+  rows.push({
+    observed_at: receivedIso,
+    observed_at_sec: receivedSec,
+    source_timestamp: null,
+    received_at: receivedIso,
+    latency_ms: null,
+    spot: median,
+    source: "consolidated",
+    out_of_order: false,
+  });
+
   void (async () => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await supabaseAdmin.from("btc_spot_ticks").upsert({
-        observed_at: nowIso,
-        observed_at_sec: nowSec,
-        spot,
-        source: "consolidated",
-      }, { onConflict: "source,observed_at_sec", ignoreDuplicates: true });
-    } catch (e) {
+      await supabaseAdmin
+        .from("btc_spot_ticks")
+        .upsert(rows, { onConflict: "source,observed_at_sec", ignoreDuplicates: true });
+    } catch {
       // Swallow — this is shadow data collection; must never impact scoring.
     }
   })();
