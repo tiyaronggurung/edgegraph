@@ -1848,6 +1848,7 @@ export type Database = {
           latency_ms: number | null
           observed_at: string
           observed_at_sec: number
+          out_of_order: boolean
           received_at: string
           source: string
           source_timestamp: string | null
@@ -1862,6 +1863,7 @@ export type Database = {
           latency_ms?: number | null
           observed_at: string
           observed_at_sec: number
+          out_of_order?: boolean
           received_at?: string
           source: string
           source_timestamp?: string | null
@@ -1876,6 +1878,7 @@ export type Database = {
           latency_ms?: number | null
           observed_at?: string
           observed_at_sec?: number
+          out_of_order?: boolean
           received_at?: string
           source?: string
           source_timestamp?: string | null
