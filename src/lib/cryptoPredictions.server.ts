@@ -97,7 +97,11 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         chart_verdict: input.chartVerdict ?? null,
         chart_strength: input.chartStrength ?? null,
         time_bucket: timeBucketOf(input.secondsToClose),
+        physics_prob: input.physicsProb ?? null,
+        independent_prob: input.independentProb ?? null,
+        jump_features: (input.jumpFeatures ?? null) as never,
       });
+
       return;
     }
     if (existing.outcome) return;
