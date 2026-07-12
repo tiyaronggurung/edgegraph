@@ -56,7 +56,8 @@ export const backfillConvictionExitOutcomes = createServerFn({ method: "POST" })
       .limit(2000);
     if (!rows || rows.length === 0) return { ok: true, backfilled: 0 };
 
-    const orderIds = [...new Set(rows.map((r: any) => r.order_id))];
+    const orderIds = [...new Set((rows as any[]).map(r => String(r.order_id)))];
+
     const { data: orders } = await supabaseAdmin
       .from("auto_trade_orders")
       .select("id, pnl_usd, status")
