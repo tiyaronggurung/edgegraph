@@ -268,8 +268,9 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                   }
                 } catch { /* shadow log is best-effort */ }
 
-
+                // ── STRIKE-CROSS EMERGENCY EXIT ──
                 // Final-90s guard: if BTC spot has crossed the strike against
+
                 // our side, market-sell now. Prevents the "flipped through
                 // strike in the last minute" full-wipe (e.g. NO held while
                 // spot ticks from -$60 below strike to +$3 above at expiry).
