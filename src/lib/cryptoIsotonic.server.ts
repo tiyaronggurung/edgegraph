@@ -237,7 +237,7 @@ export async function loadLatestFits(): Promise<IsotonicFit[]> {
     out.push({
       scope: r.scope as "global" | "bucket",
       timeBucket: (r.time_bucket as string | null) ?? null,
-      pins: (r.pins as IsotonicPin[]) ?? [],
+      pins: (r.pins as unknown as IsotonicPin[]) ?? [],
       nTrain: Number(r.n_train ?? 0),
       nTest: Number(r.n_test ?? 0),
       brierTrain: r.brier_train != null ? Number(r.brier_train) : null,
