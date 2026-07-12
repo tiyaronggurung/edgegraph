@@ -222,6 +222,28 @@ async function fetchConsolidatedSpot(fallback: number): Promise<number> {
   return vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
 }
 
+// Fire-and-forget: append the current consolidated spot to btc_spot_ticks so
+// the jump-feature builder has a 120s rolling window without adding an HTTP
+// round-trip to the scoring hot path. Retention is handled by pg_cron.
+function recordSpotTick(spot: number): void {
+  if (!(spot > 0) || !Number.isFinite(spot)) return;
+  const nowIso = new Date().toISOString();
+  const nowSec = Math.floor(Date.now() / 1000);
+  void (async () => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("btc_spot_ticks").upsert({
+        observed_at: nowIso,
+        observed_at_sec: nowSec,
+        spot,
+        source: "consolidated",
+      }, { onConflict: "source,observed_at_sec", ignoreDuplicates: true });
+    } catch (e) {
+      // Swallow — this is shadow data collection; must never impact scoring.
+    }
+  })();
+}
+
 function normCdf(x: number): number {
   const sign = x < 0 ? -1 : 1;
   const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
@@ -725,6 +747,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
     const candleSpot = recent.length ? recent[recent.length - 1].c : 0;
     // (a) Consolidated multi-venue spot (Coinbase + Binance + Kraken median).
     const spot = await fetchConsolidatedSpot(candleSpot);
+    // Shadow-log the tick for jump-feature extraction. Never blocks.
+    recordSpotTick(spot);
     const { shortSigma, longSigma } = minuteSigmaPair(recent);
     const sigmaRaw = Math.max(shortSigma, longSigma);
     const driftRaw = minuteDrift(recent);
@@ -1009,6 +1033,27 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
     void (async () => {
       try {
         const { snapshotPrediction, settleDuePredictions } = await import("./cryptoPredictions.server");
+        const { buildJumpFeatures } = await import("./cryptoJumpBuilder.server");
+        const snapshotTs = new Date();
+        // Build jump features once per market (all share same snapshot ts).
+        const jumpByTicker = new Map<string, unknown>();
+        await Promise.all(
+          markets
+            .filter(m => m.closeTime && m.secondsToClose > 0)
+            .map(async m => {
+              try {
+                const jf = await buildJumpFeatures({
+                  snapshotTs,
+                  strike: m.strike,
+                  side: m.side,
+                  sigmaMinPct: m.sigmaMinEffective ?? 0,
+                });
+                jumpByTicker.set(m.ticker, jf);
+              } catch {
+                // ignore; jumpFeatures stays undefined
+              }
+            }),
+        );
         await Promise.all(
           markets
             .filter(m => m.closeTime && m.secondsToClose > 0)
@@ -1031,8 +1076,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               chartStrength: m.chartStrength,
               physicsProb: m.physicsProb,
               independentProb: m.independentProb,
+              jumpFeatures: jumpByTicker.get(m.ticker),
             })),
-
         );
         await settleDuePredictions();
       } catch (e) {

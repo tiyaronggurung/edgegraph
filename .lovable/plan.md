@@ -1,204 +1,144 @@
-# BTC 15m Model Accuracy Roadmap
+# Phase 1B — Jump Features & Five-Policy Backtest
 
-Do not change trading gates, recovery sizing, or entry/exit paths during this work. Everything below is either read-only analysis or additive computation that the gates ignore until we explicitly wire it in.
+Read-only shadow-data collection. Zero impact on live gates, stakes, exits, calibration, or market blending.
 
-## Guiding principles
+## 1. Schema — new migration
 
-- Every proposed change is validated on **out-of-sample settled windows** before it touches decision logic.
-- Raw `modelYesProb` and its unblended intermediates are preserved so we can always answer "does the model have independent skill vs. is it copying Kalshi?"
-- No fragmenting 1,001 rows into empty buckets. Monotonic calibration on a single confidence axis, with time-bucket refinements only where N ≥ threshold.
-- Nothing below adjusts gates, staking, martingale, or exits. Phase 1 lands read-only shadows.
+**`btc_spot_ticks`** (rolling ~10–30 min window; logical ring buffer via retention job)
 
-## Probability decomposition (foundational — Phase 1)
+Columns:
+- `id bigserial pk`
+- `observed_at timestamptz not null` — when we recorded it
+- `source_timestamp timestamptz` — exchange-provided ts (nullable if source lacks one)
+- `received_at timestamptz not null default now()`
+- `latency_ms int` — received_at − source_timestamp
+- `spot numeric(14,4) not null`
+- `source text not null` — `binance_spot`, `binance_perp`, `coinbase`, etc.
+- `volume numeric` nullable
+- `aggressor_side text` nullable (`buy`/`sell`, only when the source truly provides it — currently null)
+- `bid numeric` nullable
+- `ask numeric` nullable
 
-Store and expose three probabilities per snapshot in `btc_model_predictions`:
+Indexes:
+- `(observed_at desc)`
+- `(source, observed_at desc)`
+- Unique: `(source, source_timestamp)` when source_timestamp is not null (dedupe); otherwise `(source, date_trunc('second', observed_at))`.
 
-| Column | Definition |
-|---|---|
-| `physics_prob` | Diffusion with σ and drift only — no options, no micro, no market blend, no calibration |
-| `independent_prob` | physics + Deribit options + microstructure adjustment. **No Kalshi market price input.** |
-| `model_prob` (existing) | The calibrated, potentially market-blended final probability the gates already use |
+RLS: enable; grant `SELECT` to `authenticated`; grant `ALL` to `service_role`. No `anon` grant.
 
-Purpose: an ablation report can measure whether the model's signal is genuinely independent or leaking from the market. `theory_yes_prob` (already stored) approximates `physics_prob` but includes the options blend — we split them.
+**Retention:** `pg_cron` job every 5 min → `DELETE FROM btc_spot_ticks WHERE observed_at < now() - interval '20 minutes'`. No delete in the scoring path.
+
+## 2. Tick insertion — piggyback existing scoring path
 
-## Phase 1 — Jump detection + out-of-sample isotonic calibration
+In `src/lib/cryptoBtc.functions.ts`, wherever the current pipeline already fetches BTC spot (existing `spot` value inside the scoring flow), fire-and-forget one insert into `btc_spot_ticks` per fetch. **Zero new external HTTP requests.**
+
+Dedup key: `(source, source_timestamp)` when present, else rounded second. On conflict do nothing.
+
+Concurrency: use `void supabaseAdmin.from(...).insert(...)` — do not `await` inside the hot path.
+
+## 3. Jump feature extractor — new `src/lib/cryptoJumpBuilder.server.ts`
 
-### Phase 1A: Jump detection (shadow only)
+Pure function `buildJumpFeatures({ snapshotTs, strike, sigma, side, ticks })` → structured JSON with an `available` flag and `unavailable_reason`.
 
-**New helper: `src/lib/cryptoJump.ts`**
+Cutoff rule: ONLY use ticks where `observed_at <= snapshotTs`. Include `feature_cutoff_ts = snapshotTs` in the output.
 
-Pure function taking a rolling buffer of 1s spots for the last 30s. Returns:
+Data-quality gates (set `available: false` and record reason when any fail):
+- <20 obs in last 30s
+- latest tick age > 3s
+- max intra-window gap > 5s
+- unordered / invalid source timestamps
+- coverage < 80% of requested interval
 
-```
-JumpFeatures {
-  ret5s, ret10s, ret15s, ret30s        // signed returns
-  move30sAbs                            // |Δspot in 30s| in bps
-  expectedMove30sBps                    // σ_perMin * sqrt(0.5) * 1e4
-  jumpRatio                             // move30sAbs / expectedMove30sBps
-  velocityTowardStrike                  // +bps/s toward strike, − away
-  acceleration                          // ret15s_now − ret15s_prev (signed)
-  max1sMove, max5sMove                  // largest single-tick and 5s window
-  strikeCrossings                       // # times spot crossed strike in 30s
-  volExpanding                          // recentSd(15s) > priorSd(15s) * 1.25
-  signedMoveTowardSide                  // + = move helps selected side
-}
-```
+Emit:
+- `returns`: `{r1s, r3s, r5s, r10s, r15s, r30s}`
+- `abs_move`: `{5s, 15s, 30s}`
+- `expected_move`: `{5s, 15s, 30s}` from snapshot sigma × sqrt(dt)
+- `jump_ratio`: `{5s, 15s, 30s}` = abs_move / expected_move
+- `realized_vol`: `{5s, 15s, 30s}`
+- `vol_expansion_ratio` = rv(last 30s) / rv(prev 30s)
+- `acceleration` = velocity(0–15s) − velocity(15–30s)
+- `max_1s_move_30s`, `max_5s_move_30s`
+- `signed_velocity_toward_strike`
+- `strike_crossings`: `{10s, 30s, 60s}`
+- `secs_since_last_crossing`
+- `pct_time_above_strike_30s`
+- `contested` = crossings_30s ≥ 2
+- `side_movement`: signed positive when moving in favor of selected YES/NO side
+- `quality`: `{obs_count, latest_age_ms, max_gap_ms, coverage_ratio, source_mix, cutoff_ts}`
+- `source_quality`: `"primary"` | `"odds_tape_fallback"`
 
-**Data source:** we already stream `useBinanceBtcTicks` (~1s cadence) on the client. Server side, we need the same tick buffer accessible where model prob is computed. Cheapest path: keep a rolling 30s ring buffer on the client and pass a compact feature vector alongside `spot` when the market is being scored. Backend option is to persist 1s ticks in Supabase; too much data — skip.
+Fallback: if primary <20 obs, read from `btc_odds_tape` (does not mix; tag `source_quality`).
 
-**Where features flow:**
+## 4. Wire into prediction snapshots
 
-- `src/lib/cryptoBtc.functions.ts` scoring loop (line ~850): after `spot` and before `probAboveCond`, receive `jumpFeatures` optionally attached to the request. When absent → all features null; behavior unchanged.
-- Attach `jump_features` JSONB column to `btc_model_predictions` snapshot. (Schema migration below.)
+In `src/lib/cryptoPredictions.server.ts` (or wherever `btc_model_predictions` rows are written today), before insert:
+1. Query last 120s of ticks (`observed_at <= snapshotTs AND observed_at > snapshotTs - 120s ORDER BY observed_at ASC LIMIT 500`)
+2. Call `buildJumpFeatures(...)`
+3. Store result into existing `jump_features jsonb` column (already added in Phase 1A migration)
 
-**No decision impact yet.** Phase 1A only writes features to the prediction row.
+**No probability change. No gate impact. Featues collected only.**
 
-### Phase 1B: Jump response backtest
+## 5. Five-policy backtest — `src/lib/jumpBacktest.functions.ts`
 
-Read-only. New server fn `getJumpResponseBacktest` reads all settled predictions with `jump_features IS NOT NULL` and simulates five policies against actual outcomes:
+Server function `runJumpPolicyBacktest({ from, to, thresholdsA..E })` that reads settled `btc_model_predictions` where `jump_features.available = true` and simulates:
 
-- **A. Skip** — treat as filtered
-- **B. Compress toward 0.5** — `p' = 0.5 + (p − 0.5) * (1 − compressFactor(jumpRatio))`
-- **C. Inflated σ** — recompute diffusion with `σ_eff = σ * (1 + k*jumpRatio)`, re-blend
-- **D. Blend toward market** — `p' = 0.5*p + 0.5*yesAsk`
-- **E. Larger edge floor** — keep p, require edge ≥ 8 + f(jumpRatio) pp
+- **A. Baseline** — unchanged prob
+- **B. Skip active jumps** — skip when `jump_ratio_15s > τ` AND `contested`
+- **C. Probability compression** — `p' = 0.5 + (p − 0.5) × exp(−k·jumpRatio)`
+- **D. Sigma inflation (smooth)** — piecewise linear multiplier:
+  - `<1.0` → 1.00×
+  - `1.0–1.5` → 1.00 → 1.25×
+  - `1.5–2.0` → 1.25 → 1.60×
+  - `>2.0` → clamp to 2.00×
+  - Recompute diffusion prob with inflated σ
+- **E. Larger edge floor** — unchanged prob but require `+extraBps` signed edge when `jump_ratio_15s ≥ τ`
 
-Report per policy: Brier, log loss, hit rate, realized $10-flat P/L, eligible-N. Segment by `jumpRatio` band (`<1.0`, `1.0–1.5`, `1.5–2.0`, `>2.0`) and by `sideSigDist` (ahead / behind).
+For each policy, report per-segment:
+- All snapshots · secs-to-close buckets (≤30, 31–60, 61–120) · sigma-distance zones A/B/C · contested vs uncontested · toward/away from strike · YES/NO · trending/chop/news · confidence bands · entry-price bands
 
-User's preferred starting rule (implementable behind a config flag but disabled until backtest confirms):
+Metrics per cell: N predictions, N eligible trades, win rate, Brier, log loss, calibration error, ECE, signed edge, realized $ P/L at $100 flat, ROC%, max drawdown, worst losing streak, avoided wins, avoided losses, **Δ vs baseline**.
 
-```
-jumpRatio < 1.0                            → no adjustment
-1.0 – 1.5                                  → σ_eff *= 1.15
-1.5 – 2.0                                  → σ_eff *= 1.35, EDGE_MIN += 3pp
-> 2.0                                      → skip unless
-                                              (sideSigDist ≥ +1σ AND
-                                               p − ask ≥ EDGE_MIN + 5pp
-                                               after recalculation)
-```
+### Walk-forward split
+- Group by **complete 15m market window identifier** (`ticker + strike + close_time`), NOT by ticker or by snapshot. Every snapshot from one contract stays in the same fold.
+- Rolling: train on days ≤ D, evaluate on days D+1..D+k, roll forward.
+- Report per-day results plus aggregate. Selection requires improvement on **multiple days**, not one aggregate win.
 
-**Signed movement matters.** A jump *toward* the strike on a YES pick raises risk; a jump *away* toward safety lowers it. Use `signedMoveTowardSide`, never absolute.
+## 6. Isotonic ablation panel additions
 
-### Phase 1C: Out-of-sample isotonic calibration
+Extend existing `ModelAblationPanel` to compare, side-by-side on the same walk-forward folds:
+- Applied Platt (current live)
+- Global isotonic
+- Time-bucket isotonic (with fallback trigger when N<200)
+- Fallback behavior labeled explicitly per cell
 
-**Replace:** `correction_factor = actual/predicted` clamped to [0.5, 2.0] per `(time_bucket × sigma_bucket)` in `btc_calibration`.
+Also add a validation assertion that fold split key = `(ticker, strike, close_time)` window id, not just ticker.
 
-**With:** an isotonic regression fit that consumes side-locked `model_prob` and outputs a monotonically increasing calibrated probability.
+## 7. Files touched
 
-**Training discipline:**
+New:
+- `supabase/migrations/<ts>_btc_spot_ticks.sql` — table, indexes, RLS, grants, pg_cron retention
+- `src/lib/cryptoJumpBuilder.server.ts` — pure feature builder
+- `src/lib/jumpBacktest.functions.ts` — five-policy walk-forward backtest server fn
+- `src/components/crypto/JumpBacktestPanel.tsx` — read-only report UI on `/crypto`
 
-- Split settled rows temporally into folds by **15m market window**. All snapshots of the same ticker stay in the same fold — never train and test on snapshots from the same market.
-- Rolling walk-forward: fit on windows closing before time T, evaluate on windows closing after T.
-- Global isotonic fit on `(model_prob → won)` first. Per-time-bucket fits only for buckets with N ≥ 200. Below that → fall back to global.
-- No confidence-bucket fragmentation. Confidence is the input axis of the single monotonic curve.
-- New table `btc_isotonic_fit` stores the pin points of each fit (small: ≤50 rows) with `time_bucket`, `n_train`, `n_test`, `brier_test`, `logloss_test`, `fitted_at`.
-- Refit runs in the existing nightly cron (`btc-calibrate.ts`).
+Edited:
+- `src/lib/cryptoBtc.functions.ts` — fire-and-forget spot tick insert at existing spot fetch site
+- `src/lib/cryptoPredictions.server.ts` — populate `jump_features` on new snapshots
+- `src/components/crypto/ModelAblationPanel.tsx` — isotonic comparison rows + fold-split assertion
+- `src/routes/_authenticated/crypto.tsx` — mount `JumpBacktestPanel`
+- `src/integrations/supabase/types.ts` — regenerated after migration approval
 
-**Comparison report:** for each nightly refit, produce a small metrics block:
+Untouched (explicitly protected):
+- All gates, `modelGates.server.ts` thresholds
+- Stake sizing, recovery sizing, exit logic
+- Applied `applyCalibration` (Platt) path
+- Public guest flows
+- Auto-trade / auto-odds / manual-close code paths
 
-| Method | Brier (unseen) | Log loss (unseen) | N eligible |
-|---|---|---|---|
-| Raw model | | | |
-| Current bucket correction | | | |
-| Global isotonic | | | |
-| Time-bucketed isotonic | | | |
+## 8. Deliverable
 
-Whichever wins on unseen-window Brier + log loss becomes the applied calibrator. Loser stays computed for regression tracking; nothing is deleted.
+After ~1–3 days of tick collection, `JumpBacktestPanel` renders the five-policy segmented table. I'll then recommend one policy for a **shadow-mode** test (still no live gate change) — you approve that separately before anything touches live decisions.
 
-**Application:** `finalModelProb = isotonic(independent_prob)` on the paths where model prob feeds the gates. The current `applyCalibration` path is preserved and reported side-by-side until we flip the switch.
+---
 
-## Phase 2 — Deribit blend validation (plan only for now)
-
-Do not implement until Phase 1 lands. Design:
-
-- Sweep static weights `[0, 10, 20, 30, 40, 50, 60, 70]%` on the settled log.
-- For each weight, compute Brier / log loss / realized EV on unseen windows.
-- Then test dynamic weights driven by: options_liquidity, options_bid_ask_spread, options_open_interest, strike_proximity_to_ATM, seconds_to_close, disagreement between diffusion and Deribit, whether Deribit interpolated across distant strikes, and Deribit-feed freshness.
-- Deliverable: a report + a single recommended weight function, gated behind a config flag that keeps the current 50/50 blend until reviewed.
-
-## Phase 3 — Cross-exchange features (plan only for now)
-
-Add read-only features derived from Binance + Coinbase feeds:
-
-- `binance_coinbase_mid_diff_bps`
-- `mid_diff_z_score_30s`
-- `which_exchange_led` (based on which side moved first in the last 30s)
-- `divergence_duration_s`
-- `binance_ret_30s`, `coinbase_ret_30s`
-- `stale_feed_flag_binance`, `stale_feed_flag_coinbase`
-- `median_spot` (used only for reporting; not swapped in for spot yet)
-
-Divergence is not automatically treated as directional signal. Only after a historical test shows one exchange consistently leads at 15m horizon do we upgrade any feature to a prob input.
-
-## Phase 4 — Funding rate (deferred)
-
-Do not add until Phase 2 or 3 report shows funding is *independent* of features we already have and adds measurable Brier reduction at 15m. Cheap to add later; expensive to explain away if it just correlates with drift.
-
-## Ablation report (delivered alongside Phase 1)
-
-New read-only panel `ModelAblationPanel` on `/crypto`, feeding from a new server fn. For each variant below, report on unseen settled windows: Brier, log loss, accuracy, calibration by prob band (0–20/20–40/40–60/60–80/80–100), 30s bucket perf, 60s bucket perf, YES vs NO, sigma-distance zones (A/B/C), signed edge vs market, realized $10-flat P/L on actual entry ask, max drawdown, eligible-N.
-
-Variants:
-
-1. Diffusion only
-2. Diffusion + drift
-3. Diffusion + Deribit
-4. Diffusion + microstructure
-5. Diffusion + jump features (Phase 1B live)
-6. Full model without near-expiry market blend
-7. Full model with near-expiry market blend (current)
-8. Full model after new isotonic calibration (Phase 1C)
-
-Variants 1–4 and 6–8 are computable from stored intermediates (`physics_prob`, `independent_prob`, `model_prob`) plus rerunning the specific blend/calibrator on the fly. Variant 5 requires jump features to have been captured — starts empty and fills over time.
-
-## Target-leakage audit
-
-The near-expiry blend (`blendNearExpiry` in `cryptoBtc.functions.ts`) pulls `p` toward `yesPrice` in the final 2 min when the model trails on the locked side. This may be improving Brier via **market copying** rather than independent skill. The ablation directly measures this: variant 6 vs variant 7 tells us how much of our accuracy is the blend, and comparing `independent_prob` calibration to `model_prob` calibration on the same rows quantifies leakage.
-
-If independent_prob calibrates as well as model_prob without the blend, the blend is cosmetic and should be removed. Do not touch the blend during Phase 1 — just measure it.
-
-## Backtest design (applies to all phases)
-
-- **Unit of split:** the market window (`ticker`), not the snapshot. A ticker has many snapshots (~15–30 during its life); training and testing on different snapshots of the same ticker leaks near-perfectly.
-- **Split strategy:** rolling walk-forward by `close_time`. Train on windows with `close_time < T`, evaluate on windows with `close_time ≥ T`, advance T weekly.
-- **Metrics:** Brier score (primary), log loss, hit rate (secondary — deceptive with class imbalance), realized $10-flat P/L on actual entry ask (business-facing), calibration reliability plot.
-- **Sample requirement:** any bucketed metric requires N ≥ 30 in the test fold to be reported; otherwise labelled "N too small".
-- **Reproducibility:** each backtest run stamps `code_version` (git sha) and `data_cutoff` into its report row so we can regression-track over time.
-
-## Estimated file changes
-
-Phase 1A/1C (implementation on approval):
-
-- `src/lib/cryptoJump.ts` — **new** — pure feature computation, no I/O
-- `src/lib/cryptoBtc.functions.ts` — attach optional `jumpFeatures` to market payload, thread into snapshot; expose `physics_prob` and `independent_prob` intermediates
-- `src/lib/cryptoPredictions.server.ts` — add three prob columns + `jump_features` JSONB to insert path
-- `src/lib/cryptoCalibrator.server.ts` — **rewrite** — isotonic fit, global + per-bucket, walk-forward guard
-- `src/routes/api/public/hooks/btc-calibrate.ts` — call new fitter, upsert into `btc_isotonic_fit`, keep old `btc_calibration` populated for comparison
-- `src/lib/modelAblation.functions.ts` — **new** — read-only ablation report server fn
-- `src/components/crypto/ModelAblationPanel.tsx` — **new** — panel on `/crypto`
-- Migration: add `physics_prob`, `independent_prob`, `jump_features` (JSONB) to `btc_model_predictions`; create `btc_isotonic_fit` table with grants + RLS
-
-Phase 1B (jump response backtest, read-only fn):
-
-- `src/lib/jumpBacktest.functions.ts` — **new**
-- Attach a tab or subsection to `ModelAblationPanel` for the five-policy comparison
-
-**No changes to:** `modelGates.server.ts`, staking, martingale, exits, or auto-trade flow. Zero decision impact until a follow-up turn wires an approved policy in.
-
-## Success criteria for Phase 1
-
-Before we consider wiring any Phase 1 output into gates:
-
-1. Ablation report renders and has ≥ 200 unseen-window rows per compared variant.
-2. Isotonic calibrator beats current bucket correction on Brier by ≥ 0.005 AND on log loss, on the unseen fold, for two consecutive nightly refits.
-3. Jump backtest shows one of the five policies has a strictly better Brier + P/L than "no adjustment" on the `jumpRatio ≥ 1.5` slice, with N ≥ 100 in that slice.
-
-Only then do we open a separate change to flip the switch.
-
-## What I'll deliver on approval
-
-Phase 1A + 1C in a single implementation turn, plus the ablation panel scaffold with variants 1–4 and 6–8 wired (variant 5 populates over time as jump features accumulate). Phase 1B backtest fn lands in the same turn as read-only, so we can watch the five policies against the growing settled log without touching gates.
-
-Phases 2 / 3 / 4 stay as spec-only until Phase 1 metrics arrive.
-
-Confirm and I'll start Phase 1.
+**Confirm and I'll ship it in this order:** (1) migration → (2) tick insertion + jump builder + snapshot wiring → (3) backtest fn + panel → (4) isotonic ablation additions.
