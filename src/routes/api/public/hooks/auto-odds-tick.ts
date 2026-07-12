@@ -226,7 +226,49 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 const curCentsSide = o.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice));
                 const curCents = Math.max(1, Math.min(99, Math.round(curCentsSide * 100)));
                 const curAm = centsToAmerican(curCents);
-                // ── STRIKE-CROSS EMERGENCY EXIT ──
+
+                // ── CONVICTION-DECAY SHADOW (READ-ONLY) ──
+                // Records per-tick would-exit flags for the 0.10/0.15/0.20
+                // model-prob-drop thresholds while market is in [0.48,0.55].
+                // Never mutates live exit logic. Backfilled with settled_pnl
+                // later. Best-effort — never blocks.
+                try {
+                  if (t.entry_model_prob != null && typeof m.modelYesProb === "number") {
+                    const entryProbSnap = Number(t.entry_model_prob);
+                    const curProbSide = o.side === "YES" ? m.modelYesProb : 1 - m.modelYesProb;
+                    const probDrop = entryProbSnap - curProbSide;
+                    const inFlipBand = curProbSide >= 0.48 && curProbSide <= 0.55;
+                    // Hypothetical exit-now P/L per $100 stake: curCents - entryCents.
+                    const hypoPnl = curCents - entryCents;
+                    // Signed edge NOW on the held side (bid-based). Use curCents as
+                    // proxy for sell price / current implied.
+                    const signedEdgeNow = curProbSide - curCents / 100;
+                    const secsSinceEntry = t.entered_at
+                      ? Math.round((Date.now() - new Date(t.entered_at).getTime()) / 1000)
+                      : null;
+                    await (supabaseAdmin as any)
+                      .from("auto_odds_conviction_exit_shadow")
+                      .insert({
+                        user_id: userId,
+                        order_id: o.id,
+                        ticker: o.ticker,
+                        seconds_since_entry: secsSinceEntry,
+                        seconds_to_close: m.secondsToClose,
+                        entry_prob: entryProbSnap,
+                        current_prob: curProbSide,
+                        prob_drop: probDrop,
+                        entry_ask_cents: t.entry_ask_cents ?? entryCents,
+                        current_bid_cents: curCents,
+                        signed_edge_now: signedEdgeNow,
+                        would_exit_010: inFlipBand && probDrop >= 0.10,
+                        would_exit_015: inFlipBand && probDrop >= 0.15,
+                        would_exit_020: inFlipBand && probDrop >= 0.20,
+                        hypothetical_exit_pnl: hypoPnl,
+                      });
+                  }
+                } catch { /* shadow log is best-effort */ }
+
+
                 // Final-90s guard: if BTC spot has crossed the strike against
                 // our side, market-sell now. Prevents the "flipped through
                 // strike in the last minute" full-wipe (e.g. NO held while
