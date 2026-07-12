@@ -45,6 +45,8 @@ import { PolymarketChip } from "@/components/crypto/PolymarketChip";
 import { useTripleWindowTracker } from "@/hooks/useTripleWindowTracker";
 import { listTripleWindows, type TripleWindowRow } from "@/lib/polymarketTripleWindow.functions";
 import { ModelScorecardPanel } from "@/components/crypto/ModelScorecardPanel";
+import { DailyPerformancePanel } from "@/components/crypto/DailyPerformancePanel";
+
 
 
 import { toast } from "sonner";
