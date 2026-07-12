@@ -165,7 +165,7 @@ export async function runAutoTradeCore(
       // "Next stake" == the amount we fire here.
       // Skip when caller opts out (Model Bet uses flat $10, not the ladder).
       if (!data.skipLadder) try {
-        const { loadLadderConfig } = await import("./stakingConfig.functions");
+        const { loadLadderConfig } = await import("./stakingConfig.server");
         const { replayLadder } = await import("./profitBankLadder");
         const LIVE_BANK_SEED_USD = 71;
         const LIVE_BANK_CUTOFF_ISO = "2026-07-08T04:47:00Z";

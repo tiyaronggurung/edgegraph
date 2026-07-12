@@ -2,7 +2,7 @@
 // .functions.ts file because module-scope declarations there are stripped by
 // the tss-serverfn-split transform, causing ReferenceError at runtime.
 import { replayLadder, type LadderState, type LadderConfig } from "./profitBankLadder";
-import { loadLadderConfig } from "./stakingConfig.functions";
+import { loadLadderConfig } from "./stakingConfig.server";
 
 export const BANK_SEED_USD = 71;
 export const BANK_CUTOFF_ISO = "2026-07-08T04:47:00Z";
