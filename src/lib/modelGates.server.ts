@@ -197,6 +197,17 @@ export async function runModelGates(
     };
   }
 
+  // Ask-price cap: never chase — at ≥98¢ there's no headroom even if we win.
+  if (askForSide >= MAX_ENTRY_PRICE) {
+    return {
+      allow: false, ...baseResult,
+      skipReason: `price: ask ${(askForSide * 100).toFixed(1)}¢ ≥ ${MAX_ENTRY_PRICE * 100}¢ cap`,
+      note: "price-cap",
+    };
+  }
+
+
+
   // ── Sigma-zone gate ────────────────────────────────────────────────────────
   // Signed side-adjusted σ-distance. Fails closed on missing/invalid sigma
   // because this path is auto-only (paper/manual never reach this gate).
