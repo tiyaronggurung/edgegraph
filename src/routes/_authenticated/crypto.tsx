@@ -2768,6 +2768,9 @@ function CryptoPage() {
 
           <DailyPerformancePanel />
 
+          <ModelAblationPanel />
+
+
 
 
           <CalibrationReportPanel />
