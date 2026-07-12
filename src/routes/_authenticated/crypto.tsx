@@ -44,6 +44,7 @@ import { KalshiMaintenanceBanner } from "@/components/KalshiMaintenanceBanner";
 import { PolymarketChip } from "@/components/crypto/PolymarketChip";
 import { useTripleWindowTracker } from "@/hooks/useTripleWindowTracker";
 import { listTripleWindows, type TripleWindowRow } from "@/lib/polymarketTripleWindow.functions";
+import { ModelScorecardPanel } from "@/components/crypto/ModelScorecardPanel";
 
 
 import { toast } from "sonner";
@@ -2758,6 +2759,8 @@ function CryptoPage() {
           </div>
 
           <PricingStudyPanel markets={data.markets} />
+
+          <ModelScorecardPanel />
 
           <CalibrationReportPanel />
 
