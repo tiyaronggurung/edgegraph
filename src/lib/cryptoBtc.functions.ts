@@ -808,9 +808,9 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
     const recent = candles.slice(-60);
     const candleSpot = recent.length ? recent[recent.length - 1].c : 0;
     // (a) Consolidated multi-venue spot (Coinbase + Binance + Kraken median).
-    const spot = await fetchConsolidatedSpot(candleSpot);
-    // Shadow-log the tick for jump-feature extraction. Never blocks.
-    recordSpotTick(spot);
+    const { median: spot, ticks: venueTicks } = await fetchConsolidatedSpotDetailed(candleSpot);
+    // Shadow-log per-venue + consolidated ticks for jump-feature extraction. Never blocks.
+    recordSpotTick(spot, venueTicks);
     const { shortSigma, longSigma } = minuteSigmaPair(recent);
     const sigmaRaw = Math.max(shortSigma, longSigma);
     const driftRaw = minuteDrift(recent);
