@@ -197,9 +197,11 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             // ── 2. WHIPSAW EXIT: for each tracked open order ──
             const { data: openTracked } = await supabaseAdmin
               .from("auto_odds_tracked_orders")
-              .select("id, order_id, entry_side, entry_odds, whipsaw_armed, oscillation_count, last_zone")
+              .select("id, order_id, entry_side, entry_odds, whipsaw_armed, oscillation_count, last_zone, entry_model_prob, entry_ask_cents, entered_at")
               .eq("user_id", userId)
               .eq("processed_settle", false);
+
+
 
             if (openTracked && openTracked.length > 0) {
               const orderIds = openTracked.map((r: any) => r.order_id);
@@ -224,8 +226,51 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                 const curCentsSide = o.side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice));
                 const curCents = Math.max(1, Math.min(99, Math.round(curCentsSide * 100)));
                 const curAm = centsToAmerican(curCents);
+
+                // ── CONVICTION-DECAY SHADOW (READ-ONLY) ──
+                // Records per-tick would-exit flags for the 0.10/0.15/0.20
+                // model-prob-drop thresholds while market is in [0.48,0.55].
+                // Never mutates live exit logic. Backfilled with settled_pnl
+                // later. Best-effort — never blocks.
+                try {
+                  if (t.entry_model_prob != null && typeof m.modelYesProb === "number") {
+                    const entryProbSnap = Number(t.entry_model_prob);
+                    const curProbSide = o.side === "YES" ? m.modelYesProb : 1 - m.modelYesProb;
+                    const probDrop = entryProbSnap - curProbSide;
+                    const inFlipBand = curProbSide >= 0.48 && curProbSide <= 0.55;
+                    // Hypothetical exit-now P/L per $100 stake: curCents - entryCents.
+                    const hypoPnl = curCents - entryCents;
+                    // Signed edge NOW on the held side (bid-based). Use curCents as
+                    // proxy for sell price / current implied.
+                    const signedEdgeNow = curProbSide - curCents / 100;
+                    const secsSinceEntry = t.entered_at
+                      ? Math.round((Date.now() - new Date(t.entered_at).getTime()) / 1000)
+                      : null;
+                    await (supabaseAdmin as any)
+                      .from("auto_odds_conviction_exit_shadow")
+                      .insert({
+                        user_id: userId,
+                        order_id: o.id,
+                        ticker: o.ticker,
+                        seconds_since_entry: secsSinceEntry,
+                        seconds_to_close: m.secondsToClose,
+                        entry_prob: entryProbSnap,
+                        current_prob: curProbSide,
+                        prob_drop: probDrop,
+                        entry_ask_cents: t.entry_ask_cents ?? entryCents,
+                        current_bid_cents: curCents,
+                        signed_edge_now: signedEdgeNow,
+                        would_exit_010: inFlipBand && probDrop >= 0.10,
+                        would_exit_015: inFlipBand && probDrop >= 0.15,
+                        would_exit_020: inFlipBand && probDrop >= 0.20,
+                        hypothetical_exit_pnl: hypoPnl,
+                      });
+                  }
+                } catch { /* shadow log is best-effort */ }
+
                 // ── STRIKE-CROSS EMERGENCY EXIT ──
                 // Final-90s guard: if BTC spot has crossed the strike against
+
                 // our side, market-sell now. Prevents the "flipped through
                 // strike in the last minute" full-wipe (e.g. NO held while
                 // spot ticks from -$60 below strike to +$3 above at expiry).
@@ -882,7 +927,12 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
                   order_id: placed.id,
                   entry_side: placed.side,
                   entry_odds: centsToAmerican(entryCents),
-                });
+                  // Conviction-decay shadow: snapshot at entry (read-only).
+                  entry_model_prob: modelSideP,
+                  entry_ask_cents: entryCents,
+                  entered_at: new Date().toISOString(),
+                } as any);
+
               note = `entered ${placed.ticker} ${placed.side} @ ${entryCents}¢ (${pick.reason})`;
 
               await logStudy({ entered: true, hedge_fired: false, note });
