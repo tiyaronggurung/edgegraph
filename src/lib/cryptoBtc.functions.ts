@@ -222,6 +222,28 @@ async function fetchConsolidatedSpot(fallback: number): Promise<number> {
   return vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
 }
 
+// Fire-and-forget: append the current consolidated spot to btc_spot_ticks so
+// the jump-feature builder has a 120s rolling window without adding an HTTP
+// round-trip to the scoring hot path. Retention is handled by pg_cron.
+function recordSpotTick(spot: number): void {
+  if (!(spot > 0) || !Number.isFinite(spot)) return;
+  const nowIso = new Date().toISOString();
+  const nowSec = Math.floor(Date.now() / 1000);
+  void (async () => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("btc_spot_ticks").upsert({
+        observed_at: nowIso,
+        observed_at_sec: nowSec,
+        spot,
+        source: "consolidated",
+      }, { onConflict: "source,observed_at_sec", ignoreDuplicates: true });
+    } catch (e) {
+      // Swallow — this is shadow data collection; must never impact scoring.
+    }
+  })();
+}
+
 function normCdf(x: number): number {
   const sign = x < 0 ? -1 : 1;
   const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
