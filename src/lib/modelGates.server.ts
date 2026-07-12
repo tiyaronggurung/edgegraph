@@ -46,6 +46,18 @@ const PAUSE_AFTER_3L_MS = 30 * 60_000;
 const ROUND_LEVEL_TICKS = 15;      // ±$15 of a $500 mark
 const ROUND_LEVEL_MIN_PROB = 0.78;
 
+// Sigma-zone gate.
+const NEAR_EXPIRY_SECS = 45;
+const NEAR_EXPIRY_PROB_TRIGGER = 0.95;
+const NEAR_EXPIRY_EFFECTIVE_CAP = 0.85;
+const ZONE_A_MAX = 1.0;   // absSigDist < 1.0 → at-the-money
+const ZONE_B_MAX = 2.0;   // 1.0 ≤ absSigDist < 2.0 → boundary
+const ZONE_B_BEHIND_MIN_PROB = 0.93;
+const ZONE_B_BEHIND_MIN_EDGE = 0.10;
+const ZONE_C_BEHIND_MIN_PROB = 0.90;
+const ZONE_C_BEHIND_MIN_EDGE = 0.08;
+
+
 function sigmaBucketOf(s: number): string {
   if (!Number.isFinite(s)) return "unknown";
   if (s < 0.5) return "0-0.5σ";
