@@ -1029,7 +1029,10 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               liveSide: m.liveSide,
               chartVerdict: m.chartVerdict,
               chartStrength: m.chartStrength,
+              physicsProb: m.physicsProb,
+              independentProb: m.independentProb,
             })),
+
         );
         await settleDuePredictions();
       } catch (e) {
