@@ -297,7 +297,7 @@ export async function runModelGates(
 
   // Round-level proximity: within $15 of any $500 multiple.
   const nearestRound = Math.round(m.strike / 500) * 500;
-  if (Math.abs(m.strike - nearestRound) <= ROUND_LEVEL_TICKS && adjustedSideProb < ROUND_LEVEL_MIN_PROB) {
+  if (Math.abs(m.strike - nearestRound) <= ROUND_LEVEL_TICKS && effectiveSideProb < ROUND_LEVEL_MIN_PROB) {
     return {
       allow: false, ...baseResult,
       skipReason: `regime: round-level ${nearestRound} (need prob ≥${ROUND_LEVEL_MIN_PROB * 100}%)`,
@@ -305,5 +305,12 @@ export async function runModelGates(
     };
   }
 
-  return { allow: true, ...baseResult, note: `ok corr=${corr.toFixed(2)} streak=${streak.consecLosses}L/${streak.consecWins}W ${regime.note}` };
+  const zoneLabel =
+    absSigDist < ZONE_A_MAX ? "A" : absSigDist < ZONE_B_MAX ? "B" : "C";
+  const aheadLabel = selectedSideAhead ? "ahead" : "behind";
+  return {
+    allow: true, ...baseResult,
+    note: `ok zone=${zoneLabel}-${aheadLabel} σd=${sideSigDist.toFixed(2)} corr=${corr.toFixed(2)} streak=${streak.consecLosses}L/${streak.consecWins}W${compressed ? " nearexp-compressed" : ""} ${regime.note}`,
+  };
+
 }
