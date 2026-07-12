@@ -207,34 +207,13 @@ export async function runBigFlipForUser(
       console.error("[bigFlipDetector] killswitch eval failed:", (e as Error)?.message);
     }
 
-    try {
-      const { submitKalshiBuy } = await import("./cryptoTrades.functions");
-      const limitCents = toSide === "YES"
-        ? (flipSample.yes_cents as number)
-        : (flipSample.no_cents as number);
-      if (limitCents >= 1 && limitCents <= 99) {
-        const contracts = Math.max(1, Math.floor((LIVE_STAKE_USD * 100) / limitCents));
-        await submitKalshiBuy(supabase, userId, {
-          ticker,
-          side: toSide,
-          contracts,
-          limitPriceCents: limitCents,
-          strike,
-          spot,
-          stakeUsd: (contracts * limitCents) / 100,
-          inputsSnapshot: {
-            source: "big_flip_detector",
-            yes_delta: big.delta,
-            prev_yes: prevSample.yes_cents,
-            new_yes: flipSample.yes_cents,
-            seconds_to_close: stc,
-            flip_at: flipAt,
-          },
-        });
-      }
-    } catch (e) {
-      console.error("[bigFlipDetector] live order failed:", (e as Error)?.message);
-    }
+    // Big-flip live auto-buy is DISABLED (user request 2026-07-12: strategy was
+    // net-losing — asymmetric payoffs, ~53% hit rate but avg loss 2x avg win).
+    // Signals are still detected + recorded in big_flip_signals for shadow
+    // analysis; no live Kalshi orders are placed. Re-enable only after review.
+    void submitKalshiBuy_disabled;
+    void toSide; void flipSample; void prevSample; void spot; void strike;
+    void stc; void flipAt; void ticker; void big; void userId; void supabase;
   }
 
   return {
