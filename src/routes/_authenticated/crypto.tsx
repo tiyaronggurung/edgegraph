@@ -2771,6 +2771,8 @@ function CryptoPage() {
 
           <ModelAblationPanel />
 
+          <JumpBacktestPanel />
+
 
 
 
