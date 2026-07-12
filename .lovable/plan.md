@@ -1,43 +1,76 @@
-# Unify Kalshi Auto-Trade logs
 
-## Goal
-Collapse the four separate trade tables on `/crypto` into one unified table under the **Live Kalshi Auto-Trade** section, with a new **Source** column that tags every row.
+# Model tightening — steps 1–4 (streak, edge, regime, isotonic)
 
-## Rows to combine
+Goal: raise Model-Bet hit rate toward 80% by **filtering out** low-quality signals. All 4 changes are gates that skip trades; nothing changes sizing, buy execution, ladder math, manual close, or public/guest flows.
 
-| Current section | Data feed | Source tag |
-|---|---|---|
-| Open positions · live exit signals (line ~483) | `auto_trade_orders` where status = open | `open` |
-| Model accuracy fires (Model Bet panel, ~695) | `auto_trade_orders` where `inputs_snapshot.origin='model_bet'` | `model-bet` |
-| Odds-shadow / Auto-odds trade log (~1883/2218) | `auto_trade_orders` where `is_martingale=false` and origin auto-odds | `auto-odds` |
-| Trade log at bottom (~2685) | `getMyBets` / `bets.functions` | `manual` / other |
+## Single new file (isolate risk)
 
-All four already read from the same `auto_trade_orders` table (except the bottom log, which reads bets). The merge is mostly a UI collapse, not a data refactor.
+`src/lib/modelGates.server.ts` — one exported function `runModelGates({ supabase, userId, market })` returns `{ allow: boolean, skipReason?: string, adjustedProb: number }`.
 
-## What stays untouched (regression guard)
-- **Open-position action buttons** (Close, confirm modal) — keep on the unified row when `status === "open"`.
-- **Model Bet ON/OFF toggle + $10 stake banner** — keep as-is above the table.
-- **Auto-odds ON/OFF + Kalshi auth diagnostics + settings panel** — keep, only the row table below them is removed.
-- **Data-fetching hooks** (`getMyBets`, `runAutoTrade`, odds hooks) — untouched.
-- No changes to any server functions, DB queries, or public routes.
+Everything below lives inside that helper. If we ever want to roll it all back, deleting one call site restores current behavior.
 
-## Unified table columns
-Time · Source · Ticker · Side · Strike · Spot@Entry · Model% · Edge · Entry¢ · Now¢ · Contracts · Stake · Status · P&L · Actions
+## Where it's called
 
-- Source cell is a chip: `open` (blue), `model-bet` (sky), `auto-odds` (violet), `manual` (gray).
-- Now¢ + exit-signal reason + Close button only render when `status === "open"`.
-- Filter chips above the table: All · Open · Model Bet · Auto-Odds · Manual (default All).
+`src/lib/cryptoAutoTrade.functions.ts`, inside the existing `.filter(...)` chain at **line 384**, added as the **first** check per candidate. If `allow=false` → push skipReason, `logSkip`, return false. Existing gates below it (sigma, momentum, EV, coinflip, etc.) are untouched.
 
-## Structural changes
-1. Extract row-normalizer `toUnifiedRow(order|bet) → UnifiedTradeRow` (new util at top of `crypto.tsx`).
-2. New component `<UnifiedTradeLog />` that merges the three `auto_trade_orders` queries via `useQueries` + the manual `bets` query, dedupes by id, sorts by created_at desc.
-3. Replace the four table JSX blocks with one `<UnifiedTradeLog />` mount inside the existing Live Kalshi Auto-Trade card.
-4. Section headings, action banners, and toggles above each table stay in place.
+Also updates `m.modelYesProb` for downstream EV math to use the isotonic-adjusted probability (mutate a local copy, not the original object — so no side effects into the fresh recheck at line 448).
 
-## Out of scope
-- No schema changes.
-- No changes to settlement, exit ladders, or auto-trade logic.
-- No changes to guest/public routes.
+## Gate details
 
-## Confirm before I build
-This touches ~500 lines of working UI. I'll only proceed once you say go — reply "build it" and I'll implement exactly the plan above.
+### 1. Isotonic recalibration (applied first, feeds gates 2–4)
+- Read `btc_calibration` for the current time+sigma bucket.
+- `adjustedProb = clamp(rawProb * correction_factor, 0.05, 0.95)`.
+- If no calibration row for this bucket → no adjustment (correction_factor = 1).
+
+### 2. Confidence + edge gate
+- Compute `marketProb = ask_price` for the side we're betting.
+- Require `adjustedProb ≥ 0.72` AND `adjustedProb − marketProb ≥ 0.08`.
+- Fail → skip `"conf_edge: prob 0.68 / mkt 0.64 (need ≥0.72 & Δ≥0.08)"`.
+
+### 3. Streak-aware tightening
+- Query last 5 settled `auto_trade_orders` for this user, mode=live, ordered by settled_at desc.
+- **2 consecutive losses** → raise bar: require `adjustedProb ≥ 0.75` AND entry price ≤ 70¢.
+- **3 consecutive losses** → skip entirely for 30 min (checked via most-recent settled_at).
+- **3+ consecutive wins** → no change (anti-tilt: don't press).
+- Fail → skip `"streak: 2L → need ≥0.75 (have 0.73)"`.
+
+### 4. Regime filter
+Uses `btc_odds_tape` (already recorded per user) for last 30 min:
+- Compute 1-min returns from tape prices.
+- **News spike**: latest 1-min |return| > 3× stdev of prior 5 min → skip `"regime: spike"`.
+- **Chop**: realized vol last 5 min < 20th percentile of last 24h (query aggregated) → skip `"regime: chop"`.
+- **Round-level proximity**: strike within 15 ticks of nearest $500 multiple AND `adjustedProb < 0.78` → skip `"regime: round-level"`.
+
+If insufficient tape data (<20 rows in window) → gate returns allow=true with note `"regime: warmup"`. Never blocks on missing data.
+
+## What is NOT touched
+
+- Buy execution / order submit (lines 500+)
+- Ladder sizing (`stakingConfig.server.ts`, `profitBankLadder.ts`)
+- Manual close, IOC ladder, sentiment, chart verdict
+- Auto-odds path (`odds_bet` button type) — gate only applies when `autoButtonType === "model_bet"`, checked inside the helper
+- Paper mode (`isLive === false`) — gate only runs on live
+- Force mode (`data.force === true`) — skipped, as with all other gates
+- Public/guest routes
+- `martingale_recovery_state` schema and Recovery Bet path
+
+## Rollback
+
+One-line comment-out of the gate call in `cryptoAutoTrade.functions.ts` reverts everything.
+
+## Test plan
+
+1. Build passes.
+2. Curl the cron endpoint `POST /api/public/hooks/auto-model-bet-tick` and confirm response is 200 with skipped>0 (expected — gates filter aggressively).
+3. Skip log rows show new reasons prefixed with `conf_edge:`, `streak:`, `regime:`.
+4. Live PnL flow unchanged (no schema changes).
+
+## Shipping order (one commit each)
+
+1. `modelGates.server.ts` — helper file, unused.
+2. Wire into filter chain — behind `autoButtonType === "model_bet"` and `isLive`.
+3. Verify a live tick, check skip log.
+
+Ship 1–4 now. Step 5 (multi-timeframe agreement) deferred — needs new 5m model.
+
+**Confirm and I'll start with commit 1.**
