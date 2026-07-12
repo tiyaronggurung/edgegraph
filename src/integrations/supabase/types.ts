@@ -1839,6 +1839,51 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_spot_ticks: {
+        Row: {
+          aggressor_side: string | null
+          ask: number | null
+          bid: number | null
+          id: number
+          latency_ms: number | null
+          observed_at: string
+          observed_at_sec: number
+          received_at: string
+          source: string
+          source_timestamp: string | null
+          spot: number
+          volume: number | null
+        }
+        Insert: {
+          aggressor_side?: string | null
+          ask?: number | null
+          bid?: number | null
+          id?: number
+          latency_ms?: number | null
+          observed_at: string
+          observed_at_sec: number
+          received_at?: string
+          source: string
+          source_timestamp?: string | null
+          spot: number
+          volume?: number | null
+        }
+        Update: {
+          aggressor_side?: string | null
+          ask?: number | null
+          bid?: number | null
+          id?: number
+          latency_ms?: number | null
+          observed_at?: string
+          observed_at_sec?: number
+          received_at?: string
+          source?: string
+          source_timestamp?: string | null
+          spot?: number
+          volume?: number | null
+        }
+        Relationships: []
+      }
       crypto_gate_shadow_sim: {
         Row: {
           created_at: string
