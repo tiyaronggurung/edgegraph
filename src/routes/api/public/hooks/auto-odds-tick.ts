@@ -197,9 +197,11 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
             // ── 2. WHIPSAW EXIT: for each tracked open order ──
             const { data: openTracked } = await supabaseAdmin
               .from("auto_odds_tracked_orders")
-              .select("id, order_id, entry_side, entry_odds, whipsaw_armed, oscillation_count, last_zone")
+              .select("id, order_id, entry_side, entry_odds, whipsaw_armed, oscillation_count, last_zone, entry_model_prob, entry_ask_cents, entered_at")
               .eq("user_id", userId)
               .eq("processed_settle", false);
+
+
 
             if (openTracked && openTracked.length > 0) {
               const orderIds = openTracked.map((r: any) => r.order_id);
