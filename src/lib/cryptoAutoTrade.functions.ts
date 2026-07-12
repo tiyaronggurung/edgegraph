@@ -1218,10 +1218,21 @@ export async function autoExitForUser(
         reasons.push(`${r.ticker}[${r.mode}]: POLY FLIP — Polymarket ${r.side === "YES" ? "Up" : "Down"} ${(nowOurSide * 100).toFixed(0)}% (entry ${(entryOurSide * 100).toFixed(0)}%, −${((entryOurSide - nowOurSide) * 100).toFixed(0)}pts)`);
       }
     }
+    // Model-Bet simple exits: +20¢ absolute profit target and ×0.30 stop.
+    // Fires earlier than the generic ladder for model_bet users only.
+    if (!exitReason && isModelBetUser && (markCents - entry) >= 20) {
+      exitReason = "tp";
+      reasons.push(`${r.ticker}[${r.mode}][model_bet]: +20¢ TP — mark ${markCents}¢ vs entry ${entry}¢`);
+    }
+    if (!exitReason && isModelBetUser && entry > 0 && markCents <= Math.floor(entry * 0.30)) {
+      exitReason = "sl";
+      reasons.push(`${r.ticker}[${r.mode}][model_bet]: ×0.30 SL — mark ${markCents}¢ ≤ ${Math.floor(entry * 0.30)}¢ (entry ${entry}¢)`);
+    }
     if (!exitReason && sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
       exitReason = "flip";
       reasons.push(`${r.ticker}[${r.mode}]: flip — model now ${(sideProbNow * 100).toFixed(0)}% for ${r.side} (< ${LIVE_FLIP_PROB * 100}%)`);
     }
+
     else if (!exitReason && netLock) exitReason = "net";
     else if (!exitReason && markPnl >= tpThreshold) exitReason = "tp";
     else if (!exitReason && markPnl <= slThreshold) exitReason = "sl";
