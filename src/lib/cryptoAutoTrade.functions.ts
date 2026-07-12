@@ -912,6 +912,16 @@ export async function autoExitForUser(
   const reasons: string[] = [];
   const liveEnabled = process.env.KALSHI_LIVE_ENABLED === "true";
 
+  // Model-Bet-only simple exit rules: +20¢ absolute TP and ×0.30 entry SL.
+  // These fire earlier than the standard ladder for users on model_bet.
+  const { data: btSettings } = await supabase
+    .from("auto_odds_settings")
+    .select("auto_button_type")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const isModelBetUser = (btSettings?.auto_button_type ?? "") === "model_bet";
+
+
   const nowIso = new Date().toISOString();
   const { data: open } = await supabase
     .from("auto_trade_orders")
