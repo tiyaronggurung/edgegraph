@@ -2781,6 +2781,9 @@ function CryptoPage() {
 
           <SignedEdgeVetoPanel />
 
+          <ConvictionExitPanel />
+
+
 
 
 
