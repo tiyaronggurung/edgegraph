@@ -48,6 +48,7 @@ import { ModelScorecardPanel } from "@/components/crypto/ModelScorecardPanel";
 import { DailyPerformancePanel } from "@/components/crypto/DailyPerformancePanel";
 import { ModelAblationPanel } from "@/components/crypto/ModelAblationPanel";
 import { JumpBacktestPanel } from "@/components/crypto/JumpBacktestPanel";
+import { JumpRecommendationCard } from "@/components/crypto/JumpRecommendationCard";
 
 
 
