@@ -502,12 +502,6 @@ export const runJumpPolicyBacktest = createServerFn({ method: "POST" })
       pocket88,
       walkForward,
       sourceSplit,
-      toIso,
-      analysisMode: "window",
-      results,
-      snapshotResults,
-      pocket88,
-      walkForward,
       perDay,
       foldSplitKey: "ticker|strike|close_time",
     } satisfies JumpBacktestResponse;
