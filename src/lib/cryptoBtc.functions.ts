@@ -206,7 +206,7 @@ export interface VenueSpotTick {
   spot: number;
   sourceTimestampMs: number | null; // exchange-reported time; null when venue doesn't provide one
 }
-async function fetchConsolidatedSpot(fallback: number): Promise<{ median: number; ticks: VenueSpotTick[] }> {
+async function fetchConsolidatedSpotDetailed(fallback: number): Promise<{ median: number; ticks: VenueSpotTick[] }> {
   const sources = await Promise.allSettled<VenueSpotTick>([
     (async () => {
       const j: any = await fetch(
@@ -217,7 +217,6 @@ async function fetchConsolidatedSpot(fallback: number): Promise<{ median: number
       return { source: "coinbase", spot: Number(j.price), sourceTimestampMs: Number.isFinite(t) ? t : null };
     })(),
     (async () => {
-      // /ticker/24hr returns closeTime; /ticker/price does not.
       const j: any = await fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT").then(r => r.json());
       const t = Number(j?.closeTime);
       return { source: "binance", spot: Number(j.lastPrice ?? j.price), sourceTimestampMs: Number.isFinite(t) && t > 0 ? t : null };
@@ -236,6 +235,11 @@ async function fetchConsolidatedSpot(fallback: number): Promise<{ median: number
   const mid = Math.floor(vals.length / 2);
   const median = vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
   return { median, ticks };
+}
+
+// Backward-compat wrapper: existing call sites just want the number.
+async function fetchConsolidatedSpot(fallback: number): Promise<number> {
+  return (await fetchConsolidatedSpotDetailed(fallback)).median;
 }
 
 // Best-effort per-source last-seen exchange timestamp (in ms) to flag
