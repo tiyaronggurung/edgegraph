@@ -467,12 +467,41 @@ export const runJumpPolicyBacktest = createServerFn({ method: "POST" })
       }
     }
 
+    // Source-split (window-level, "all" segment): primary vs odds-tape fallback vs combined.
+    const primaryRows = simRows.filter(r => r.sourceQuality === "primary");
+    const fallbackRows = simRows.filter(r => r.sourceQuality === "odds_tape_fallback");
+    const unknownRows = simRows.filter(r => r.sourceQuality === "unknown");
+    const buildSourceTable = (label: string, rowsIn: SimRow[]): PolicyResult[] => {
+      if (!rowsIn.length) return [];
+      const baseUnits = windowUnits("A_baseline", rowsIn);
+      const base = summarize("A_baseline", label, baseUnits, undefined, true);
+      const out: PolicyResult[] = [base];
+      for (const p of POLICIES) {
+        if (p === "A_baseline") continue;
+        out.push(summarize(p, label, windowUnits(p, rowsIn), { pnl_usd: base.pnl_usd, brier: base.brier }, true));
+      }
+      return out;
+    };
+    const sourceSplit = {
+      primary: buildSourceTable("primary", primaryRows),
+      fallback: buildSourceTable("fallback", fallbackRows),
+      combined: buildSourceTable("combined", simRows),
+      counts: { primary: primaryRows.length, fallback: fallbackRows.length, unknown: unknownRows.length },
+    };
+
     const windowCount = new Set(simRows.map(r => r.windowKey)).size;
     return {
       totalRows: all.length,
       eligibleRows: simRows.length,
       windows: windowCount,
       fromIso,
+      toIso,
+      analysisMode: "window",
+      results,
+      snapshotResults,
+      pocket88,
+      walkForward,
+      sourceSplit,
       toIso,
       analysisMode: "window",
       results,
