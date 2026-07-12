@@ -49,6 +49,7 @@ import { Route as ApiPublicHooksBackfillTripleWindowRouteImport } from './routes
 import { Route as ApiPublicHooksBackfillOutcomesRouteImport } from './routes/api/public/hooks/backfill-outcomes'
 import { Route as ApiPublicHooksAutoTradeRouteImport } from './routes/api/public/hooks/auto-trade'
 import { Route as ApiPublicHooksAutoOddsTickRouteImport } from './routes/api/public/hooks/auto-odds-tick'
+import { Route as ApiPublicHooksAutoModelBetTickRouteImport } from './routes/api/public/hooks/auto-model-bet-tick'
 
 const UnsubscribeRoute = UnsubscribeRouteImport.update({
   id: '/unsubscribe',
@@ -267,6 +268,12 @@ const ApiPublicHooksAutoOddsTickRoute =
     path: '/api/public/hooks/auto-odds-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksAutoModelBetTickRoute =
+  ApiPublicHooksAutoModelBetTickRouteImport.update({
+    id: '/api/public/hooks/auto-model-bet-tick',
+    path: '/api/public/hooks/auto-model-bet-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -292,6 +299,7 @@ export interface FileRoutesByFullPath {
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/hooks/auto-model-bet-tick': typeof ApiPublicHooksAutoModelBetTickRoute
   '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
@@ -333,6 +341,7 @@ export interface FileRoutesByTo {
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/hooks/auto-model-bet-tick': typeof ApiPublicHooksAutoModelBetTickRoute
   '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
@@ -376,6 +385,7 @@ export interface FileRoutesById {
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/hooks/auto-model-bet-tick': typeof ApiPublicHooksAutoModelBetTickRoute
   '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
   '/api/public/hooks/backfill-outcomes': typeof ApiPublicHooksBackfillOutcomesRoute
@@ -419,6 +429,7 @@ export interface FileRouteTypes {
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/hooks/auto-model-bet-tick'
     | '/api/public/hooks/auto-odds-tick'
     | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
@@ -460,6 +471,7 @@ export interface FileRouteTypes {
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/hooks/auto-model-bet-tick'
     | '/api/public/hooks/auto-odds-tick'
     | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
@@ -502,6 +514,7 @@ export interface FileRouteTypes {
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/hooks/auto-model-bet-tick'
     | '/api/public/hooks/auto-odds-tick'
     | '/api/public/hooks/auto-trade'
     | '/api/public/hooks/backfill-outcomes'
@@ -531,6 +544,7 @@ export interface RootRouteChildren {
   ApiHealthKalshiRoute: typeof ApiHealthKalshiRoute
   ApiPublicSendDailyDigestsRoute: typeof ApiPublicSendDailyDigestsRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
+  ApiPublicHooksAutoModelBetTickRoute: typeof ApiPublicHooksAutoModelBetTickRoute
   ApiPublicHooksAutoOddsTickRoute: typeof ApiPublicHooksAutoOddsTickRoute
   ApiPublicHooksAutoTradeRoute: typeof ApiPublicHooksAutoTradeRoute
   ApiPublicHooksBackfillOutcomesRoute: typeof ApiPublicHooksBackfillOutcomesRoute
@@ -831,6 +845,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksAutoOddsTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/auto-model-bet-tick': {
+      id: '/api/public/hooks/auto-model-bet-tick'
+      path: '/api/public/hooks/auto-model-bet-tick'
+      fullPath: '/api/public/hooks/auto-model-bet-tick'
+      preLoaderRoute: typeof ApiPublicHooksAutoModelBetTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -883,6 +904,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthKalshiRoute: ApiHealthKalshiRoute,
   ApiPublicSendDailyDigestsRoute: ApiPublicSendDailyDigestsRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
+  ApiPublicHooksAutoModelBetTickRoute: ApiPublicHooksAutoModelBetTickRoute,
   ApiPublicHooksAutoOddsTickRoute: ApiPublicHooksAutoOddsTickRoute,
   ApiPublicHooksAutoTradeRoute: ApiPublicHooksAutoTradeRoute,
   ApiPublicHooksBackfillOutcomesRoute: ApiPublicHooksBackfillOutcomesRoute,
