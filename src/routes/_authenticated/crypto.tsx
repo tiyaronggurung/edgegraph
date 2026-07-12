@@ -50,6 +50,8 @@ import { ModelAblationPanel } from "@/components/crypto/ModelAblationPanel";
 import { JumpBacktestPanel } from "@/components/crypto/JumpBacktestPanel";
 import { JumpRecommendationCard } from "@/components/crypto/JumpRecommendationCard";
 import { SignedEdgeVetoPanel } from "@/components/crypto/SignedEdgeVetoPanel";
+import { ConvictionExitPanel } from "@/components/crypto/ConvictionExitPanel";
+
 
 
 
