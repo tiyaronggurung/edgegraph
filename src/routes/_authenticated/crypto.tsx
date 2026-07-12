@@ -49,6 +49,7 @@ import { DailyPerformancePanel } from "@/components/crypto/DailyPerformancePanel
 import { ModelAblationPanel } from "@/components/crypto/ModelAblationPanel";
 import { JumpBacktestPanel } from "@/components/crypto/JumpBacktestPanel";
 import { JumpRecommendationCard } from "@/components/crypto/JumpRecommendationCard";
+import { SignedEdgeVetoPanel } from "@/components/crypto/SignedEdgeVetoPanel";
 
 
 
@@ -2775,6 +2776,8 @@ function CryptoPage() {
           <JumpBacktestPanel />
 
           <JumpRecommendationCard />
+
+          <SignedEdgeVetoPanel />
 
 
 
