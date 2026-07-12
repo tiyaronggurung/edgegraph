@@ -91,10 +91,14 @@ export const backfillDecisionLogOutcomes = createServerFn({ method: "POST" })
       const won = outcome === r.picked_side;
       const theo = r.entry_price_cents ? pnl100(r.entry_price_cents, won) : null;
       const realized = r.order_id ? (pnlByOrder.get(r.order_id) ?? null) : null;
-      const patch: Record<string, unknown> = { final_outcome: outcome };
+      const patch: {
+        final_outcome: string;
+        theoretical_pnl_100?: number;
+        realized_pnl_usd?: number;
+      } = { final_outcome: outcome };
       if (theo !== null) patch.theoretical_pnl_100 = theo;
       if (realized !== null) patch.realized_pnl_usd = realized;
-      const { error } = await supabaseAdmin
+      const { error } = await (supabaseAdmin as any)
         .from("auto_odds_decision_log")
         .update(patch)
         .eq("id", r.id);
