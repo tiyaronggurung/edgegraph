@@ -88,6 +88,11 @@ export interface BtcMarket {
   // Pricing study: pure random-walk fair value (diffusion + options blend, BEFORE
   // microstructure/calibration). Compare vs market YES ¢ to see Kalshi mispricing.
   theoryYesProb: number;
+  // Phase 1 · probability decomposition. These stay untouched by market blend
+  // and calibration so we can measure independent model skill vs. market copy.
+  physicsProb: number;      // diffusion + drift only, no options/micro/calib/blend
+  independentProb: number;  // physics + options + micro, no market blend, no calib
+
   // ── PHASE 1 · STEP 5 — Edge gate ─────────────────────────────────────────
   requiredEdgePts: number;   // dynamic threshold edge must clear to BET
   gateAction: "BET" | "PASS";
@@ -944,6 +949,11 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           sigmaDistance: sigDist,
           sigmaMinEffective: sigmaEff,
           theoryYesProb: pBase,
+          // Physics = pure diffusion (line ~856); independent = physics + options
+          // + micro but before calibration and the near-expiry market blend.
+          physicsProb: pDiffusion,
+          independentProb: adj.p,
+
           requiredEdgePts,
           gateAction,
           gateReason,
@@ -1019,7 +1029,10 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               liveSide: m.liveSide,
               chartVerdict: m.chartVerdict,
               chartStrength: m.chartStrength,
+              physicsProb: m.physicsProb,
+              independentProb: m.independentProb,
             })),
+
         );
         await settleDuePredictions();
       } catch (e) {

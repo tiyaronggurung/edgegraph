@@ -21,7 +21,16 @@ export interface SnapshotInput {
   liveSide?: "YES" | "NO";
   chartVerdict?: "YES" | "NO" | "neutral";
   chartStrength?: number;
+  // Phase 1: probability decomposition. Physics = diffusion+drift only.
+  // Independent = physics + options + micro, but no Kalshi market blend and
+  // no calibration. Both stored for the ablation report; gates ignore them.
+  physicsProb?: number;
+  independentProb?: number;
+  // Phase 1A: jump-detection feature snapshot. Populated when the client
+  // supplies a 1s spot buffer; otherwise null. Read-only; not gated on yet.
+  jumpFeatures?: unknown;
 }
+
 
 export function timeBucketOf(secondsToClose: number): string {
   if (secondsToClose <= 30) return "30s";
@@ -88,7 +97,11 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         chart_verdict: input.chartVerdict ?? null,
         chart_strength: input.chartStrength ?? null,
         time_bucket: timeBucketOf(input.secondsToClose),
+        physics_prob: input.physicsProb ?? null,
+        independent_prob: input.independentProb ?? null,
+        jump_features: (input.jumpFeatures ?? null) as never,
       });
+
       return;
     }
     if (existing.outcome) return;
@@ -113,6 +126,10 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         chart_verdict: input.chartVerdict ?? null,
         chart_strength: input.chartStrength ?? null,
         time_bucket: timeBucketOf(input.secondsToClose),
+        physics_prob: input.physicsProb ?? null,
+        independent_prob: input.independentProb ?? null,
+        jump_features: (input.jumpFeatures ?? null) as never,
+
         ...(flipped ? {
           flip_count: Number(existing.flip_count ?? 0) + 1,
           flipped_at: new Date().toISOString(),

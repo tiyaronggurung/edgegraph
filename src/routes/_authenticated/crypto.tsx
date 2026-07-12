@@ -46,6 +46,8 @@ import { useTripleWindowTracker } from "@/hooks/useTripleWindowTracker";
 import { listTripleWindows, type TripleWindowRow } from "@/lib/polymarketTripleWindow.functions";
 import { ModelScorecardPanel } from "@/components/crypto/ModelScorecardPanel";
 import { DailyPerformancePanel } from "@/components/crypto/DailyPerformancePanel";
+import { ModelAblationPanel } from "@/components/crypto/ModelAblationPanel";
+
 
 
 
@@ -2765,6 +2767,9 @@ function CryptoPage() {
           <ModelScorecardPanel />
 
           <DailyPerformancePanel />
+
+          <ModelAblationPanel />
+
 
 
 

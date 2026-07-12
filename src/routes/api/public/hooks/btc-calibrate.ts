@@ -108,8 +108,29 @@ export const Route = createFileRoute("/api/public/hooks/btc-calibrate")({
           .upsert(upserts, { onConflict: "time_bucket,sigma_bucket" });
 
         if (upErr) return new Response(JSON.stringify({ ok: false, error: upErr.message }), { status: 500 });
-        return new Response(JSON.stringify({ ok: true, fitted: upserts.length, rows: rows.length }));
+
+        // Phase 1C: additionally fit out-of-sample isotonic calibration and
+        // persist to btc_isotonic_fit. Read-only alongside existing calibrator;
+        // gates are NOT rewired here. Errors are non-fatal to this cron.
+        let isotonicFitted = 0;
+        let isotonicError: string | null = null;
+        try {
+          const { fitIsotonic, persistFits } = await import("@/lib/cryptoIsotonic.server");
+          const fits = await fitIsotonic();
+          isotonicFitted = await persistFits(fits);
+        } catch (e) {
+          isotonicError = e instanceof Error ? e.message : String(e);
+        }
+
+        return new Response(JSON.stringify({
+          ok: true,
+          fitted: upserts.length,
+          rows: rows.length,
+          isotonic_fitted: isotonicFitted,
+          isotonic_error: isotonicError,
+        }));
       },
+
     },
   },
 });
