@@ -145,6 +145,7 @@ export type Database = {
           confidence_tier: string | null
           created_at: string
           edge: number | null
+          entry_ask_prob: number | null
           entry_price_cents: number | null
           ev_score: number | null
           expected_value: number | null
@@ -165,6 +166,7 @@ export type Database = {
           model_yes_prob: number | null
           momentum_score: number | null
           note: string | null
+          odds_band_eligible: boolean | null
           order_id: string | null
           orderflow_score: number | null
           picked_side: string
@@ -174,11 +176,18 @@ export type Database = {
           prediction_direction_5min_ago: string | null
           prediction_duration_seconds: number | null
           prediction_flip_count: number | null
+          realized_pnl_usd: number | null
           seconds_to_close: number | null
+          sigma_distance: number | null
           sigma_multiplier: number | null
           sigma_score: number | null
+          signed_edge: number | null
+          signed_edge_veto_003_would_skip: boolean | null
+          signed_edge_veto_005_would_skip: boolean | null
+          signed_edge_veto_008_would_skip: boolean | null
           spot: number | null
           stake_used: number | null
+          theoretical_pnl_100: number | null
           ticker: string
           time_bucket: string | null
           time_penalty: number | null
@@ -197,6 +206,7 @@ export type Database = {
           confidence_tier?: string | null
           created_at?: string
           edge?: number | null
+          entry_ask_prob?: number | null
           entry_price_cents?: number | null
           ev_score?: number | null
           expected_value?: number | null
@@ -217,6 +227,7 @@ export type Database = {
           model_yes_prob?: number | null
           momentum_score?: number | null
           note?: string | null
+          odds_band_eligible?: boolean | null
           order_id?: string | null
           orderflow_score?: number | null
           picked_side: string
@@ -226,11 +237,18 @@ export type Database = {
           prediction_direction_5min_ago?: string | null
           prediction_duration_seconds?: number | null
           prediction_flip_count?: number | null
+          realized_pnl_usd?: number | null
           seconds_to_close?: number | null
+          sigma_distance?: number | null
           sigma_multiplier?: number | null
           sigma_score?: number | null
+          signed_edge?: number | null
+          signed_edge_veto_003_would_skip?: boolean | null
+          signed_edge_veto_005_would_skip?: boolean | null
+          signed_edge_veto_008_would_skip?: boolean | null
           spot?: number | null
           stake_used?: number | null
+          theoretical_pnl_100?: number | null
           ticker: string
           time_bucket?: string | null
           time_penalty?: number | null
@@ -249,6 +267,7 @@ export type Database = {
           confidence_tier?: string | null
           created_at?: string
           edge?: number | null
+          entry_ask_prob?: number | null
           entry_price_cents?: number | null
           ev_score?: number | null
           expected_value?: number | null
@@ -269,6 +288,7 @@ export type Database = {
           model_yes_prob?: number | null
           momentum_score?: number | null
           note?: string | null
+          odds_band_eligible?: boolean | null
           order_id?: string | null
           orderflow_score?: number | null
           picked_side?: string
@@ -278,11 +298,18 @@ export type Database = {
           prediction_direction_5min_ago?: string | null
           prediction_duration_seconds?: number | null
           prediction_flip_count?: number | null
+          realized_pnl_usd?: number | null
           seconds_to_close?: number | null
+          sigma_distance?: number | null
           sigma_multiplier?: number | null
           sigma_score?: number | null
+          signed_edge?: number | null
+          signed_edge_veto_003_would_skip?: boolean | null
+          signed_edge_veto_005_would_skip?: boolean | null
+          signed_edge_veto_008_would_skip?: boolean | null
           spot?: number | null
           stake_used?: number | null
+          theoretical_pnl_100?: number | null
           ticker?: string
           time_bucket?: string | null
           time_penalty?: number | null
