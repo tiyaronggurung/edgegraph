@@ -17,20 +17,8 @@ import { diagnoseRecentMisses, studyMissesWithAI, getLatestStudy, setRecommendat
 import { recomputeShadowSim, getShadowSimReport, type ShadowSimGateStat } from "@/lib/cryptoShadowSim.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { useBtcVelocity } from "@/hooks/useBtcVelocity";
-import { EquityMomentumPanel } from "@/components/EquityMomentumPanel";
 import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
 import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
-import { OddsStudyPanel } from "@/components/crypto/OddsStudyPanel";
-import { IocLadderPanel } from "@/components/crypto/IocLadderPanel";
-import { FlipShadowPanel } from "@/components/crypto/FlipShadowPanel";
-import { ScalpShadowPanel } from "@/components/crypto/ScalpShadowPanel";
-import { TaShadowPanel } from "@/components/crypto/TaShadowPanel";
-import { SkipBucketPanel } from "@/components/crypto/SkipBucketPanel";
-import { LossCapPanel } from "@/components/crypto/LossCapPanel";
-import { FlipRecorderPanel } from "@/components/crypto/FlipRecorderPanel";
-import { OddsShadowTraderPanel } from "@/components/crypto/OddsShadowTraderPanel";
-import { MartingaleRecoveryPanel } from "@/components/crypto/MartingaleRecoveryPanel";
-import { ManualTradesPanel } from "@/components/crypto/ManualTradesPanel";
 import { NextStakeBanner } from "@/components/crypto/NextStakeBanner";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
 import { useCalibrationShift } from "@/hooks/useCalibrationShift";
@@ -45,13 +33,28 @@ import { KalshiMaintenanceBanner } from "@/components/KalshiMaintenanceBanner";
 import { PolymarketChip } from "@/components/crypto/PolymarketChip";
 import { useTripleWindowTracker } from "@/hooks/useTripleWindowTracker";
 import { listTripleWindows, type TripleWindowRow } from "@/lib/polymarketTripleWindow.functions";
-import { ModelScorecardPanel } from "@/components/crypto/ModelScorecardPanel";
-import { DailyPerformancePanel } from "@/components/crypto/DailyPerformancePanel";
-import { ModelAblationPanel } from "@/components/crypto/ModelAblationPanel";
-import { JumpBacktestPanel } from "@/components/crypto/JumpBacktestPanel";
-import { JumpRecommendationCard } from "@/components/crypto/JumpRecommendationCard";
-import { SignedEdgeVetoPanel } from "@/components/crypto/SignedEdgeVetoPanel";
-import { ConvictionExitPanel } from "@/components/crypto/ConvictionExitPanel";
+
+// Lazy-loaded panels: mounted only when scrolled near the viewport (LazyOnVisible).
+// Keeps first paint fast — these panels don't fire queries or parse JS on load.
+const EquityMomentumPanel = lazy(() => import("@/components/EquityMomentumPanel").then(m => ({ default: m.EquityMomentumPanel })));
+const OddsStudyPanel = lazy(() => import("@/components/crypto/OddsStudyPanel").then(m => ({ default: m.OddsStudyPanel })));
+const IocLadderPanel = lazy(() => import("@/components/crypto/IocLadderPanel").then(m => ({ default: m.IocLadderPanel })));
+const FlipShadowPanel = lazy(() => import("@/components/crypto/FlipShadowPanel").then(m => ({ default: m.FlipShadowPanel })));
+const ScalpShadowPanel = lazy(() => import("@/components/crypto/ScalpShadowPanel").then(m => ({ default: m.ScalpShadowPanel })));
+const TaShadowPanel = lazy(() => import("@/components/crypto/TaShadowPanel").then(m => ({ default: m.TaShadowPanel })));
+const SkipBucketPanel = lazy(() => import("@/components/crypto/SkipBucketPanel").then(m => ({ default: m.SkipBucketPanel })));
+const LossCapPanel = lazy(() => import("@/components/crypto/LossCapPanel").then(m => ({ default: m.LossCapPanel })));
+const FlipRecorderPanel = lazy(() => import("@/components/crypto/FlipRecorderPanel").then(m => ({ default: m.FlipRecorderPanel })));
+const OddsShadowTraderPanel = lazy(() => import("@/components/crypto/OddsShadowTraderPanel").then(m => ({ default: m.OddsShadowTraderPanel })));
+const MartingaleRecoveryPanel = lazy(() => import("@/components/crypto/MartingaleRecoveryPanel").then(m => ({ default: m.MartingaleRecoveryPanel })));
+const ManualTradesPanel = lazy(() => import("@/components/crypto/ManualTradesPanel").then(m => ({ default: m.ManualTradesPanel })));
+const ModelScorecardPanel = lazy(() => import("@/components/crypto/ModelScorecardPanel").then(m => ({ default: m.ModelScorecardPanel })));
+const DailyPerformancePanel = lazy(() => import("@/components/crypto/DailyPerformancePanel").then(m => ({ default: m.DailyPerformancePanel })));
+const ModelAblationPanel = lazy(() => import("@/components/crypto/ModelAblationPanel").then(m => ({ default: m.ModelAblationPanel })));
+const JumpBacktestPanel = lazy(() => import("@/components/crypto/JumpBacktestPanel").then(m => ({ default: m.JumpBacktestPanel })));
+const JumpRecommendationCard = lazy(() => import("@/components/crypto/JumpRecommendationCard").then(m => ({ default: m.JumpRecommendationCard })));
+const SignedEdgeVetoPanel = lazy(() => import("@/components/crypto/SignedEdgeVetoPanel").then(m => ({ default: m.SignedEdgeVetoPanel })));
+const ConvictionExitPanel = lazy(() => import("@/components/crypto/ConvictionExitPanel").then(m => ({ default: m.ConvictionExitPanel })));
 
 
 
