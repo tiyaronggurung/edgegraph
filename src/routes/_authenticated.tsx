@@ -45,9 +45,9 @@ function AuthLayout() {
     );
   }
   if (!user) {
-    // Inside 24h grace: keep rendering the shell so the user isn't kicked out.
-    // Individual server calls that 401 will surface their own errors, but the
-    // UI stays put until Supabase silently refreshes the token.
+    // Inside 24h grace: keep the user on the protected page, but do not render
+    // child routes yet. Those children auto-run authenticated server functions;
+    // rendering them without a restored session creates missing-bearer 401s.
     let withinGrace = false;
     try {
       const raw = typeof window !== "undefined" ? localStorage.getItem(AUTH_GRACE_KEY) : null;
@@ -55,6 +55,16 @@ function AuthLayout() {
       withinGrace = Number.isFinite(t) && t > 0 && Date.now() - t < AUTH_GRACE_MS;
     } catch { /* ignore */ }
     if (!withinGrace) return null;
+    return (
+      <div className="min-h-screen overflow-x-hidden">
+        <AppNav />
+        <main className="w-full max-w-7xl mx-auto px-4 py-6">
+          <div className="min-h-[60vh] grid place-items-center text-muted-foreground font-mono text-xs uppercase tracking-widest">
+            Reconnecting secure session…
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (
