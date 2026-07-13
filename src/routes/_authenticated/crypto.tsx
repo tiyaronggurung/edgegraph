@@ -720,8 +720,24 @@ function ModelAccuracyPanel() {
               .slice(0, 20);
             const wins20 = last20.reduce((n, r) => n + (r.wasCorrect === true ? 1 : 0), 0);
             const losses20 = last20.reduce((n, r) => n + (r.wasCorrect === false ? 1 : 0), 0);
+            // Streak analysis across ALL settled (most recent first).
+            const settledDesc = s.recent
+              .filter(r => r.wasCorrect !== null && r.settledAt)
+              .slice()
+              .sort((a, b) => (b.settledAt ?? "").localeCompare(a.settledAt ?? ""));
+            let currentStreak = 0;
+            for (const r of settledDesc) {
+              if (r.wasCorrect === true) currentStreak++;
+              else break;
+            }
+            let longestStreak = 0;
+            let run = 0;
+            for (const r of settledDesc) {
+              if (r.wasCorrect === true) { run++; if (run > longestStreak) longestStreak = run; }
+              else run = 0;
+            }
             return (
-          <div className="grid grid-cols-2 md:grid-cols-7 divide-x divide-border">
+          <div className="grid grid-cols-2 md:grid-cols-8 divide-x divide-border">
             <Cell label="Tracked (7d)" value={String(s.total)} sub={`${s.settled} settled`} />
             <Cell label="Correct (7d)" value={`${s.correct} / ${s.settled}`} />
             <Cell
@@ -752,11 +768,23 @@ function ModelAccuracyPanel() {
             />
 
             <Cell
+              label="Win streak"
+              value={
+                <span>
+                  <span className="font-bold text-emerald-400">{currentStreak}W</span>
+                  {currentStreak > 0 && <span className="text-muted-foreground text-xs ml-1">🔥</span>}
+                </span>
+              }
+              sub={longestStreak > 0 ? `best: ${longestStreak}W (7d)` : "no wins yet"}
+            />
+
+            <Cell
               label="Awaiting settle"
               value={String(s.total - s.settled)}
               sub="close time passed but BTC price pending"
             />
           </div>
+
             );
           })()}
           {s.recent.length > 0 && (
