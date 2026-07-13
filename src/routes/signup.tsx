@@ -18,15 +18,23 @@ function Signup() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: window.location.origin + "/dashboard" },
-    });
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("Account created — check your inbox to confirm.");
-    nav({ to: "/login" });
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      setLoading(false);
+      return toast.error(error.message);
+    }
+    // Auto-confirm is on — user should have a session immediately.
+    if (data.session) {
+      toast.success("Account created — welcome!");
+      nav({ to: "/dashboard" });
+    } else {
+      // Fallback: try signing in with the same creds
+      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+      setLoading(false);
+      if (signInErr) return toast.error(signInErr.message);
+      toast.success("Account created — welcome!");
+      nav({ to: "/dashboard" });
+    }
   };
 
   return (
