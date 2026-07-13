@@ -617,6 +617,17 @@ export async function runAutoTradeCore(
         skipReasons.push(`${m.ticker}: ${side} ${limitCents}¢ > ${liveMaxEntryCents}¢ ceiling — skipped`);
         continue;
       }
+      // ── Sub-edge regime gate (LIVE only) ──
+      // 30-day ROI-by-bucket analysis: only entry ≥76¢ AND side_prob ≥0.70
+      // is net-positive. Every other bucket is a loser. Skips cheap contracts
+      // and low-conviction favorites that quietly bleed the account.
+      if (isLive) {
+        const sideProb = side === "YES" ? m.modelYesProb : (1 - m.modelYesProb);
+        if (limitCents < 76 || sideProb < 0.70) {
+          skipReasons.push(`${m.ticker}: sub_edge_regime — ${side} ${limitCents}¢ / prob ${(sideProb * 100).toFixed(0)}% (need ≥76¢ & ≥70%)`);
+          continue;
+        }
+      }
 
       // ── Polymarket telemetry (live only, non-blocking) ──
       // Record Polymarket's 5-min BTC Up/Down snapshot for study only.
