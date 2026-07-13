@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getOddsShadowReport } from "@/lib/oddsShadowTrader.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { DollarSign } from "lucide-react";
 
@@ -10,9 +11,18 @@ export function NextStakeBanner() {
   const report = useServerFn(getOddsShadowReport);
   const { data } = useQuery({
     queryKey: ["oddsShadowReport"],
-    queryFn: () => report(),
+    queryFn: async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) return null;
+      try { return await report(); }
+      catch (e: any) {
+        if (String(e?.message ?? e).includes("Unauthorized")) return null;
+        throw e;
+      }
+    },
     refetchInterval: 5_000,
   });
+
   const r = data && data.ok ? data : null;
   if (!r || !r.bankroll) return null;
   const b = r.bankroll as typeof r.bankroll & {
