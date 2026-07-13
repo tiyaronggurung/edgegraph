@@ -633,6 +633,7 @@ export const settleExpiredTrades = createServerFn({ method: "POST" })
         }).eq("id", t.id);
       }
     }
-    return { settled: results.length, results };
+    return { settled: results.length, results, remaining: trades.length === BATCH_SIZE ? BATCH_SIZE : 0 };
   });
+
 
