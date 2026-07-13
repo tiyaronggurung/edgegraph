@@ -869,8 +869,9 @@ export async function runAutoTradeCore(
         .single();
 
       if (error) { skipReasons.push(`${m.ticker}: insert error ${error.message}`); continue; }
-      if (row) placed.push(row as AutoTradeOrderRow);
+      if (row) { placed.push(row as AutoTradeOrderRow); openTickers.add(m.ticker); }
     }
+
 
 
     return {
