@@ -2504,13 +2504,16 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
 
 
 function KalshiBalanceBadge() {
+  const { isAdmin, loading: planLoading } = usePlan();
   const balFn = useServerFn(checkKalshiBalance);
   const q = useQuery({
     queryKey: ["kalshi-balance"],
     queryFn: () => balFn(),
     refetchInterval: 15_000,
     staleTime: 10_000,
+    enabled: isAdmin,
   });
+  if (planLoading || !isAdmin) return null;
   const cents = q.data?.ok ? q.data.balanceCents ?? null : null;
   const label = cents != null ? `$${(cents / 100).toFixed(2)}` : q.isLoading ? "…" : "—";
   const title = q.data?.ok
