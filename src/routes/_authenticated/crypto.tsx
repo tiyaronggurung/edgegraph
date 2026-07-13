@@ -69,6 +69,14 @@ export const Route = createFileRoute("/_authenticated/crypto")({
       { name: "description", content: "Live model predictions for Kalshi BTC 15-minute up/down markets with edge vs market price." },
     ],
   }),
+  // Fire-and-forget prefetch of the three hottest queries so they load in
+  // parallel with the JS chunk instead of waiting for the component to mount.
+  // Errors are swallowed — useQuery will re-fetch normally if these fail.
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery({ queryKey: ["crypto-trades"], queryFn: () => listMyCryptoTrades() }).catch(() => {});
+    context.queryClient.prefetchQuery({ queryKey: ["btc-markets"], queryFn: () => getBtcMarkets() }).catch(() => {});
+    context.queryClient.prefetchQuery({ queryKey: ["btc-pred-stats"], queryFn: () => getPredictionStats() }).catch(() => {});
+  },
   component: CryptoPage,
 });
 
