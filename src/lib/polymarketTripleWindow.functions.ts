@@ -56,7 +56,8 @@ export const upsertTripleWindow = createServerFn({ method: "POST" })
       combined_conf: data.combined_conf,
       enrichment_json: (data.enrichment ?? null) as never,
     };
-    const { error } = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
       .from("btc_polymarket_triple_window")
       .upsert(row, { onConflict: "kalshi_ticker" });
     if (error) throw new Error(error.message);
