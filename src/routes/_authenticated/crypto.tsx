@@ -2600,6 +2600,8 @@ function CryptoPage() {
 
       <ModelBetPanel />
 
+      <ModelAccuracyPanel />
+
       {data && <AutoTradePanel markets={data.markets} />}
 
 
@@ -2855,8 +2857,6 @@ function CryptoPage() {
           <CalibrationReportPanel />
 
           <ModelStudyPanel />
-
-          <ModelAccuracyPanel />
 
 
 
