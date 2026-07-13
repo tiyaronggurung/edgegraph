@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { AlertTriangle, RotateCw, Shield } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import {
   getRecoveryState,
   setRecoveryEnabled,
@@ -23,7 +24,16 @@ export function MartingaleRecoveryPanel() {
 
   const { data: state, isLoading } = useQuery({
     queryKey: ["martingaleRecovery"],
-    queryFn: () => getState(),
+    queryFn: async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) return null;
+      try {
+        return await getState();
+      } catch (e: any) {
+        if (String(e?.message ?? e).includes("Unauthorized")) return null;
+        throw e;
+      }
+    },
     refetchInterval: 15_000,
   });
 
