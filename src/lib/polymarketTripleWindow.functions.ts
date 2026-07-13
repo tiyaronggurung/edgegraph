@@ -118,7 +118,8 @@ export const settleTripleWindow = createServerFn({ method: "POST" })
     const s = await fetchKalshiSettlement(data.ticker);
     if (!s || !s.finalized || !s.result) return { ok: false, reason: "not finalized" };
 
-    const { error } = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
       .from("btc_polymarket_triple_window")
       .update({
         actual_outcome: s.result.toUpperCase(),
