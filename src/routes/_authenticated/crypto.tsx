@@ -2600,6 +2600,7 @@ function CryptoPage() {
 
       <ModelBetPanel />
 
+      {data && <AutoTradePanel markets={data.markets} />}
 
 
       <div className="border border-yellow-500/30 bg-yellow-500/5 rounded-lg p-3 text-xs text-yellow-200/90 flex gap-2">
@@ -2864,8 +2865,6 @@ function CryptoPage() {
           <EquityMomentumPanel />
 
           <MartingaleRecoveryPanel />
-
-          <AutoTradePanel markets={data.markets} />
 
           <OddsStudyPanel />
 
