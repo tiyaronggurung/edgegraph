@@ -234,6 +234,7 @@ export interface PredictionStatsResult {
     wasCorrect: boolean | null;
     settlePrice: number | null;
     closeTime: string;
+    settledAt: string | null;
     liveSide: "YES" | "NO" | null;
     flipCount: number;
     chartVerdict: "YES" | "NO" | "neutral" | null;
@@ -254,7 +255,7 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
 
   const { data: rows } = await supabaseAdmin
     .from("btc_model_predictions")
-    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, live_side, flip_count, chart_verdict, chart_strength")
+    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, settled_at, live_side, flip_count, chart_verdict, chart_strength")
     .gte("close_time", cutoff)
     .order("close_time", { ascending: false })
     .limit(500);
@@ -300,6 +301,7 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
       wasCorrect: (r.was_correct as boolean | null) ?? null,
       settlePrice: r.settle_price != null ? Number(r.settle_price) : null,
       closeTime: r.close_time as string,
+      settledAt: (r.settled_at as string | null) ?? null,
       liveSide: (r.live_side as "YES" | "NO" | null) ?? null,
       flipCount: Number(r.flip_count ?? 0),
       chartVerdict: (r.chart_verdict as "YES" | "NO" | "neutral" | null) ?? null,
