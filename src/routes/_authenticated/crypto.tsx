@@ -859,6 +859,28 @@ function ModelBetPanel() {
     window.localStorage.setItem(MODEL_BET_LS_ENABLED, enabled ? "on" : "off");
   }, [enabled]);
 
+  const persistEnabled = async (on: boolean) => {
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u?.user?.id;
+      if (!uid) return;
+      if (on) {
+        await supabase.from("auto_odds_settings").upsert({
+          user_id: uid,
+          enabled: true,
+          auto_button_type: "model_bet",
+          stopped_reason: null,
+        }, { onConflict: "user_id" });
+      } else {
+        // Only clear when this row belongs to Model Bet; never touch odds_bet rows.
+        await supabase.from("auto_odds_settings")
+          .update({ enabled: false })
+          .eq("user_id", uid)
+          .eq("auto_button_type", "model_bet");
+      }
+    } catch { /* non-fatal; local loop still runs */ }
+  };
+
   const toggleOn = () => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem("crypto.autoOdds", "off");
@@ -866,10 +888,12 @@ function ModelBetPanel() {
       window.dispatchEvent(new CustomEvent(AUTO_BET_MUTEX_EVENT, { detail: "modelBet" }));
     }
     setEnabled(true);
+    void persistEnabled(true);
     toast.success(`Model Bet ON · $${stake} per prediction (Value pick side)`);
   };
   const toggleOff = () => {
     setEnabled(false);
+    void persistEnabled(false);
     toast.info("Model Bet OFF");
   };
 
