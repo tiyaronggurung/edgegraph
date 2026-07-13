@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, useEffect, useRef, lazy } from "react";
 import { LazyOnVisible } from "@/components/LazyOnVisible";
 import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle, ArrowUp, ArrowDown, Volume2, VolumeX } from "lucide-react";
-import { playOrderPlaced, playOrderFilled } from "@/lib/orderSounds";
+import { playOrderPlaced, playOrderFilled, playModelBetPing } from "@/lib/orderSounds";
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades, checkKalshiBalance, diagnoseKalshiAuth, type KalshiDiagStep } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats, getCalibrationReport, type CalibrationRow } from "@/lib/cryptoPredictions.functions";
@@ -1045,6 +1045,7 @@ function ModelBetPanel() {
 
         if (res.placed > 0 && res.orders?.[0]) {
           const o = res.orders[0];
+          try { playModelBetPing(); } catch { /* noop */ }
           toast.success(`Model Bet $${stake}: ${pick.side === "YES" ? "UP" : "DOWN"} ${pick.ticker} @ ${o.limit_cents}¢`);
           setLastFired(`${pick.ticker} ${pick.side} @ ${o.limit_cents}¢`);
         } else {

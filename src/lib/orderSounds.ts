@@ -40,3 +40,9 @@ export function playOrderFilled() {
   tone(880, 140, 0, 0.09);
   tone(1320, 200, 140, 0.09);
 }
+
+// Discord-style two-note ping for Model Bet placements.
+export function playModelBetPing() {
+  tone(587.33, 120, 0, 0.09);    // D5
+  tone(880.0, 220, 110, 0.09);   // A5
+}
