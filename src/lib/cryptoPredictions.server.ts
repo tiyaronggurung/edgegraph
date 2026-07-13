@@ -1,6 +1,8 @@
 // Server-only helpers for snapshotting + settling BTC model predictions.
 // Filename .server.ts blocks any client-side import.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { fetchKalshiSettlement } from "@/lib/kalshiSettle";
+
 
 const COINBASE = "https://api.exchange.coinbase.com";
 
