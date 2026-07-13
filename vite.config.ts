@@ -12,4 +12,11 @@ export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
   },
+  vite: {
+    build: {
+      // Hide implementation details from published bundles: no source maps
+      // means devtools can't map minified code back to readable TS.
+      sourcemap: false,
+    },
+  },
 });
