@@ -1,13 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 // Server-side cron: fires the Model Bet auto-trade for every opted-in user
-// every minute, 24/7 — independent of whether their browser tab is open or
-// their web session has expired. Mirrors the browser auto-fire path but
-// stays flat $10 / skipLadder (matches the standing stake rule).
-//
-// Opt-in gate: auto_odds_settings.enabled = true AND auto_button_type = 'model_bet'.
-// Odds Bet users, disabled users, and users without Kalshi creds are skipped.
-// One user's failure never kills the loop.
+// every minute, 24/7 — independent of whether their browser tab is open.
+// Mirrors the browser Model Bet panel: force-fires on the newest open
+// prediction's value-pick side, bypassing the standard confidence/sigzone
+// gates. Flat $10 stake, one order per ticker per user, 75¢ entry cap.
 
 export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
   server: {
@@ -43,36 +40,57 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
           (p) => (p.kalshi_api_key_id ?? "").trim() && (p.kalshi_private_key_pem ?? "").trim(),
         );
 
-        const tapeCutoff = new Date(Date.now() - 120_000).toISOString();
-        const results: Array<{ userId: string; placed: number; skipped: number; error?: string }> = [];
+        // Newest open predictions — one per still-live ticker.
+        const nowIso = new Date().toISOString();
+        const { data: preds } = await supabaseAdmin
+          .from("btc_model_predictions")
+          .select("ticker, side, close_time")
+          .gt("close_time", nowIso)
+          .order("close_time", { ascending: false })
+          .limit(5);
+        const openPreds = (preds ?? []) as Array<{ ticker: string; side: "YES" | "NO"; close_time: string }>;
+
+        const results: Array<{ userId: string; placed: number; skipped: number; ticker?: string; error?: string }> = [];
 
         for (const u of usersWithCreds) {
           try {
-            // Skip idle users (no fresh tape in last 2 min) to avoid pointless work.
-            const { data: tape } = await supabaseAdmin
-              .from("btc_odds_tape")
-              .select("snapped_at")
-              .eq("user_id", u.id)
-              .gte("snapped_at", tapeCutoff)
-              .limit(1);
-            if (!tape || tape.length === 0) continue;
+            // Pick the newest open prediction the user hasn't already been filled on (live).
+            let pick: { ticker: string; side: "YES" | "NO" } | null = null;
+            for (const p of openPreds) {
+              const { data: existing } = await supabaseAdmin
+                .from("auto_trade_orders")
+                .select("id")
+                .eq("user_id", u.id)
+                .eq("ticker", p.ticker)
+                .eq("mode", "live")
+                .limit(1);
+              if (!existing || existing.length === 0) {
+                pick = { ticker: p.ticker, side: p.side };
+                break;
+              }
+            }
+            if (!pick) {
+              results.push({ userId: u.id, placed: 0, skipped: 0 });
+              continue;
+            }
 
             const res = await runAutoTradeCore(supabaseAdmin as never, u.id, {
               mode: "live",
               stakeUsd: 10,
               confirm: "I_UNDERSTAND_LIVE",
               skipLadder: true,
-              force: false,
+              force: true,
               isMartingale: false,
-              forceTicker: undefined,
-              forceSide: undefined,
-              maxEntryCents: undefined,
-              maxOrders: 5,
+              forceTicker: pick.ticker,
+              forceSide: pick.side,
+              maxEntryCents: 75,
+              maxOrders: 1,
             });
             results.push({
               userId: u.id,
               placed: res.placed ?? 0,
               skipped: res.skipped ?? 0,
+              ticker: pick.ticker,
             });
           } catch (e) {
             const msg = (e as Error)?.message ?? String(e);
