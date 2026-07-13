@@ -581,16 +581,22 @@ export const settleExpiredTrades = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const cutoff = new Date(Date.now() - 10_000).toISOString();
+    const BATCH_SIZE = 5;
+    // Fetch a small batch ordered by oldest close_time first. Keeps each
+    // invocation well under the statement timeout even without an index;
+    // the client polls on a 10s loop so subsequent batches drain quickly.
     const { data: trades, error } = await supabase
       .from("crypto_trades")
-      .select("*")
+      .select("id, ticker, side, stake_usd, contracts, raw, close_time")
       .eq("user_id", userId)
       .eq("status", "submitted")
       .not("close_time", "is", null)
       .lt("close_time", cutoff)
-      .limit(25);
+      .order("close_time", { ascending: true })
+      .limit(BATCH_SIZE);
     if (error) throw new Error(error.message);
-    if (!trades?.length) return { settled: 0, results: [] };
+    if (!trades?.length) return { settled: 0, results: [], remaining: 0 };
+
 
     const results: Array<{ tradeId: string; outcome: string; pnl: number; settleCents: number }> = [];
     for (const t of trades) {
@@ -627,6 +633,7 @@ export const settleExpiredTrades = createServerFn({ method: "POST" })
         }).eq("id", t.id);
       }
     }
-    return { settled: results.length, results };
+    return { settled: results.length, results, remaining: trades.length === BATCH_SIZE ? BATCH_SIZE : 0 };
   });
+
 
