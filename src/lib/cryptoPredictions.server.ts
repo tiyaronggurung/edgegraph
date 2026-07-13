@@ -255,7 +255,7 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
 
   const { data: rows } = await supabaseAdmin
     .from("btc_model_predictions")
-    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, live_side, flip_count, chart_verdict, chart_strength")
+    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, settled_at, live_side, flip_count, chart_verdict, chart_strength")
     .gte("close_time", cutoff)
     .order("close_time", { ascending: false })
     .limit(500);
