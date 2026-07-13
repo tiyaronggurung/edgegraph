@@ -171,18 +171,27 @@ export async function settleDuePredictions(): Promise<{ settled: number }> {
 
     if (!due?.length) return { settled: 0 };
 
-    // Fetch settle prices in parallel (Coinbase can handle it) so a batch of
-    // 200 doesn't take 200×latency serially.
+    // Prefer Kalshi's official settlement (result + expiration_value).
+    // Fall back to Coinbase spot only when Kalshi hasn't finalized yet.
     const results = await Promise.all(due.map(async (r) => {
+      const kalshi = await fetchKalshiSettlement(r.ticker as string);
+      if (kalshi?.finalized && kalshi.result) {
+        return { r, settle: kalshi.expirationValue, outcome: kalshi.result.toUpperCase() as "YES" | "NO" };
+      }
       const closeSec = Math.floor(new Date(r.close_time as string).getTime() / 1000);
       const settle = await priceAt(closeSec);
-      return { r, settle };
+      return { r, settle, outcome: null as "YES" | "NO" | null };
     }));
 
     let settled = 0;
-    await Promise.all(results.map(async ({ r, settle }) => {
-      if (settle == null) return;
-      const outcome: "YES" | "NO" = settle >= Number(r.strike) ? "YES" : "NO";
+    await Promise.all(results.map(async ({ r, settle, outcome: kalshiOutcome }) => {
+      let outcome: "YES" | "NO";
+      if (kalshiOutcome) {
+        outcome = kalshiOutcome;
+      } else {
+        if (settle == null) return;
+        outcome = settle >= Number(r.strike) ? "YES" : "NO";
+      }
       const wasCorrect = outcome === r.side;
       await supabaseAdmin
         .from("btc_model_predictions")
@@ -195,6 +204,7 @@ export async function settleDuePredictions(): Promise<{ settled: number }> {
         .eq("id", r.id);
       settled++;
     }));
+
     return { settled };
   } catch (e) {
     console.warn("settleDuePredictions failed:", e);
