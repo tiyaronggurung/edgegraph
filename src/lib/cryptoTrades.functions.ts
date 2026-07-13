@@ -335,6 +335,21 @@ export const checkKalshiBalance = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ ok: boolean; balanceCents?: number; payoutCents?: number; error?: string; status?: number }> => {
     try {
+      // Non-admin users must use their own saved Kalshi API key.
+      // Only admins get the shared env-key fallback.
+      const { data: profile } = await context.supabase
+        .from("profiles")
+        .select("is_admin, kalshi_api_key_id, kalshi_private_key_pem")
+        .eq("id", context.userId)
+        .maybeSingle();
+      const isAdmin = !!profile?.is_admin;
+      const hasOwnCreds =
+        !!(profile?.kalshi_api_key_id ?? "").trim() &&
+        !!(profile?.kalshi_private_key_pem ?? "").trim();
+      if (!isAdmin && !hasOwnCreds) {
+        return { ok: false, error: "Connect Kalshi in Settings" };
+      }
+
       const path = "/portfolio/balance";
       const headers = await signKalshi("GET", path, context.userId);
       const res = await fetch(`${KALSHI_BASE}${path}`, { method: "GET", headers });
