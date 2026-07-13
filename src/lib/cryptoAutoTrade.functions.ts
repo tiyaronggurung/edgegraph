@@ -591,29 +591,31 @@ export async function runAutoTradeCore(
     }
 
 
-    // ── Duplicate-fire guard ──
-    // Don't place a second auto bet on a ticker that already has an open
-    // order (status: placed | closing) for this user. Prevents the
-    // ~10s-apart duplicate fires observed on the same market.
-    const openTickers = new Set<string>();
+    // ── Duplicate-fire guard (15-minute window) ──
+    // Skip a ticker if this user already placed an auto_trade_orders row
+    // for it in the last 15 minutes (any status). Fires everywhere else —
+    // this only blocks the ~seconds-apart duplicate seen on the same market.
+    const recentTickers15m = new Set<string>();
     try {
-      const { data: openRows } = await supabase
+      const cutoffIso = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      const { data: recentRows } = await supabase
         .from("auto_trade_orders")
         .select("ticker")
         .eq("user_id", userId)
-        .in("status", ["placed", "closing"]);
-      for (const r of (openRows ?? []) as Array<{ ticker: string }>) {
-        openTickers.add(r.ticker);
+        .gte("created_at", cutoffIso);
+      for (const r of (recentRows ?? []) as Array<{ ticker: string }>) {
+        recentTickers15m.add(r.ticker);
       }
-    } catch { /* if the read fails, fall through — insert path still races safely */ }
+    } catch { /* if the read fails, fall through */ }
 
     const placed: AutoTradeOrderRow[] = [];
     for (const entry of plan) {
       const { m, side, stakeUsd: sizedStake, kind } = entry;
-      if (openTickers.has(m.ticker)) {
-        skipReasons.push(`${m.ticker}: duplicate — open order already exists for this ticker`);
+      if (recentTickers15m.has(m.ticker)) {
+        skipReasons.push(`${m.ticker}: duplicate — already placed within last 15 min`);
         continue;
       }
+
 
       if (!data.force && freshProbBySide.size > 0 && kind !== "kalshi_primary_disagree") {
         // Skip the model-direction recheck for the Kalshi-primary leg on
@@ -869,7 +871,7 @@ export async function runAutoTradeCore(
         .single();
 
       if (error) { skipReasons.push(`${m.ticker}: insert error ${error.message}`); continue; }
-      if (row) { placed.push(row as AutoTradeOrderRow); openTickers.add(m.ticker); }
+      if (row) { placed.push(row as AutoTradeOrderRow); recentTickers15m.add(m.ticker); }
     }
 
 
