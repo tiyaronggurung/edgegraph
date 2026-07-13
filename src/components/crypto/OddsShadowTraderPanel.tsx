@@ -22,9 +22,18 @@ export function OddsShadowTraderPanel() {
   const runTick = useMutation({ mutationFn: () => tick() });
   const { data } = useQuery({
     queryKey: ["oddsShadowReport"],
-    queryFn: () => report(),
+    queryFn: async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) return null;
+      try { return await report(); }
+      catch (e: any) {
+        if (String(e?.message ?? e).includes("Unauthorized")) return null;
+        throw e;
+      }
+    },
     refetchInterval: 2_000,
   });
+
 
   // Filter-bypass toggles (persist to auto_odds_settings).
   const settingsQ = useQuery<GateSettings>({
