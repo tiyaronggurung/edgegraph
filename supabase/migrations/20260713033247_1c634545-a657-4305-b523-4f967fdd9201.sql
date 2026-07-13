@@ -1,0 +1,1 @@
+UPDATE public.auto_odds_settings SET enabled = true, auto_button_type = 'model_bet', updated_at = now() WHERE user_id = '45df0ff2-8fef-453a-943f-6cad510fb1d2';
