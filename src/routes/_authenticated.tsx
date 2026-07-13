@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AppNav } from "@/components/AppNav";
+import { SessionWatermark } from "@/components/SessionWatermark";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthLayout,
@@ -73,6 +74,7 @@ function AuthLayout() {
       <main className="w-full max-w-7xl mx-auto px-4 py-6">
         <Outlet />
       </main>
+      <SessionWatermark />
     </div>
   );
 
