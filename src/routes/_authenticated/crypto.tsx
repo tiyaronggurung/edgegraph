@@ -2899,60 +2899,47 @@ function CryptoPage() {
 
           <PricingStudyPanel markets={data.markets} />
 
-          <ModelScorecardPanel />
+          <LazyOnVisible><ModelScorecardPanel /></LazyOnVisible>
 
+          <LazyOnVisible><DailyPerformancePanel /></LazyOnVisible>
 
+          <LazyOnVisible><ModelAblationPanel /></LazyOnVisible>
 
-          <DailyPerformancePanel />
+          <LazyOnVisible><JumpBacktestPanel /></LazyOnVisible>
 
-          <ModelAblationPanel />
+          <LazyOnVisible><JumpRecommendationCard /></LazyOnVisible>
 
-          <JumpBacktestPanel />
+          <LazyOnVisible><SignedEdgeVetoPanel /></LazyOnVisible>
 
-          <JumpRecommendationCard />
-
-          <SignedEdgeVetoPanel />
-
-          <ConvictionExitPanel />
-
-
-
-
+          <LazyOnVisible><ConvictionExitPanel /></LazyOnVisible>
 
           <CalibrationReportPanel />
 
           <ModelStudyPanel />
 
+          <LazyOnVisible><EquityMomentumPanel /></LazyOnVisible>
 
+          <LazyOnVisible><MartingaleRecoveryPanel /></LazyOnVisible>
 
+          <LazyOnVisible><OddsStudyPanel /></LazyOnVisible>
 
+          <LazyOnVisible><IocLadderPanel /></LazyOnVisible>
 
-          <EquityMomentumPanel />
+          <LazyOnVisible><FlipRecorderPanel /></LazyOnVisible>
 
-          <MartingaleRecoveryPanel />
+          <LazyOnVisible><OddsShadowTraderPanel /></LazyOnVisible>
 
-          <OddsStudyPanel />
+          <LazyOnVisible><ManualTradesPanel /></LazyOnVisible>
 
-          <IocLadderPanel />
+          <LazyOnVisible><SkipBucketPanel /></LazyOnVisible>
 
-          <FlipRecorderPanel />
+          <LazyOnVisible><LossCapPanel /></LazyOnVisible>
 
-          <OddsShadowTraderPanel />
+          <LazyOnVisible><FlipShadowPanel /></LazyOnVisible>
 
+          <LazyOnVisible><ScalpShadowPanel /></LazyOnVisible>
 
-
-
-          <ManualTradesPanel />
-
-          <SkipBucketPanel />
-
-          <LossCapPanel />
-
-          <FlipShadowPanel />
-
-          <ScalpShadowPanel />
-
-          <TaShadowPanel />
+          <LazyOnVisible><TaShadowPanel /></LazyOnVisible>
 
         </>
       )}
