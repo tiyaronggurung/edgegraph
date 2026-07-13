@@ -1629,10 +1629,12 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
         if (!uid || cancelled) return;
         const { data: row } = await supabase
           .from("auto_odds_settings")
-          .select("enabled, consecutive_losses, stopped_reason")
+          .select("enabled, consecutive_losses, stopped_reason, auto_button_type")
           .eq("user_id", uid)
           .maybeSingle();
         if (cancelled || !row) return;
+        // Ignore rows owned by Model Bet — don't flip Auto-Odds UI from a model_bet row.
+        if (row.auto_button_type && row.auto_button_type !== "odds_bet") return;
         if (row.enabled !== autoOdds) {
           setAutoOdds(row.enabled);
           if (typeof window !== "undefined") {
