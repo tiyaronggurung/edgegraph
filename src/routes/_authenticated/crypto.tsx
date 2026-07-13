@@ -691,13 +691,14 @@ function ModelAccuracyPanel() {
 
 
   const pct = (n: number) => (n * 100).toFixed(1) + "%";
-  const Cell = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
+  const Cell = ({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) => (
     <div className="px-3 py-2">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="text-lg font-bold font-mono">{value}</div>
       {sub && <div className="text-[10px] text-muted-foreground">{sub}</div>}
     </div>
   );
+
 
   return (
     <div className="border border-border rounded-lg bg-card">
