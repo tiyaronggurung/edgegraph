@@ -617,11 +617,12 @@ export async function runAutoTradeCore(
         skipReasons.push(`${m.ticker}: ${side} ${limitCents}¢ > ${liveMaxEntryCents}¢ ceiling — skipped`);
         continue;
       }
-      // ── Sub-edge regime gate (LIVE only) ──
+      // ── Sub-edge regime gate (LIVE only, Odds-Bet only) ──
       // 30-day ROI-by-bucket analysis: only entry ≥76¢ AND side_prob ≥0.70
-      // is net-positive. Every other bucket is a loser. Skips cheap contracts
-      // and low-conviction favorites that quietly bleed the account.
-      if (isLive) {
+      // is net-positive for the Odds-Bet path. Model Bet bypasses this gate
+      // per user request: fire on every new model prediction up to the 75¢
+      // ceiling enforced above, regardless of side_prob.
+      if (isLive && autoButtonType !== "model_bet") {
         const sideProb = side === "YES" ? m.modelYesProb : (1 - m.modelYesProb);
         if (limitCents < 76 || sideProb < 0.70) {
           skipReasons.push(`${m.ticker}: sub_edge_regime — ${side} ${limitCents}¢ / prob ${(sideProb * 100).toFixed(0)}% (need ≥76¢ & ≥70%)`);
