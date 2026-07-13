@@ -2859,9 +2859,8 @@ function CryptoPage() {
 
           <PricingStudyPanel markets={data.markets} />
 
-          <TopPick markets={data.markets} />
-
           <ModelScorecardPanel />
+
 
 
           <DailyPerformancePanel />
