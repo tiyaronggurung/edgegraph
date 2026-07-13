@@ -2858,8 +2858,6 @@ function CryptoPage() {
 
           <ModelStudyPanel />
 
-          <ModelAccuracyPanel />
-
 
 
 
