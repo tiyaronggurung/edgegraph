@@ -2793,7 +2793,7 @@ function CryptoPage() {
 
           <ModelAccuracyPanel />
 
-          <ModelBetPanel />
+
 
 
 
