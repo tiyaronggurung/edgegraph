@@ -691,13 +691,14 @@ function ModelAccuracyPanel() {
 
 
   const pct = (n: number) => (n * 100).toFixed(1) + "%";
-  const Cell = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
+  const Cell = ({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) => (
     <div className="px-3 py-2">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="text-lg font-bold font-mono">{value}</div>
       {sub && <div className="text-[10px] text-muted-foreground">{sub}</div>}
     </div>
   );
+
 
   return (
     <div className="border border-border rounded-lg bg-card">
@@ -712,9 +713,9 @@ function ModelAccuracyPanel() {
       ) : (
         <>
           {(() => {
-            const last20 = s.recent.filter(r => r.outcome).slice(0, 20);
-            const wins20 = last20.filter(r => r.wasCorrect).length;
-            const losses20 = last20.length - wins20;
+            const last20 = s.recent.filter(r => r.wasCorrect !== null).slice(0, 20);
+            const wins20 = last20.filter(r => r.wasCorrect === true).length;
+            const losses20 = last20.filter(r => r.wasCorrect === false).length;
             return (
           <div className="grid grid-cols-2 md:grid-cols-7 divide-x divide-border">
             <Cell label="Tracked (7d)" value={String(s.total)} sub={`${s.settled} settled`} />
@@ -735,10 +736,17 @@ function ModelAccuracyPanel() {
               sub={`${s.byWindow.last12h.correct}/${s.byWindow.last12h.settled}`}
             />
             <Cell
-              label="Last 20"
-              value={last20.length ? `${wins20}W / ${losses20}L` : "—"}
-              sub={last20.length ? pct(wins20 / last20.length) : "not enough settled"}
+              label={`Last ${last20.length} settled`}
+              value={last20.length ? (
+                <span>
+                  <span className="font-bold text-emerald-400">{wins20}W</span>
+                  <span className="text-muted-foreground"> / </span>
+                  <span className="font-bold text-red-400">{losses20}L</span>
+                </span>
+              ) : "—"}
+              sub={last20.length ? `${pct(wins20 / last20.length)} · of last ${last20.length}` : "not enough settled"}
             />
+
             <Cell
               label="Awaiting settle"
               value={String(s.total - s.settled)}
