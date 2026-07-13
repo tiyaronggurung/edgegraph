@@ -857,7 +857,50 @@ function ModelBetPanel() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(MODEL_BET_LS_ENABLED, enabled ? "on" : "off");
+    // Mirror to DB so server-side auto-model-bet tick sees this user's state.
+    (async () => {
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        const uid = u?.user?.id;
+        if (!uid) return;
+        if (enabled) {
+          await supabase.from("auto_odds_settings").upsert({
+            user_id: uid,
+            enabled: true,
+            auto_button_type: "model_bet",
+            stopped_reason: null,
+          }, { onConflict: "user_id" });
+        } else {
+          await supabase.from("auto_odds_settings")
+            .update({ enabled: false })
+            .eq("user_id", uid)
+            .eq("auto_button_type", "model_bet");
+        }
+      } catch { /* non-fatal */ }
+    })();
   }, [enabled]);
+
+  const persistEnabled = async (on: boolean) => {
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u?.user?.id;
+      if (!uid) return;
+      if (on) {
+        await supabase.from("auto_odds_settings").upsert({
+          user_id: uid,
+          enabled: true,
+          auto_button_type: "model_bet",
+          stopped_reason: null,
+        }, { onConflict: "user_id" });
+      } else {
+        // Only clear when this row belongs to Model Bet; never touch odds_bet rows.
+        await supabase.from("auto_odds_settings")
+          .update({ enabled: false })
+          .eq("user_id", uid)
+          .eq("auto_button_type", "model_bet");
+      }
+    } catch { /* non-fatal; local loop still runs */ }
+  };
 
   const toggleOn = () => {
     if (typeof window !== "undefined") {
@@ -866,10 +909,12 @@ function ModelBetPanel() {
       window.dispatchEvent(new CustomEvent(AUTO_BET_MUTEX_EVENT, { detail: "modelBet" }));
     }
     setEnabled(true);
+    void persistEnabled(true);
     toast.success(`Model Bet ON · $${stake} per prediction (Value pick side)`);
   };
   const toggleOff = () => {
     setEnabled(false);
+    void persistEnabled(false);
     toast.info("Model Bet OFF");
   };
 
@@ -1591,14 +1636,27 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
         const { data: u } = await supabase.auth.getUser();
         const uid = u?.user?.id;
         if (!uid || cancelled) return;
-        await supabase.from("auto_odds_settings").upsert({
-          user_id: uid,
-          enabled: autoOdds,
-          consecutive_losses: autoOddsLosses,
-          auto_button_type: "odds_bet",
-          stopped_reason: autoOdds ? null : (autoOddsLosses >= 3 ? "three_losses" : null),
-        }, { onConflict: "user_id" });
-
+        if (autoOdds) {
+          // Turning Auto-Odds ON: claim the settings row for odds_bet.
+          await supabase.from("auto_odds_settings").upsert({
+            user_id: uid,
+            enabled: true,
+            consecutive_losses: autoOddsLosses,
+            auto_button_type: "odds_bet",
+            stopped_reason: null,
+          }, { onConflict: "user_id" });
+        } else {
+          // Turning Auto-Odds OFF: only clear if this row is currently odds_bet;
+          // never clobber a Model Bet row.
+          await supabase.from("auto_odds_settings")
+            .update({
+              enabled: false,
+              consecutive_losses: autoOddsLosses,
+              stopped_reason: autoOddsLosses >= 3 ? "three_losses" : null,
+            })
+            .eq("user_id", uid)
+            .eq("auto_button_type", "odds_bet");
+        }
       } catch { /* non-fatal; client loop still runs */ }
     })();
     return () => { cancelled = true; };
@@ -1616,10 +1674,12 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
         if (!uid || cancelled) return;
         const { data: row } = await supabase
           .from("auto_odds_settings")
-          .select("enabled, consecutive_losses, stopped_reason")
+          .select("enabled, consecutive_losses, stopped_reason, auto_button_type")
           .eq("user_id", uid)
           .maybeSingle();
         if (cancelled || !row) return;
+        // Ignore rows owned by Model Bet — don't flip Auto-Odds UI from a model_bet row.
+        if (row.auto_button_type && row.auto_button_type !== "odds_bet") return;
         if (row.enabled !== autoOdds) {
           setAutoOdds(row.enabled);
           if (typeof window !== "undefined") {
