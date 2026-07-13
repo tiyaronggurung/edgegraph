@@ -1045,6 +1045,7 @@ function ModelBetPanel() {
 
         if (res.placed > 0 && res.orders?.[0]) {
           const o = res.orders[0];
+          try { playModelBetPing(); } catch { /* noop */ }
           toast.success(`Model Bet $${stake}: ${pick.side === "YES" ? "UP" : "DOWN"} ${pick.ticker} @ ${o.limit_cents}¢`);
           setLastFired(`${pick.ticker} ${pick.side} @ ${o.limit_cents}¢`);
         } else {
