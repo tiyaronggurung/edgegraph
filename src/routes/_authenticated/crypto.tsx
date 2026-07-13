@@ -713,9 +713,13 @@ function ModelAccuracyPanel() {
       ) : (
         <>
           {(() => {
-            const last20 = s.recent.filter(r => r.wasCorrect !== null).slice(0, 20);
-            const wins20 = last20.filter(r => r.wasCorrect === true).length;
-            const losses20 = last20.filter(r => r.wasCorrect === false).length;
+            const last20 = s.recent
+              .filter(r => r.wasCorrect !== null && r.settledAt)
+              .slice()
+              .sort((a, b) => (b.settledAt ?? "").localeCompare(a.settledAt ?? ""))
+              .slice(0, 20);
+            const wins20 = last20.reduce((n, r) => n + (r.wasCorrect === true ? 1 : 0), 0);
+            const losses20 = last20.reduce((n, r) => n + (r.wasCorrect === false ? 1 : 0), 0);
             return (
           <div className="grid grid-cols-2 md:grid-cols-7 divide-x divide-border">
             <Cell label="Tracked (7d)" value={String(s.total)} sub={`${s.settled} settled`} />
