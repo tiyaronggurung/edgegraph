@@ -2624,7 +2624,10 @@ function CryptoPage() {
 
       <ModelBetPanel />
 
+      {data && <TopPick markets={data.markets} />}
+
       <ModelAccuracyPanel />
+
 
       {data && <AutoTradePanel markets={data.markets} />}
 
