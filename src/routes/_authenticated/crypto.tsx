@@ -57,7 +57,6 @@ import { ConvictionExitPanel } from "@/components/crypto/ConvictionExitPanel";
 
 
 import { toast } from "sonner";
-import { usePlan } from "@/hooks/usePlan";
 
 export const Route = createFileRoute("/_authenticated/crypto")({
   head: () => ({
