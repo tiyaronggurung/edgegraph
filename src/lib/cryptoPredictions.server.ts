@@ -234,6 +234,7 @@ export interface PredictionStatsResult {
     wasCorrect: boolean | null;
     settlePrice: number | null;
     closeTime: string;
+    settledAt: string | null;
     liveSide: "YES" | "NO" | null;
     flipCount: number;
     chartVerdict: "YES" | "NO" | "neutral" | null;
