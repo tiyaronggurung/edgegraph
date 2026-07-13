@@ -591,9 +591,30 @@ export async function runAutoTradeCore(
     }
 
 
+    // ── Duplicate-fire guard ──
+    // Don't place a second auto bet on a ticker that already has an open
+    // order (status: placed | closing) for this user. Prevents the
+    // ~10s-apart duplicate fires observed on the same market.
+    const openTickers = new Set<string>();
+    try {
+      const { data: openRows } = await supabase
+        .from("auto_trade_orders")
+        .select("ticker")
+        .eq("user_id", userId)
+        .in("status", ["placed", "closing"]);
+      for (const r of (openRows ?? []) as Array<{ ticker: string }>) {
+        openTickers.add(r.ticker);
+      }
+    } catch { /* if the read fails, fall through — insert path still races safely */ }
+
     const placed: AutoTradeOrderRow[] = [];
     for (const entry of plan) {
       const { m, side, stakeUsd: sizedStake, kind } = entry;
+      if (openTickers.has(m.ticker)) {
+        skipReasons.push(`${m.ticker}: duplicate — open order already exists for this ticker`);
+        continue;
+      }
+
       if (!data.force && freshProbBySide.size > 0 && kind !== "kalshi_primary_disagree") {
         // Skip the model-direction recheck for the Kalshi-primary leg on
         // disagreement — by definition the model doesn't back that side.
