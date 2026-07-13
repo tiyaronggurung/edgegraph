@@ -66,8 +66,25 @@ async function incrementCounter(
       ai_verdicts_used: 0,
     };
     row[counter] = 1;
-    const { error } = await supabase.from("usage_counters").insert(row);
+    // Upsert to avoid unique-constraint race when two calls create the same period row.
+    const { error } = await supabase
+      .from("usage_counters")
+      .upsert(row, { onConflict: "user_id,period_start", ignoreDuplicates: true });
     if (error) throw error;
+    // If a concurrent insert won the race, our row was ignored — apply the increment now.
+    const { data: after } = await supabase
+      .from("usage_counters")
+      .select(`id, ${counter}`)
+      .eq("user_id", userId)
+      .eq("period_start", period)
+      .maybeSingle();
+    if (after && (after as any)[counter] !== 1) {
+      const { error: uErr } = await supabase
+        .from("usage_counters")
+        .update({ [counter]: ((after as any)[counter] ?? 0) + 1, updated_at: new Date().toISOString() })
+        .eq("id", (after as any).id);
+      if (uErr) throw uErr;
+    }
   }
 
   return {
