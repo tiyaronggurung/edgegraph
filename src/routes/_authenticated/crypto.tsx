@@ -1591,14 +1591,27 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
         const { data: u } = await supabase.auth.getUser();
         const uid = u?.user?.id;
         if (!uid || cancelled) return;
-        await supabase.from("auto_odds_settings").upsert({
-          user_id: uid,
-          enabled: autoOdds,
-          consecutive_losses: autoOddsLosses,
-          auto_button_type: "odds_bet",
-          stopped_reason: autoOdds ? null : (autoOddsLosses >= 3 ? "three_losses" : null),
-        }, { onConflict: "user_id" });
-
+        if (autoOdds) {
+          // Turning Auto-Odds ON: claim the settings row for odds_bet.
+          await supabase.from("auto_odds_settings").upsert({
+            user_id: uid,
+            enabled: true,
+            consecutive_losses: autoOddsLosses,
+            auto_button_type: "odds_bet",
+            stopped_reason: null,
+          }, { onConflict: "user_id" });
+        } else {
+          // Turning Auto-Odds OFF: only clear if this row is currently odds_bet;
+          // never clobber a Model Bet row.
+          await supabase.from("auto_odds_settings")
+            .update({
+              enabled: false,
+              consecutive_losses: autoOddsLosses,
+              stopped_reason: autoOddsLosses >= 3 ? "three_losses" : null,
+            })
+            .eq("user_id", uid)
+            .eq("auto_button_type", "odds_bet");
+        }
       } catch { /* non-fatal; client loop still runs */ }
     })();
     return () => { cancelled = true; };
