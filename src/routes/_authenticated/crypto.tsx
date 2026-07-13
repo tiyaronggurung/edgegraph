@@ -857,6 +857,27 @@ function ModelBetPanel() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(MODEL_BET_LS_ENABLED, enabled ? "on" : "off");
+    // Mirror to DB so server-side auto-model-bet tick sees this user's state.
+    (async () => {
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        const uid = u?.user?.id;
+        if (!uid) return;
+        if (enabled) {
+          await supabase.from("auto_odds_settings").upsert({
+            user_id: uid,
+            enabled: true,
+            auto_button_type: "model_bet",
+            stopped_reason: null,
+          }, { onConflict: "user_id" });
+        } else {
+          await supabase.from("auto_odds_settings")
+            .update({ enabled: false })
+            .eq("user_id", uid)
+            .eq("auto_button_type", "model_bet");
+        }
+      } catch { /* non-fatal */ }
+    })();
   }, [enabled]);
 
   const persistEnabled = async (on: boolean) => {
