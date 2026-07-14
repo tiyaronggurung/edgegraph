@@ -126,7 +126,7 @@ export const runAutoTrade = createServerFn({ method: "POST" })
       stakeUsd: Math.min(stakeCap, Math.max(1, data?.stakeUsd ?? stakeCap)),
       forceTicker: typeof data?.forceTicker === "string" && data.forceTicker.length > 0 ? data.forceTicker : undefined,
       forceSide: data?.forceSide === "YES" || data?.forceSide === "NO" ? data.forceSide : undefined,
-      maxEntryCents: Number.isFinite(rawMax) && rawMax >= 50 && rawMax <= 95 ? rawMax : undefined,
+      maxEntryCents: Number.isFinite(rawMax) && rawMax >= 1 && rawMax <= 95 ? rawMax : undefined,
       skipLadder: data?.skipLadder === true,
     } satisfies RunAutoTradeInput;
   })
