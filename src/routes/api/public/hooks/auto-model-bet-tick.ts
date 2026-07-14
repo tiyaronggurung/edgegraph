@@ -2,9 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 
 // Server-side cron: fires the Model Bet auto-trade for every opted-in user
 // every minute, 24/7 — independent of whether their browser tab is open.
-// Mirrors the browser Model Bet panel: force-fires on the newest open
-// prediction's value-pick side, bypassing the standard confidence/sigzone
-// gates. Flat $10 stake, one order per ticker per user, 75¢ entry cap.
+// Only fires in the final 5 minutes before close, and only when the model
+// side is <= 10¢ (cheap late-window entries). Flat $10 stake, one order
+// per ticker per user.
 
 export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
   server: {
@@ -40,13 +40,16 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
           (p) => (p.kalshi_api_key_id ?? "").trim() && (p.kalshi_private_key_pem ?? "").trim(),
         );
 
-        // Newest open predictions — one per still-live ticker.
-        const nowIso = new Date().toISOString();
+        // Newest open predictions — only fire in the final 5 minutes before close.
+        const now = Date.now();
+        const nowIso = new Date(now).toISOString();
+        const windowEndIso = new Date(now + 5 * 60 * 1000).toISOString();
         const { data: preds } = await supabaseAdmin
           .from("btc_model_predictions")
           .select("ticker, side, close_time")
           .gt("close_time", nowIso)
-          .order("close_time", { ascending: false })
+          .lte("close_time", windowEndIso)
+          .order("close_time", { ascending: true })
           .limit(5);
         const openPreds = (preds ?? []) as Array<{ ticker: string; side: "YES" | "NO"; close_time: string }>;
 
@@ -83,7 +86,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
               isMartingale: false,
               forceTicker: pick.ticker,
               forceSide: pick.side,
-              maxEntryCents: 75,
+              maxEntryCents: 10,
               maxOrders: 1,
             });
             results.push({
