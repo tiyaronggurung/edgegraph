@@ -45,11 +45,11 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
         const nowIso = new Date().toISOString();
         const { data: preds } = await supabaseAdmin
           .from("btc_model_predictions")
-          .select("ticker, side, close_time")
+          .select("ticker, side, close_time, model_prob")
           .gt("close_time", nowIso)
           .order("close_time", { ascending: true })
           .limit(10);
-        const openPreds = (preds ?? []) as Array<{ ticker: string; side: "YES" | "NO"; close_time: string }>;
+        const openPreds = (preds ?? []) as Array<{ ticker: string; side: "YES" | "NO"; close_time: string; model_prob: number | null }>;
 
         const results: Array<{ userId: string; placed: number; skipped: number; ticker?: string; error?: string; priceCents?: number; stakeUsd?: number }> = [];
 
