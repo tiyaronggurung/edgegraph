@@ -40,17 +40,15 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
           (p) => (p.kalshi_api_key_id ?? "").trim() && (p.kalshi_private_key_pem ?? "").trim(),
         );
 
-        // Newest open predictions — only fire in the final 5 minutes before close.
-        const now = Date.now();
-        const nowIso = new Date(now).toISOString();
-        const windowEndIso = new Date(now + 5 * 60 * 1000).toISOString();
+        // Newest open predictions — any that are still live. Entry gate is
+        // price-based (our-side ≤ 10¢), not time-based.
+        const nowIso = new Date().toISOString();
         const { data: preds } = await supabaseAdmin
           .from("btc_model_predictions")
           .select("ticker, side, close_time")
           .gt("close_time", nowIso)
-          .lte("close_time", windowEndIso)
           .order("close_time", { ascending: true })
-          .limit(5);
+          .limit(10);
         const openPreds = (preds ?? []) as Array<{ ticker: string; side: "YES" | "NO"; close_time: string }>;
 
         const results: Array<{ userId: string; placed: number; skipped: number; ticker?: string; error?: string; priceCents?: number; stakeUsd?: number }> = [];
