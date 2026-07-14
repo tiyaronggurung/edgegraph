@@ -2899,8 +2899,9 @@ function CryptoPage() {
         </div>
       )}
 
-      {q.isLoading && <div className="border border-border rounded-lg bg-card p-6 text-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Loading…</div>}
-      {q.isError && <div className="border border-red-500/40 rounded-lg bg-card p-4 text-sm text-red-400">Failed to load Kalshi/Coinbase feeds.</div>}
+      {q.isLoading && !data && <div className="border border-border rounded-lg bg-card p-6 text-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Loading…</div>}
+      {q.isError && !data && <div className="border border-red-500/40 rounded-lg bg-card p-4 text-sm text-red-400">Reconnecting to Kalshi/Coinbase feeds…</div>}
+      {q.isError && data && <div className="text-[11px] text-amber-400/80 px-1 flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Reconnecting to feeds — showing last snapshot.</div>}
 
       {data && (
         <>
