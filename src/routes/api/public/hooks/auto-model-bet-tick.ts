@@ -98,6 +98,101 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
               continue;
             }
 
+            // ── Confirmation-candle gate (Auto Model Bet only) ─────────────
+            // Pull last ~5 minutes of BTC spot ticks and evaluate:
+            //   1. Counter-spike: |spot(now) - spot(60s ago)| > $100 against side → skip
+            //   2. Last-tick agreement: last 2 tick deltas both against side → skip
+            //   3. Coin-flip chop: ≥2 direction flips across last 5 ticks → skip
+            // Skips are logged to auto_model_bet_errors, never placed.
+            {
+              const sinceIso = new Date(Date.now() - 5 * 60_000).toISOString();
+              const { data: spotRows } = await supabaseAdmin
+                .from("btc_spot_ticks")
+                .select("spot, observed_at")
+                .gte("observed_at", sinceIso)
+                .order("observed_at", { ascending: false })
+                .limit(60);
+              const ticks = (spotRows ?? []).map((r) => ({
+                spot: Number(r.spot),
+                t: new Date(r.observed_at as string).getTime(),
+              })).filter((r) => Number.isFinite(r.spot));
+
+              if (ticks.length >= 3) {
+                const now = ticks[0];
+                // Find tick closest to 60s ago (ticks sorted desc by time).
+                const target60 = now.t - 60_000;
+                let sixty = ticks[ticks.length - 1];
+                for (const t of ticks) {
+                  if (t.t <= target60) { sixty = t; break; }
+                }
+                const move60 = now.spot - sixty.spot;
+                const sideSign = pick.side === "YES" ? 1 : -1;
+
+                // 1. Counter-spike >$100 against side
+                if (Math.abs(move60) > 100 && Math.sign(move60) !== sideSign) {
+                  await supabaseAdmin.from("auto_model_bet_errors").insert({
+                    user_id: u.id,
+                    ticker: pick.ticker,
+                    side: pick.side,
+                    price_cents: pick.priceCents,
+                    stage: "counter_spike",
+                    error: `spot moved ${move60.toFixed(0)}$ in 60s against ${pick.side}`.slice(0, 500),
+                  });
+                  results.push({ userId: u.id, placed: 0, skipped: 1, ticker: pick.ticker });
+                  continue;
+                }
+
+                // Build newest→oldest 5 deltas (each = newer - older).
+                const sample = ticks.slice(0, 6);
+                const deltas: number[] = [];
+                for (let i = 0; i < sample.length - 1; i++) {
+                  deltas.push(sample[i].spot - sample[i + 1].spot);
+                }
+
+                // 2. Last-tick agreement: last 2 deltas both against side
+                if (deltas.length >= 2) {
+                  const d0sign = Math.sign(deltas[0]);
+                  const d1sign = Math.sign(deltas[1]);
+                  if (d0sign !== 0 && d1sign !== 0 && d0sign === d1sign && d0sign !== sideSign) {
+                    await supabaseAdmin.from("auto_model_bet_errors").insert({
+                      user_id: u.id,
+                      ticker: pick.ticker,
+                      side: pick.side,
+                      price_cents: pick.priceCents,
+                      stage: "last_tick_disagree",
+                      error: `last 2 ticks moved against ${pick.side} (${deltas[0].toFixed(1)}, ${deltas[1].toFixed(1)})`.slice(0, 500),
+                    });
+                    results.push({ userId: u.id, placed: 0, skipped: 1, ticker: pick.ticker });
+                    continue;
+                  }
+                }
+
+                // 3. Coin-flip chop: ≥2 direction flips across last 5 deltas
+                if (deltas.length >= 5) {
+                  let flips = 0;
+                  let prevSign = 0;
+                  for (const d of deltas.slice(0, 5)) {
+                    const s = Math.sign(d);
+                    if (s === 0) continue;
+                    if (prevSign !== 0 && s !== prevSign) flips++;
+                    prevSign = s;
+                  }
+                  if (flips >= 2) {
+                    await supabaseAdmin.from("auto_model_bet_errors").insert({
+                      user_id: u.id,
+                      ticker: pick.ticker,
+                      side: pick.side,
+                      price_cents: pick.priceCents,
+                      stage: "coin_flip",
+                      error: `chop: ${flips} flips in last 5 ticks [${deltas.slice(0,5).map(d=>d.toFixed(1)).join(", ")}]`.slice(0, 500),
+                    });
+                    results.push({ userId: u.id, placed: 0, skipped: 1, ticker: pick.ticker });
+                    continue;
+                  }
+                }
+              }
+            }
+
             // Size stake to keep payout ≤ $20 at the observed price.
             const stakeUsd = Math.max(1, Math.min(BASE_STAKE, Math.floor((PAYOUT_CAP * pick.priceCents) / 100 * 100) / 100));
 
