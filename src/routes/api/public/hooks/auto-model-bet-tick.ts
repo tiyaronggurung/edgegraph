@@ -61,6 +61,8 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
         const BASE_STAKE = 10;
         const PAYOUT_CAP = 20;
 
+        const MIN_SIDE_PROB = 0.60;
+
         for (const u of usersWithCreds) {
           let pick: { ticker: string; side: "YES" | "NO"; priceCents: number } | null = null;
           try {
