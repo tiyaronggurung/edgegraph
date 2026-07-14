@@ -2525,7 +2525,14 @@ function KalshiBalanceBadge() {
     staleTime: 10_000,
   });
   const cents = q.data?.ok ? q.data.balanceCents ?? null : null;
-  const label = cents != null ? `$${(cents / 100).toFixed(2)}` : q.isLoading ? "…" : "—";
+  const needsConnect = q.data?.error === "Connect Kalshi in Settings";
+  const label = cents != null
+    ? `$${(cents / 100).toFixed(2)}`
+    : q.isLoading
+    ? "…"
+    : needsConnect
+    ? "Connect Kalshi →"
+    : "—";
   const title = q.data?.ok
     ? `Kalshi balance (live, refreshes every 15s)`
     : q.data?.error ?? "Kalshi balance unavailable";
@@ -2535,7 +2542,16 @@ function KalshiBalanceBadge() {
       className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded bg-card text-xs font-mono tabular-nums"
     >
       <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Kalshi</span>
-      <span className={q.data?.ok ? "text-emerald-400 font-semibold" : "text-muted-foreground"}>{label}</span>
+      {needsConnect ? (
+        <Link
+          to="/settings"
+          className="text-[color:var(--color-primary)] hover:underline font-semibold"
+        >
+          {label}
+        </Link>
+      ) : (
+        <span className={q.data?.ok ? "text-emerald-400 font-semibold" : "text-muted-foreground"}>{label}</span>
+      )}
       {q.isFetching && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
     </div>
   );
