@@ -112,10 +112,34 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
               maxEntryCents: MAX_ENTRY_CENTS,
               maxOrders: 1,
             });
+            const placed = res.placed ?? 0;
+            const skipped = res.skipped ?? 0;
+            // If the core returned 0 placed AND 0 skipped it usually means a
+            // Kalshi-side rejection (bad key / no balance / market closed).
+            // Capture whatever reason string the core exposes so the user can
+            // see it in auto_model_bet_errors instead of losing it to console.
+            if (placed === 0) {
+              const reason =
+                (res as { reason?: string; error?: string; message?: string }).reason ??
+                (res as { error?: string }).error ??
+                (res as { message?: string }).message ??
+                null;
+              if (reason) {
+                await supabaseAdmin.from("auto_model_bet_errors").insert({
+                  user_id: u.id,
+                  ticker: pick.ticker,
+                  side: pick.side,
+                  price_cents: pick.priceCents,
+                  stake_usd: stakeUsd,
+                  stage: "core_no_fill",
+                  error: String(reason).slice(0, 500),
+                });
+              }
+            }
             results.push({
               userId: u.id,
-              placed: res.placed ?? 0,
-              skipped: res.skipped ?? 0,
+              placed,
+              skipped,
               ticker: pick.ticker,
               priceCents: pick.priceCents,
               stakeUsd,
@@ -123,8 +147,19 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
           } catch (e) {
             const msg = (e as Error)?.message ?? String(e);
             console.error("[auto-model-bet-tick] user", u.id, msg);
+            try {
+              await supabaseAdmin.from("auto_model_bet_errors").insert({
+                user_id: u.id,
+                ticker: pick.ticker,
+                side: pick.side,
+                price_cents: pick.priceCents,
+                stage: "exception",
+                error: msg.slice(0, 500),
+              });
+            } catch { /* swallow */ }
             results.push({ userId: u.id, placed: 0, skipped: 0, error: msg });
           }
+
         }
 
         return Response.json({
