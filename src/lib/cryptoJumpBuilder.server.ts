@@ -93,15 +93,15 @@ export async function buildJumpFeatures(input: BuildJumpInput): Promise<BuiltJum
     try {
       const { data } = await supabaseAdmin
         .from("btc_odds_tape")
-        .select("recorded_at, spot")
-        .lte("recorded_at", cutoffIso)
-        .gt("recorded_at", startIso)
-        .order("recorded_at", { ascending: true })
+        .select("snapped_at, spot")
+        .lte("snapped_at", cutoffIso)
+        .gt("snapped_at", startIso)
+        .order("snapped_at", { ascending: true })
         .limit(500);
       const fallback: TickRow[] = (data ?? [])
         .filter((r: any) => Number(r.spot) > 0)
         .map((r: any) => ({
-          observed_at: r.recorded_at as string,
+          observed_at: r.snapped_at as string,
           spot: Number(r.spot),
           source: "odds_tape",
         }));
@@ -113,6 +113,7 @@ export async function buildJumpFeatures(input: BuildJumpInput): Promise<BuiltJum
       // ignore
     }
   }
+
 
   const quality = buildQuality(ticks, cutoffIso);
 
