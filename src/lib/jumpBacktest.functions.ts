@@ -396,7 +396,14 @@ export const runJumpPolicyBacktest = createServerFn({ method: "POST" })
       "jr 1.0-1.5": simRows.filter(r => (r.jumpRatio ?? 0) >= 1.0 && (r.jumpRatio ?? 0) < 1.5),
       "jr 1.5-2.0": simRows.filter(r => (r.jumpRatio ?? 0) >= 1.5 && (r.jumpRatio ?? 0) < 2.0),
       "jr>=2.0": simRows.filter(r => (r.jumpRatio ?? 0) >= 2.0),
+      // Direction × magnitude: did the pre-buy jump go WITH the selected side
+      // (sideMovementBps > 0) or AGAINST it. Answers "big jump → continuation?"
+      "jr>=1.5 & with-side": simRows.filter(r => (r.jumpRatio ?? 0) >= 1.5 && (r.sideMovementBps ?? 0) > 0),
+      "jr>=1.5 & against-side": simRows.filter(r => (r.jumpRatio ?? 0) >= 1.5 && (r.sideMovementBps ?? 0) < 0),
+      "jr>=2.0 & with-side": simRows.filter(r => (r.jumpRatio ?? 0) >= 2.0 && (r.sideMovementBps ?? 0) > 0),
+      "jr>=2.0 & against-side": simRows.filter(r => (r.jumpRatio ?? 0) >= 2.0 && (r.sideMovementBps ?? 0) < 0),
     };
+
 
     // Window-level primary results
     const results = runSegmentsWindow(simRows, segments);
