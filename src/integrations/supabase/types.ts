@@ -101,6 +101,42 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_model_bet_errors: {
+        Row: {
+          created_at: string
+          error: string
+          id: string
+          price_cents: number | null
+          side: string | null
+          stage: string
+          stake_usd: number | null
+          ticker: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error: string
+          id?: string
+          price_cents?: number | null
+          side?: string | null
+          stage: string
+          stake_usd?: number | null
+          ticker?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error?: string
+          id?: string
+          price_cents?: number | null
+          side?: string | null
+          stage?: string
+          stake_usd?: number | null
+          ticker?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       auto_odds_calibration: {
         Row: {
           last_tuned_at: string
