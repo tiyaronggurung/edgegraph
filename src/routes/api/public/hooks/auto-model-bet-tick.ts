@@ -57,8 +57,8 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
         // each contract pays $1, so stake ≤ price¢ / 5 keeps payout ≤ $20.
         // Base stake $5, but shrunk to hit the payout cap given the entry price.
         // Also gate: only fire if our-side price ≤ 10¢ (cheap late-window entry).
-        const MAX_ENTRY_CENTS = 10;
-        const BASE_STAKE = 5;
+        const MAX_ENTRY_CENTS = 70;
+        const BASE_STAKE = 10;
         const PAYOUT_CAP = 20;
 
         for (const u of usersWithCreds) {
