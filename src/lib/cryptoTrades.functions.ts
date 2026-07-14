@@ -118,26 +118,21 @@ export async function getValidatedKalshiKey(): Promise<ValidatedKalshiKey> {
 export async function resolveKalshiCreds(
   userId?: string,
 ): Promise<{ keyId: string; rawPem: string; source: "user" | "env" }> {
-  if (userId) {
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data } = await supabaseAdmin
-        .from("profiles")
-        .select("kalshi_api_key_id, kalshi_private_key_pem")
-        .eq("id", userId)
-        .maybeSingle();
-      const keyId = (data?.kalshi_api_key_id ?? "").trim();
-      const rawPem = (data?.kalshi_private_key_pem ?? "").trim();
-      if (keyId && rawPem) return { keyId, rawPem, source: "user" };
-    } catch {
-      // fall through to env
-    }
+  if (!userId) {
+    throw new Error("Kalshi credentials not configured. Add your API Key ID and Private Key in Settings → API connectors.");
   }
-  const envKeyId = process.env.KALSHI_API_KEY_ID;
-  const envPem = process.env.KALSHI_PRIVATE_KEY_PEM;
-  if (!envKeyId) throw new Error("KALSHI_API_KEY_ID is not configured");
-  if (!envPem) throw new Error("KALSHI_PRIVATE_KEY_PEM is not configured");
-  return { keyId: envKeyId, rawPem: envPem, source: "env" };
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("profiles")
+    .select("kalshi_api_key_id, kalshi_private_key_pem")
+    .eq("id", userId)
+    .maybeSingle();
+  const keyId = (data?.kalshi_api_key_id ?? "").trim();
+  const rawPem = (data?.kalshi_private_key_pem ?? "").trim();
+  if (!keyId || !rawPem) {
+    throw new Error("Kalshi credentials not configured. Add your API Key ID and Private Key in Settings → API connectors.");
+  }
+  return { keyId, rawPem, source: "user" };
 }
 
 export async function signKalshi(
