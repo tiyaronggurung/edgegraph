@@ -1274,7 +1274,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
   // Read the shared btc-markets cache populated by CryptoPage. React Query
   // dedupes by key — no extra fetch, we just subscribe to updates.
   const marketsFn = useServerFn(getBtcMarkets);
-  const marketsQ = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 2_000, staleTime: 1_000 });
+  const marketsQ = useQuery({ queryKey: ["btc-markets"], queryFn: () => marketsFn(), refetchInterval: 1_000, staleTime: 500 });
 
   const [liveBusy, setLiveBusy] = useState(false);
   const [forceBusy, setForceBusy] = useState(false);
