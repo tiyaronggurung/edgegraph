@@ -124,7 +124,9 @@ interface SimRow {
   jumpRatio: number | null;
   contested: boolean;
   sourceQuality: "primary" | "odds_tape_fallback" | "unknown";
+  sideMovementBps: number | null;
 }
+
 
 function applyPolicy(policy: Policy, r: SimRow): { accept: boolean; prob: number } {
   const jr = r.jumpRatio ?? 0;
