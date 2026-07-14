@@ -836,6 +836,19 @@ export async function runAutoTradeCore(
 
       const stakeFilled = (filledContracts * filledEntryCents) / 100;
 
+      // Attach the most-recent jump features (if any) recorded for this ticker
+      // so we have a per-order audit trail of what the pre-buy market looked
+      // like. Read-only — does not affect the buy decision.
+      let jumpSnap: unknown = null;
+      try {
+        const { data: jf } = await supabase
+          .from("btc_model_predictions")
+          .select("jump_features")
+          .eq("ticker", m.ticker)
+          .maybeSingle();
+        jumpSnap = (jf as any)?.jump_features ?? null;
+      } catch { /* non-fatal */ }
+
       const { data: row, error } = await supabase
         .from("auto_trade_orders")
         .insert({
@@ -864,7 +877,8 @@ export async function runAutoTradeCore(
           partial_pnl_usd: 0,
           exit_ladder: DEFAULT_EXIT_LADDER as any,
           is_martingale: false,
-          inputs_snapshot: { iocLadder: ladderTelemetry, polymarket: polymarketSnap, planKind: kind, modelSide: m.side, kalshiLeanYesPrice: m.yesPrice } as any,
+          inputs_snapshot: { iocLadder: ladderTelemetry, polymarket: polymarketSnap, planKind: kind, modelSide: m.side, kalshiLeanYesPrice: m.yesPrice, jump: jumpSnap } as any,
+
 
         })
         .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
