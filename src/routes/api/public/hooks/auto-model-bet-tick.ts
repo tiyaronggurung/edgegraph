@@ -86,7 +86,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
               isMartingale: false,
               forceTicker: pick.ticker,
               forceSide: pick.side,
-              maxEntryCents: 75,
+              maxEntryCents: 10,
               maxOrders: 1,
             });
             results.push({
