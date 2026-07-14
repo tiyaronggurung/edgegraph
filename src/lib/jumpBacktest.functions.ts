@@ -108,6 +108,7 @@ function sigmaInflationMult(jumpRatio: number | null): number {
 
 interface JF { available?: boolean; source_quality?: "primary" | "odds_tape_fallback" | "none"; extra?: { jumpRatio15s?: number | null; jumpRatio30s?: number | null; contested?: boolean; sideMovementBps?: number | null; } }
 
+
 interface SimRow {
   id: string;
   windowKey: string;
@@ -124,7 +125,9 @@ interface SimRow {
   jumpRatio: number | null;
   contested: boolean;
   sourceQuality: "primary" | "odds_tape_fallback" | "unknown";
+  sideMovementBps: number | null;
 }
+
 
 function applyPolicy(policy: Policy, r: SimRow): { accept: boolean; prob: number } {
   const jr = r.jumpRatio ?? 0;
@@ -375,7 +378,9 @@ export const runJumpPolicyBacktest = createServerFn({ method: "POST" })
         sourceQuality: jf.source_quality === "primary" ? "primary"
           : jf.source_quality === "odds_tape_fallback" ? "odds_tape_fallback"
           : "unknown",
+        sideMovementBps: jf.extra?.sideMovementBps ?? null,
       });
+
     }
 
     const segments: Record<string, SimRow[]> = {
@@ -391,7 +396,14 @@ export const runJumpPolicyBacktest = createServerFn({ method: "POST" })
       "jr 1.0-1.5": simRows.filter(r => (r.jumpRatio ?? 0) >= 1.0 && (r.jumpRatio ?? 0) < 1.5),
       "jr 1.5-2.0": simRows.filter(r => (r.jumpRatio ?? 0) >= 1.5 && (r.jumpRatio ?? 0) < 2.0),
       "jr>=2.0": simRows.filter(r => (r.jumpRatio ?? 0) >= 2.0),
+      // Direction × magnitude: did the pre-buy jump go WITH the selected side
+      // (sideMovementBps > 0) or AGAINST it. Answers "big jump → continuation?"
+      "jr>=1.5 & with-side": simRows.filter(r => (r.jumpRatio ?? 0) >= 1.5 && (r.sideMovementBps ?? 0) > 0),
+      "jr>=1.5 & against-side": simRows.filter(r => (r.jumpRatio ?? 0) >= 1.5 && (r.sideMovementBps ?? 0) < 0),
+      "jr>=2.0 & with-side": simRows.filter(r => (r.jumpRatio ?? 0) >= 2.0 && (r.sideMovementBps ?? 0) > 0),
+      "jr>=2.0 & against-side": simRows.filter(r => (r.jumpRatio ?? 0) >= 2.0 && (r.sideMovementBps ?? 0) < 0),
     };
+
 
     // Window-level primary results
     const results = runSegmentsWindow(simRows, segments);
