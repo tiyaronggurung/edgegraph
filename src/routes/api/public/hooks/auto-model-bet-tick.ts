@@ -151,9 +151,9 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
             try {
               await supabaseAdmin.from("auto_model_bet_errors").insert({
                 user_id: u.id,
-                ticker: pick.ticker,
-                side: pick.side,
-                price_cents: pick.priceCents,
+                ticker: pick?.ticker ?? null,
+                side: pick?.side ?? null,
+                price_cents: pick?.priceCents ?? null,
                 stage: "exception",
                 error: msg.slice(0, 500),
               });
