@@ -53,12 +53,21 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
           .limit(5);
         const openPreds = (preds ?? []) as Array<{ ticker: string; side: "YES" | "NO"; close_time: string }>;
 
-        const results: Array<{ userId: string; placed: number; skipped: number; ticker?: string; error?: string }> = [];
+        const results: Array<{ userId: string; placed: number; skipped: number; ticker?: string; error?: string; priceCents?: number; stakeUsd?: number }> = [];
+
+        // Payout cap: max $20 per order. Contracts = floor(stake*100/price),
+        // each contract pays $1, so stake ≤ price¢ / 5 keeps payout ≤ $20.
+        // Base stake $5, but shrunk to hit the payout cap given the entry price.
+        // Also gate: only fire if our-side price ≤ 10¢ (cheap late-window entry).
+        const MAX_ENTRY_CENTS = 10;
+        const BASE_STAKE = 5;
+        const PAYOUT_CAP = 20;
 
         for (const u of usersWithCreds) {
           try {
-            // Pick the newest open prediction the user hasn't already been filled on (live).
-            let pick: { ticker: string; side: "YES" | "NO" } | null = null;
+            // Pick the newest open prediction the user hasn't been filled on,
+            // AND whose our-side price is currently ≤ 10¢.
+            let pick: { ticker: string; side: "YES" | "NO"; priceCents: number } | null = null;
             for (const p of openPreds) {
               const { data: existing } = await supabaseAdmin
                 .from("auto_trade_orders")
@@ -67,26 +76,42 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
                 .eq("ticker", p.ticker)
                 .eq("mode", "live")
                 .limit(1);
-              if (!existing || existing.length === 0) {
-                pick = { ticker: p.ticker, side: p.side };
-                break;
-              }
+              if (existing && existing.length > 0) continue;
+
+              // Latest odds snapshot for this ticker (any user — public price).
+              const { data: tape } = await supabaseAdmin
+                .from("btc_odds_tape")
+                .select("yes_cents, no_cents, snapped_at")
+                .eq("ticker", p.ticker)
+                .order("snapped_at", { ascending: false })
+                .limit(1);
+              const row = tape?.[0] as { yes_cents: number | null; no_cents: number | null; snapped_at: string } | undefined;
+              if (!row) continue;
+              // Stale > 90s → skip (odds can flip fast in the last 5 min).
+              if (Date.now() - new Date(row.snapped_at).getTime() > 90_000) continue;
+              const priceCents = p.side === "YES" ? Number(row.yes_cents) : Number(row.no_cents);
+              if (!Number.isFinite(priceCents) || priceCents <= 0 || priceCents > MAX_ENTRY_CENTS) continue;
+              pick = { ticker: p.ticker, side: p.side, priceCents };
+              break;
             }
             if (!pick) {
               results.push({ userId: u.id, placed: 0, skipped: 0 });
               continue;
             }
 
+            // Size stake to keep payout ≤ $20 at the observed price.
+            const stakeUsd = Math.max(1, Math.min(BASE_STAKE, Math.floor((PAYOUT_CAP * pick.priceCents) / 100 * 100) / 100));
+
             const res = await runAutoTradeCore(supabaseAdmin as never, u.id, {
               mode: "live",
-              stakeUsd: 10,
+              stakeUsd,
               confirm: "I_UNDERSTAND_LIVE",
               skipLadder: true,
               force: true,
               isMartingale: false,
               forceTicker: pick.ticker,
               forceSide: pick.side,
-              maxEntryCents: 10,
+              maxEntryCents: MAX_ENTRY_CENTS,
               maxOrders: 1,
             });
             results.push({
@@ -94,6 +119,8 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
               placed: res.placed ?? 0,
               skipped: res.skipped ?? 0,
               ticker: pick.ticker,
+              priceCents: pick.priceCents,
+              stakeUsd,
             });
           } catch (e) {
             const msg = (e as Error)?.message ?? String(e);
