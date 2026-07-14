@@ -92,6 +92,23 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
               if (Date.now() - new Date(row.snapped_at).getTime() > 90_000) continue;
               const priceCents = p.side === "YES" ? Number(row.yes_cents) : Number(row.no_cents);
               if (!Number.isFinite(priceCents) || priceCents <= 0 || priceCents > MAX_ENTRY_CENTS) continue;
+
+              // Low-confidence gate: side-locked model prob must be ≥ 0.60.
+              // Historical analysis: the 50–55% bucket only wins 15.6%.
+              const rawProb = p.model_prob == null ? null : Number(p.model_prob);
+              const sideProb = rawProb == null ? null : (p.side === "YES" ? rawProb : 1 - rawProb);
+              if (sideProb == null || sideProb < MIN_SIDE_PROB) {
+                await supabaseAdmin.from("auto_model_bet_errors").insert({
+                  user_id: u.id,
+                  ticker: p.ticker,
+                  side: p.side,
+                  price_cents: priceCents,
+                  stage: "low_conf",
+                  error: `side-locked prob ${sideProb == null ? "null" : sideProb.toFixed(3)} < ${MIN_SIDE_PROB}`.slice(0, 500),
+                });
+                continue;
+              }
+
               pick = { ticker: p.ticker, side: p.side, priceCents };
               break;
             }
