@@ -2,9 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 
 // Server-side cron: fires the Model Bet auto-trade for every opted-in user
 // every minute, 24/7 — independent of whether their browser tab is open.
-// Mirrors the browser Model Bet panel: force-fires on the newest open
-// prediction's value-pick side, bypassing the standard confidence/sigzone
-// gates. Flat $10 stake, one order per ticker per user, 75¢ entry cap.
+// Only fires in the final 5 minutes before close, and only when the model
+// side is <= 10¢ (cheap late-window entries). Flat $10 stake, one order
+// per ticker per user.
 
 export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
   server: {
