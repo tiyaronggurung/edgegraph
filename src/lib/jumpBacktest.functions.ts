@@ -108,6 +108,7 @@ function sigmaInflationMult(jumpRatio: number | null): number {
 
 interface JF { available?: boolean; source_quality?: "primary" | "odds_tape_fallback" | "none"; extra?: { jumpRatio15s?: number | null; jumpRatio30s?: number | null; contested?: boolean; sideMovementBps?: number | null; } }
 
+
 interface SimRow {
   id: string;
   windowKey: string;
