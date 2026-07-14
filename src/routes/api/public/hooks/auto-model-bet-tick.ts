@@ -62,10 +62,11 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
         const PAYOUT_CAP = 20;
 
         for (const u of usersWithCreds) {
+          let pick: { ticker: string; side: "YES" | "NO"; priceCents: number } | null = null;
           try {
             // Pick the newest open prediction the user hasn't been filled on,
-            // AND whose our-side price is currently ≤ 10¢.
-            let pick: { ticker: string; side: "YES" | "NO"; priceCents: number } | null = null;
+            // AND whose our-side price is currently ≤ MAX_ENTRY_CENTS.
+
             for (const p of openPreds) {
               const { data: existing } = await supabaseAdmin
                 .from("auto_trade_orders")
