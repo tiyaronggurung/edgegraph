@@ -45,11 +45,11 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
         const nowIso = new Date().toISOString();
         const { data: preds } = await supabaseAdmin
           .from("btc_model_predictions")
-          .select("ticker, side, close_time")
+          .select("ticker, side, close_time, model_prob")
           .gt("close_time", nowIso)
           .order("close_time", { ascending: true })
           .limit(10);
-        const openPreds = (preds ?? []) as Array<{ ticker: string; side: "YES" | "NO"; close_time: string }>;
+        const openPreds = (preds ?? []) as Array<{ ticker: string; side: "YES" | "NO"; close_time: string; model_prob: number | null }>;
 
         const results: Array<{ userId: string; placed: number; skipped: number; ticker?: string; error?: string; priceCents?: number; stakeUsd?: number }> = [];
 
@@ -60,6 +60,8 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
         const MAX_ENTRY_CENTS = 70;
         const BASE_STAKE = 10;
         const PAYOUT_CAP = 20;
+
+        const MIN_SIDE_PROB = 0.60;
 
         for (const u of usersWithCreds) {
           let pick: { ticker: string; side: "YES" | "NO"; priceCents: number } | null = null;
@@ -90,6 +92,23 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
               if (Date.now() - new Date(row.snapped_at).getTime() > 90_000) continue;
               const priceCents = p.side === "YES" ? Number(row.yes_cents) : Number(row.no_cents);
               if (!Number.isFinite(priceCents) || priceCents <= 0 || priceCents > MAX_ENTRY_CENTS) continue;
+
+              // Low-confidence gate: side-locked model prob must be ≥ 0.60.
+              // Historical analysis: the 50–55% bucket only wins 15.6%.
+              const rawProb = p.model_prob == null ? null : Number(p.model_prob);
+              const sideProb = rawProb == null ? null : (p.side === "YES" ? rawProb : 1 - rawProb);
+              if (sideProb == null || sideProb < MIN_SIDE_PROB) {
+                await supabaseAdmin.from("auto_model_bet_errors").insert({
+                  user_id: u.id,
+                  ticker: p.ticker,
+                  side: p.side,
+                  price_cents: priceCents,
+                  stage: "low_conf",
+                  error: `side-locked prob ${sideProb == null ? "null" : sideProb.toFixed(3)} < ${MIN_SIDE_PROB}`.slice(0, 500),
+                });
+                continue;
+              }
+
               pick = { ticker: p.ticker, side: p.side, priceCents };
               break;
             }
