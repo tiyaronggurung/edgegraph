@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AppNav } from "@/components/AppNav";
 import { SessionWatermark } from "@/components/SessionWatermark";
@@ -10,10 +10,12 @@ export const Route = createFileRoute("/_authenticated")({
 
 const AUTH_GRACE_KEY = "eg.auth.lastSeenAt";
 const AUTH_GRACE_MS = 24 * 60 * 60 * 1000; // 24h — never auto-logout inside this window
+const RECONNECT_WAIT_MS = 4500;
 
 function AuthLayout() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
+  const [reconnectExpired, setReconnectExpired] = useState(false);
 
   // Stamp the "last seen authenticated" time whenever we have a live user.
   useEffect(() => {
@@ -37,6 +39,21 @@ function AuthLayout() {
     const here = window.location.pathname + window.location.search;
     nav({ to: "/login", search: { redirect: here } });
   }, [user, loading, nav]);
+
+  useEffect(() => {
+    if (loading || user) {
+      setReconnectExpired(false);
+      return;
+    }
+    const id = window.setTimeout(() => setReconnectExpired(true), RECONNECT_WAIT_MS);
+    return () => window.clearTimeout(id);
+  }, [user, loading]);
+
+  useEffect(() => {
+    if (!reconnectExpired || loading || user) return;
+    const here = window.location.pathname + window.location.search;
+    nav({ to: "/login", search: { redirect: here } });
+  }, [reconnectExpired, loading, user, nav]);
 
   if (loading) {
     return (

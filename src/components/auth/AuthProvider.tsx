@@ -16,13 +16,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
+      if (!active) return;
       setSession(s);
       setLoading(false);
     });
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+
+    const startupTimeout = new Promise<Session | null>((resolve) => {
+      window.setTimeout(() => resolve(null), 2500);
+    });
+
+    Promise.race([
+      supabase.auth.getSession().then(({ data }) => data.session),
+      startupTimeout,
+    ]).then((s) => {
+      if (!active) return;
+      setSession(s);
       setLoading(false);
+      if (!s) supabase.auth.refreshSession().catch(() => undefined);
     });
 
     // Keep the session alive forever: whenever the tab regains focus or the
@@ -38,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     document.addEventListener("visibilitychange", refresh);
 
     return () => {
+      active = false;
       subscription.unsubscribe();
       window.removeEventListener("focus", refresh);
       window.removeEventListener("online", refresh);
