@@ -377,7 +377,9 @@ export const runJumpPolicyBacktest = createServerFn({ method: "POST" })
         sourceQuality: jf.source_quality === "primary" ? "primary"
           : jf.source_quality === "odds_tape_fallback" ? "odds_tape_fallback"
           : "unknown",
+        sideMovementBps: jf.extra?.sideMovementBps ?? null,
       });
+
     }
 
     const segments: Record<string, SimRow[]> = {
