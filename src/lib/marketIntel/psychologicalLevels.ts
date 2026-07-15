@@ -98,7 +98,7 @@ interface LevelScore {
 function scoreLevel(spot: number, interval: number, candles: Candle[], atr: number): LevelScore {
   const level = nearestMultiple(spot, interval);
   const halfWidth = zoneHalfWidth(interval, atr);
-  const inters = walkInteractions(candles, level, halfWidth);
+  const inters = walkInteractions(candles, level, halfWidth, atr);
   const crossings = countCrossings(candles, level);
 
   const reasons: string[] = [];
