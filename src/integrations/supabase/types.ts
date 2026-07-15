@@ -1777,7 +1777,7 @@ export type Database = {
           structure_direction: string
           structure_strength: number
           ticker: string
-          user_id: string
+          user_id: string | null
           volatility_regime: string
           warnings_jsonb: Json
           window_start: string
@@ -1824,7 +1824,7 @@ export type Database = {
           structure_direction: string
           structure_strength: number
           ticker: string
-          user_id: string
+          user_id?: string | null
           volatility_regime: string
           warnings_jsonb?: Json
           window_start: string
@@ -1871,7 +1871,7 @@ export type Database = {
           structure_direction?: string
           structure_strength?: number
           ticker?: string
-          user_id?: string
+          user_id?: string | null
           volatility_regime?: string
           warnings_jsonb?: Json
           window_start?: string
