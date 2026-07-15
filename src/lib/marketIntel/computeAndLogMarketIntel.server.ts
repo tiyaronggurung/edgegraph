@@ -8,6 +8,7 @@
 import type { Candle, MarketIntel, MarketIntelStatus } from "./types";
 import { MARKET_INTEL_VERSION } from "./types";
 import { computeMarketIntel } from "./combine";
+import { deriveWindowFields, type SettlementLinkStatus, type TimeBucket } from "./windowMapping";
 
 export interface ComputeAndLogInput {
   /** May be null for global (system-wide) predictions like the BTC 15-min market. */
