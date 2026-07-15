@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { SPORTS } from "@/lib/sports";
 import { toast } from "sonner";
 import { AlertPreferencesCard } from "@/components/settings/AlertPreferencesCard";
+import { AutoExitConfigPanel } from "@/components/settings/AutoExitConfigPanel";
 import {
   getKalshiCredsStatus,
   saveKalshiCreds,
