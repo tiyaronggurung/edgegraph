@@ -1262,9 +1262,9 @@ export async function autoExitForUser(
   }
 
   for (const { r, markCents, markPnl, remaining, entry } of stillOpen) {
-    const tpThreshold = LIVE_TP_FRAC * Number(r.stake_usd);
+    const tpThreshold = cfgTpFrac * Number(r.stake_usd);
     const secondsLeft = Math.max(0, (Date.parse(r.close_time) - Date.now()) / 1000);
-    const slFrac = secondsLeft < LIVE_LATE_TIGHTEN_SEC ? LIVE_LATE_SL_FRAC : LIVE_SL_FRAC;
+    const slFrac = secondsLeft < LIVE_LATE_TIGHTEN_SEC ? cfgLateSlFrac : cfgSlFrac;
     const slThreshold = -slFrac * Number(r.stake_usd);
     const adverseCents = entry - markCents;
     const sideProbNow = currentModelProbBySide.get(r.ticker);
