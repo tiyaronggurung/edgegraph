@@ -12,27 +12,29 @@ function C(t: number, o: number, h: number, l: number, c: number): Candle {
   return { t, o, h, l, c, v: 1, closed: true };
 }
 
-/** Build a smoothly rising or falling series with configurable wick style. */
+/** Zigzag ramp: overall directional but with small pullbacks so fractal swings exist. */
 function ramp(
   n: number,
   start: number,
   step: number,
   opts: { bodyPct?: number; wick?: number; wickBias?: "up" | "down" | "even" } = {},
 ): Candle[] {
-  const { bodyPct = 0.7, wick = 5, wickBias = "even" } = opts;
+  const { bodyPct = 0.7, wickBias = "even" } = opts;
   const out: Candle[] = [];
   let px = start;
   for (let i = 0; i < n; i++) {
     const o = px;
-    const c = px + step;
-    const b = Math.abs(c - o);
+    // Every 3rd bar: pull back ~45% of a step to create swing points.
+    const s = i > 0 && i % 3 === 2 ? -step * 0.45 : step;
+    const c = px + s;
+    const b = Math.abs(c - o) || 1;
     const totalRange = b / bodyPct;
     const wickTotal = Math.max(0, totalRange - b);
     let up = wickTotal / 2, lo = wickTotal / 2;
     if (wickBias === "up") { up = wickTotal * 0.85; lo = wickTotal * 0.15; }
     if (wickBias === "down") { up = wickTotal * 0.15; lo = wickTotal * 0.85; }
-    const h = Math.max(o, c) + up + wick * 0.001;
-    const l = Math.min(o, c) - lo - wick * 0.001;
+    const h = Math.max(o, c) + up;
+    const l = Math.min(o, c) - lo;
     out.push(C(i * 60_000, o, h, l, c));
     px = c;
   }
