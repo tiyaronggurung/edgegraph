@@ -29,11 +29,8 @@ export const matchPendingSettlements = createServerFn({ method: "POST" })
     const cutoff = new Date(Date.now() - data.graceMinutes * 60_000).toISOString();
     const { data: pending, error: readErr } = await supabaseAdmin
       .from("btc_market_intel")
-      // @ts-expect-error: new columns not in generated types yet
       .select("id, ticker, close_time")
-      // @ts-expect-error: new column filter
       .eq("settlement_link_status", "pending")
-      // @ts-expect-error: new column filter
       .lt("window_close_ts", cutoff)
       .limit(data.maxRows);
     if (readErr) return { ok: false as const, reason: readErr.message, matched: 0, missing: 0, ambiguous: 0, scanned: 0 };
