@@ -170,6 +170,13 @@ export async function computeAndLogMarketIntel(input: ComputeAndLogInput): Promi
       return { status: "skipped_min_interval", intel: null, inserted: false, calculationDurationMs: 0, inputLagMs: 0 };
     }
 
+    // Derive window mapping + settlement-link status from the ticker (Turn 4A).
+    const wf = deriveWindowFields({
+      ticker: input.ticker,
+      decisionTs: input.decisionTs,
+      closeTime: input.closeTime,
+    });
+
     // Clone arrays defensively so we never mutate caller data.
     const cutoffMs = input.decisionTs.getTime();
     const c1 = sanitizeCandles([...input.candles1m], cutoffMs);
