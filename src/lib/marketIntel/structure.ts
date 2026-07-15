@@ -4,7 +4,7 @@
 
 import type { Candle, StructurePoint, StructureResult, Direction, MarketState } from "./types";
 
-const PIVOT_N = 2; // 5-bar fractal: needs 2 neighbors each side
+const PIVOT_N = 1; // 3-bar fractal: needs 1 neighbor each side
 
 /** Extract fractal swing highs/lows from closed candles, oldest→newest. */
 export function findSwings(candles: Candle[]): StructurePoint[] {
