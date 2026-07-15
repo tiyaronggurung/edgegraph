@@ -1142,6 +1142,37 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               jumpFeatures: jumpByTicker.get(m.ticker),
             })),
         );
+
+        // ── SHADOW: MarketIntel telemetry (Phase 1, Turn 3) ──
+        // Fire-and-forget. Never affects the live model, gates, trades, or UI.
+        // Every failure is swallowed inside computeAndLogMarketIntel itself.
+        try {
+          const { computeAndLogMarketIntel } = await import("./marketIntel/computeAndLogMarketIntel.server");
+          const { data: userData } = await supabase.auth.getUser();
+          const userId = userData?.user?.id;
+          if (userId) {
+            await Promise.all(
+              markets
+                .filter(m => m.closeTime && m.secondsToClose > 0)
+                .map(m => computeAndLogMarketIntel({
+                  userId,
+                  ticker: m.ticker,
+                  strike: m.strike,
+                  spot: m.spot,
+                  closeTime: m.closeTime as string,
+                  decisionTs: snapshotTs,
+                  secondsToClose: m.secondsToClose,
+                  candles1m: recent,
+                  candles5m,
+                  candles15m: [],
+                  predictionId: null,
+                })),
+            );
+          }
+        } catch {
+          // observational only — never affects the caller
+        }
+
         await settleDuePredictions();
       } catch (e) {
         console.warn("prediction tracking failed:", e);
