@@ -91,7 +91,21 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
               // Stale > 90s → skip (odds can flip fast in the last 5 min).
               if (Date.now() - new Date(row.snapped_at).getTime() > 90_000) continue;
               const priceCents = p.side === "YES" ? Number(row.yes_cents) : Number(row.no_cents);
-              if (!Number.isFinite(priceCents) || priceCents <= 0 || priceCents > MAX_ENTRY_CENTS) continue;
+              if (!Number.isFinite(priceCents) || priceCents <= 0 || priceCents > MAX_ENTRY_CENTS) {
+                // Additive observability: previously this filter skipped silently,
+                // creating hours-long gaps in auto_model_bet_errors whenever every
+                // open market printed at 99¢/0.1¢ (BTC deep on one side of strikes).
+                // Log the reason so those windows show up on the health panel.
+                await supabaseAdmin.from("auto_model_bet_errors").insert({
+                  user_id: u.id,
+                  ticker: p.ticker,
+                  side: p.side,
+                  price_cents: Number.isFinite(priceCents) ? priceCents : null,
+                  stage: "oob_price",
+                  error: `our-side price ${Number.isFinite(priceCents) ? priceCents.toFixed(1) + "¢" : "n/a"} outside (0, ${MAX_ENTRY_CENTS}¢] — market pinned`.slice(0, 500),
+                });
+                continue;
+              }
 
               // Low-confidence gate: side-locked model prob must be ≥ 0.60.
               // Historical analysis: the 50–55% bucket only wins 15.6%.
