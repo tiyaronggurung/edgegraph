@@ -126,7 +126,9 @@ function sanitizeCandles(candles: Candle[] | undefined, cutoffMs: number): Candl
 
 function latestCloseTime(cs: Candle[]): string | null {
   if (cs.length === 0) return null;
-  return new Date(cs[cs.length - 1].t).toISOString();
+  const raw = cs[cs.length - 1].t;
+  const ms = raw < 1e12 ? raw * 1000 : raw;
+  return new Date(ms).toISOString();
 }
 
 async function defaultInserter(row: InserterRow): Promise<{ inserted: boolean; error?: string }> {
@@ -194,8 +196,13 @@ export async function computeAndLogMarketIntel(input: ComputeAndLogInput): Promi
     });
 
     const calcMs = Date.now() - started;
-    const lastCloseMs = c1.length ? c1[c1.length - 1].t : cutoffMs;
-    const inputLagMs = Math.max(0, cutoffMs - lastCloseMs);
+    // Candle `t` may arrive in seconds (Coinbase) or ms (Binance). Normalise
+    // to ms before subtracting from the ms-scale cutoff, then clamp to int32
+    // so any future unit surprise degrades to a capped value instead of a
+    // 22003 overflow that silently drops the whole row.
+    const rawLastClose = c1.length ? c1[c1.length - 1].t : cutoffMs;
+    const lastCloseMs = rawLastClose < 1e12 ? rawLastClose * 1000 : rawLastClose;
+    const inputLagMs = Math.min(2_147_483_647, Math.max(0, cutoffMs - lastCloseMs));
 
     const signals = {
       input_cutoff_time: input.decisionTs.toISOString(),
