@@ -1019,10 +1019,17 @@ export async function autoExitForUser(
   // These fire earlier than the standard ladder for users on model_bet.
   const { data: btSettings } = await supabase
     .from("auto_odds_settings")
-    .select("auto_button_type")
+    .select("auto_button_type, exit_tp_frac, exit_sl_frac, exit_late_sl_frac, exit_edge_decay_cents, exit_flip_prob, exit_odds_flip_cents")
     .eq("user_id", userId)
     .maybeSingle();
   const isModelBetUser = (btSettings?.auto_button_type ?? "") === "model_bet";
+  // Per-user exit thresholds (fall back to module defaults if unset).
+  const cfgTpFrac = Number(btSettings?.exit_tp_frac ?? LIVE_TP_FRAC) || LIVE_TP_FRAC;
+  const cfgSlFrac = Number(btSettings?.exit_sl_frac ?? LIVE_SL_FRAC) || LIVE_SL_FRAC;
+  const cfgLateSlFrac = Number(btSettings?.exit_late_sl_frac ?? LIVE_LATE_SL_FRAC) || LIVE_LATE_SL_FRAC;
+  const cfgEdgeDecayCents = Number(btSettings?.exit_edge_decay_cents ?? LIVE_EDGE_DECAY_CENTS) || LIVE_EDGE_DECAY_CENTS;
+  const cfgFlipProb = Number(btSettings?.exit_flip_prob ?? LIVE_FLIP_PROB) || LIVE_FLIP_PROB;
+  const cfgOddsFlipCents = Number(btSettings?.exit_odds_flip_cents ?? 12) || 12;
 
 
   const nowIso = new Date().toISOString();
