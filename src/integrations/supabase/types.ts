@@ -1734,6 +1734,116 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_market_intel: {
+        Row: {
+          chop_score: number
+          close_time: string
+          compression_score: number
+          confidence: number
+          continuation_score: number
+          created_at: string
+          direction: string
+          exhaustion_score: number
+          expected_move_15m_pct: number
+          expected_move_15m_usd: number
+          id: string
+          market_intel_version: string
+          market_state: string
+          outcome: string | null
+          pnl_usd: number | null
+          prediction_id: string | null
+          reasons_jsonb: Json
+          reversal_score: number
+          settle_price: number | null
+          signals_jsonb: Json
+          spot_at_compute: number
+          strike: number
+          strike_distance_in_expected_moves: number
+          strike_distance_usd: number
+          structure_direction: string
+          structure_strength: number
+          ticker: string
+          user_id: string
+          volatility_regime: string
+          warnings_jsonb: Json
+          window_start: string
+        }
+        Insert: {
+          chop_score?: number
+          close_time: string
+          compression_score?: number
+          confidence: number
+          continuation_score?: number
+          created_at?: string
+          direction: string
+          exhaustion_score?: number
+          expected_move_15m_pct: number
+          expected_move_15m_usd: number
+          id?: string
+          market_intel_version: string
+          market_state: string
+          outcome?: string | null
+          pnl_usd?: number | null
+          prediction_id?: string | null
+          reasons_jsonb?: Json
+          reversal_score?: number
+          settle_price?: number | null
+          signals_jsonb?: Json
+          spot_at_compute: number
+          strike: number
+          strike_distance_in_expected_moves: number
+          strike_distance_usd: number
+          structure_direction: string
+          structure_strength: number
+          ticker: string
+          user_id: string
+          volatility_regime: string
+          warnings_jsonb?: Json
+          window_start: string
+        }
+        Update: {
+          chop_score?: number
+          close_time?: string
+          compression_score?: number
+          confidence?: number
+          continuation_score?: number
+          created_at?: string
+          direction?: string
+          exhaustion_score?: number
+          expected_move_15m_pct?: number
+          expected_move_15m_usd?: number
+          id?: string
+          market_intel_version?: string
+          market_state?: string
+          outcome?: string | null
+          pnl_usd?: number | null
+          prediction_id?: string | null
+          reasons_jsonb?: Json
+          reversal_score?: number
+          settle_price?: number | null
+          signals_jsonb?: Json
+          spot_at_compute?: number
+          strike?: number
+          strike_distance_in_expected_moves?: number
+          strike_distance_usd?: number
+          structure_direction?: string
+          structure_strength?: number
+          ticker?: string
+          user_id?: string
+          volatility_regime?: string
+          warnings_jsonb?: Json
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "btc_market_intel_prediction_id_fkey"
+            columns: ["prediction_id"]
+            isOneToOne: false
+            referencedRelation: "btc_model_predictions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       btc_model_predictions: {
         Row: {
           anchor_z: number | null
