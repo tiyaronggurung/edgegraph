@@ -38,29 +38,31 @@ interface Interaction {
  * "close_above" / "close_below" = clean close outside the zone.
  * "wick_through" = wick pierced but close remained inside zone.
  */
-function walkInteractions(candles: Candle[], level: number, halfWidth: number): Interaction[] {
+function walkInteractions(candles: Candle[], level: number, halfWidth: number, atr: number): Interaction[] {
   const zoneLo = level - halfWidth;
   const zoneHi = level + halfWidth;
+  // Proximity: candle must get near the actual level line, not just inside the wide zone.
+  // "Near" = the candle's closest edge is within max(halfWidth, 0.75*ATR) of the line,
+  // or the candle straddles the line outright.
+  const proximity = Math.max(halfWidth, atr * 0.75);
   const out: Interaction[] = [];
   for (let i = 0; i < candles.length; i++) {
     const c = candles[i];
-    const touches = c.l <= zoneHi && c.h >= zoneLo;
-    if (!touches) continue;
+    const straddles = c.l <= level && c.h >= level;
+    const nearHigh = Math.abs(c.h - level) <= proximity;
+    const nearLow = Math.abs(c.l - level) <= proximity;
+    if (!straddles && !nearHigh && !nearLow) continue;
+
     const closedAbove = c.c > zoneHi;
     const closedBelow = c.c < zoneLo;
     const wickedAbove = c.h > zoneHi;
     const wickedBelow = c.l < zoneLo;
 
-    if (closedAbove && wickedBelow) {
-      out.push({ kind: "close_above", candleIdx: i });
-    } else if (closedBelow && wickedAbove) {
-      out.push({ kind: "close_below", candleIdx: i });
-    } else if (closedAbove) {
-      out.push({ kind: "close_above", candleIdx: i });
-    } else if (closedBelow) {
-      out.push({ kind: "close_below", candleIdx: i });
-    } else {
-      // Closed inside the zone.
+    if (closedAbove && wickedBelow) out.push({ kind: "close_above", candleIdx: i });
+    else if (closedBelow && wickedAbove) out.push({ kind: "close_below", candleIdx: i });
+    else if (closedAbove) out.push({ kind: "close_above", candleIdx: i });
+    else if (closedBelow) out.push({ kind: "close_below", candleIdx: i });
+    else {
       if (wickedAbove && c.c < level) out.push({ kind: "rejection_down", candleIdx: i });
       else if (wickedBelow && c.c > level) out.push({ kind: "rejection_up", candleIdx: i });
       else if (wickedAbove || wickedBelow) out.push({ kind: "wick_through", candleIdx: i });
