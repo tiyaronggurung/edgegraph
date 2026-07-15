@@ -498,6 +498,12 @@ export type Database = {
           consecutive_losses: number
           created_at: string
           enabled: boolean
+          exit_edge_decay_cents: number
+          exit_flip_prob: number
+          exit_late_sl_frac: number
+          exit_odds_flip_cents: number
+          exit_sl_frac: number
+          exit_tp_frac: number
           hedge_band_hi: number | null
           hedge_band_lo: number | null
           ignore_cents_band: boolean
@@ -521,6 +527,12 @@ export type Database = {
           consecutive_losses?: number
           created_at?: string
           enabled?: boolean
+          exit_edge_decay_cents?: number
+          exit_flip_prob?: number
+          exit_late_sl_frac?: number
+          exit_odds_flip_cents?: number
+          exit_sl_frac?: number
+          exit_tp_frac?: number
           hedge_band_hi?: number | null
           hedge_band_lo?: number | null
           ignore_cents_band?: boolean
@@ -544,6 +556,12 @@ export type Database = {
           consecutive_losses?: number
           created_at?: string
           enabled?: boolean
+          exit_edge_decay_cents?: number
+          exit_flip_prob?: number
+          exit_late_sl_frac?: number
+          exit_odds_flip_cents?: number
+          exit_sl_frac?: number
+          exit_tp_frac?: number
           hedge_band_hi?: number | null
           hedge_band_lo?: number | null
           ignore_cents_band?: boolean
