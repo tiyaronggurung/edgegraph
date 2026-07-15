@@ -134,15 +134,17 @@ async function defaultInserter(row: InserterRow): Promise<{ inserted: boolean; e
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("btc_market_intel")
-      // @ts-expect-error: table schema types don't include Turn-3 new columns yet
+      // @ts-expect-error: table schema types don't include Turn-3/4A new columns yet
       .insert(row);
     if (error) {
       // 23505 = unique_violation → idempotent no-op.
       if ((error as { code?: string }).code === "23505") return { inserted: false, error: "duplicate" };
+      console.warn(`[marketIntel] insert failed: ${error.message} (code=${(error as { code?: string }).code ?? "?"})`);
       return { inserted: false, error: error.message };
     }
     return { inserted: true };
   } catch (e) {
+    console.warn(`[marketIntel] insert threw: ${(e as Error).message}`);
     return { inserted: false, error: (e as Error).message };
   }
 }
