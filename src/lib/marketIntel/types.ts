@@ -102,6 +102,35 @@ export interface CandlePatternHit {
   candleIndex: number;
 }
 
+export type MarketIntelStatus = "computed" | "insufficient_data" | "partial" | "error";
+
+export type PsychLevelRole = "support" | "resistance" | "none";
+export type PsychLevelState =
+  | "untested"
+  | "tested_held"
+  | "tested_broken"
+  | "accepted_breakout"
+  | "accepted_breakdown"
+  | "retest"
+  | "polarity_flip"
+  | "stale"
+  | "chop_magnet"
+  | "none";
+
+export interface PsychologicalLevelResult {
+  nearestLevel: number | null;
+  intervalUsd: number;              // 50, 100, 250, 500, or 1000
+  role: PsychLevelRole;
+  strength: number;                 // 0..100
+  distanceUsd: number;
+  distanceAtr: number;
+  state: PsychLevelState;
+  confluenceScore: number;          // 0..100 — multiple intervals aligned
+  crossings: number;                // recent crossings within lookback
+  touches: number;
+  reasons: string[];
+}
+
 export interface MarketIntel {
   market_state: MarketState;
   structure_direction: Direction;
@@ -124,14 +153,27 @@ export interface MarketIntel {
   strike_distance_usd: number;
   strike_distance_in_expected_moves: number;
 
+  psych: PsychologicalLevelResult;
+
   direction: Direction;
   confidence: number;
+
+  status: MarketIntelStatus;
 
   reasons: string[];
   warnings: string[];
 
   version: typeof MARKET_INTEL_VERSION;
+  component_versions: {
+    structure: string;
+    volatility: string;
+    patterns: string;
+    sequence: string;
+    combiner: string;
+    psychological_levels: string;
+  };
 }
+
 
 export interface MarketIntelInput {
   spot: number;
