@@ -71,7 +71,6 @@ export const matchPendingSettlements = createServerFn({ method: "POST" })
 
       const { error: upErr } = await supabaseAdmin
         .from("btc_market_intel")
-        // @ts-expect-error: new column update
         .update({ settlement_link_status: nextStatus })
         .in("id", g.ids);
       if (upErr) continue;
