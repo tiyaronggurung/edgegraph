@@ -10,7 +10,8 @@ import { MARKET_INTEL_VERSION } from "./types";
 import { computeMarketIntel } from "./combine";
 
 export interface ComputeAndLogInput {
-  userId: string;
+  /** May be null for global (system-wide) predictions like the BTC 15-min market. */
+  userId: string | null;
   ticker: string;
   strike: number;
   spot: number;
