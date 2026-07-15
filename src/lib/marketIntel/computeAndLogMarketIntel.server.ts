@@ -134,7 +134,6 @@ async function defaultInserter(row: InserterRow): Promise<{ inserted: boolean; e
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("btc_market_intel")
-      // @ts-expect-error: table schema types don't include Turn-3/4A new columns yet
       .insert(row);
     if (error) {
       // 23505 = unique_violation → idempotent no-op.
