@@ -82,6 +82,12 @@ type InserterRow = {
   psych_distance_atr: number | null;
   psych_state: string | null;
   round_confluence_score: number | null;
+  market_window_id: string | null;
+  window_open_ts: string | null;
+  window_close_ts: string | null;
+  seconds_to_close: number | null;
+  time_bucket: TimeBucket | null;
+  settlement_link_status: SettlementLinkStatus;
   signals_jsonb: unknown;
   reasons_jsonb: unknown;
   warnings_jsonb: unknown;
