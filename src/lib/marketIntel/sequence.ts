@@ -133,18 +133,30 @@ export function analyzeSequence(
   // EXPANSION: ranges growing
   if (rangeTrend.sign > 0) expansion = Math.min(100, Math.round(rangeTrend.magnitude * 800));
 
-  // EXHAUSTION detection — 3+ candles same net direction, bodies SHRINKING, opposing wicks GROWING
+  // EXHAUSTION detection — check last-3 bars directly (strict monotonic).
+  // 3+ candles same-color net-direction, bodies SHRINKING, opposing wicks GROWING.
   const last3 = c1.slice(-3);
   const l3Green = last3.filter(isGreen).length;
   const l3Red = last3.filter(isRed).length;
-  const bodyShrinking = bodyTrend.sign < 0 && bodyTrend.magnitude > 0.05;
-  if (l3Green >= 2 && bodyShrinking && upWickTrend.sign > 0 && netMove1 > 0) {
-    exhaustion = 70;
-    reasons.push("bullish exhaustion: shrinking bodies + growing upper wicks");
+  if (last3.length === 3) {
+    const b3 = last3.map(body);
+    const upw3 = last3.map(upperWick);
+    const lo3 = last3.map(lowerWick);
+    const bodyShrink3 = b3[0] > b3[1] && b3[1] > b3[2];
+    const upGrow3 = upw3[0] < upw3[1] && upw3[1] < upw3[2];
+    const loGrow3 = lo3[0] < lo3[1] && lo3[1] < lo3[2];
+    if (l3Green >= 2 && bodyShrink3 && upGrow3 && netMove1 > 0) {
+      exhaustion = 70;
+      reasons.push("bullish exhaustion: shrinking bodies + growing upper wicks");
+    }
+    if (l3Red >= 2 && bodyShrink3 && loGrow3 && netMove1 < 0) {
+      exhaustion = 70;
+      reasons.push("bearish exhaustion: shrinking bodies + growing lower wicks");
+    }
   }
-  if (l3Red >= 2 && bodyShrinking && loWickTrend.sign > 0 && netMove1 < 0) {
-    exhaustion = 70;
-    reasons.push("bearish exhaustion: shrinking bodies + growing lower wicks");
+  // Retain trend-based hints for reasons log
+  if (bodyTrend.sign < 0 && (upWickTrend.sign > 0 || loWickTrend.sign > 0)) {
+    reasons.push(`body↓ wick↑ (trend-signal)`);
   }
 
   // REVERSAL: strong opposite candle vs prior trend
