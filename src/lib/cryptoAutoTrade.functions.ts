@@ -987,12 +987,12 @@ export const settleAutoTradeOrders = createServerFn({ method: "POST" })
 
 // ── STEP 9 · Auto-Exit Live Positions ─────────────────────────────────────
 // Combined exit policy for live auto-trade orders, evaluated every minute:
-//   • Take-profit: mark PnL ≥ +70% of stake → close at current bid
+//   • Take-profit: mark PnL ≥ +80% of stake → close at current bid
 //   • Stop-loss:   mark PnL ≤ -50% of stake → close at current bid
 //   • Edge decay:  price moved ≥2¢ against our side → close at current bid
 // Paper orders and manual crypto_trades are untouched. Settlement still
 // happens via settleAutoTradeOrders for any position not exited early.
-const LIVE_TP_FRAC = 0.70;
+const LIVE_TP_FRAC = 0.80;
 const LIVE_SL_FRAC = 0.50;
 const LIVE_EDGE_DECAY_CENTS = 2;
 // Direction-flip: if the live model now gives our side < this prob, bail out
