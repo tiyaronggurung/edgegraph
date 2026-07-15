@@ -1366,15 +1366,15 @@ export async function autoExitForUser(
 
 
 
-    if (!exitReason && sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
+    if (!exitReason && sideProbNow !== undefined && sideProbNow < cfgFlipProb) {
       exitReason = "flip";
-      reasons.push(`${r.ticker}[${r.mode}]: flip — model now ${(sideProbNow * 100).toFixed(0)}% for ${r.side} (< ${LIVE_FLIP_PROB * 100}%)`);
+      reasons.push(`${r.ticker}[${r.mode}]: flip — model now ${(sideProbNow * 100).toFixed(0)}% for ${r.side} (< ${(cfgFlipProb * 100).toFixed(0)}%)`);
     }
 
     else if (!exitReason && netLock) exitReason = "net";
     else if (!exitReason && markPnl >= tpThreshold) exitReason = "tp";
     else if (!exitReason && markPnl <= slThreshold) exitReason = "sl";
-    else if (!exitReason && adverseCents >= LIVE_EDGE_DECAY_CENTS) exitReason = "edge";
+    else if (!exitReason && adverseCents >= cfgEdgeDecayCents) exitReason = "edge";
     if (!exitReason) continue;
 
     const { data: claimed } = await supabase
