@@ -1019,10 +1019,17 @@ export async function autoExitForUser(
   // These fire earlier than the standard ladder for users on model_bet.
   const { data: btSettings } = await supabase
     .from("auto_odds_settings")
-    .select("auto_button_type")
+    .select("auto_button_type, exit_tp_frac, exit_sl_frac, exit_late_sl_frac, exit_edge_decay_cents, exit_flip_prob, exit_odds_flip_cents")
     .eq("user_id", userId)
     .maybeSingle();
   const isModelBetUser = (btSettings?.auto_button_type ?? "") === "model_bet";
+  // Per-user exit thresholds (fall back to module defaults if unset).
+  const cfgTpFrac = Number(btSettings?.exit_tp_frac ?? LIVE_TP_FRAC) || LIVE_TP_FRAC;
+  const cfgSlFrac = Number(btSettings?.exit_sl_frac ?? LIVE_SL_FRAC) || LIVE_SL_FRAC;
+  const cfgLateSlFrac = Number(btSettings?.exit_late_sl_frac ?? LIVE_LATE_SL_FRAC) || LIVE_LATE_SL_FRAC;
+  const cfgEdgeDecayCents = Number(btSettings?.exit_edge_decay_cents ?? LIVE_EDGE_DECAY_CENTS) || LIVE_EDGE_DECAY_CENTS;
+  const cfgFlipProb = Number(btSettings?.exit_flip_prob ?? LIVE_FLIP_PROB) || LIVE_FLIP_PROB;
+  const cfgOddsFlipCents = Number(btSettings?.exit_odds_flip_cents ?? 12) || 12;
 
 
   const nowIso = new Date().toISOString();
@@ -1255,9 +1262,9 @@ export async function autoExitForUser(
   }
 
   for (const { r, markCents, markPnl, remaining, entry } of stillOpen) {
-    const tpThreshold = LIVE_TP_FRAC * Number(r.stake_usd);
+    const tpThreshold = cfgTpFrac * Number(r.stake_usd);
     const secondsLeft = Math.max(0, (Date.parse(r.close_time) - Date.now()) / 1000);
-    const slFrac = secondsLeft < LIVE_LATE_TIGHTEN_SEC ? LIVE_LATE_SL_FRAC : LIVE_SL_FRAC;
+    const slFrac = secondsLeft < LIVE_LATE_TIGHTEN_SEC ? cfgLateSlFrac : cfgSlFrac;
     const slThreshold = -slFrac * Number(r.stake_usd);
     const adverseCents = entry - markCents;
     const sideProbNow = currentModelProbBySide.get(r.ticker);
@@ -1292,10 +1299,9 @@ export async function autoExitForUser(
       }
     }
 
-    // Kalshi-odds flip: the market moved ≥12¢ against our side vs entry
-    // (independent of our model). Tightened from 20¢ → 12¢ so we bail on
-    // the crowd rotation before a full crash.
-    if (!exitReason && (entry - markCents) >= 12) {
+    // Kalshi-odds flip: the market moved ≥cfgOddsFlipCents against our side vs entry
+    // (independent of our model). Configurable per user (default 12¢).
+    if (!exitReason && (entry - markCents) >= cfgOddsFlipCents) {
       exitReason = "odds_flip";
       reasons.push(`${r.ticker}[${r.mode}]: ODDS FLIP — Kalshi ${r.side} ${markCents}¢ vs entry ${entry}¢ (−${entry - markCents}¢)`);
     }
@@ -1360,15 +1366,15 @@ export async function autoExitForUser(
 
 
 
-    if (!exitReason && sideProbNow !== undefined && sideProbNow < LIVE_FLIP_PROB) {
+    if (!exitReason && sideProbNow !== undefined && sideProbNow < cfgFlipProb) {
       exitReason = "flip";
-      reasons.push(`${r.ticker}[${r.mode}]: flip — model now ${(sideProbNow * 100).toFixed(0)}% for ${r.side} (< ${LIVE_FLIP_PROB * 100}%)`);
+      reasons.push(`${r.ticker}[${r.mode}]: flip — model now ${(sideProbNow * 100).toFixed(0)}% for ${r.side} (< ${(cfgFlipProb * 100).toFixed(0)}%)`);
     }
 
     else if (!exitReason && netLock) exitReason = "net";
     else if (!exitReason && markPnl >= tpThreshold) exitReason = "tp";
     else if (!exitReason && markPnl <= slThreshold) exitReason = "sl";
-    else if (!exitReason && adverseCents >= LIVE_EDGE_DECAY_CENTS) exitReason = "edge";
+    else if (!exitReason && adverseCents >= cfgEdgeDecayCents) exitReason = "edge";
     if (!exitReason) continue;
 
     const { data: claimed } = await supabase

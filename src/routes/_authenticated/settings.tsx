@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { SPORTS } from "@/lib/sports";
 import { toast } from "sonner";
 import { AlertPreferencesCard } from "@/components/settings/AlertPreferencesCard";
+import { AutoExitConfigPanel } from "@/components/settings/AutoExitConfigPanel";
 import {
   getKalshiCredsStatus,
   saveKalshiCreds,
@@ -125,6 +126,7 @@ graph_snapshots(id, analysis_id, user_id, timestamp,
           </div>
         </div>
         <AlertPreferencesCard />
+        <div className="lg:col-span-2"><AutoExitConfigPanel /></div>
       </div>
     </div>
   );
