@@ -126,6 +126,7 @@ graph_snapshots(id, analysis_id, user_id, timestamp,
           </div>
         </div>
         <AlertPreferencesCard />
+        <div className="lg:col-span-2"><AutoExitConfigPanel /></div>
       </div>
     </div>
   );
