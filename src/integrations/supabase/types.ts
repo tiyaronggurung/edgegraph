@@ -1736,27 +1736,41 @@ export type Database = {
       }
       btc_market_intel: {
         Row: {
+          calculation_duration_ms: number | null
           chop_score: number
           close_time: string
           compression_score: number
           confidence: number
           continuation_score: number
           created_at: string
+          decision_ts: string | null
           direction: string
           exhaustion_score: number
+          expansion_score: number
           expected_move_15m_pct: number
           expected_move_15m_usd: number
           id: string
+          input_lag_ms: number | null
           market_intel_version: string
           market_state: string
+          nearest_psych_level: number | null
           outcome: string | null
           pnl_usd: number | null
           prediction_id: string | null
+          psych_distance_atr: number | null
+          psych_distance_usd: number | null
+          psych_level_interval: number | null
+          psych_level_role: string | null
+          psych_level_strength: number | null
+          psych_state: string | null
           reasons_jsonb: Json
           reversal_score: number
+          round_confluence_score: number | null
+          sequence_state: string | null
           settle_price: number | null
           signals_jsonb: Json
           spot_at_compute: number
+          status: string
           strike: number
           strike_distance_in_expected_moves: number
           strike_distance_usd: number
@@ -1769,27 +1783,41 @@ export type Database = {
           window_start: string
         }
         Insert: {
+          calculation_duration_ms?: number | null
           chop_score?: number
           close_time: string
           compression_score?: number
           confidence: number
           continuation_score?: number
           created_at?: string
+          decision_ts?: string | null
           direction: string
           exhaustion_score?: number
+          expansion_score?: number
           expected_move_15m_pct: number
           expected_move_15m_usd: number
           id?: string
+          input_lag_ms?: number | null
           market_intel_version: string
           market_state: string
+          nearest_psych_level?: number | null
           outcome?: string | null
           pnl_usd?: number | null
           prediction_id?: string | null
+          psych_distance_atr?: number | null
+          psych_distance_usd?: number | null
+          psych_level_interval?: number | null
+          psych_level_role?: string | null
+          psych_level_strength?: number | null
+          psych_state?: string | null
           reasons_jsonb?: Json
           reversal_score?: number
+          round_confluence_score?: number | null
+          sequence_state?: string | null
           settle_price?: number | null
           signals_jsonb?: Json
           spot_at_compute: number
+          status?: string
           strike: number
           strike_distance_in_expected_moves: number
           strike_distance_usd: number
@@ -1802,27 +1830,41 @@ export type Database = {
           window_start: string
         }
         Update: {
+          calculation_duration_ms?: number | null
           chop_score?: number
           close_time?: string
           compression_score?: number
           confidence?: number
           continuation_score?: number
           created_at?: string
+          decision_ts?: string | null
           direction?: string
           exhaustion_score?: number
+          expansion_score?: number
           expected_move_15m_pct?: number
           expected_move_15m_usd?: number
           id?: string
+          input_lag_ms?: number | null
           market_intel_version?: string
           market_state?: string
+          nearest_psych_level?: number | null
           outcome?: string | null
           pnl_usd?: number | null
           prediction_id?: string | null
+          psych_distance_atr?: number | null
+          psych_distance_usd?: number | null
+          psych_level_interval?: number | null
+          psych_level_role?: string | null
+          psych_level_strength?: number | null
+          psych_state?: string | null
           reasons_jsonb?: Json
           reversal_score?: number
+          round_confluence_score?: number | null
+          sequence_state?: string | null
           settle_price?: number | null
           signals_jsonb?: Json
           spot_at_compute?: number
+          status?: string
           strike?: number
           strike_distance_in_expected_moves?: number
           strike_distance_usd?: number
