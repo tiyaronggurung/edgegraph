@@ -15,14 +15,14 @@ function nearestMultiple(price: number, interval: number): number {
 }
 
 /**
- * Zone half-width in USD around a level. Scales with ATR so a $50 level in
+ * Zone half-width in USD around a level. Volatility-scaled — a $50 level in
  * calm markets is narrow and the same level in a shock regime is wider.
+ * Capped so a large-interval label doesn't create a huge zone in a quiet market.
  */
 function zoneHalfWidth(interval: number, atr: number): number {
-  // Baseline: 8% of the interval; expand with ATR up to 40% of interval.
-  const base = interval * 0.08;
-  const atrBoost = Math.min(interval * 0.32, (atr ?? 0) * 0.6);
-  return base + atrBoost;
+  const atrBoost = atr * 0.5;
+  const base = Math.min(interval * 0.04, 15);
+  return Math.max(base + atrBoost, atr * 0.3, 3);
 }
 
 interface Interaction {
@@ -31,20 +31,15 @@ interface Interaction {
 }
 
 /**
- * Walk closed candles and record every meaningful interaction with a level.
- * "touch" = candle range intersects the zone.
- * "rejection_up" = touched from below, closed at least half-zone back below.
- * "rejection_down" = touched from above, closed at least half-zone back above.
- * "close_above" / "close_below" = clean close outside the zone.
- * "wick_through" = wick pierced but close remained inside zone.
+ * Walk closed candles and record interactions with a level.
+ * Proximity gate: the candle must actually get close to the level line —
+ * either straddle it, or have one edge within max(halfWidth, ATR*0.5) of it.
+ * Bars that trade cleanly on one side without approaching the level don't count.
  */
 function walkInteractions(candles: Candle[], level: number, halfWidth: number, atr: number): Interaction[] {
   const zoneLo = level - halfWidth;
   const zoneHi = level + halfWidth;
-  // Proximity: candle must get near the actual level line, not just inside the wide zone.
-  // "Near" = the candle's closest edge is within max(halfWidth, 0.75*ATR) of the line,
-  // or the candle straddles the line outright.
-  const proximity = Math.max(halfWidth, atr * 0.75);
+  const proximity = Math.max(halfWidth, atr * 0.5);
   const out: Interaction[] = [];
   for (let i = 0; i < candles.length; i++) {
     const c = candles[i];
@@ -53,20 +48,25 @@ function walkInteractions(candles: Candle[], level: number, halfWidth: number, a
     const nearLow = Math.abs(c.l - level) <= proximity;
     if (!straddles && !nearHigh && !nearLow) continue;
 
-    const closedAbove = c.c > zoneHi;
-    const closedBelow = c.c < zoneLo;
-    const wickedAbove = c.h > zoneHi;
-    const wickedBelow = c.l < zoneLo;
-
-    if (closedAbove && wickedBelow) out.push({ kind: "close_above", candleIdx: i });
-    else if (closedBelow && wickedAbove) out.push({ kind: "close_below", candleIdx: i });
-    else if (closedAbove) out.push({ kind: "close_above", candleIdx: i });
-    else if (closedBelow) out.push({ kind: "close_below", candleIdx: i });
-    else {
-      if (wickedAbove && c.c < level) out.push({ kind: "rejection_down", candleIdx: i });
-      else if (wickedBelow && c.c > level) out.push({ kind: "rejection_up", candleIdx: i });
-      else if (wickedAbove || wickedBelow) out.push({ kind: "wick_through", candleIdx: i });
-      else out.push({ kind: "touch", candleIdx: i });
+    if (straddles) {
+      const range = Math.max(1e-9, c.h - c.l);
+      const cp = (c.c - c.l) / range; // 0..1
+      if (cp >= 0.66) out.push({ kind: "rejection_up", candleIdx: i });   // closed high — level held as support
+      else if (cp <= 0.34) out.push({ kind: "rejection_down", candleIdx: i }); // closed low — level held as resistance
+      else out.push({ kind: "wick_through", candleIdx: i });
+      continue;
+    }
+    // Candle sits entirely on one side of the level but is proximity-close.
+    const entirelyAbove = c.l > level;
+    if (entirelyAbove) {
+      // Approaching from above; if close reached back down toward the line it's a level-bounce.
+      // Clean close well above the zone with no low intrusion is a "close_above" (accepted-side).
+      if (c.l > zoneHi) out.push({ kind: "close_above", candleIdx: i });
+      else out.push({ kind: "rejection_up", candleIdx: i });
+    } else {
+      // Candle entirely below the level.
+      if (c.h < zoneLo) out.push({ kind: "close_below", candleIdx: i });
+      else out.push({ kind: "rejection_down", candleIdx: i });
     }
   }
   return out;
