@@ -1299,10 +1299,9 @@ export async function autoExitForUser(
       }
     }
 
-    // Kalshi-odds flip: the market moved ≥12¢ against our side vs entry
-    // (independent of our model). Tightened from 20¢ → 12¢ so we bail on
-    // the crowd rotation before a full crash.
-    if (!exitReason && (entry - markCents) >= 12) {
+    // Kalshi-odds flip: the market moved ≥cfgOddsFlipCents against our side vs entry
+    // (independent of our model). Configurable per user (default 12¢).
+    if (!exitReason && (entry - markCents) >= cfgOddsFlipCents) {
       exitReason = "odds_flip";
       reasons.push(`${r.ticker}[${r.mode}]: ODDS FLIP — Kalshi ${r.side} ${markCents}¢ vs entry ${entry}¢ (−${entry - markCents}¢)`);
     }
