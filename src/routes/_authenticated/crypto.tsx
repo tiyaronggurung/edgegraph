@@ -2928,6 +2928,9 @@ function CryptoPage() {
 
           <LazyOnVisible><ModelScorecardPanel /></LazyOnVisible>
 
+          <LazyOnVisible><MarketIntelHealthPanel /></LazyOnVisible>
+
+
           <LazyOnVisible><DailyPerformancePanel /></LazyOnVisible>
 
           <LazyOnVisible><ModelAblationPanel /></LazyOnVisible>
