@@ -57,16 +57,16 @@ function walkInteractions(candles: Candle[], level: number, halfWidth: number, a
       continue;
     }
     // Candle sits entirely on one side of the level but is proximity-close.
+    // Only count as a "real test" if the candle actually reached across the
+    // line (low dipped below for a support test, high spiked above for a
+    // resistance test). Pure proximity without crossing = no evidence.
     const entirelyAbove = c.l > level;
     if (entirelyAbove) {
-      // Approaching from above; if close reached back down toward the line it's a level-bounce.
-      // Clean close well above the zone with no low intrusion is a "close_above" (accepted-side).
       if (c.l > zoneHi) out.push({ kind: "close_above", candleIdx: i });
-      else out.push({ kind: "rejection_up", candleIdx: i });
+      // else: proximity-close but never crossed → not a real test; skip.
     } else {
-      // Candle entirely below the level.
       if (c.h < zoneLo) out.push({ kind: "close_below", candleIdx: i });
-      else out.push({ kind: "rejection_down", candleIdx: i });
+      // else: proximity-close from below but no straddle → skip.
     }
   }
   return out;
