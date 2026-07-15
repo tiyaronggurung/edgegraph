@@ -110,42 +110,45 @@ function scoreLevel(spot: number, interval: number, candles: Candle[], atr: numb
   let acceptanceUp = 0;
   let acceptanceDown = 0;
   let wickOnly = 0;
+  let realTests = 0; // straddles / wick-throughs / true rejections
   let lastInteractionAge = N;
 
   for (const it of inters) {
     const age = N - it.candleIdx;
     const w = Math.max(0.2, 1 - age / Math.max(N, 20));
-    if (it.kind === "rejection_up") rejectionScore += 20 * w;
-    else if (it.kind === "rejection_down") rejectionScore += 20 * w;
+    if (it.kind === "rejection_up") { rejectionScore += 20 * w; realTests++; }
+    else if (it.kind === "rejection_down") { rejectionScore += 20 * w; realTests++; }
+    else if (it.kind === "wick_through") { wickOnly += 5 * w; realTests++; }
     else if (it.kind === "close_above") acceptanceUp += 15 * w;
     else if (it.kind === "close_below") acceptanceDown += 15 * w;
-    else if (it.kind === "wick_through") wickOnly += 5 * w;
-    else rejectionScore += 4 * w; // plain touch
+    else { rejectionScore += 4 * w; realTests++; }
     if (age < lastInteractionAge) lastInteractionAge = age;
   }
 
-  // Role: which side of the level is spot?
+  // A level with only "close on one side" evidence (never actually approached)
+  // is NOT tested — a flat market drifting near a distant level shouldn't
+  // score as accepted_breakout.
+  const evidenceOfContact = realTests > 0 || crossings > 0;
+
   const above = spot > level;
   const role: PsychLevelRole = above ? "support" : (spot < level ? "resistance" : "none");
 
-  // Determine state
   let state: PsychLevelState = "untested";
-  if (touches === 0) state = "untested";
+  if (!evidenceOfContact) state = "untested";
   else if (crossings >= 4) state = "chop_magnet";
-  else if (above && acceptanceUp > 20 && acceptanceUp > acceptanceDown) {
-    // Spot is above, and we've cleanly accepted breakouts up.
+  else if (above && acceptanceUp > 20 && acceptanceUp > acceptanceDown && crossings >= 1) {
     state = acceptanceDown > 10 ? "polarity_flip" : "accepted_breakout";
-  } else if (!above && acceptanceDown > 20 && acceptanceDown > acceptanceUp) {
+  } else if (!above && acceptanceDown > 20 && acceptanceDown > acceptanceUp && crossings >= 1) {
     state = acceptanceUp > 10 ? "polarity_flip" : "accepted_breakdown";
   } else if (rejectionScore > 25 && crossings === 0) state = "tested_held";
   else if (crossings >= 1) state = "tested_broken";
   else if (lastInteractionAge > N * 0.7) state = "stale";
   else state = "tested_held";
 
-  // Confirm retest — accepted breakout followed by a return to the level.
   if ((state === "accepted_breakout" || state === "accepted_breakdown") && lastInteractionAge < N * 0.15) {
     state = "retest";
   }
+
 
   // Strength: weighted evidence, capped.
   let strength = 0;
