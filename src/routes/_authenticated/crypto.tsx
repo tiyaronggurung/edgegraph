@@ -55,6 +55,7 @@ const JumpBacktestPanel = lazy(() => import("@/components/crypto/JumpBacktestPan
 const JumpRecommendationCard = lazy(() => import("@/components/crypto/JumpRecommendationCard").then(m => ({ default: m.JumpRecommendationCard })));
 const SignedEdgeVetoPanel = lazy(() => import("@/components/crypto/SignedEdgeVetoPanel").then(m => ({ default: m.SignedEdgeVetoPanel })));
 const ConvictionExitPanel = lazy(() => import("@/components/crypto/ConvictionExitPanel").then(m => ({ default: m.ConvictionExitPanel })));
+const MarketIntelHealthPanel = lazy(() => import("@/components/crypto/MarketIntelHealthPanel").then(m => ({ default: m.MarketIntelHealthPanel })));
 
 
 
@@ -2926,6 +2927,9 @@ function CryptoPage() {
           <PricingStudyPanel markets={data.markets} />
 
           <LazyOnVisible><ModelScorecardPanel /></LazyOnVisible>
+
+          <LazyOnVisible><MarketIntelHealthPanel /></LazyOnVisible>
+
 
           <LazyOnVisible><DailyPerformancePanel /></LazyOnVisible>
 
