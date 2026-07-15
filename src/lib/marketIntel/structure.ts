@@ -125,9 +125,9 @@ export function classifyStructure(
 
   const dirScore = (d: Direction) => d === "UP" ? 1 : d === "DOWN" ? -1 : 0;
   // Weights: 15m 0.5, 5m 0.35, 1m 0.15
-  const w15 = s15 ? 0.5 : 0;
-  const w5 = s15 ? 0.35 : 0.7;
-  const w1 = s15 ? 0.15 : 0.3;
+  const w15 = s15 ? 0.55 : 0;
+  const w5 = s15 ? 0.30 : 0.80;
+  const w1 = s15 ? 0.15 : 0.20;
   const votes =
     dirScore(s1.direction) * s1.strength * w1 +
     dirScore(s5.direction) * s5.strength * w5 +
@@ -138,9 +138,9 @@ export function classifyStructure(
 
   let direction: Direction = "NEUTRAL";
   let state: MarketState = "range";
-  if (raw > 0.35) { direction = "UP"; state = s5.state === "bull_trend" || (s15?.state === "bull_trend") ? "bull_trend" : "transition"; }
-  else if (raw < -0.35) { direction = "DOWN"; state = s5.state === "bear_trend" || (s15?.state === "bear_trend") ? "bear_trend" : "transition"; }
-  else if (Math.abs(raw) < 0.1) { direction = "NEUTRAL"; state = "range"; }
+  if (raw > 0.22) { direction = "UP"; state = s5.state === "bull_trend" || (s15?.state === "bull_trend") ? "bull_trend" : "transition"; }
+  else if (raw < -0.22) { direction = "DOWN"; state = s5.state === "bear_trend" || (s15?.state === "bear_trend") ? "bear_trend" : "transition"; }
+  else if (Math.abs(raw) < 0.08) { direction = "NEUTRAL"; state = "range"; }
   else { direction = raw > 0 ? "UP" : "DOWN"; state = "transition"; }
 
   const strength = Math.round(Math.min(100, Math.abs(raw) * 100));
