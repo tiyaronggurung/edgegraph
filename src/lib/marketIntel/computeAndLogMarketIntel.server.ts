@@ -44,7 +44,7 @@ type EnvConfig = {
 };
 
 type InserterRow = {
-  user_id: string;
+  user_id: string | null;
   prediction_id: string | null;
   ticker: string;
   window_start: string;
