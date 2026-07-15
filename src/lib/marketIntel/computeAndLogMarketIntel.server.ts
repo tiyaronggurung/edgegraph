@@ -126,7 +126,9 @@ function sanitizeCandles(candles: Candle[] | undefined, cutoffMs: number): Candl
 
 function latestCloseTime(cs: Candle[]): string | null {
   if (cs.length === 0) return null;
-  return new Date(cs[cs.length - 1].t).toISOString();
+  const raw = cs[cs.length - 1].t;
+  const ms = raw < 1e12 ? raw * 1000 : raw;
+  return new Date(ms).toISOString();
 }
 
 async function defaultInserter(row: InserterRow): Promise<{ inserted: boolean; error?: string }> {
