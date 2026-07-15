@@ -1753,6 +1753,7 @@ export type Database = {
           input_lag_ms: number | null
           market_intel_version: string
           market_state: string
+          market_window_id: string | null
           nearest_psych_level: number | null
           outcome: string | null
           pnl_usd: number | null
@@ -1766,8 +1767,10 @@ export type Database = {
           reasons_jsonb: Json
           reversal_score: number
           round_confluence_score: number | null
+          seconds_to_close: number | null
           sequence_state: string | null
           settle_price: number | null
+          settlement_link_status: string | null
           signals_jsonb: Json
           spot_at_compute: number
           status: string
@@ -1777,9 +1780,12 @@ export type Database = {
           structure_direction: string
           structure_strength: number
           ticker: string
+          time_bucket: string | null
           user_id: string | null
           volatility_regime: string
           warnings_jsonb: Json
+          window_close_ts: string | null
+          window_open_ts: string | null
           window_start: string
         }
         Insert: {
@@ -1800,6 +1806,7 @@ export type Database = {
           input_lag_ms?: number | null
           market_intel_version: string
           market_state: string
+          market_window_id?: string | null
           nearest_psych_level?: number | null
           outcome?: string | null
           pnl_usd?: number | null
@@ -1813,8 +1820,10 @@ export type Database = {
           reasons_jsonb?: Json
           reversal_score?: number
           round_confluence_score?: number | null
+          seconds_to_close?: number | null
           sequence_state?: string | null
           settle_price?: number | null
+          settlement_link_status?: string | null
           signals_jsonb?: Json
           spot_at_compute: number
           status?: string
@@ -1824,9 +1833,12 @@ export type Database = {
           structure_direction: string
           structure_strength: number
           ticker: string
+          time_bucket?: string | null
           user_id?: string | null
           volatility_regime: string
           warnings_jsonb?: Json
+          window_close_ts?: string | null
+          window_open_ts?: string | null
           window_start: string
         }
         Update: {
@@ -1847,6 +1859,7 @@ export type Database = {
           input_lag_ms?: number | null
           market_intel_version?: string
           market_state?: string
+          market_window_id?: string | null
           nearest_psych_level?: number | null
           outcome?: string | null
           pnl_usd?: number | null
@@ -1860,8 +1873,10 @@ export type Database = {
           reasons_jsonb?: Json
           reversal_score?: number
           round_confluence_score?: number | null
+          seconds_to_close?: number | null
           sequence_state?: string | null
           settle_price?: number | null
+          settlement_link_status?: string | null
           signals_jsonb?: Json
           spot_at_compute?: number
           status?: string
@@ -1871,9 +1886,12 @@ export type Database = {
           structure_direction?: string
           structure_strength?: number
           ticker?: string
+          time_bucket?: string | null
           user_id?: string | null
           volatility_regime?: string
           warnings_jsonb?: Json
+          window_close_ts?: string | null
+          window_open_ts?: string | null
           window_start?: string
         }
         Relationships: [
@@ -3252,7 +3270,168 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_market_intel_alerts: {
+        Row: {
+          alert_cadence_high: boolean | null
+          alert_direction_skewed: boolean | null
+          alert_error_rate_high: boolean | null
+          alert_input_lag_high: boolean | null
+          alert_insufficient_high: boolean | null
+          alert_missing_5m_high: boolean | null
+          alert_settlement_match_low: boolean | null
+          as_of: string | null
+          total_snapshots: number | null
+        }
+        Relationships: []
+      }
+      v_market_intel_collection_health: {
+        Row: {
+          as_of: string | null
+          avg_calc_ms: number | null
+          avg_input_lag_ms: number | null
+          avg_snapshots_per_ticker: number | null
+          confidence_distribution: Json | null
+          direction_distribution: Json | null
+          error_pct: number | null
+          error_rows: number | null
+          insufficient_pct: number | null
+          insufficient_rows: number | null
+          market_state_distribution: Json | null
+          matched_pct: number | null
+          matched_rows: number | null
+          median_snapshots_per_ticker: number | null
+          missing_15m_pct: number | null
+          missing_15m_rows: number | null
+          missing_1m_pct: number | null
+          missing_1m_rows: number | null
+          missing_5m_pct: number | null
+          missing_5m_rows: number | null
+          ok_rows: number | null
+          p95_calc_ms: number | null
+          p95_input_lag_ms: number | null
+          partial_pct: number | null
+          partial_rows: number | null
+          pending_rows: number | null
+          psych_level_role_distribution: Json | null
+          rows_per_hour: number | null
+          sequence_state_distribution: Json | null
+          status_distribution: Json | null
+          total_snapshots: number | null
+          unique_settled_tickers: number | null
+          unique_tickers: number | null
+          volatility_regime_distribution: Json | null
+        }
+        Relationships: []
+      }
+      v_market_intel_eval: {
+        Row: {
+          calculation_duration_ms: number | null
+          decision_ts: string | null
+          entry_yes_price: number | null
+          input_lag_ms: number | null
+          intel_confidence: number | null
+          intel_direction: string | null
+          intel_status: string | null
+          is_first_snapshot: boolean | null
+          is_last_preclose_snapshot: boolean | null
+          market_intel_id: string | null
+          market_state: string | null
+          market_window_id: string | null
+          pred_model_prob: number | null
+          pred_side: string | null
+          pred_strike: number | null
+          psych_distance_atr: number | null
+          psych_level_interval: number | null
+          psych_level_role: string | null
+          psych_level_strength: number | null
+          psych_state: string | null
+          seconds_to_close: number | null
+          sequence_state: string | null
+          settle_outcome: string | null
+          settle_price: number | null
+          settled_at: string | null
+          settlement_link_status: string | null
+          snapshot_number_in_window: number | null
+          strike_distance_in_expected_moves: number | null
+          structure_direction: string | null
+          structure_strength: number | null
+          ticker: string | null
+          time_bucket: string | null
+          user_id: string | null
+          volatility_regime: string | null
+          was_correct: boolean | null
+          window_close_ts: string | null
+          window_open_ts: string | null
+        }
+        Relationships: []
+      }
+      v_market_intel_window_primary: {
+        Row: {
+          bucket_center_s: number | null
+          calculation_duration_ms: number | null
+          chop_score: number | null
+          close_time: string | null
+          compression_score: number | null
+          confidence: number | null
+          continuation_score: number | null
+          created_at: string | null
+          decision_ts: string | null
+          direction: string | null
+          exhaustion_score: number | null
+          expansion_score: number | null
+          expected_move_15m_pct: number | null
+          expected_move_15m_usd: number | null
+          id: string | null
+          input_lag_ms: number | null
+          market_intel_version: string | null
+          market_state: string | null
+          market_window_id: string | null
+          mwid_effective: string | null
+          nearest_psych_level: number | null
+          outcome: string | null
+          pnl_usd: number | null
+          prediction_id: string | null
+          psych_distance_atr: number | null
+          psych_distance_usd: number | null
+          psych_level_interval: number | null
+          psych_level_role: string | null
+          psych_level_strength: number | null
+          psych_state: string | null
+          reasons_jsonb: Json | null
+          reversal_score: number | null
+          rn: number | null
+          round_confluence_score: number | null
+          seconds_to_close: number | null
+          sequence_state: string | null
+          settle_price: number | null
+          settlement_link_status: string | null
+          signals_jsonb: Json | null
+          spot_at_compute: number | null
+          status: string | null
+          strike: number | null
+          strike_distance_in_expected_moves: number | null
+          strike_distance_usd: number | null
+          structure_direction: string | null
+          structure_strength: number | null
+          ticker: string | null
+          time_bucket: string | null
+          user_id: string | null
+          volatility_regime: string | null
+          warnings_jsonb: Json | null
+          window_close_ts: string | null
+          window_open_ts: string | null
+          window_start: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "btc_market_intel_prediction_id_fkey"
+            columns: ["prediction_id"]
+            isOneToOne: false
+            referencedRelation: "btc_model_predictions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       delete_email: {

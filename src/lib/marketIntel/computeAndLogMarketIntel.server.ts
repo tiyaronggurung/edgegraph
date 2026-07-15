@@ -8,6 +8,7 @@
 import type { Candle, MarketIntel, MarketIntelStatus } from "./types";
 import { MARKET_INTEL_VERSION } from "./types";
 import { computeMarketIntel } from "./combine";
+import { deriveWindowFields, type SettlementLinkStatus, type TimeBucket } from "./windowMapping";
 
 export interface ComputeAndLogInput {
   /** May be null for global (system-wide) predictions like the BTC 15-min market. */
@@ -81,6 +82,12 @@ type InserterRow = {
   psych_distance_atr: number | null;
   psych_state: string | null;
   round_confluence_score: number | null;
+  market_window_id: string | null;
+  window_open_ts: string | null;
+  window_close_ts: string | null;
+  seconds_to_close: number | null;
+  time_bucket: TimeBucket | null;
+  settlement_link_status: SettlementLinkStatus;
   signals_jsonb: unknown;
   reasons_jsonb: unknown;
   warnings_jsonb: unknown;
@@ -162,6 +169,13 @@ export async function computeAndLogMarketIntel(input: ComputeAndLogInput): Promi
     if (nowMs - prev < env.minLogIntervalMs) {
       return { status: "skipped_min_interval", intel: null, inserted: false, calculationDurationMs: 0, inputLagMs: 0 };
     }
+
+    // Derive window mapping + settlement-link status from the ticker (Turn 4A).
+    const wf = deriveWindowFields({
+      ticker: input.ticker,
+      decisionTs: input.decisionTs,
+      closeTime: input.closeTime,
+    });
 
     // Clone arrays defensively so we never mutate caller data.
     const cutoffMs = input.decisionTs.getTime();
@@ -270,7 +284,13 @@ export async function computeAndLogMarketIntel(input: ComputeAndLogInput): Promi
       psych_distance_atr: intel.psych.distanceAtr,
       psych_state: intel.psych.state,
       round_confluence_score: intel.psych.confluenceScore,
-      signals_jsonb: signals,
+      market_window_id: wf.marketWindowId,
+      window_open_ts: wf.windowOpenTs,
+      window_close_ts: wf.windowCloseTs,
+      seconds_to_close: wf.secondsToClose ?? input.secondsToClose ?? null,
+      time_bucket: wf.timeBucket,
+      settlement_link_status: wf.settlementLinkStatus,
+      signals_jsonb: { ...signals, window_mapping: { ticker_valid: wf.tickerValid, ticker_reason: wf.tickerReason ?? null } },
       reasons_jsonb: intel.reasons,
       warnings_jsonb: intel.warnings,
     };
