@@ -77,6 +77,15 @@ export interface GateInput {
   requiredEdgePts: number;
   kelly: number;
   gap: GapAnalysis;
+  // Chosen-side confidence = side==="YES" ? modelYesProb : 1 - modelYesProb.
+  // Measures how strongly the current model still backs the LOCKED side. On
+  // 1,330 settled rows the <0.45 bucket hit only 9.4% (locked side had
+  // diverged from the model's current directional lean). Optional — undefined
+  // preserves legacy behavior so unit tests and old call sites keep working.
+  sideConf?: number;
+  // True when the live per-tick directional call disagrees with the locked
+  // side. Same 9.4% loser bucket — the model wants to flip but can't.
+  liveFlipped?: boolean;
 }
 
 export interface GateResult {
@@ -84,8 +93,13 @@ export interface GateResult {
   gateReason: string;
 }
 
+// Minimum chosen-side confidence for the edge gate to fire. 0.90 matches
+// the settled-sample study where side_conf >= 0.90 hits ~94%; lower
+// thresholds mix in the low-conviction band that history says loses.
+export const MIN_SIDE_CONF = 0.90;
+
 export function evaluateGate(input: GateInput): GateResult {
-  const { side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap } = input;
+  const { side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap, sideConf, liveFlipped } = input;
   const pinRiskFloor = pinRiskFloorSigmas(secondsToClose);
   const currentlyWinning = gap.needsDirection === "hold";
 
@@ -94,6 +108,21 @@ export function evaluateGate(input: GateInput): GateResult {
   }
   if (yesPrice <= 0.02 || yesPrice >= 0.98) {
     return { gateAction: "PASS", gateReason: "price pinned (≤2¢ or ≥98¢) — no room for edge" };
+  }
+  // Side-confidence gate: blocks the "locked-side diverged from model"
+  // bucket (~9% historical hit rate). Skipped when caller omits sideConf.
+  if (sideConf !== undefined && sideConf < MIN_SIDE_CONF) {
+    return {
+      gateAction: "PASS",
+      gateReason: `low side-confidence — model backs ${side} at ${(sideConf * 100).toFixed(0)}% (need ≥${(MIN_SIDE_CONF * 100).toFixed(0)}%)`,
+    };
+  }
+  // Live-flip gate: skip when the per-tick direction opposes the locked side.
+  if (liveFlipped) {
+    return {
+      gateAction: "PASS",
+      gateReason: `live model has flipped away from locked ${side} — skip`,
+    };
   }
   if (sigDist < pinRiskFloor && secondsToClose > 60) {
     return {
@@ -122,9 +151,10 @@ export function evaluateGate(input: GateInput): GateResult {
   if (kelly <= 0) {
     return { gateAction: "PASS", gateReason: "Kelly fraction ≤ 0" };
   }
+  const confNote = sideConf !== undefined ? ` · sideConf ${(sideConf * 100).toFixed(0)}%` : "";
   return {
     gateAction: "BET",
-    gateReason: `edge ${edgeAbs.toFixed(1)}pts ≥ required ${requiredEdgePts.toFixed(1)}pts · safety ${sigDist.toFixed(2)}σ · ${gap.verdict}`,
+    gateReason: `edge ${edgeAbs.toFixed(1)}pts ≥ required ${requiredEdgePts.toFixed(1)}pts · safety ${sigDist.toFixed(2)}σ${confNote} · ${gap.verdict}`,
   };
 }
 
