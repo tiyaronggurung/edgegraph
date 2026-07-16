@@ -592,6 +592,28 @@ export async function runAutoTradeCore(
     }
 
 
+    // ── Polymarket 15-min triple-window veto (batch fetch once) ──
+    // btc_polymarket_triple_window rolls 3× 5-min Polymarket snapshots into a
+    // per-ticker YES/NO forecast with confidence 0..1. When Poly disagrees
+    // with our plan side AND its confidence is high, skip the fire. Poly is
+    // NEVER blended into model_prob — it's a veto filter only.
+    const POLY_VETO_CONF = 0.35; // = P(our side) ≤ 0.325 or ≥ 0.675 the other way
+    const polyByTicker = new Map<string, { dir: "YES" | "NO"; conf: number }>();
+    try {
+      const plannedTickers = Array.from(new Set(plan.map(p => p.m.ticker)));
+      if (plannedTickers.length > 0) {
+        const { data: polyRows } = await (supabase as any)
+          .from("btc_polymarket_triple_window")
+          .select("kalshi_ticker, combined_dir, combined_conf")
+          .in("kalshi_ticker", plannedTickers);
+        for (const r of (polyRows ?? []) as Array<{ kalshi_ticker: string; combined_dir: string | null; combined_conf: number | null }>) {
+          if ((r.combined_dir === "YES" || r.combined_dir === "NO") && r.combined_conf != null) {
+            polyByTicker.set(r.kalshi_ticker, { dir: r.combined_dir, conf: Number(r.combined_conf) });
+          }
+        }
+      }
+    } catch { /* poly veto is best-effort — never block on failure */ }
+
     // ── Duplicate-fire guard (15-minute window) ──
     // Skip a ticker if this user already placed an auto_trade_orders row
     // for it in the last 15 minutes (any status). Fires everywhere else —
@@ -608,6 +630,7 @@ export async function runAutoTradeCore(
         recentTickers15m.add(r.ticker);
       }
     } catch { /* if the read fails, fall through */ }
+
 
     const placed: AutoTradeOrderRow[] = [];
     for (const entry of plan) {
