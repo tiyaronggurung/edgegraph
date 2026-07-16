@@ -1051,6 +1051,7 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           requiredEdgePts,
           gateAction,
           gateReason,
+          sideConf,
           thresholdParts: { base: tBase, calib: tCalib, time: tTime, spread: tSpread, regime: tRegime, whale: tWhale },
           gapAnalysis,
           anchorZ: (() => {
