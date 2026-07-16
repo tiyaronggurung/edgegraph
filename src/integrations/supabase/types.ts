@@ -1686,6 +1686,159 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_gate_config: {
+        Row: {
+          btc_entry_gate_enabled: boolean
+          config_version: number
+          id: number
+          log_gate_decisions: boolean
+          min_calibrated_edge_points: number
+          min_side_confidence: number
+          positive_edge_mode: string
+          require_live_side_agreement: boolean
+          slippage_buffer_prob: number
+          updated_at: string
+        }
+        Insert: {
+          btc_entry_gate_enabled?: boolean
+          config_version?: number
+          id?: number
+          log_gate_decisions?: boolean
+          min_calibrated_edge_points?: number
+          min_side_confidence?: number
+          positive_edge_mode?: string
+          require_live_side_agreement?: boolean
+          slippage_buffer_prob?: number
+          updated_at?: string
+        }
+        Update: {
+          btc_entry_gate_enabled?: boolean
+          config_version?: number
+          id?: number
+          log_gate_decisions?: boolean
+          min_calibrated_edge_points?: number
+          min_side_confidence?: number
+          positive_edge_mode?: string
+          require_live_side_agreement?: boolean
+          slippage_buffer_prob?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      btc_gate_decision_log: {
+        Row: {
+          all_reasons: Json | null
+          calibrated_edge: number | null
+          close_time: string | null
+          config_version: number | null
+          decision_bucket: number
+          decision_ts: string
+          estimated_fee: number | null
+          event_id: string | null
+          fee_adjusted_edge: number | null
+          gate_action: string
+          id: number
+          live_agreement_passed: boolean | null
+          live_side: string | null
+          live_side_disagrees: boolean | null
+          locked_side: string
+          model_prob: number | null
+          no_ask: number | null
+          no_bid: number | null
+          positive_edge_mode: string | null
+          positive_edge_passed: boolean | null
+          positive_edge_shadow_pass: boolean | null
+          primary_reason: string | null
+          raw_model_edge: number | null
+          require_live_agreement: boolean | null
+          require_positive_edge: boolean | null
+          seconds_to_close: number | null
+          selected_side_ask: number | null
+          side_conf_threshold: number | null
+          side_confidence: number | null
+          side_confidence_passed: boolean | null
+          slippage_adjusted_edge: number | null
+          source_path: string
+          ticker: string
+          yes_ask: number | null
+          yes_bid: number | null
+        }
+        Insert: {
+          all_reasons?: Json | null
+          calibrated_edge?: number | null
+          close_time?: string | null
+          config_version?: number | null
+          decision_bucket: number
+          decision_ts?: string
+          estimated_fee?: number | null
+          event_id?: string | null
+          fee_adjusted_edge?: number | null
+          gate_action: string
+          id?: number
+          live_agreement_passed?: boolean | null
+          live_side?: string | null
+          live_side_disagrees?: boolean | null
+          locked_side: string
+          model_prob?: number | null
+          no_ask?: number | null
+          no_bid?: number | null
+          positive_edge_mode?: string | null
+          positive_edge_passed?: boolean | null
+          positive_edge_shadow_pass?: boolean | null
+          primary_reason?: string | null
+          raw_model_edge?: number | null
+          require_live_agreement?: boolean | null
+          require_positive_edge?: boolean | null
+          seconds_to_close?: number | null
+          selected_side_ask?: number | null
+          side_conf_threshold?: number | null
+          side_confidence?: number | null
+          side_confidence_passed?: boolean | null
+          slippage_adjusted_edge?: number | null
+          source_path: string
+          ticker: string
+          yes_ask?: number | null
+          yes_bid?: number | null
+        }
+        Update: {
+          all_reasons?: Json | null
+          calibrated_edge?: number | null
+          close_time?: string | null
+          config_version?: number | null
+          decision_bucket?: number
+          decision_ts?: string
+          estimated_fee?: number | null
+          event_id?: string | null
+          fee_adjusted_edge?: number | null
+          gate_action?: string
+          id?: number
+          live_agreement_passed?: boolean | null
+          live_side?: string | null
+          live_side_disagrees?: boolean | null
+          locked_side?: string
+          model_prob?: number | null
+          no_ask?: number | null
+          no_bid?: number | null
+          positive_edge_mode?: string | null
+          positive_edge_passed?: boolean | null
+          positive_edge_shadow_pass?: boolean | null
+          primary_reason?: string | null
+          raw_model_edge?: number | null
+          require_live_agreement?: boolean | null
+          require_positive_edge?: boolean | null
+          seconds_to_close?: number | null
+          selected_side_ask?: number | null
+          side_conf_threshold?: number | null
+          side_confidence?: number | null
+          side_confidence_passed?: boolean | null
+          slippage_adjusted_edge?: number | null
+          source_path?: string
+          ticker?: string
+          yes_ask?: number | null
+          yes_bid?: number | null
+        }
+        Relationships: []
+      }
       btc_isotonic_fit: {
         Row: {
           brier_test: number | null
