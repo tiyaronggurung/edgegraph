@@ -67,7 +67,11 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
         const MIN_SIDE_PROB = 0.60;
 
         for (const u of usersWithCreds) {
-          let pick: { ticker: string; side: "YES" | "NO"; priceCents: number } | null = null;
+          let pick: {
+            ticker: string; side: "YES" | "NO"; priceCents: number;
+            yesCents: number | null; noCents: number | null;
+            modelProbYes: number | null; closeTime: string;
+          } | null = null;
           try {
             // Pick the newest open prediction the user hasn't been filled on,
             // AND whose our-side price is currently ≤ MAX_ENTRY_CENTS.
