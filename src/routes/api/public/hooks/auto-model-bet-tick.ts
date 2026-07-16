@@ -130,7 +130,13 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
                 continue;
               }
 
-              pick = { ticker: p.ticker, side: p.side, priceCents };
+              pick = {
+                ticker: p.ticker, side: p.side, priceCents,
+                yesCents: Number.isFinite(Number(row.yes_cents)) ? Number(row.yes_cents) : null,
+                noCents:  Number.isFinite(Number(row.no_cents))  ? Number(row.no_cents)  : null,
+                modelProbYes: rawProb,
+                closeTime: p.close_time,
+              };
               break;
             }
             if (!pick) {
