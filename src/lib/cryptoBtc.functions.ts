@@ -98,6 +98,9 @@ export interface BtcMarket {
   gateAction: "BET" | "PASS";
   gateReason: string;        // human explanation of pass/bet
   thresholdParts: { base: number; calib: number; time: number; spread: number; regime: number; whale: number };
+  // Chosen-side confidence: side==="YES" ? modelYesProb : 1-modelYesProb.
+  // Historical: >=0.90 hits ~94%, <0.45 hits ~9% on 1,330 settled BTC rows.
+  sideConf: number;
   // ── Gap analysis: why strike & spot differ, and whether spot can traverse the gap
   gapAnalysis: {
     gapUsd: number;            // signed $: positive = spot ABOVE strike, negative = BELOW
@@ -1001,8 +1004,12 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         const tWhale = edgeParts.whale;
 
         const gapAnalysis = computeGapAnalysis({ spot, strike, side, sigmaEff, secondsToClose, micro });
+        // Chosen-side confidence: how strongly current calibrated P(YES) still
+        // backs the LOCKED side. Feeds the new side-confidence gate.
+        const sideConf = side === "YES" ? p : 1 - p;
         const { gateAction, gateReason } = evaluateGate({
           side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap: gapAnalysis,
+          sideConf,
         });
 
         markets.push({
@@ -1044,6 +1051,7 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           requiredEdgePts,
           gateAction,
           gateReason,
+          sideConf,
           thresholdParts: { base: tBase, calib: tCalib, time: tTime, spread: tSpread, regime: tRegime, whale: tWhale },
           gapAnalysis,
           anchorZ: (() => {
