@@ -453,6 +453,7 @@ export async function runAutoTradeCore(
           if (m.sigmaDistance < minSigma) { const r = `sigDist ${m.sigmaDistance.toFixed(2)}σ < ${minSigma}σ`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (!m.gapAnalysis.momentumAlignsWithSide) { const r = `momentum fights ${m.side}`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (m.secondsToClose < minSeconds) { const r = `${m.secondsToClose}s < ${minSeconds}s`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
+          if (m.secondsToClose > maxSeconds) { const r = `fresh_market_warmup: ${m.secondsToClose}s > ${maxSeconds}s (wait ${LIVE_MARKET_WARMUP_SEC}s after new strike opens)`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (equity) {
             if (equity.btcImpact.wouldBlock === "block_up" && m.side === "YES") {
               const r = "blocked by equity risk_off (strong)"; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
