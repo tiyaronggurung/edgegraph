@@ -243,15 +243,18 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
             // Uses ask from btc_odds_tape (converted cents → probability once).
             {
               const btcGateCfg = await getBtcGateConfig();
-              // pick was set from the loop above; guaranteed non-null here.
-              const yesAskProb = (Number(row.yes_cents) / 100);
-              const noAskProb  = (Number(row.no_cents) / 100);
+              // Convert cents → probability exactly once (cents / 100).
+              const yesAskProb = pick.yesCents != null ? pick.yesCents / 100 : NaN;
+              const noAskProb  = pick.noCents  != null ? pick.noCents  / 100 : NaN;
               const validYes = Number.isFinite(yesAskProb) && yesAskProb > 0 && yesAskProb < 1 ? yesAskProb : null;
               const validNo  = Number.isFinite(noAskProb)  && noAskProb  > 0 && noAskProb  < 1 ? noAskProb  : null;
-              const modelProbYes = rawProb ?? (pick.side === "YES" ? sideProb! : 1 - sideProb!);
+              // Reconstruct P(YES) from the stored model_prob. If missing,
+              // derive from side + our-side price fallback (60% floor above).
+              const modelProbYes = pick.modelProbYes ?? (pick.side === "YES" ? 0.6 : 0.4);
+              const secondsToClose = Math.max(0, Math.ceil((new Date(pick.closeTime).getTime() - Date.now()) / 1000));
               const decision = evaluateBtcEntry({
                 lockedSide: pick.side,
-                liveSide: pick.side,   // this path has no independent live-side signal
+                liveSide: pick.side,   // no independent live-side signal on this path
                 modelProb: modelProbYes,
                 yesAsk: validYes,
                 noAsk: validNo,
@@ -261,8 +264,8 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
                 decision,
                 sourcePath: "auto_model_bet_tick",
                 ticker: pick.ticker,
-                closeTime: p.close_time,
-                secondsToClose: Math.max(0, Math.ceil((new Date(p.close_time).getTime() - Date.now()) / 1000)),
+                closeTime: pick.closeTime,
+                secondsToClose,
                 modelProb: modelProbYes,
                 yesAsk: validYes,
                 noAsk: validNo,
