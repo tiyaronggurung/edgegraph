@@ -41,6 +41,7 @@ import { Route as ApiPublicHooksSettleBtcPredictionsRouteImport } from './routes
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
 import { Route as ApiPublicHooksOddsShadowTickRouteImport } from './routes/api/public/hooks/odds-shadow-tick'
 import { Route as ApiPublicHooksMartingaleTickRouteImport } from './routes/api/public/hooks/martingale-tick'
+import { Route as ApiPublicHooksMarketIntelMatchRouteImport } from './routes/api/public/hooks/market-intel-match'
 import { Route as ApiPublicHooksCryptoStudyRouteImport } from './routes/api/public/hooks/crypto-study'
 import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
 import { Route as ApiPublicHooksBtcCalibrateRouteImport } from './routes/api/public/hooks/btc-calibrate'
@@ -221,6 +222,12 @@ const ApiPublicHooksMartingaleTickRoute =
     path: '/api/public/hooks/martingale-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksMarketIntelMatchRoute =
+  ApiPublicHooksMarketIntelMatchRouteImport.update({
+    id: '/api/public/hooks/market-intel-match',
+    path: '/api/public/hooks/market-intel-match',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksCryptoStudyRoute =
   ApiPublicHooksCryptoStudyRouteImport.update({
     id: '/api/public/hooks/crypto-study',
@@ -308,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
+  '/api/public/hooks/market-intel-match': typeof ApiPublicHooksMarketIntelMatchRoute
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -350,6 +358,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
+  '/api/public/hooks/market-intel-match': typeof ApiPublicHooksMarketIntelMatchRoute
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -394,6 +403,7 @@ export interface FileRoutesById {
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
+  '/api/public/hooks/market-intel-match': typeof ApiPublicHooksMarketIntelMatchRoute
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -438,6 +448,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/btc-calibrate'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
+    | '/api/public/hooks/market-intel-match'
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
@@ -480,6 +491,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/btc-calibrate'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
+    | '/api/public/hooks/market-intel-match'
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
@@ -523,6 +535,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/btc-calibrate'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
+    | '/api/public/hooks/market-intel-match'
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
@@ -553,6 +566,7 @@ export interface RootRouteChildren {
   ApiPublicHooksBtcCalibrateRoute: typeof ApiPublicHooksBtcCalibrateRoute
   ApiPublicHooksCaptureClosingOddsRoute: typeof ApiPublicHooksCaptureClosingOddsRoute
   ApiPublicHooksCryptoStudyRoute: typeof ApiPublicHooksCryptoStudyRoute
+  ApiPublicHooksMarketIntelMatchRoute: typeof ApiPublicHooksMarketIntelMatchRoute
   ApiPublicHooksMartingaleTickRoute: typeof ApiPublicHooksMartingaleTickRoute
   ApiPublicHooksOddsShadowTickRoute: typeof ApiPublicHooksOddsShadowTickRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
@@ -789,6 +803,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksMartingaleTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/market-intel-match': {
+      id: '/api/public/hooks/market-intel-match'
+      path: '/api/public/hooks/market-intel-match'
+      fullPath: '/api/public/hooks/market-intel-match'
+      preLoaderRoute: typeof ApiPublicHooksMarketIntelMatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/crypto-study': {
       id: '/api/public/hooks/crypto-study'
       path: '/api/public/hooks/crypto-study'
@@ -914,6 +935,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksBtcCalibrateRoute: ApiPublicHooksBtcCalibrateRoute,
   ApiPublicHooksCaptureClosingOddsRoute: ApiPublicHooksCaptureClosingOddsRoute,
   ApiPublicHooksCryptoStudyRoute: ApiPublicHooksCryptoStudyRoute,
+  ApiPublicHooksMarketIntelMatchRoute: ApiPublicHooksMarketIntelMatchRoute,
   ApiPublicHooksMartingaleTickRoute: ApiPublicHooksMartingaleTickRoute,
   ApiPublicHooksOddsShadowTickRoute: ApiPublicHooksOddsShadowTickRoute,
   ApiPublicHooksRecomputePredictionsRoute:
@@ -928,13 +950,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
