@@ -130,6 +130,10 @@ export interface BtcMarket {
   liveFlipped: boolean;         // true if liveSide != locked side this tick
   chartVerdict: "YES" | "NO" | "neutral";
   chartStrength: number;        // 0..1 confidence from combined 1m+5m verdict
+  // Shared central-gate decision (side confidence + live agreement + positive edge).
+  // Reported alongside the legacy `gateAction`/`gateReason` so callers can
+  // enforce the same universal gate. Nullable if config lookup failed.
+  entryGate: BtcEntryGateDecision | null;
 }
 
 
