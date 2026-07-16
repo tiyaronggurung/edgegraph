@@ -3,6 +3,9 @@
 // Optional override: POST market context to CRYPTO_MODEL_URL and use returned {prob}.
 import { createServerFn } from "@tanstack/react-start";
 import { computeGapAnalysis, computeRequiredEdgePts, evaluateGate } from "./cryptoBtcGate";
+import { evaluateBtcEntry, type BtcEntryGateDecision } from "./btcEntryGate";
+import { getBtcGateConfig } from "./btcGateConfig.server";
+import { logBtcGateDecision } from "./btcGateLog.server";
 import { getChartVerdict } from "./ta/chartVerdict";
 
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
