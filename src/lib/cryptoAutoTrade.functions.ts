@@ -473,6 +473,21 @@ export async function runAutoTradeCore(
           if (m.gateAction !== "BET") { const r = `gate ${m.gateAction}`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (m.sigmaDistance < minSigma) { const r = `sigDist ${m.sigmaDistance.toFixed(2)}σ < ${minSigma}σ`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (!m.gapAnalysis.momentumAlignsWithSide) { const r = `momentum fights ${m.side}`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
+          // Sharpening #1: reject unstable predictions (live path only).
+          if (isLive) {
+            const flips = flipByTicker.get(m.ticker) ?? 0;
+            if (flips >= 1) {
+              const r = `flip_gate: prediction has flipped ${flips}× — unstable, skip (7d: 25% flip rate, −$123/wk)`;
+              skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
+            }
+          }
+          // Sharpening #2: reject when chart verdict aligns with side (live path).
+          // Aligned bucket bled −$240/wk; neutral won +$92; against was breakeven.
+          if (isLive && (m.chartVerdict === "YES" || m.chartVerdict === "NO") && m.chartVerdict === m.side) {
+            const r = `chart_align_gate: chart ${m.chartVerdict} aligned with side ${m.side} — priced-in, skip (7d: aligned bled −$240)`;
+            skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
+          }
+
           if (m.secondsToClose < minSeconds) { const r = `${m.secondsToClose}s < ${minSeconds}s`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (m.secondsToClose > maxSeconds) { const r = `fresh_market_warmup: ${m.secondsToClose}s > ${maxSeconds}s (wait ${LIVE_MARKET_WARMUP_SEC}s after new strike opens)`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (equity) {
