@@ -6,6 +6,9 @@
 // (this prefix bypasses published-site auth — we still validate apikey).
 import { createFileRoute } from "@tanstack/react-router";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
+import { evaluateBtcEntry } from "@/lib/btcEntryGate";
+import { getBtcGateConfig } from "@/lib/btcGateConfig.server";
+import { logBtcGateDecision } from "@/lib/btcGateLog.server";
 
 const LIFETIME_CAP = 5;
 const STAKE_USD = 50;
