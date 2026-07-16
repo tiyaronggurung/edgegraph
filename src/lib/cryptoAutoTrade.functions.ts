@@ -431,7 +431,28 @@ export async function runAutoTradeCore(
         });
       };
 
+      // ── Sharpening gates (data-driven from 7d live analysis) ──
+      // 1) flip_count ≥ 1 → reject: 25% of predictions flip pre-close and bleed.
+      // 2) chart_verdict aligned with side → reject: market has already priced
+      //    in the chart signal; aligned bucket bleeds while neutral wins.
+      // Both are additive skip-only, live path only (paper unaffected).
+      const flipByTicker = new Map<string, number>();
+      if (isLive && result.markets.length > 0) {
+        try {
+          const tickers = Array.from(new Set(result.markets.map(m => m.ticker)));
+          const { data: preds } = await (supabase as any)
+            .from("btc_model_predictions")
+            .select("ticker, flip_count")
+            .in("ticker", tickers)
+            .is("outcome", null);
+          for (const p of (preds ?? []) as Array<{ ticker: string; flip_count: number | null }>) {
+            flipByTicker.set(p.ticker, Math.max(flipByTicker.get(p.ticker) ?? 0, Number(p.flip_count ?? 0)));
+          }
+        } catch { /* on error, gate is a no-op this tick */ }
+      }
+
       candidates = result.markets
+
         .map(m => {
           const adj = equity?.btcImpact.edgeAdjustPts ?? 0;
           const aligned = m.side === "YES" ? adj : -adj;
