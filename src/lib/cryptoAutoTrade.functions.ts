@@ -451,6 +451,36 @@ export async function runAutoTradeCore(
         } catch { /* on error, gate is a no-op this tick */ }
       }
 
+      // Shadow-log only (no firing change): compute "raw dir streak of last 5"
+      // over recent settled predictions where value-pick side == live_side.
+      // For each such prediction, matched=1 iff rawDir (model_prob>=0.5→YES,
+      // else NO) equals the value-pick side. Streak=3 is the bleed bucket
+      // (14d study: 51.9% wr, +$1.48/contract vs 57.3% baseline).
+      let streak3Global: { streak: number | null; wouldSkip: boolean } = { streak: null, wouldSkip: false };
+      if (isLive) {
+        try {
+          const { data: recent } = await (supabase as any)
+            .from("btc_model_predictions")
+            .select("side, live_side, model_prob")
+            .not("live_side", "is", null)
+            .not("outcome", "is", null)
+            .order("close_time", { ascending: false })
+            .limit(50);
+          const agreed = ((recent ?? []) as Array<{ side: string; live_side: string; model_prob: number }>)
+            .filter(r => r.side === r.live_side)
+            .slice(0, 5);
+          if (agreed.length === 5) {
+            const streak = agreed.reduce((acc, r) => {
+              const rawDir = Number(r.model_prob) >= 0.5 ? "YES" : "NO";
+              return acc + (rawDir === r.side ? 1 : 0);
+            }, 0);
+            streak3Global = { streak, wouldSkip: streak === 3 };
+          }
+        } catch { /* non-fatal */ }
+      }
+      // Expose to insert path below.
+      (result as any).__streak3 = streak3Global;
+
       candidates = result.markets
 
         .map(m => {
