@@ -1023,6 +1023,56 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           sideConf,
         });
 
+        // ── liveSide MUST be computed BEFORE the shared entry gate ──
+        const rawDir: "YES" | "NO" = p >= 0.5 ? "YES" : "NO";
+        const cvDir = chartVerdict?.combined.direction ?? "neutral";
+        const cvConf = chartVerdict?.combined.confidence ?? 0;
+        const elapsedMinLive = 15 - minsRemaining;
+        const anchorZLive = (() => {
+          const em = Math.max(0.5, elapsedMinLive);
+          const denom = windowOpen * sigmaEff * Math.sqrt(em);
+          return denom > 0 ? (spot - windowOpen) / denom : 0;
+        })();
+        const zSign: "YES" | "NO" | null =
+          anchorZLive > 0.5 ? "YES" : anchorZLive < -0.5 ? "NO" : null;
+        const canFlip =
+          !!lockedPre &&
+          rawDir !== lockedPre &&
+          cvDir === rawDir && cvConf >= 0.5 &&
+          zSign === rawDir &&
+          elapsedMinLive >= 3 &&
+          secondsToClose >= 90;
+        const liveSide: "YES" | "NO" = canFlip ? rawDir : side;
+
+        // ── Shared central gate (universal — every automatic path uses this) ──
+        const yesAskDollars = Number(m.yes_ask_dollars ?? 0);
+        const noAskDollars = Number(m.no_ask_dollars ?? 0);
+        const entryGate = evaluateBtcEntry({
+          lockedSide: side,
+          liveSide,
+          modelProb: p,
+          yesAsk: yesAskDollars > 0 && yesAskDollars < 1 ? yesAskDollars : null,
+          noAsk: noAskDollars > 0 && noAskDollars < 1 ? noAskDollars : null,
+          config: btcGateCfg,
+        });
+
+        // Fire-and-forget log; never throws, idempotent by 60s bucket.
+        void logBtcGateDecision({
+          decision: entryGate,
+          sourcePath: "live_market",
+          ticker: m.ticker,
+          eventId: e.event_ticker ?? null,
+          closeTime,
+          secondsToClose,
+          modelProb: p,
+          yesBid: Number(m.yes_bid_dollars ?? 0) || null,
+          yesAsk: yesAskDollars || null,
+          noBid: Number(m.no_bid_dollars ?? 0) || null,
+          noAsk: noAskDollars || null,
+          calibratedEdgeUpstream: edgePts / 100,
+          config: btcGateCfg,
+        });
+
         markets.push({
           ticker: m.ticker,
           eventTicker: e.event_ticker,
@@ -1054,8 +1104,6 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           sigmaDistance: sigDist,
           sigmaMinEffective: sigmaEff,
           theoryYesProb: pBase,
-          // Physics = pure diffusion (line ~856); independent = physics + options
-          // + micro but before calibration and the near-expiry market blend.
           physicsProb: pDiffusion,
           independentProb: adj.p,
 
@@ -1065,45 +1113,14 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           sideConf,
           thresholdParts: { base: tBase, calib: tCalib, time: tTime, spread: tSpread, regime: tRegime, whale: tWhale },
           gapAnalysis,
-          anchorZ: (() => {
-            const elapsedMin = Math.max(0.5, 15 - minsRemaining);
-            const denom = windowOpen * sigmaEff * Math.sqrt(elapsedMin);
-            return denom > 0 ? (spot - windowOpen) / denom : 0;
-          })(),
-          ...(() => {
-            // Live-side calculation: locked side stays put; live side can flip
-            // when chart verdict + anchor drift + raw model all agree on the
-            // opposite direction AND we're past the early-window / not-too-late gates.
-            const rawDir: "YES" | "NO" = p >= 0.5 ? "YES" : "NO";
-            const cvDir = chartVerdict?.combined.direction ?? "neutral";
-            const cvConf = chartVerdict?.combined.confidence ?? 0;
-            const elapsedMin = 15 - minsRemaining;
-            const anchorZ = (() => {
-              const em = Math.max(0.5, elapsedMin);
-              const denom = windowOpen * sigmaEff * Math.sqrt(em);
-              return denom > 0 ? (spot - windowOpen) / denom : 0;
-            })();
-            const zSign: "YES" | "NO" | null =
-              anchorZ > 0.5 ? "YES" : anchorZ < -0.5 ? "NO" : null;
-            // Flip gates: raw model must disagree with locked, chart must
-            // strongly agree with raw model, anchor drift must agree, and we
-            // must be past 3 min but with >=90s left.
-            const canFlip =
-              !!lockedPre &&
-              rawDir !== lockedPre &&
-              cvDir === rawDir && cvConf >= 0.5 &&
-              zSign === rawDir &&
-              elapsedMin >= 3 &&
-              secondsToClose >= 90;
-            const liveSide: "YES" | "NO" = canFlip ? rawDir : side;
-            return {
-              liveSide,
-              liveFlipped: liveSide !== side,
-              chartVerdict: cvDir as "YES" | "NO" | "neutral",
-              chartStrength: cvConf,
-            };
-          })(),
+          anchorZ: anchorZLive,
+          liveSide,
+          liveFlipped: liveSide !== side,
+          chartVerdict: cvDir as "YES" | "NO" | "neutral",
+          chartStrength: cvConf,
+          entryGate,
         });
+
       }
     }
 
