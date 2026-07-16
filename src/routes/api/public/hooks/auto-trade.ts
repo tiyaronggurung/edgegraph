@@ -61,6 +61,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
           liveCandidates = markets.markets
             .filter(m =>
               m.gateAction === "BET" &&
+              (m.entryGate?.action ?? "PASS") === "BET" &&   // shared universal gate
               m.sigmaDistance >= MIN_SIGMA &&
               m.gapAnalysis.momentumAlignsWithSide &&
               m.secondsToClose >= MIN_SECONDS_TO_CLOSE
