@@ -1001,8 +1001,12 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         const tWhale = edgeParts.whale;
 
         const gapAnalysis = computeGapAnalysis({ spot, strike, side, sigmaEff, secondsToClose, micro });
+        // Chosen-side confidence: how strongly current calibrated P(YES) still
+        // backs the LOCKED side. Feeds the new side-confidence gate.
+        const sideConf = side === "YES" ? p : 1 - p;
         const { gateAction, gateReason } = evaluateGate({
           side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap: gapAnalysis,
+          sideConf,
         });
 
         markets.push({
