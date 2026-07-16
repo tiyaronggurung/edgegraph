@@ -592,6 +592,28 @@ export async function runAutoTradeCore(
     }
 
 
+    // ── Polymarket 15-min triple-window veto (batch fetch once) ──
+    // btc_polymarket_triple_window rolls 3× 5-min Polymarket snapshots into a
+    // per-ticker YES/NO forecast with confidence 0..1. When Poly disagrees
+    // with our plan side AND its confidence is high, skip the fire. Poly is
+    // NEVER blended into model_prob — it's a veto filter only.
+    const POLY_VETO_CONF = 0.35; // = P(our side) ≤ 0.325 or ≥ 0.675 the other way
+    const polyByTicker = new Map<string, { dir: "YES" | "NO"; conf: number }>();
+    try {
+      const plannedTickers = Array.from(new Set(plan.map(p => p.m.ticker)));
+      if (plannedTickers.length > 0) {
+        const { data: polyRows } = await (supabase as any)
+          .from("btc_polymarket_triple_window")
+          .select("kalshi_ticker, combined_dir, combined_conf")
+          .in("kalshi_ticker", plannedTickers);
+        for (const r of (polyRows ?? []) as Array<{ kalshi_ticker: string; combined_dir: string | null; combined_conf: number | null }>) {
+          if ((r.combined_dir === "YES" || r.combined_dir === "NO") && r.combined_conf != null) {
+            polyByTicker.set(r.kalshi_ticker, { dir: r.combined_dir, conf: Number(r.combined_conf) });
+          }
+        }
+      }
+    } catch { /* poly veto is best-effort — never block on failure */ }
+
     // ── Duplicate-fire guard (15-minute window) ──
     // Skip a ticker if this user already placed an auto_trade_orders row
     // for it in the last 15 minutes (any status). Fires everywhere else —
@@ -608,6 +630,7 @@ export async function runAutoTradeCore(
         recentTickers15m.add(r.ticker);
       }
     } catch { /* if the read fails, fall through */ }
+
 
     const placed: AutoTradeOrderRow[] = [];
     for (const entry of plan) {
@@ -626,11 +649,33 @@ export async function runAutoTradeCore(
           skipReasons.push(`${m.ticker}: entry-recheck — ${side} no longer in fresh market list`);
           continue;
         }
-        if (p < LIVE_FLIP_PROB) {
-          skipReasons.push(`${m.ticker}: entry-recheck — model now ${(p * 100).toFixed(0)}% for ${side} (< ${LIVE_FLIP_PROB * 100}%)`);
+        // #1 Freeze-side fix: if fresh model no longer picks our side at all
+        // (p < 0.5), the plan side is stale — hard skip. This kills the
+        // "planned YES but mp flipped to 0.05" wrong-side fires.
+        if (p < 0.5) {
+          skipReasons.push(`${m.ticker}: freeze-side — fresh model now ${(p * 100).toFixed(0)}% for ${side} (< 50%) — plan side is stale, skip`);
+          continue;
+        }
+        // #3 Coin-flip skip: even when the side is still favored, if the
+        // model's conviction is thin (|p-0.5| < 0.15, i.e. p ∈ 0.50..0.65),
+        // the edge is inside noise. Historical 4-shot hours with side_prob
+        // in this band ran 40% hit rate. Skip.
+        if (p < 0.65) {
+          skipReasons.push(`${m.ticker}: coin-flip — fresh model ${(p * 100).toFixed(0)}% for ${side} (need ≥65%) — thin conviction, skip`);
           continue;
         }
       }
+
+      // #2 Polymarket 15-min veto: if Poly's rolling 3-window forecast
+      // disagrees with our plan side AND its confidence is high, skip.
+      // Poly reads the same strike from a different crowd every 5 min ×3;
+      // strong disagreement is a real independent signal.
+      const poly = polyByTicker.get(m.ticker);
+      if (poly && poly.dir !== side && poly.conf >= POLY_VETO_CONF) {
+        skipReasons.push(`${m.ticker}: poly-veto — Polymarket 15-min says ${poly.dir} @ conf ${(poly.conf * 100).toFixed(0)}% vs our ${side} — skip`);
+        continue;
+      }
+
       const limitCents = Math.max(1, Math.min(99, Math.round(
         (side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
       )));
