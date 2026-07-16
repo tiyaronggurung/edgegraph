@@ -1,4 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { evaluateBtcEntry } from "@/lib/btcEntryGate";
+import { getBtcGateConfig } from "@/lib/btcGateConfig.server";
+import { logBtcGateDecision } from "@/lib/btcGateLog.server";
 
 // Server-side cron: fires the Model Bet auto-trade for every opted-in user
 // every minute, 24/7 — independent of whether their browser tab is open.
