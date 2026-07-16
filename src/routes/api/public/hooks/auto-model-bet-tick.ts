@@ -229,6 +229,49 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
               }
             }
 
+            // ── Shared central BTC entry gate (universal) ──
+            // Uses ask from btc_odds_tape (converted cents → probability once).
+            {
+              const btcGateCfg = await getBtcGateConfig();
+              // pick was set from the loop above; guaranteed non-null here.
+              const yesAskProb = (Number(row.yes_cents) / 100);
+              const noAskProb  = (Number(row.no_cents) / 100);
+              const validYes = Number.isFinite(yesAskProb) && yesAskProb > 0 && yesAskProb < 1 ? yesAskProb : null;
+              const validNo  = Number.isFinite(noAskProb)  && noAskProb  > 0 && noAskProb  < 1 ? noAskProb  : null;
+              const modelProbYes = rawProb ?? (pick.side === "YES" ? sideProb! : 1 - sideProb!);
+              const decision = evaluateBtcEntry({
+                lockedSide: pick.side,
+                liveSide: pick.side,   // this path has no independent live-side signal
+                modelProb: modelProbYes,
+                yesAsk: validYes,
+                noAsk: validNo,
+                config: btcGateCfg,
+              });
+              void logBtcGateDecision({
+                decision,
+                sourcePath: "auto_model_bet_tick",
+                ticker: pick.ticker,
+                closeTime: p.close_time,
+                secondsToClose: Math.max(0, Math.ceil((new Date(p.close_time).getTime() - Date.now()) / 1000)),
+                modelProb: modelProbYes,
+                yesAsk: validYes,
+                noAsk: validNo,
+                config: btcGateCfg,
+              });
+              if (decision.action !== "BET") {
+                await supabaseAdmin.from("auto_model_bet_errors").insert({
+                  user_id: u.id,
+                  ticker: pick.ticker,
+                  side: pick.side,
+                  price_cents: pick.priceCents,
+                  stage: "central_gate",
+                  error: decision.reason.slice(0, 500),
+                });
+                results.push({ userId: u.id, placed: 0, skipped: 1, ticker: pick.ticker });
+                continue;
+              }
+            }
+
             // Size stake to keep payout ≤ $20 at the observed price.
             const stakeUsd = Math.max(1, Math.min(BASE_STAKE, Math.floor((PAYOUT_CAP * pick.priceCents) / 100 * 100) / 100));
 
