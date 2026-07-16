@@ -915,6 +915,10 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
       } catch { return new Map<string, "YES" | "NO">(); }
     })();
 
+    // Fetch shared BTC gate config once per snapshot — cached 30s in memory.
+    const btcGateCfg = await getBtcGateConfig();
+
+
     for (const e of events) {
       for (const m of e.markets ?? []) {
         if (m.status !== "active") continue;
