@@ -179,7 +179,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
 
 
 
-        const candidates = [...liveCandidates, ...storedCandidates]
+        const candidates = [...liveCandidates, ...gatedStoredCandidates]
           .filter((candidate, index, all) => all.findIndex(other => other.ticker === candidate.ticker) === index)
           .sort((a, b) => b.edgeAbs - a.edgeAbs);
 
