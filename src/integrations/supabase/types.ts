@@ -1235,6 +1235,7 @@ export type Database = {
           model_prob: number
           partial_pnl_usd: number
           pnl_usd: number | null
+          raw_streak_at_fire: number | null
           seconds_to_close: number
           session_id: string
           settle_price: number | null
@@ -1244,6 +1245,7 @@ export type Database = {
           spot_at_entry: number
           stake_usd: number
           status: string
+          streak3_would_skip: boolean | null
           strike: number
           ticker: string
           user_id: string
@@ -1269,6 +1271,7 @@ export type Database = {
           model_prob: number
           partial_pnl_usd?: number
           pnl_usd?: number | null
+          raw_streak_at_fire?: number | null
           seconds_to_close: number
           session_id: string
           settle_price?: number | null
@@ -1278,6 +1281,7 @@ export type Database = {
           spot_at_entry: number
           stake_usd: number
           status?: string
+          streak3_would_skip?: boolean | null
           strike: number
           ticker: string
           user_id: string
@@ -1303,6 +1307,7 @@ export type Database = {
           model_prob?: number
           partial_pnl_usd?: number
           pnl_usd?: number | null
+          raw_streak_at_fire?: number | null
           seconds_to_close?: number
           session_id?: string
           settle_price?: number | null
@@ -1312,6 +1317,7 @@ export type Database = {
           spot_at_entry?: number
           stake_usd?: number
           status?: string
+          streak3_would_skip?: boolean | null
           strike?: number
           ticker?: string
           user_id?: string
