@@ -34,7 +34,7 @@ const LIVE_MIN_EV_MARGIN = 0.03;          // #1 EV: (model_prob - ask_price) mus
 const LIVE_COOLDOWN_SEC = 90;             // #5 no re-entry on a ticker within N sec of a close
 const LIVE_PER_SYMBOL_LOSS_CAP_USD = 40;  // #6 per-symbol 24h loss cap → auto-pause that symbol
 const LIVE_LATE_TIGHTEN_SEC = 180;        // #2 tighten SL under this many seconds to expiry
-const LIVE_LATE_SL_FRAC = 0.25;           // #2 tighter SL fraction near expiry (vs LIVE_SL_FRAC)
+const LIVE_LATE_SL_FRAC = 0.20;           // #2 tighter SL fraction near expiry (vs LIVE_SL_FRAC)
 const LIVE_COINFLIP_BAND = 0.05;          // #4 |ask - 0.5| below this = coinflip zone
 const LIVE_COINFLIP_MIN_SIGMA = 1.5;      // #4 need this much sigma to trade coinflip prices
 
