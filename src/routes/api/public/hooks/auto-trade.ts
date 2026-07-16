@@ -6,6 +6,9 @@
 // (this prefix bypasses published-site auth — we still validate apikey).
 import { createFileRoute } from "@tanstack/react-router";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
+import { evaluateBtcEntry } from "@/lib/btcEntryGate";
+import { getBtcGateConfig } from "@/lib/btcGateConfig.server";
+import { logBtcGateDecision } from "@/lib/btcGateLog.server";
 
 const LIFETIME_CAP = 5;
 const STAKE_USD = 50;
@@ -58,6 +61,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
           liveCandidates = markets.markets
             .filter(m =>
               m.gateAction === "BET" &&
+              (m.entryGate?.action ?? "PASS") === "BET" &&   // shared universal gate
               m.sigmaDistance >= MIN_SIGMA &&
               m.gapAnalysis.momentumAlignsWithSide &&
               m.secondsToClose >= MIN_SECONDS_TO_CLOSE
@@ -128,7 +132,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
             };
           })
           .filter(m => {
-            // Model prob on OUR side (not YES prob). If we picked NO we want 1 - yesProb.
+            // Baseline sanity filters (unchanged).
             const sideProb = m.side === "YES" ? m.modelYesProb : 1 - m.modelYesProb;
             return (
               m.edgePts >= FALLBACK_MIN_EDGE_PTS &&
@@ -136,12 +140,46 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
               Number.isFinite(m.limitCents) &&
               Number.isFinite(m.modelYesProb) &&
               Number.isFinite(m.yesPrice) &&
-              // Skip tail-lottery bets: model must give our side ≥25% chance.
               sideProb >= 0.25
             );
           });
 
-        const candidates = [...liveCandidates, ...storedCandidates]
+        // ── Shared central gate for the stored-prediction fallback path ──
+        // We have no live order-book here, so yesAsk = market_yes_price
+        // (the last known cents value). liveSide is unknown to this path;
+        // pass the locked side (no disagreement possible from stored rows).
+        const btcGateCfgFallback = await getBtcGateConfig();
+        const gatedStoredCandidates: AutoTradeCandidate[] = [];
+        for (const c of storedCandidates) {
+          const yesAskProb = Number.isFinite(c.yesPrice) && c.yesPrice > 0 && c.yesPrice < 1 ? c.yesPrice : null;
+          const noAskProb = yesAskProb !== null ? 1 - yesAskProb : null;
+          const decision = evaluateBtcEntry({
+            lockedSide: c.side,
+            liveSide: c.side,
+            modelProb: c.modelYesProb,
+            yesAsk: yesAskProb,
+            noAsk: noAskProb,
+            config: btcGateCfgFallback,
+          });
+          void logBtcGateDecision({
+            decision,
+            sourcePath: "stored_prediction_fallback",
+            ticker: c.ticker,
+            eventId: c.eventTicker ?? null,
+            closeTime: c.closeTime,
+            secondsToClose: c.secondsToClose,
+            modelProb: c.modelYesProb,
+            yesAsk: yesAskProb,
+            noAsk: noAskProb,
+            calibratedEdgeUpstream: c.edgePts / 100,
+            config: btcGateCfgFallback,
+          });
+          if (decision.action === "BET") gatedStoredCandidates.push(c);
+        }
+
+
+
+        const candidates = [...liveCandidates, ...gatedStoredCandidates]
           .filter((candidate, index, all) => all.findIndex(other => other.ticker === candidate.ticker) === index)
           .sort((a, b) => b.edgeAbs - a.edgeAbs);
 

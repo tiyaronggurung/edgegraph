@@ -1,4 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { evaluateBtcEntry } from "@/lib/btcEntryGate";
+import { getBtcGateConfig } from "@/lib/btcGateConfig.server";
+import { logBtcGateDecision } from "@/lib/btcGateLog.server";
 
 // Server-side cron: fires the Model Bet auto-trade for every opted-in user
 // every minute, 24/7 — independent of whether their browser tab is open.
@@ -64,7 +67,11 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
         const MIN_SIDE_PROB = 0.60;
 
         for (const u of usersWithCreds) {
-          let pick: { ticker: string; side: "YES" | "NO"; priceCents: number } | null = null;
+          let pick: {
+            ticker: string; side: "YES" | "NO"; priceCents: number;
+            yesCents: number | null; noCents: number | null;
+            modelProbYes: number | null; closeTime: string;
+          } | null = null;
           try {
             // Pick the newest open prediction the user hasn't been filled on,
             // AND whose our-side price is currently ≤ MAX_ENTRY_CENTS.
@@ -123,7 +130,13 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
                 continue;
               }
 
-              pick = { ticker: p.ticker, side: p.side, priceCents };
+              pick = {
+                ticker: p.ticker, side: p.side, priceCents,
+                yesCents: Number.isFinite(Number(row.yes_cents)) ? Number(row.yes_cents) : null,
+                noCents:  Number.isFinite(Number(row.no_cents))  ? Number(row.no_cents)  : null,
+                modelProbYes: rawProb,
+                closeTime: p.close_time,
+              };
               break;
             }
             if (!pick) {
@@ -223,6 +236,52 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
                     continue;
                   }
                 }
+              }
+            }
+
+            // ── Shared central BTC entry gate (universal) ──
+            // Uses ask from btc_odds_tape (converted cents → probability once).
+            {
+              const btcGateCfg = await getBtcGateConfig();
+              // Convert cents → probability exactly once (cents / 100).
+              const yesAskProb = pick.yesCents != null ? pick.yesCents / 100 : NaN;
+              const noAskProb  = pick.noCents  != null ? pick.noCents  / 100 : NaN;
+              const validYes = Number.isFinite(yesAskProb) && yesAskProb > 0 && yesAskProb < 1 ? yesAskProb : null;
+              const validNo  = Number.isFinite(noAskProb)  && noAskProb  > 0 && noAskProb  < 1 ? noAskProb  : null;
+              // Reconstruct P(YES) from the stored model_prob. If missing,
+              // derive from side + our-side price fallback (60% floor above).
+              const modelProbYes = pick.modelProbYes ?? (pick.side === "YES" ? 0.6 : 0.4);
+              const secondsToClose = Math.max(0, Math.ceil((new Date(pick.closeTime).getTime() - Date.now()) / 1000));
+              const decision = evaluateBtcEntry({
+                lockedSide: pick.side,
+                liveSide: pick.side,   // no independent live-side signal on this path
+                modelProb: modelProbYes,
+                yesAsk: validYes,
+                noAsk: validNo,
+                config: btcGateCfg,
+              });
+              void logBtcGateDecision({
+                decision,
+                sourcePath: "auto_model_bet_tick",
+                ticker: pick.ticker,
+                closeTime: pick.closeTime,
+                secondsToClose,
+                modelProb: modelProbYes,
+                yesAsk: validYes,
+                noAsk: validNo,
+                config: btcGateCfg,
+              });
+              if (decision.action !== "BET") {
+                await supabaseAdmin.from("auto_model_bet_errors").insert({
+                  user_id: u.id,
+                  ticker: pick.ticker,
+                  side: pick.side,
+                  price_cents: pick.priceCents,
+                  stage: "central_gate",
+                  error: decision.reason.slice(0, 500),
+                });
+                results.push({ userId: u.id, placed: 0, skipped: 1, ticker: pick.ticker });
+                continue;
               }
             }
 
