@@ -194,6 +194,15 @@ export async function runAutoTradeCore(
         console.warn("[live-stake] ladder read failed:", e?.message ?? e);
       }
 
+      // #3 — 48h safety cap: halve live stakes while diagnosing loss streak.
+      // Applies AFTER the ladder overrides stake, so it caps the ladder too.
+      const LIVE_SAFETY_STAKE_CAP_USD = 5;
+      if (data.stakeUsd > LIVE_SAFETY_STAKE_CAP_USD) {
+        (data as { stakeUsd: number }).stakeUsd = LIVE_SAFETY_STAKE_CAP_USD;
+      }
+
+
+
       // ── Balance-aware stake sizing (live only) ──
       // If Kalshi cash balance < requested stake, shrink stake to whole
       // remaining balance (rounded down to $1). Skip if balance < $1.
@@ -639,6 +648,32 @@ export async function runAutoTradeCore(
         skipReasons.push(`${m.ticker}: duplicate — already placed within last 15 min`);
         continue;
       }
+
+      // #1 — Wrong-side hard guard (unconditional, runs even when the
+      // fresh-recheck below is skipped). If the model doesn't favor our
+      // chosen side at ≥50%, never fire. Kills the p=0.05/side=YES and
+      // p=0.86/side=NO wrong-side leaks seen in the last 24h.
+      {
+        const sideProbGuard = side === "YES" ? m.modelYesProb : 1 - m.modelYesProb;
+        if (!Number.isFinite(sideProbGuard) || sideProbGuard < 0.5) {
+          skipReasons.push(`${m.ticker}: wrong-side — model gives ${side} only ${((sideProbGuard || 0) * 100).toFixed(0)}% (need ≥50%) — skip`);
+          continue;
+        }
+      }
+
+      // #2 — Extreme-entry + late-window guard: buying at ≤15¢ or ≥85¢
+      // with <300s to close is a near-auto SL when spot is anywhere near
+      // strike. Kills the entry=1¢/ttc=62s and entry=15¢/ttc=387s losses.
+      {
+        const askForSide = Math.round(((side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) || 0) * 100);
+        const ttcGuard = Number(m.secondsToClose ?? 0);
+        if (ttcGuard > 0 && ttcGuard < 300 && (askForSide <= 15 || askForSide >= 85)) {
+          skipReasons.push(`${m.ticker}: extreme-late — ${side} @ ${askForSide}¢ with ${ttcGuard}s left — skip`);
+          continue;
+        }
+      }
+
+
 
 
       if (!data.force && freshProbBySide.size > 0 && kind !== "kalshi_primary_disagree") {
