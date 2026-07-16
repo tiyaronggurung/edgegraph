@@ -194,6 +194,15 @@ export async function runAutoTradeCore(
         console.warn("[live-stake] ladder read failed:", e?.message ?? e);
       }
 
+      // #3 — 48h safety cap: halve live stakes while diagnosing loss streak.
+      // Applies AFTER the ladder overrides stake, so it caps the ladder too.
+      const LIVE_SAFETY_STAKE_CAP_USD = 5;
+      if (data.stakeUsd > LIVE_SAFETY_STAKE_CAP_USD) {
+        (data as { stakeUsd: number }).stakeUsd = LIVE_SAFETY_STAKE_CAP_USD;
+      }
+
+
+
       // ── Balance-aware stake sizing (live only) ──
       // If Kalshi cash balance < requested stake, shrink stake to whole
       // remaining balance (rounded down to $1). Skip if balance < $1.
