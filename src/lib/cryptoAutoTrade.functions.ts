@@ -26,6 +26,12 @@ const LIVE_MAX_STAKE_USD_PER_ORDER = 150; // matches DEFAULT_LADDER_CONFIG.maxSt
 const LIVE_MIN_SIGMA_DISTANCE = 1.25;
 const LIVE_MIN_EDGE_PTS = 5;
 const LIVE_MIN_SECONDS_TO_CLOSE = 120;
+// Fresh-market warmup: skip a 15-min market for the first N seconds after it opens.
+// A Kalshi 15-min market = 900s total, so secondsToClose > (900 - warmup) means
+// "market is younger than warmup — wait for the fresh strike to print its own
+// price action instead of chasing the prior candle's momentum".
+const LIVE_MARKET_WARMUP_SEC = 90;
+const LIVE_MAX_SECONDS_TO_CLOSE = 900 - LIVE_MARKET_WARMUP_SEC; // 810s
 const LIVE_DAILY_ORDER_CAP = 40;
 const LIVE_DAILY_LOSS_CAP_USD = 250; // realized loss in last 24h that halts new orders (50% of $500 bankroll)
 const LIVE_CONFIRM_TOKEN = "I_UNDERSTAND_LIVE";
@@ -331,6 +337,7 @@ export async function runAutoTradeCore(
 
     const minSigma = isLive ? LIVE_MIN_SIGMA_DISTANCE : MIN_SIGMA_DISTANCE_PAPER;
     const minSeconds = isLive ? LIVE_MIN_SECONDS_TO_CLOSE : 90;
+    const maxSeconds = isLive ? LIVE_MAX_SECONDS_TO_CLOSE : Number.POSITIVE_INFINITY;
     const minEdgePts = isLive ? LIVE_MIN_EDGE_PTS : 0;
 
     // ── Model Bet quality gates (isotonic + confidence/edge + streak + regime) ──
@@ -446,6 +453,7 @@ export async function runAutoTradeCore(
           if (m.sigmaDistance < minSigma) { const r = `sigDist ${m.sigmaDistance.toFixed(2)}σ < ${minSigma}σ`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (!m.gapAnalysis.momentumAlignsWithSide) { const r = `momentum fights ${m.side}`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (m.secondsToClose < minSeconds) { const r = `${m.secondsToClose}s < ${minSeconds}s`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
+          if (m.secondsToClose > maxSeconds) { const r = `fresh_market_warmup: ${m.secondsToClose}s > ${maxSeconds}s (wait ${LIVE_MARKET_WARMUP_SEC}s after new strike opens)`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (equity) {
             if (equity.btcImpact.wouldBlock === "block_up" && m.side === "YES") {
               const r = "blocked by equity risk_off (strong)"; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
