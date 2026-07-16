@@ -579,13 +579,14 @@ export async function runAutoTradeCore(
         const singleSide = kalshiSide ?? m.side;
         plan.push({ m, side: singleSide, stakeUsd: data.stakeUsd, kind: "primary" });
       } else {
-        // Disagreement → primary on Kalshi lean only. Model-side probe
-        // DISABLED per user request (was betting the reverse side and
-        // losing). Do not re-enable without explicit user approval.
-        plan.push({ m, side: kalshiSide, stakeUsd: data.stakeUsd, kind: "kalshi_primary_disagree" });
+        // Disagreement → HARD PASS. Post-mortem on 24h of trades showed the
+        // "trust Kalshi lean on disagreement" branch was 1W-7L / −$60.72
+        // (vs 2W-4L / −$27.14 when model+Kalshi agreed). Both sides bleed,
+        // but firing against the model is the biggest single leak. Only
+        // fire when Kalshi lean AND live model agree on direction.
         const rawEdgePts = Math.abs(m.modelYesProb - yp) * 100;
         const flipTag = m.liveFlipped ? " (chart-flipped)" : "";
-        skipReasons.push(`${m.ticker}: disagree — Kalshi leans ${kalshiSide} @ ${(yp * 100).toFixed(0)}¢, live model picks ${rawModelSide}${flipTag} (edge ${rawEdgePts.toFixed(1)}pts) → $${data.stakeUsd} ${kalshiSide} only (probe disabled)`);
+        skipReasons.push(`${m.ticker}: SKIP — Kalshi leans ${kalshiSide} @ ${(yp * 100).toFixed(0)}¢ but live model picks ${rawModelSide}${flipTag} (edge ${rawEdgePts.toFixed(1)}pts) — no fire on disagreement`);
       }
 
     }
