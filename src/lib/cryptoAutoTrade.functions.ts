@@ -1033,6 +1033,8 @@ export async function runAutoTradeCore(
           exit_ladder: DEFAULT_EXIT_LADDER as any,
           is_martingale: false,
           inputs_snapshot: { iocLadder: ladderTelemetry, polymarket: polymarketSnap, planKind: kind, modelSide: m.side, kalshiLeanYesPrice: m.yesPrice, jump: jumpSnap } as any,
+          raw_streak_at_fire: ((result as any).__streak3?.streak ?? null),
+          streak3_would_skip: Boolean((result as any).__streak3?.wouldSkip),
 
 
         })
