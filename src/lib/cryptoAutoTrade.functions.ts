@@ -337,6 +337,7 @@ export async function runAutoTradeCore(
 
     const minSigma = isLive ? LIVE_MIN_SIGMA_DISTANCE : MIN_SIGMA_DISTANCE_PAPER;
     const minSeconds = isLive ? LIVE_MIN_SECONDS_TO_CLOSE : 90;
+    const maxSeconds = isLive ? LIVE_MAX_SECONDS_TO_CLOSE : Number.POSITIVE_INFINITY;
     const minEdgePts = isLive ? LIVE_MIN_EDGE_PTS : 0;
 
     // ── Model Bet quality gates (isotonic + confidence/edge + streak + regime) ──
