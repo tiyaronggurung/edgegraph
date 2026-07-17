@@ -188,7 +188,7 @@ export function evaluateBtcEntry(input: BtcEntryGateInput): BtcEntryGateDecision
     );
   }
 
-  const shouldBet = sideConfidencePassed && liveAgreementPassed && positiveEdgeEnforcedPassed;
+  const shouldBet = sideConfidencePassed && liveAgreementPassed && positiveEdgeEnforcedPassed && !contrarianKill;
   const primaryReason = shouldBet
     ? (() => {
         const parts = [`side-conf ${(sideConfidence * 100).toFixed(0)}%`];
