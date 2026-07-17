@@ -1219,6 +1219,7 @@ export type Database = {
           contracts: number
           contracts_remaining: number | null
           created_at: string
+          dwell_gate_would_skip: boolean
           edge_pts: number
           entry_price_cents: number | null
           error_message: string | null
@@ -1235,6 +1236,7 @@ export type Database = {
           model_prob: number
           partial_pnl_usd: number
           pnl_usd: number | null
+          raw_dir_dwell_at_fire: number | null
           raw_streak_at_fire: number | null
           seconds_to_close: number
           session_id: string
@@ -1255,6 +1257,7 @@ export type Database = {
           contracts: number
           contracts_remaining?: number | null
           created_at?: string
+          dwell_gate_would_skip?: boolean
           edge_pts: number
           entry_price_cents?: number | null
           error_message?: string | null
@@ -1271,6 +1274,7 @@ export type Database = {
           model_prob: number
           partial_pnl_usd?: number
           pnl_usd?: number | null
+          raw_dir_dwell_at_fire?: number | null
           raw_streak_at_fire?: number | null
           seconds_to_close: number
           session_id: string
@@ -1291,6 +1295,7 @@ export type Database = {
           contracts?: number
           contracts_remaining?: number | null
           created_at?: string
+          dwell_gate_would_skip?: boolean
           edge_pts?: number
           entry_price_cents?: number | null
           error_message?: string | null
@@ -1307,6 +1312,7 @@ export type Database = {
           model_prob?: number
           partial_pnl_usd?: number
           pnl_usd?: number | null
+          raw_dir_dwell_at_fire?: number | null
           raw_streak_at_fire?: number | null
           seconds_to_close?: number
           session_id?: string
