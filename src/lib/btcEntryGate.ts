@@ -146,6 +146,21 @@ export function evaluateBtcEntry(input: BtcEntryGateInput): BtcEntryGateDecision
   const positiveEdgeEnforcedPassed =
     !positiveEdgeEnforced ? true : positiveEdgePassed === true;
 
+  // ── Contrarian-edge kill (hard-coded, always on) ──
+  // Rationale: the 2 losers in the last 6h were both "big contrarian edge"
+  // trades — model backed NO at 61%/71% while market priced NO at 22¢/38¢
+  // (i.e. market ≥62% YES). A contrarian trade with a huge raw edge tends to
+  // mean the model is stale on the last 2 candles, not that we found value.
+  // Block when the market prices the locked side as the clear minority
+  // (ask ≤ 0.40 → market ≥ 60% on the other side) AND raw model edge ≥ 25pts.
+  const CONTRARIAN_ASK_MAX = 0.40;
+  const CONTRARIAN_EDGE_MIN = 0.25;
+  const contrarianKill =
+    selectedSideAsk !== null &&
+    rawModelEdge !== null &&
+    selectedSideAsk <= CONTRARIAN_ASK_MAX &&
+    rawModelEdge >= CONTRARIAN_EDGE_MIN;
+
   const allReasons: string[] = [];
   if (!sideConfidencePassed) {
     allReasons.push(
@@ -165,8 +180,15 @@ export function evaluateBtcEntry(input: BtcEntryGateInput): BtcEntryGateDecision
       );
     }
   }
+  if (contrarianKill) {
+    const askPct = (selectedSideAsk! * 100).toFixed(0);
+    const edgePts = (rawModelEdge! * 100).toFixed(1);
+    allReasons.push(
+      `contrarian kill — market prices ${lockedSide} at ${askPct}¢ with ${edgePts}pt raw edge (≥25pt contrarian trades historically lose)`,
+    );
+  }
 
-  const shouldBet = sideConfidencePassed && liveAgreementPassed && positiveEdgeEnforcedPassed;
+  const shouldBet = sideConfidencePassed && liveAgreementPassed && positiveEdgeEnforcedPassed && !contrarianKill;
   const primaryReason = shouldBet
     ? (() => {
         const parts = [`side-conf ${(sideConfidence * 100).toFixed(0)}%`];
