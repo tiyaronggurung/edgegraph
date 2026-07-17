@@ -1084,6 +1084,9 @@ export async function runAutoTradeCore(
           inputs_snapshot: { iocLadder: ladderTelemetry, polymarket: polymarketSnap, planKind: kind, modelSide: m.side, kalshiLeanYesPrice: m.yesPrice, jump: jumpSnap } as any,
           raw_streak_at_fire: ((result as any).__streak3?.streak ?? null),
           streak3_would_skip: Boolean((result as any).__streak3?.wouldSkip),
+          raw_dir_dwell_at_fire: ((result as any).__dwellByKey?.get?.(`${m.ticker}|${side}`)?.dwell ?? null),
+          dwell_gate_would_skip: Boolean((result as any).__dwellByKey?.get?.(`${m.ticker}|${side}`)?.wouldSkip),
+
 
 
         })
