@@ -481,6 +481,55 @@ export async function runAutoTradeCore(
       // Expose to insert path below.
       (result as any).__streak3 = streak3Global;
 
+      // ── Raw Dir dwell ratio (SHADOW ONLY) ──────────────────────────────
+      // For each candidate market: fetch spot ticks from the last 15 min,
+      // bucket into 1-min bins, use last spot per bin. rawDir_bin = YES if
+      // spot >= strike else NO. dwell = fraction of bins matching m.side.
+      // Blocks nothing yet — recorded per-order for post-hoc study.
+      const dwellByKey = new Map<string, { dwell: number | null; wouldSkip: boolean }>();
+      if (isLive && result.markets.length > 0) {
+        try {
+          const cutoffIso = new Date(Date.now() - 15 * 60_000).toISOString();
+          const { data: ticks } = await (supabase as any)
+            .from("btc_spot_ticks")
+            .select("observed_at, spot")
+            .gte("observed_at", cutoffIso)
+            .order("observed_at", { ascending: true })
+            .limit(2000);
+          const rows = (ticks ?? []) as Array<{ observed_at: string; spot: number | string }>;
+          // Bucket by minute; keep last spot per bucket.
+          const perMinute = new Map<number, number>();
+          for (const r of rows) {
+            const t = new Date(r.observed_at).getTime();
+            if (!Number.isFinite(t)) continue;
+            const bin = Math.floor(t / 60_000);
+            const s = Number(r.spot);
+            if (Number.isFinite(s)) perMinute.set(bin, s);
+          }
+          const nowBin = Math.floor(Date.now() / 60_000);
+          const bins: Array<{ bin: number; spot: number }> = [];
+          for (let b = nowBin - 14; b <= nowBin; b++) {
+            const s = perMinute.get(b);
+            if (s !== undefined) bins.push({ bin: b, spot: s });
+          }
+          for (const m of result.markets) {
+            if (bins.length < 5) {
+              dwellByKey.set(`${m.ticker}|${m.side}`, { dwell: null, wouldSkip: false });
+              continue;
+            }
+            let match = 0;
+            for (const { spot } of bins) {
+              const rawDir = spot >= m.strike ? "YES" : "NO";
+              if (rawDir === m.side) match++;
+            }
+            const dwell = match / bins.length;
+            dwellByKey.set(`${m.ticker}|${m.side}`, { dwell, wouldSkip: dwell < 0.60 });
+          }
+        } catch { /* shadow only — non-fatal */ }
+      }
+      (result as any).__dwellByKey = dwellByKey;
+
+
       candidates = result.markets
 
         .map(m => {
@@ -1035,6 +1084,9 @@ export async function runAutoTradeCore(
           inputs_snapshot: { iocLadder: ladderTelemetry, polymarket: polymarketSnap, planKind: kind, modelSide: m.side, kalshiLeanYesPrice: m.yesPrice, jump: jumpSnap } as any,
           raw_streak_at_fire: ((result as any).__streak3?.streak ?? null),
           streak3_would_skip: Boolean((result as any).__streak3?.wouldSkip),
+          raw_dir_dwell_at_fire: ((result as any).__dwellByKey?.get?.(`${m.ticker}|${side}`)?.dwell ?? null),
+          dwell_gate_would_skip: Boolean((result as any).__dwellByKey?.get?.(`${m.ticker}|${side}`)?.wouldSkip),
+
 
 
         })
