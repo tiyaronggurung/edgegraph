@@ -1225,6 +1225,8 @@ export type Database = {
           error_message: string | null
           event_ticker: string | null
           exit_ladder: Json | null
+          funding_rate_at_fire: number | null
+          funding_zscore_30d: number | null
           gap_in_sigmas: number
           id: string
           inputs_snapshot: Json | null
@@ -1265,6 +1267,8 @@ export type Database = {
           error_message?: string | null
           event_ticker?: string | null
           exit_ladder?: Json | null
+          funding_rate_at_fire?: number | null
+          funding_zscore_30d?: number | null
           gap_in_sigmas: number
           id?: string
           inputs_snapshot?: Json | null
@@ -1305,6 +1309,8 @@ export type Database = {
           error_message?: string | null
           event_ticker?: string | null
           exit_ladder?: Json | null
+          funding_rate_at_fire?: number | null
+          funding_zscore_30d?: number | null
           gap_in_sigmas?: number
           id?: string
           inputs_snapshot?: Json | null
