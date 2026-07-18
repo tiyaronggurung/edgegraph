@@ -1175,6 +1175,9 @@ export async function runAutoTradeCore(
           dwell_gate_would_skip: Boolean((result as any).__dwellByKey?.get?.(`${m.ticker}|${side}`)?.wouldSkip),
           settle_spike_z_at_fire: ((result as any).__spikeByTicker?.get?.(m.ticker)?.z ?? null),
           settle_spike_would_skip: Boolean((result as any).__spikeByTicker?.get?.(m.ticker)?.wouldSkip),
+          funding_rate_at_fire: ((result as any).__funding?.rate ?? null),
+          funding_zscore_30d: ((result as any).__funding?.z ?? null),
+
 
 
 
