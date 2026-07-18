@@ -1182,7 +1182,7 @@ export async function runAutoTradeCore(
 
 
         })
-        .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
+        .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd, inputs_snapshot")
         .single();
 
       if (error) { skipReasons.push(`${m.ticker}: insert error ${error.message}`); continue; }
@@ -1210,7 +1210,7 @@ export async function runAutoTradeCore(
               count: String(filledContracts),
               price: tpPriceDollars.toFixed(4),
               // No time_in_force → Kalshi treats as resting (GTC) limit.
-              self_trade_prevention_type: "cancel_aggressing",
+              self_trade_prevention_type: "taker_at_cross",
               client_order_id: `tp30-${(row as any).id}`.slice(0, 64),
             };
             const tpRes = await fetch(`${KALSHI_PUBLIC_BASE}${tpPath}`, {
@@ -1220,7 +1220,19 @@ export async function runAutoTradeCore(
             });
             const tpJson: any = await tpRes.json().catch(() => ({}));
             if (!tpRes.ok) {
-              skipReasons.push(`${m.ticker}: TP+30% limit failed — ${tpJson?.error?.message ?? `http ${tpRes.status}`}`);
+              const tpError = tpJson?.error?.message ?? tpJson?.message ?? `http ${tpRes.status}`;
+              skipReasons.push(`${m.ticker}: TP+30% limit failed — ${tpError}`);
+              try {
+                await supabase.from("auto_model_bet_errors").insert({
+                  user_id: userId,
+                  ticker: m.ticker,
+                  side,
+                  price_cents: tpCents,
+                  stake_usd: stakeFilled,
+                  stage: "tp30_failed",
+                  error: String(tpError).slice(0, 500),
+                });
+              } catch { /* non-fatal */ }
             } else {
               const tpOrderId = tpJson?.order_id ?? tpJson?.order?.order_id ?? null;
               try {
@@ -1242,7 +1254,19 @@ export async function runAutoTradeCore(
               } catch { /* non-fatal */ }
             }
           } catch (e: any) {
-            skipReasons.push(`${m.ticker}: TP+30% limit err ${e?.message ?? "x"}`);
+            const tpError = e?.message ?? "x";
+            skipReasons.push(`${m.ticker}: TP+30% limit err ${tpError}`);
+            try {
+              await supabase.from("auto_model_bet_errors").insert({
+                user_id: userId,
+                ticker: m.ticker,
+                side,
+                price_cents: filledEntryCents > 0 ? Math.min(99, Math.max(filledEntryCents + 1, Math.round(filledEntryCents * 1.3))) : null,
+                stake_usd: stakeFilled,
+                stage: "tp30_failed",
+                error: String(tpError).slice(0, 500),
+              });
+            } catch { /* non-fatal */ }
           }
         }
       }
