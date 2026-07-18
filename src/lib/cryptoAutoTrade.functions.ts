@@ -1161,7 +1161,7 @@ export async function runAutoTradeCore(
         // Immediately after the entry fills, park a GTC limit sell at
         // round(entry × 1.3) so gains get captured without a market exit.
         // Best-effort: any failure is non-fatal to the entry.
-        if (isLive && filledOk && filledContracts > 0) {
+        if (isLive && kalshiOrderId && filledContracts > 0) {
           try {
             const rawTarget = Math.round(filledEntryCents * 1.3);
             const tpCents = Math.min(99, Math.max(filledEntryCents + 1, rawTarget));
