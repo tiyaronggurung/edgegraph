@@ -612,6 +612,29 @@ export async function runAutoTradeCore(
       }
       (result as any).__funding = fundingSnap;
 
+      // ── Coinbase↔Binance divergence shadow (SHADOW ONLY) ─────────────
+      // Fetch both spot prices at fire time. Divergence in bps may
+      // predict short-term direction (lead-lag between venues).
+      // Blocks nothing — logged per order to inputs_snapshot.cb_bn.
+      let cbBnSnap: { cb: number | null; bn: number | null; div_bps: number | null } = { cb: null, bn: null, div_bps: null };
+      if (isLive && result.markets.length > 0) {
+        try {
+          const [cbJ, bnJ] = await Promise.all([
+            fetch("https://api.coinbase.com/v2/prices/BTC-USD/spot", { signal: AbortSignal.timeout(2500) }).then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", { signal: AbortSignal.timeout(2500) }).then(r => r.ok ? r.json() : null).catch(() => null),
+          ]);
+          const cb = cbJ && (cbJ as any).data?.amount ? Number((cbJ as any).data.amount) : null;
+          const bn = bnJ && (bnJ as any).price ? Number((bnJ as any).price) : null;
+          const div_bps = (cb !== null && bn !== null && bn > 0 && Number.isFinite(cb) && Number.isFinite(bn))
+            ? ((cb - bn) / bn) * 10000
+            : null;
+          cbBnSnap = { cb, bn, div_bps };
+        } catch { /* shadow only — non-fatal */ }
+      }
+      (result as any).__cbBn = cbBnSnap;
+
+
+
 
 
 
