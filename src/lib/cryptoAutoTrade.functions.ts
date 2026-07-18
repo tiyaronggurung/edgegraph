@@ -1143,6 +1143,8 @@ export async function runAutoTradeCore(
           streak3_would_skip: Boolean((result as any).__streak3?.wouldSkip),
           raw_dir_dwell_at_fire: ((result as any).__dwellByKey?.get?.(`${m.ticker}|${side}`)?.dwell ?? null),
           dwell_gate_would_skip: Boolean((result as any).__dwellByKey?.get?.(`${m.ticker}|${side}`)?.wouldSkip),
+          settle_spike_z_at_fire: ((result as any).__spikeByTicker?.get?.(m.ticker)?.z ?? null),
+          settle_spike_would_skip: Boolean((result as any).__spikeByTicker?.get?.(m.ticker)?.wouldSkip),
 
 
 
