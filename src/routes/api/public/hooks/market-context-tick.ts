@@ -108,7 +108,7 @@ export const Route = createFileRoute("/api/public/hooks/market-context-tick")({
               strikePrice: row.strike != null ? Number(row.strike) : null,
               modelProb: row.model_prob,
               modelSide: row.side,
-              sideConf: row.side_conf,
+              sideConf: null,
               fired: true,
               orderId: row.id,
             });
