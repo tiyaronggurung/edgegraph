@@ -1219,6 +1219,17 @@ export type Database = {
           contracts: number
           contracts_remaining: number | null
           created_at: string
+          ctx_adx_15m: number | null
+          ctx_bb_5m_pctb: number | null
+          ctx_engine_version: string | null
+          ctx_macd_15m_hist: number | null
+          ctx_nearest_resistance_distance_pct: number | null
+          ctx_nearest_support_distance_pct: number | null
+          ctx_rsi_15m: number | null
+          ctx_rsi_1h: number | null
+          ctx_trend_alignment_score: number | null
+          ctx_vp_price_position: string | null
+          ctx_vwap_distance_pct: number | null
           dwell_gate_would_skip: boolean
           edge_pts: number
           entry_price_cents: number | null
@@ -1261,6 +1272,17 @@ export type Database = {
           contracts: number
           contracts_remaining?: number | null
           created_at?: string
+          ctx_adx_15m?: number | null
+          ctx_bb_5m_pctb?: number | null
+          ctx_engine_version?: string | null
+          ctx_macd_15m_hist?: number | null
+          ctx_nearest_resistance_distance_pct?: number | null
+          ctx_nearest_support_distance_pct?: number | null
+          ctx_rsi_15m?: number | null
+          ctx_rsi_1h?: number | null
+          ctx_trend_alignment_score?: number | null
+          ctx_vp_price_position?: string | null
+          ctx_vwap_distance_pct?: number | null
           dwell_gate_would_skip?: boolean
           edge_pts: number
           entry_price_cents?: number | null
@@ -1303,6 +1325,17 @@ export type Database = {
           contracts?: number
           contracts_remaining?: number | null
           created_at?: string
+          ctx_adx_15m?: number | null
+          ctx_bb_5m_pctb?: number | null
+          ctx_engine_version?: string | null
+          ctx_macd_15m_hist?: number | null
+          ctx_nearest_resistance_distance_pct?: number | null
+          ctx_nearest_support_distance_pct?: number | null
+          ctx_rsi_15m?: number | null
+          ctx_rsi_1h?: number | null
+          ctx_trend_alignment_score?: number | null
+          ctx_vp_price_position?: string | null
+          ctx_vwap_distance_pct?: number | null
           dwell_gate_would_skip?: boolean
           edge_pts?: number
           entry_price_cents?: number | null
@@ -1908,6 +1941,213 @@ export type Database = {
           pins?: Json
           scope?: string
           time_bucket?: string | null
+        }
+        Relationships: []
+      }
+      btc_market_context: {
+        Row: {
+          adx_15m: number | null
+          adx_15m_minus_di: number | null
+          adx_15m_plus_di: number | null
+          bb_5m_bandwidth: number | null
+          bb_5m_lower: number | null
+          bb_5m_mid: number | null
+          bb_5m_pctb: number | null
+          bb_5m_squeeze: boolean | null
+          bb_5m_upper: number | null
+          captured_at: string
+          checkpoint_type: string
+          context_engine_version: string
+          fired: boolean
+          id: string
+          macd_15m_cross: string | null
+          macd_15m_hist: number | null
+          macd_15m_line: number | null
+          macd_15m_signal: number | null
+          macd_5m_cross: string | null
+          macd_5m_hist: number | null
+          macd_5m_line: number | null
+          macd_5m_signal: number | null
+          model_prob: number | null
+          model_side: string | null
+          nearest_resistance: number | null
+          nearest_resistance_distance_pct: number | null
+          nearest_resistance_distance_usd: number | null
+          nearest_resistance_tf: string | null
+          nearest_resistance_touches: number | null
+          nearest_support: number | null
+          nearest_support_distance_pct: number | null
+          nearest_support_distance_usd: number | null
+          nearest_support_tf: string | null
+          nearest_support_touches: number | null
+          order_id: string | null
+          raw_json: Json | null
+          rsi_15m: number | null
+          rsi_1h: number | null
+          rsi_5m: number | null
+          side_conf: number | null
+          spot_price: number | null
+          sr_algorithm_version: string
+          sr_zones_json: Json | null
+          strike_distance_atr: number | null
+          strike_distance_em: number | null
+          strike_distance_pct: number | null
+          strike_distance_usd: number | null
+          strike_price: number | null
+          ticker: string
+          trend_15m: string | null
+          trend_1h: string | null
+          trend_1m: string | null
+          trend_4h: string | null
+          trend_5m: string | null
+          trend_alignment_score: number | null
+          volume_profile_version: string
+          vp_poc: number | null
+          vp_price_position: string | null
+          vp_vah: number | null
+          vp_val: number | null
+          vwap_above: boolean | null
+          vwap_distance_pct: number | null
+          vwap_distance_usd: number | null
+          vwap_session: number | null
+          window_end_ts: string
+          window_start_ts: string
+        }
+        Insert: {
+          adx_15m?: number | null
+          adx_15m_minus_di?: number | null
+          adx_15m_plus_di?: number | null
+          bb_5m_bandwidth?: number | null
+          bb_5m_lower?: number | null
+          bb_5m_mid?: number | null
+          bb_5m_pctb?: number | null
+          bb_5m_squeeze?: boolean | null
+          bb_5m_upper?: number | null
+          captured_at?: string
+          checkpoint_type: string
+          context_engine_version?: string
+          fired?: boolean
+          id?: string
+          macd_15m_cross?: string | null
+          macd_15m_hist?: number | null
+          macd_15m_line?: number | null
+          macd_15m_signal?: number | null
+          macd_5m_cross?: string | null
+          macd_5m_hist?: number | null
+          macd_5m_line?: number | null
+          macd_5m_signal?: number | null
+          model_prob?: number | null
+          model_side?: string | null
+          nearest_resistance?: number | null
+          nearest_resistance_distance_pct?: number | null
+          nearest_resistance_distance_usd?: number | null
+          nearest_resistance_tf?: string | null
+          nearest_resistance_touches?: number | null
+          nearest_support?: number | null
+          nearest_support_distance_pct?: number | null
+          nearest_support_distance_usd?: number | null
+          nearest_support_tf?: string | null
+          nearest_support_touches?: number | null
+          order_id?: string | null
+          raw_json?: Json | null
+          rsi_15m?: number | null
+          rsi_1h?: number | null
+          rsi_5m?: number | null
+          side_conf?: number | null
+          spot_price?: number | null
+          sr_algorithm_version?: string
+          sr_zones_json?: Json | null
+          strike_distance_atr?: number | null
+          strike_distance_em?: number | null
+          strike_distance_pct?: number | null
+          strike_distance_usd?: number | null
+          strike_price?: number | null
+          ticker: string
+          trend_15m?: string | null
+          trend_1h?: string | null
+          trend_1m?: string | null
+          trend_4h?: string | null
+          trend_5m?: string | null
+          trend_alignment_score?: number | null
+          volume_profile_version?: string
+          vp_poc?: number | null
+          vp_price_position?: string | null
+          vp_vah?: number | null
+          vp_val?: number | null
+          vwap_above?: boolean | null
+          vwap_distance_pct?: number | null
+          vwap_distance_usd?: number | null
+          vwap_session?: number | null
+          window_end_ts: string
+          window_start_ts: string
+        }
+        Update: {
+          adx_15m?: number | null
+          adx_15m_minus_di?: number | null
+          adx_15m_plus_di?: number | null
+          bb_5m_bandwidth?: number | null
+          bb_5m_lower?: number | null
+          bb_5m_mid?: number | null
+          bb_5m_pctb?: number | null
+          bb_5m_squeeze?: boolean | null
+          bb_5m_upper?: number | null
+          captured_at?: string
+          checkpoint_type?: string
+          context_engine_version?: string
+          fired?: boolean
+          id?: string
+          macd_15m_cross?: string | null
+          macd_15m_hist?: number | null
+          macd_15m_line?: number | null
+          macd_15m_signal?: number | null
+          macd_5m_cross?: string | null
+          macd_5m_hist?: number | null
+          macd_5m_line?: number | null
+          macd_5m_signal?: number | null
+          model_prob?: number | null
+          model_side?: string | null
+          nearest_resistance?: number | null
+          nearest_resistance_distance_pct?: number | null
+          nearest_resistance_distance_usd?: number | null
+          nearest_resistance_tf?: string | null
+          nearest_resistance_touches?: number | null
+          nearest_support?: number | null
+          nearest_support_distance_pct?: number | null
+          nearest_support_distance_usd?: number | null
+          nearest_support_tf?: string | null
+          nearest_support_touches?: number | null
+          order_id?: string | null
+          raw_json?: Json | null
+          rsi_15m?: number | null
+          rsi_1h?: number | null
+          rsi_5m?: number | null
+          side_conf?: number | null
+          spot_price?: number | null
+          sr_algorithm_version?: string
+          sr_zones_json?: Json | null
+          strike_distance_atr?: number | null
+          strike_distance_em?: number | null
+          strike_distance_pct?: number | null
+          strike_distance_usd?: number | null
+          strike_price?: number | null
+          ticker?: string
+          trend_15m?: string | null
+          trend_1h?: string | null
+          trend_1m?: string | null
+          trend_4h?: string | null
+          trend_5m?: string | null
+          trend_alignment_score?: number | null
+          volume_profile_version?: string
+          vp_poc?: number | null
+          vp_price_position?: string | null
+          vp_vah?: number | null
+          vp_val?: number | null
+          vwap_above?: boolean | null
+          vwap_distance_pct?: number | null
+          vwap_distance_usd?: number | null
+          vwap_session?: number | null
+          window_end_ts?: string
+          window_start_ts?: string
         }
         Relationships: []
       }
