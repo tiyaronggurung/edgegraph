@@ -529,6 +529,63 @@ export async function runAutoTradeCore(
       }
       (result as any).__dwellByKey = dwellByKey;
 
+      // ── Settlement-window price-spike shadow gate (SHADOW ONLY) ───────
+      // Hypothesis (Dai/Jia/Yu 2026): short-horizon prediction contracts
+      // are manipulable via last-seconds spot pushes. We approximate a
+      // "manipulation-prone" moment by measuring the absolute price move
+      // in the most recent 30s window vs the stdev of 30s |Δspot| moves
+      // over the preceding ~5 min. wouldSkip = z ≥ 3 AND ≤90s to close.
+      // Blocks nothing — logged per order for post-hoc study.
+      const spikeByTicker = new Map<string, { z: number | null; wouldSkip: boolean }>();
+      if (isLive && result.markets.length > 0) {
+        try {
+          const cutoffIso = new Date(Date.now() - 6 * 60_000).toISOString();
+          const { data: ticks } = await (supabase as any)
+            .from("btc_spot_ticks")
+            .select("observed_at, spot")
+            .gte("observed_at", cutoffIso)
+            .order("observed_at", { ascending: true })
+            .limit(4000);
+          const rows = (ticks ?? []) as Array<{ observed_at: string; spot: number | string }>;
+          const series = rows
+            .map(r => ({ t: new Date(r.observed_at).getTime(), s: Number(r.spot) }))
+            .filter(p => Number.isFinite(p.t) && Number.isFinite(p.s));
+          // Rolling 30s |Δspot| samples over the 6-min window.
+          const nowMs = Date.now();
+          const samples: number[] = [];
+          const windowMs = 30_000;
+          const stepMs = 15_000;
+          for (let end = nowMs - windowMs; end >= nowMs - 6 * 60_000 + windowMs; end -= stepMs) {
+            const winStart = end - windowMs;
+            const inWin = series.filter(p => p.t >= winStart && p.t <= end);
+            if (inWin.length >= 2) {
+              const first = inWin[0].s;
+              const last = inWin[inWin.length - 1].s;
+              samples.push(Math.abs(last - first));
+            }
+          }
+          // Last 30s move.
+          const lastWinStart = nowMs - windowMs;
+          const lastInWin = series.filter(p => p.t >= lastWinStart);
+          let z: number | null = null;
+          if (lastInWin.length >= 2 && samples.length >= 6) {
+            const lastMove = Math.abs(lastInWin[lastInWin.length - 1].s - lastInWin[0].s);
+            const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+            const variance = samples.reduce((a, b) => a + (b - mean) ** 2, 0) / samples.length;
+            const stdev = Math.sqrt(variance);
+            z = stdev > 1e-6 ? (lastMove - mean) / stdev : null;
+          }
+          for (const m of result.markets) {
+            const nearSettle = typeof m.secondsToClose === "number" && m.secondsToClose <= 90;
+            const wouldSkip = z !== null && z >= 3 && nearSettle;
+            spikeByTicker.set(m.ticker, { z, wouldSkip });
+          }
+        } catch { /* shadow only — non-fatal */ }
+      }
+      (result as any).__spikeByTicker = spikeByTicker;
+
+
+
 
       candidates = result.markets
 
@@ -1086,6 +1143,8 @@ export async function runAutoTradeCore(
           streak3_would_skip: Boolean((result as any).__streak3?.wouldSkip),
           raw_dir_dwell_at_fire: ((result as any).__dwellByKey?.get?.(`${m.ticker}|${side}`)?.dwell ?? null),
           dwell_gate_would_skip: Boolean((result as any).__dwellByKey?.get?.(`${m.ticker}|${side}`)?.wouldSkip),
+          settle_spike_z_at_fire: ((result as any).__spikeByTicker?.get?.(m.ticker)?.z ?? null),
+          settle_spike_would_skip: Boolean((result as any).__spikeByTicker?.get?.(m.ticker)?.wouldSkip),
 
 
 

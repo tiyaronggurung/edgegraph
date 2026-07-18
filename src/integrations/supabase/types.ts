@@ -1241,6 +1241,8 @@ export type Database = {
           seconds_to_close: number
           session_id: string
           settle_price: number | null
+          settle_spike_would_skip: boolean
+          settle_spike_z_at_fire: number | null
           settled_at: string | null
           side: string
           sigma_distance: number
@@ -1279,6 +1281,8 @@ export type Database = {
           seconds_to_close: number
           session_id: string
           settle_price?: number | null
+          settle_spike_would_skip?: boolean
+          settle_spike_z_at_fire?: number | null
           settled_at?: string | null
           side: string
           sigma_distance: number
@@ -1317,6 +1321,8 @@ export type Database = {
           seconds_to_close?: number
           session_id?: string
           settle_price?: number | null
+          settle_spike_would_skip?: boolean
+          settle_spike_z_at_fire?: number | null
           settled_at?: string | null
           side?: string
           sigma_distance?: number
