@@ -584,6 +584,36 @@ export async function runAutoTradeCore(
       }
       (result as any).__spikeByTicker = spikeByTicker;
 
+      // ── Funding-rate shadow (SHADOW ONLY) ────────────────────────────
+      // Fetch Binance BTCUSDT perp funding rate + 30d z-score at fire time.
+      // Extreme positive funding = longs overcrowded → DOWN edge hypothesis.
+      // Extreme negative funding = shorts overcrowded → UP edge hypothesis.
+      // Blocks nothing — logged per order to auto_trade_orders for study.
+      let fundingSnap: { rate: number | null; z: number | null } = { rate: null, z: null };
+      if (isLive && result.markets.length > 0) {
+        try {
+          const [curJ, histJ] = await Promise.all([
+            fetch("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT", { signal: AbortSignal.timeout(2500) }).then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch("https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&limit=90", { signal: AbortSignal.timeout(2500) }).then(r => r.ok ? r.json() : null).catch(() => null),
+          ]);
+          const cur = curJ && Number.isFinite(Number((curJ as any).lastFundingRate)) ? Number((curJ as any).lastFundingRate) : null;
+          const hist: number[] = Array.isArray(histJ)
+            ? (histJ as Array<{ fundingRate: string }>).map(h => Number(h.fundingRate)).filter(v => Number.isFinite(v))
+            : [];
+          let z: number | null = null;
+          if (cur !== null && hist.length >= 20) {
+            const mean = hist.reduce((a, b) => a + b, 0) / hist.length;
+            const variance = hist.reduce((a, b) => a + (b - mean) ** 2, 0) / hist.length;
+            const stdev = Math.sqrt(variance);
+            z = stdev > 1e-9 ? (cur - mean) / stdev : null;
+          }
+          fundingSnap = { rate: cur, z };
+        } catch { /* shadow only — non-fatal */ }
+      }
+      (result as any).__funding = fundingSnap;
+
+
+
 
 
 
