@@ -1153,7 +1153,66 @@ export async function runAutoTradeCore(
         .single();
 
       if (error) { skipReasons.push(`${m.ticker}: insert error ${error.message}`); continue; }
-      if (row) { placed.push(row as AutoTradeOrderRow); recentTickers15m.add(m.ticker); }
+      if (row) {
+        placed.push(row as AutoTradeOrderRow);
+        recentTickers15m.add(m.ticker);
+
+        // ── Resting +30% take-profit limit sell (LIVE only) ────────────
+        // Immediately after the entry fills, park a GTC limit sell at
+        // round(entry × 1.3) so gains get captured without a market exit.
+        // Best-effort: any failure is non-fatal to the entry.
+        if (isLive && filledOk && filledContracts > 0) {
+          try {
+            const rawTarget = Math.round(filledEntryCents * 1.3);
+            const tpCents = Math.min(99, Math.max(filledEntryCents + 1, rawTarget));
+            const { signKalshi } = await import("./cryptoTrades.functions");
+            const tpPath = "/portfolio/events/orders";
+            const tpHeaders = await signKalshi("POST", tpPath, userId);
+            const tpPriceDollars = (side === "YES" ? tpCents : 100 - tpCents) / 100;
+            const tpBody = {
+              ticker: m.ticker,
+              action: "sell",
+              side: side === "YES" ? "ask" : "bid",
+              type: "limit",
+              count: String(filledContracts),
+              price: tpPriceDollars.toFixed(4),
+              // No time_in_force → Kalshi treats as resting (GTC) limit.
+              self_trade_prevention_type: "cancel_aggressing",
+              client_order_id: `tp30-${(row as any).id}`.slice(0, 64),
+            };
+            const tpRes = await fetch(`${KALSHI_PUBLIC_BASE}${tpPath}`, {
+              method: "POST",
+              headers: { ...tpHeaders, "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify(tpBody),
+            });
+            const tpJson: any = await tpRes.json().catch(() => ({}));
+            if (!tpRes.ok) {
+              skipReasons.push(`${m.ticker}: TP+30% limit failed — ${tpJson?.error?.message ?? `http ${tpRes.status}`}`);
+            } else {
+              const tpOrderId = tpJson?.order_id ?? tpJson?.order?.order_id ?? null;
+              try {
+                await supabase
+                  .from("auto_trade_orders")
+                  .update({
+                    inputs_snapshot: {
+                      ...((row as any).inputs_snapshot ?? {}),
+                      tp30: {
+                        target_cents: tpCents,
+                        entry_cents: filledEntryCents,
+                        contracts: filledContracts,
+                        kalshi_order_id: tpOrderId,
+                        placed_at: new Date().toISOString(),
+                      },
+                    },
+                  })
+                  .eq("id", (row as any).id);
+              } catch { /* non-fatal */ }
+            }
+          } catch (e: any) {
+            skipReasons.push(`${m.ticker}: TP+30% limit err ${e?.message ?? "x"}`);
+          }
+        }
+      }
     }
 
 
