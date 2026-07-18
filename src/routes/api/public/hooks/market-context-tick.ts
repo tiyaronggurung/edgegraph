@@ -82,19 +82,18 @@ export const Route = createFileRoute("/api/public/hooks/market-context-tick")({
           const ninetySecAgo = new Date(Date.now() - 90_000).toISOString();
           const { data: recentOrders } = await supabaseAdmin
             .from("auto_trade_orders")
-            .select("id, ticker, strike, created_at, side, model_prob, side_conf")
+            .select("id, ticker, strike, created_at, side, model_prob")
             .gte("created_at", ninetySecAgo)
             .limit(50);
 
           for (const o of recentOrders ?? []) {
-            const row = o as {
+            const row = o as unknown as {
               id: string;
               ticker: string;
               strike: string | number | null;
               created_at: string;
               side: string | null;
               model_prob: number | null;
-              side_conf: number | null;
             };
             if (!row.ticker) continue;
             const createdMs = Date.parse(row.created_at);
