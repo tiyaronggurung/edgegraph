@@ -929,6 +929,20 @@ export async function runAutoTradeCore(
       const limitCents = Math.max(1, Math.min(99, Math.round(
         (side === "YES" ? (m.yesAsk || m.yesPrice) : (m.noAsk || (1 - m.yesPrice))) * 100,
       )));
+      // ── Kill entry <50¢ (LIVE only, all paths) ──
+      // 7d audit: entries <50¢ hit 34% WR and accounted for the entire
+      // −$116 bleed. Applies to force and non-force paths alike.
+      if (isLive && limitCents < 50) {
+        skipReasons.push(`${m.ticker}: sub50_kill — ${side} ${limitCents}¢ < 50¢ (7d: 34% WR, −$116)`);
+        continue;
+      }
+      // ── Kill edge <3pts (LIVE only, all paths) ──
+      // 7d audit: edge_pts <3 is unprofitable; the 3–15 band delivered
+      // +$55 PnL. Applies to force and non-force paths alike.
+      if (isLive && Number.isFinite(m.edgePts) && m.edgePts < 3) {
+        skipReasons.push(`${m.ticker}: sub_edge_kill — edge ${m.edgePts.toFixed(1)}pts < 3pts (7d: <3pts unprofitable)`);
+        continue;
+      }
       // ── Max-entry ceiling (live only, configurable) ──
       // Above this, one loss costs many wins to claw back. Default 78¢ —
       // user can raise up to 95¢ via the Odds Shadow Trader panel.
