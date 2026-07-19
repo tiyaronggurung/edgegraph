@@ -380,6 +380,170 @@ export async function runAutoTradeCore(
       } catch { /* no settings row → gate off, existing behavior */ }
     }
 
+    // ── Shadow-signal computations (run for BOTH force and non-force paths) ──
+    // These populate telemetry on auto_trade_orders / inputs_snapshot so we
+    // can later study whether to promote them to hard gates. Previously they
+    // lived inside the `!data.force` else branch, which meant 100% of real
+    // production trades (all called with force:true) logged nulls.
+    {
+      // raw-dir streak of last 5
+      let streak3Global: { streak: number | null; wouldSkip: boolean } = { streak: null, wouldSkip: false };
+      if (isLive) {
+        try {
+          const { data: recent } = await (supabase as any)
+            .from("btc_model_predictions")
+            .select("side, live_side, model_prob")
+            .not("live_side", "is", null)
+            .not("outcome", "is", null)
+            .order("close_time", { ascending: false })
+            .limit(50);
+          const agreed = ((recent ?? []) as Array<{ side: string; live_side: string; model_prob: number }>)
+            .filter(r => r.side === r.live_side)
+            .slice(0, 5);
+          if (agreed.length === 5) {
+            const streak = agreed.reduce((acc, r) => {
+              const rawDir = Number(r.model_prob) >= 0.5 ? "YES" : "NO";
+              return acc + (rawDir === r.side ? 1 : 0);
+            }, 0);
+            streak3Global = { streak, wouldSkip: streak === 3 };
+          }
+        } catch { /* non-fatal */ }
+      }
+      (result as any).__streak3 = streak3Global;
+
+      // Raw Dir dwell ratio (shadow)
+      const dwellByKey = new Map<string, { dwell: number | null; wouldSkip: boolean }>();
+      if (isLive && result.markets.length > 0) {
+        try {
+          const cutoffIso = new Date(Date.now() - 15 * 60_000).toISOString();
+          const { data: ticks } = await (supabase as any)
+            .from("btc_spot_ticks")
+            .select("observed_at, spot")
+            .gte("observed_at", cutoffIso)
+            .order("observed_at", { ascending: true })
+            .limit(2000);
+          const rows = (ticks ?? []) as Array<{ observed_at: string; spot: number | string }>;
+          const perMinute = new Map<number, number>();
+          for (const r of rows) {
+            const t = new Date(r.observed_at).getTime();
+            if (!Number.isFinite(t)) continue;
+            const bin = Math.floor(t / 60_000);
+            const s = Number(r.spot);
+            if (Number.isFinite(s)) perMinute.set(bin, s);
+          }
+          const nowBin = Math.floor(Date.now() / 60_000);
+          const bins: Array<{ bin: number; spot: number }> = [];
+          for (let b = nowBin - 14; b <= nowBin; b++) {
+            const s = perMinute.get(b);
+            if (s !== undefined) bins.push({ bin: b, spot: s });
+          }
+          for (const m of result.markets) {
+            if (bins.length < 5) {
+              dwellByKey.set(`${m.ticker}|${m.side}`, { dwell: null, wouldSkip: false });
+              continue;
+            }
+            let match = 0;
+            for (const { spot } of bins) {
+              const rawDir = spot >= m.strike ? "YES" : "NO";
+              if (rawDir === m.side) match++;
+            }
+            const dwell = match / bins.length;
+            dwellByKey.set(`${m.ticker}|${m.side}`, { dwell, wouldSkip: dwell < 0.60 });
+          }
+        } catch { /* shadow only — non-fatal */ }
+      }
+      (result as any).__dwellByKey = dwellByKey;
+
+      // Settlement-window price-spike shadow gate
+      const spikeByTicker = new Map<string, { z: number | null; wouldSkip: boolean }>();
+      if (isLive && result.markets.length > 0) {
+        try {
+          const cutoffIso = new Date(Date.now() - 6 * 60_000).toISOString();
+          const { data: ticks } = await (supabase as any)
+            .from("btc_spot_ticks")
+            .select("observed_at, spot")
+            .gte("observed_at", cutoffIso)
+            .order("observed_at", { ascending: true })
+            .limit(4000);
+          const rows = (ticks ?? []) as Array<{ observed_at: string; spot: number | string }>;
+          const series = rows
+            .map(r => ({ t: new Date(r.observed_at).getTime(), s: Number(r.spot) }))
+            .filter(p => Number.isFinite(p.t) && Number.isFinite(p.s));
+          const nowMs = Date.now();
+          const samples: number[] = [];
+          const windowMs = 30_000;
+          const stepMs = 15_000;
+          for (let end = nowMs - windowMs; end >= nowMs - 6 * 60_000 + windowMs; end -= stepMs) {
+            const winStart = end - windowMs;
+            const inWin = series.filter(p => p.t >= winStart && p.t <= end);
+            if (inWin.length >= 2) {
+              const first = inWin[0].s;
+              const last = inWin[inWin.length - 1].s;
+              samples.push(Math.abs(last - first));
+            }
+          }
+          const lastWinStart = nowMs - windowMs;
+          const lastInWin = series.filter(p => p.t >= lastWinStart);
+          let z: number | null = null;
+          if (lastInWin.length >= 2 && samples.length >= 6) {
+            const lastMove = Math.abs(lastInWin[lastInWin.length - 1].s - lastInWin[0].s);
+            const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+            const variance = samples.reduce((a, b) => a + (b - mean) ** 2, 0) / samples.length;
+            const stdev = Math.sqrt(variance);
+            z = stdev > 1e-6 ? (lastMove - mean) / stdev : null;
+          }
+          for (const m of result.markets) {
+            const nearSettle = typeof m.secondsToClose === "number" && m.secondsToClose <= 90;
+            const wouldSkip = z !== null && z >= 3 && nearSettle;
+            spikeByTicker.set(m.ticker, { z, wouldSkip });
+          }
+        } catch { /* shadow only — non-fatal */ }
+      }
+      (result as any).__spikeByTicker = spikeByTicker;
+
+      // Binance funding-rate shadow
+      let fundingSnap: { rate: number | null; z: number | null } = { rate: null, z: null };
+      if (isLive && result.markets.length > 0) {
+        try {
+          const [curJ, histJ] = await Promise.all([
+            fetch("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT", { signal: AbortSignal.timeout(2500) }).then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch("https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&limit=90", { signal: AbortSignal.timeout(2500) }).then(r => r.ok ? r.json() : null).catch(() => null),
+          ]);
+          const cur = curJ && Number.isFinite(Number((curJ as any).lastFundingRate)) ? Number((curJ as any).lastFundingRate) : null;
+          const hist: number[] = Array.isArray(histJ)
+            ? (histJ as Array<{ fundingRate: string }>).map(h => Number(h.fundingRate)).filter(v => Number.isFinite(v))
+            : [];
+          let z: number | null = null;
+          if (cur !== null && hist.length >= 20) {
+            const mean = hist.reduce((a, b) => a + b, 0) / hist.length;
+            const variance = hist.reduce((a, b) => a + (b - mean) ** 2, 0) / hist.length;
+            const stdev = Math.sqrt(variance);
+            z = stdev > 1e-9 ? (cur - mean) / stdev : null;
+          }
+          fundingSnap = { rate: cur, z };
+        } catch { /* shadow only — non-fatal */ }
+      }
+      (result as any).__funding = fundingSnap;
+
+      // Coinbase↔Binance divergence shadow
+      let cbBnSnap: { cb: number | null; bn: number | null; div_bps: number | null } = { cb: null, bn: null, div_bps: null };
+      if (isLive && result.markets.length > 0) {
+        try {
+          const [cbJ, bnJ] = await Promise.all([
+            fetch("https://api.coinbase.com/v2/prices/BTC-USD/spot", { signal: AbortSignal.timeout(2500) }).then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", { signal: AbortSignal.timeout(2500) }).then(r => r.ok ? r.json() : null).catch(() => null),
+          ]);
+          const cb = cbJ && (cbJ as any).data?.amount ? Number((cbJ as any).data.amount) : null;
+          const bn = bnJ && (bnJ as any).price ? Number((bnJ as any).price) : null;
+          const div_bps = (cb !== null && bn !== null && bn > 0 && Number.isFinite(cb) && Number.isFinite(bn))
+            ? ((cb - bn) / bn) * 10000
+            : null;
+          cbBnSnap = { cb, bn, div_bps };
+        } catch { /* shadow only — non-fatal */ }
+      }
+      (result as any).__cbBn = cbBnSnap;
+    }
+
     let candidates;
     if (data.force) {
       // Force mode: bypass entry gates (edge/sigma/momentum/time/dedupe/equity-block).
