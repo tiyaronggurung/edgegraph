@@ -652,11 +652,23 @@ export async function runAutoTradeCore(
               skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
             }
           }
-          // Sharpening #2: reject when chart verdict aligns with side (live path).
-          // Aligned bucket bled −$240/wk; neutral won +$92; against was breakeven.
-          if (isLive && (m.chartVerdict === "YES" || m.chartVerdict === "NO") && m.chartVerdict === m.side) {
-            const r = `chart_align_gate: chart ${m.chartVerdict} aligned with side ${m.side} — priced-in, skip (7d: aligned bled −$240)`;
-            skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
+          // Sharpening #2 (v2): ta_outlier_kill — skip only when TA disagrees
+          // with BOTH Kalshi and Model (TA is the lone outlier).
+          // Old chart_align_gate reversed: 14d data (n=231) shows TA-alignment
+          // is the profitable bucket (3/3 agree = 76.7% WR, +$119), while TA
+          // as the lone dissenter bleeds ≈ −$360 across ~73 trades.
+          if (isLive && (m.chartVerdict === "YES" || m.chartVerdict === "NO")) {
+            const taDir = m.chartVerdict;
+            const yp = m.yesPrice;
+            const kalshiDir: "YES" | "NO" | "neutral" =
+              yp >= 0.55 ? "YES" : yp <= 0.45 ? "NO" : "neutral";
+            const modelDir = m.side;
+            const taVsKalshi = kalshiDir !== "neutral" && taDir !== kalshiDir;
+            const taVsModel = taDir !== modelDir;
+            if (taVsKalshi && taVsModel) {
+              const r = `ta_outlier_kill: TA=${taDir} disagrees w/ Kalshi=${kalshiDir} AND Model=${modelDir} — skip (14d: −$360 bleed as lone outlier)`;
+              skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
+            }
           }
 
           if (m.secondsToClose < minSeconds) { const r = `${m.secondsToClose}s < ${minSeconds}s`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
