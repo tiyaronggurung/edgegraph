@@ -1120,27 +1120,47 @@ function PredBetPanel() {
   const [lastFired, setLastFired] = useState<string | null>(null);
   const [lastSkip, setLastSkip] = useState<string | null>(null);
 
-  const verdict = useMemo(() => {
+  // Locked verdict: snapshot the first pred-formula result for each active
+  // window and hold it fixed until that window closes or a new one starts.
+  const [lockedVerdict, setLockedVerdict] = useState<{ ticker: string; verdict: PredVerdict } | null>(null);
+
+  const activeWindow = useMemo(() => {
     const s = statsQ.data;
     if (!s || !s.recent?.length) return null;
     const now = Date.now();
-    const active = [...s.recent]
+    return [...s.recent]
       .filter((r) => !r.outcome && new Date(r.closeTime).getTime() > now)
-      .sort((a, b) => new Date(a.closeTime).getTime() - new Date(b.closeTime).getTime())[0];
-    if (!active) return null;
-    const sideAsk = active.side === "YES" ? active.marketYesPrice : 1 - active.marketYesPrice;
-    const edgeOk = Math.abs(active.edgePts) >= PRED_MIN_EDGE_ABS;
+      .sort((a, b) => new Date(a.closeTime).getTime() - new Date(b.closeTime).getTime())[0] ?? null;
+  }, [statsQ.data]);
+
+  const computeVerdict = (r: any): PredVerdict => {
+    const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
+    const edgeOk = Math.abs(r.edgePts) >= PRED_MIN_EDGE_ABS;
     const askOk = sideAsk >= PRED_MIN_ASK && sideAsk <= PRED_MAX_ASK;
-    const flipOk = !active.liveSide || active.liveSide === active.side;
+    const flipOk = !r.liveSide || r.liveSide === r.side;
     if (edgeOk && askOk && flipOk) {
-      return { action: (active.side === "YES" ? "UP" : "DOWN") as "UP" | "DOWN", ask: sideAsk, edge: active.edgePts, reasons: [] as string[] };
+      return { action: (r.side === "YES" ? "UP" : "DOWN") as "UP" | "DOWN", ask: sideAsk, edge: r.edgePts, reasons: [] as string[] };
     }
     const reasons: string[] = [];
-    if (!edgeOk) reasons.push(`edge ${active.edgePts.toFixed(1)}`);
+    if (!edgeOk) reasons.push(`edge ${r.edgePts.toFixed(1)}`);
     if (!askOk) reasons.push(`ask ${Math.round(sideAsk * 100)}¢`);
     if (!flipOk) reasons.push("flip");
-    return { action: "SKIP" as const, ask: sideAsk, edge: active.edgePts, reasons };
-  }, [statsQ.data]);
+    return { action: "SKIP" as const, ask: sideAsk, edge: r.edgePts, reasons };
+  };
+
+  const liveVerdict = useMemo(() => activeWindow ? computeVerdict(activeWindow) : null, [activeWindow]);
+
+  useEffect(() => {
+    if (!activeWindow) {
+      if (lockedVerdict) setLockedVerdict(null);
+      return;
+    }
+    if (lockedVerdict?.ticker !== activeWindow.ticker) {
+      setLockedVerdict({ ticker: activeWindow.ticker, verdict: liveVerdict });
+    }
+  }, [activeWindow, liveVerdict, lockedVerdict]);
+
+  const verdict = lockedVerdict?.verdict ?? liveVerdict;
 
   const persistEnabled = async (on: boolean) => {
     try {
