@@ -1347,7 +1347,7 @@ function PredBetPanel() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <PredVerdictBox verdict={verdict} locked={!!lockedVerdict} />
+          <PredVerdictBox verdict={verdict} locked={!!lockedVerdict} closeTime={activeWindow?.closeTime ?? null} />
           <div className="flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">
             {firing && <Loader2 className="h-3 w-3 animate-spin" />}
             {lastFired && <span>last: {lastFired}</span>}
