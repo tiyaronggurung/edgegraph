@@ -885,6 +885,21 @@ function ModelAccuracyPanel() {
             for (const x of results) { if (x) { run++; if (run > best) best = run; } else run = 0; }
             const settled24 = w24 + l24;
             const settled12 = w12 + l12;
+
+            // ---- PRED v2 shadow tally (TA-align, live-locked rows only) ----
+            let v2Fires = 0, v2Wins = 0, v2Losses = 0, v2SkipsFromBase = 0, v2SkipsFromTa = 0;
+            for (const r of settledDesc) {
+              const locked = predVerdicts[r.ticker];
+              if (!locked?.v2Action) continue; // no live lock → not part of v2 sample
+              if (locked.v2Action === "SKIP") {
+                if (locked.action === "SKIP") v2SkipsFromBase++; else v2SkipsFromTa++;
+                continue;
+              }
+              const res = predV2ResultFor(r);
+              if (res == null) continue;
+              v2Fires++;
+              if (res) v2Wins++; else v2Losses++;
+            }
             return (
               <div className="border-t border-border">
                 <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/10">
