@@ -749,6 +749,22 @@ function ModelAccuracyPanel() {
     return action === "UP" ? yesWon : !yesWon;
   };
 
+  // ---- PRED v2 (SHADOW, TA-align filter) ------------------------------
+  // v2 only exists for tickers that were locked while open (chart verdict
+  // captured). Historical rows w/o a locked record return SKIP so they
+  // don't pollute v2 win-rate math.
+  const predV2ActionFor = (r: { ticker: string }): "UP" | "DOWN" | "SKIP" => {
+    const locked = predVerdicts[r.ticker];
+    return locked?.v2Action ?? "SKIP";
+  };
+  const predV2ResultFor = (r: { ticker: string; side: "YES" | "NO"; wasCorrect: boolean | null }): boolean | null => {
+    if (r.wasCorrect == null) return null;
+    const action = predV2ActionFor(r);
+    if (action === "SKIP") return null;
+    const yesWon = (r.side === "YES" && r.wasCorrect === true) || (r.side === "NO" && r.wasCorrect === false);
+    return action === "UP" ? yesWon : !yesWon;
+  };
+
 
   return (
     <div className="border border-border rounded-lg bg-card">
@@ -869,6 +885,21 @@ function ModelAccuracyPanel() {
             for (const x of results) { if (x) { run++; if (run > best) best = run; } else run = 0; }
             const settled24 = w24 + l24;
             const settled12 = w12 + l12;
+
+            // ---- PRED v2 shadow tally (TA-align, live-locked rows only) ----
+            let v2Fires = 0, v2Wins = 0, v2Losses = 0, v2SkipsFromBase = 0, v2SkipsFromTa = 0;
+            for (const r of settledDesc) {
+              const locked = predVerdicts[r.ticker];
+              if (!locked?.v2Action) continue; // no live lock → not part of v2 sample
+              if (locked.v2Action === "SKIP") {
+                if (locked.action === "SKIP") v2SkipsFromBase++; else v2SkipsFromTa++;
+                continue;
+              }
+              const res = predV2ResultFor(r);
+              if (res == null) continue;
+              v2Fires++;
+              if (res) v2Wins++; else v2Losses++;
+            }
             return (
               <div className="border-t border-border">
                 <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/10">
@@ -923,6 +954,19 @@ function ModelAccuracyPanel() {
                     sub="rough: 45¢ avg win"
                   />
                 </div>
+                <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/5 border-t border-border flex items-center gap-3 flex-wrap">
+                  <span>🧪 PRED v2 shadow (TA-align)</span>
+                  <span className="normal-case text-muted-foreground/80">
+                    fires <span className="font-mono text-foreground">{v2Fires}</span>
+                    {" · "}wr <span className="font-mono text-foreground">{v2Fires ? pct(v2Wins / v2Fires) : "—"}</span>
+                    {" · "}<span className="text-emerald-400 font-mono">{v2Wins}W</span>
+                    {" / "}<span className="text-red-400 font-mono">{v2Losses}L</span>
+                    {" · "}filtered by TA <span className="font-mono text-foreground">{v2SkipsFromTa}</span>
+                    {" · "}base SKIPs <span className="font-mono text-foreground">{v2SkipsFromBase}</span>
+                    {" · "}vs base PRED wr <span className="font-mono text-foreground">{fires ? pct(wins / fires) : "—"}</span>
+                    {v2Fires < 20 && <span className="ml-2 text-amber-500/80">· need ~50 fires for signal</span>}
+                  </span>
+                </div>
               </div>
             );
           })()}
@@ -944,6 +988,7 @@ function ModelAccuracyPanel() {
                       {/* Live column hidden (kept in data model); replaced by PRED column below */}
                       {/* <th className="text-left p-2" title="Live side = chart+model+drift combined; flips mid-window when chart & anchor drift confirm the opposite direction. Auto-trader probe uses this.">Live</th> */}
                       <th className="text-left p-2" title="PRED verdict for this 15m window: Value pick where |edge|≥3pt AND ask 50–78¢ AND no live flip. Otherwise SKIP.">PRED</th>
+                      <th className="text-left p-2" title="PRED v2 (SHADOW · no live impact): base PRED + TA-align filter. SKIPs when chart verdict opposes the PRED side. Only populated for tickers locked live.">PRED v2</th>
                       <th className="text-right p-2">Strike</th>
                       <th className="text-right p-2">Model%</th>
                       <th className="text-right p-2">Market¢</th>
@@ -951,6 +996,7 @@ function ModelAccuracyPanel() {
                       <th className="text-right p-2">Settle</th>
                       <th className="text-center p-2" title="Result of the Value pick (locked side)">Result</th>
                       <th className="text-center p-2" title="Result of the PRED action (UP/DOWN) vs actual settle. SKIP → —.">PRED Result</th>
+                      <th className="text-center p-2" title="SHADOW: result of PRED v2 (TA-align). SKIP → —.">v2 Result</th>
                     </tr>
                   </thead>
 
@@ -1036,6 +1082,25 @@ function ModelAccuracyPanel() {
                             );
                           })()}
                         </td>
+                        <td className="p-2">
+                          {(() => {
+                            // PRED v2 (SHADOW): only shown for tickers locked while live.
+                            const locked = predVerdicts[r.ticker];
+                            if (!locked || !locked.v2Action) {
+                              return <span className="text-muted-foreground/60" title="v2 requires live lock (TA bias captured)">—</span>;
+                            }
+                            const cls = locked.v2Action === "UP"
+                              ? "text-emerald-400 font-semibold"
+                              : locked.v2Action === "DOWN"
+                                ? "text-red-400 font-semibold"
+                                : "text-muted-foreground";
+                            const taTxt = locked.taBias ? `TA ${locked.taBias}${locked.taScore != null ? ` (${locked.taScore.toFixed(0)})` : ""}` : "TA n/a";
+                            const title = locked.v2Action === "SKIP"
+                              ? `v2 SKIP · ${(locked.v2Reasons || []).join(" · ") || "no setup"} · ${taTxt}`
+                              : `v2 ${locked.v2Action} · ${taTxt} · shadow`;
+                            return <span className={cls} title={title}>🧪 {locked.v2Action}</span>;
+                          })()}
+                        </td>
                         <td className="p-2 text-right">{fmt$(r.strike)}</td>
                         <td className="p-2 text-right">{(r.modelProb * 100).toFixed(1)}%</td>
                         <td className="p-2 text-right">{(r.marketYesPrice * 100).toFixed(0)}</td>
@@ -1051,6 +1116,16 @@ function ModelAccuracyPanel() {
                             const action = predActionFor(r);
                             if (action === "SKIP") return <span className="text-muted-foreground">—</span>;
                             const res = predResultFor(r);
+                            if (res === true) return <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>;
+                            if (res === false) return <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>;
+                            return <span className="text-muted-foreground">pending</span>;
+                          })()}
+                        </td>
+                        <td className="p-2 text-center">
+                          {(() => {
+                            const action = predV2ActionFor(r);
+                            if (action === "SKIP") return <span className="text-muted-foreground/60">—</span>;
+                            const res = predV2ResultFor(r);
                             if (res === true) return <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>;
                             if (res === false) return <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>;
                             return <span className="text-muted-foreground">pending</span>;
@@ -1300,6 +1375,13 @@ type PredLockedRecord = {
   edge: number;
   reasons: string[];
   lockedAt: number;
+  // ---- Shadow: PRED v2 (TA-align filter, no live behavior change) ----
+  // Captures chart verdict bias at lock time so we can score TA-align
+  // performance side-by-side with base PRED after ~50 fires.
+  taBias?: "up" | "down" | "flat";
+  taScore?: number;               // 0..100 chart verdict score at lock
+  v2Action?: "UP" | "DOWN" | "SKIP";
+  v2Reasons?: string[];
 };
 
 function readPredVerdicts(): Record<string, PredLockedRecord> {
@@ -1341,6 +1423,15 @@ function PredBetPanel() {
   const [lastFired, setLastFired] = useState<string | null>(null);
   const [lastSkip, setLastSkip] = useState<string | null>(null);
 
+  // Shadow-only: chart verdict at lock time drives PRED v2 (TA-align).
+  // No influence on live PRED fires — pure logging for A/B comparison.
+  const chartV = useChartVerdict();
+  const taBiasNow: "up" | "down" | "flat" = !chartV.ready
+    ? "flat"
+    : chartV.score >= 55 ? "up"
+    : chartV.score <= 45 ? "down"
+    : "flat";
+
   // Locked verdict: snapshot the first pred-formula result for each active
   // window and hold it fixed until that window closes or a new one starts.
   const [lockedVerdict, setLockedVerdict] = useState<{ ticker: string; verdict: PredVerdict } | null>(null);
@@ -1379,16 +1470,35 @@ function PredBetPanel() {
     if (lockedVerdict?.ticker !== activeWindow.ticker) {
       setLockedVerdict({ ticker: activeWindow.ticker, verdict: liveVerdict });
       if (liveVerdict) {
+        // ---- PRED v2 (shadow): base action + TA-align filter ----
+        // v2 SKIPs when: base SKIPs, OR TA bias directly opposes the action.
+        // Neutral TA ("flat") is allowed (permissive align-or-neutral).
+        let v2Action: "UP" | "DOWN" | "SKIP" = liveVerdict.action;
+        const v2Reasons: string[] = [...liveVerdict.reasons];
+        if (liveVerdict.action !== "SKIP") {
+          const disagree =
+            (liveVerdict.action === "UP" && taBiasNow === "down") ||
+            (liveVerdict.action === "DOWN" && taBiasNow === "up");
+          if (disagree) {
+            v2Action = "SKIP";
+            v2Reasons.push(`ta ${taBiasNow}`);
+          }
+        }
         writePredVerdict(activeWindow.ticker, {
           action: liveVerdict.action,
           ask: liveVerdict.ask,
           edge: liveVerdict.edge,
           reasons: liveVerdict.reasons,
           lockedAt: Date.now(),
+          taBias: taBiasNow,
+          taScore: chartV.ready ? chartV.score : undefined,
+          v2Action,
+          v2Reasons,
         });
       }
     }
-  }, [activeWindow, liveVerdict, lockedVerdict]);
+  }, [activeWindow, liveVerdict, lockedVerdict, taBiasNow, chartV.ready, chartV.score]);
+
 
   const verdict = lockedVerdict?.verdict ?? liveVerdict;
 
