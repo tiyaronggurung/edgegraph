@@ -749,6 +749,22 @@ function ModelAccuracyPanel() {
     return action === "UP" ? yesWon : !yesWon;
   };
 
+  // ---- PRED v2 (SHADOW, TA-align filter) ------------------------------
+  // v2 only exists for tickers that were locked while open (chart verdict
+  // captured). Historical rows w/o a locked record return SKIP so they
+  // don't pollute v2 win-rate math.
+  const predV2ActionFor = (r: { ticker: string }): "UP" | "DOWN" | "SKIP" => {
+    const locked = predVerdicts[r.ticker];
+    return locked?.v2Action ?? "SKIP";
+  };
+  const predV2ResultFor = (r: { ticker: string; side: "YES" | "NO"; wasCorrect: boolean | null }): boolean | null => {
+    if (r.wasCorrect == null) return null;
+    const action = predV2ActionFor(r);
+    if (action === "SKIP") return null;
+    const yesWon = (r.side === "YES" && r.wasCorrect === true) || (r.side === "NO" && r.wasCorrect === false);
+    return action === "UP" ? yesWon : !yesWon;
+  };
+
 
   return (
     <div className="border border-border rounded-lg bg-card">
