@@ -894,6 +894,7 @@ function ModelAccuracyPanel() {
                             );
                           })()}
                         </td>
+                        <td className="p-2 text-right">{fmt$(r.strike)}</td>
                         <td className="p-2 text-right">{(r.modelProb * 100).toFixed(1)}%</td>
                         <td className="p-2 text-right">{(r.marketYesPrice * 100).toFixed(0)}</td>
                         <td className="p-2 text-right">{r.edgePts >= 0 ? "+" : ""}{r.edgePts.toFixed(1)}</td>
