@@ -1293,10 +1293,13 @@ function PredBetPanel() {
             Value pick (raw_dir) · |edge|≥{PRED_MIN_EDGE_ABS}pt · ask {Math.round(PRED_MIN_ASK*100)}–{Math.round(PRED_MAX_ASK*100)}¢ · hold to settle · one bet / ticker
           </span>
         </div>
-        <div className="flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">
-          {firing && <Loader2 className="h-3 w-3 animate-spin" />}
-          {lastFired && <span>last: {lastFired}</span>}
-          {lastSkip && <span className="opacity-60">skip: {lastSkip}</span>}
+        <div className="flex items-center gap-3">
+          <PredVerdictBox verdict={verdict} />
+          <div className="flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">
+            {firing && <Loader2 className="h-3 w-3 animate-spin" />}
+            {lastFired && <span>last: {lastFired}</span>}
+            {lastSkip && <span className="opacity-60">skip: {lastSkip}</span>}
+          </div>
         </div>
       </div>
     </div>
