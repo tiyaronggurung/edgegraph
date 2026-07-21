@@ -727,6 +727,28 @@ function ModelAccuracyPanel() {
     </div>
   );
 
+  // ---- PRED action per row: prefer the locked verdict (persisted by
+  // PredBetPanel), else fall back to the live formula for historical rows
+  // never seen while their window was open.
+  const predActionFor = (r: { ticker: string; side: "YES" | "NO"; marketYesPrice: number; edgePts: number; liveSide: "YES" | "NO" | null; }): "UP" | "DOWN" | "SKIP" => {
+    const locked = predVerdicts[r.ticker];
+    if (locked) return locked.action;
+    const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
+    const edgeOk = Math.abs(r.edgePts) >= 3;
+    const askOk = sideAsk >= 0.50 && sideAsk <= 0.78;
+    const flipOk = !r.liveSide || r.liveSide === r.side;
+    if (edgeOk && askOk && flipOk) return r.side === "YES" ? "UP" : "DOWN";
+    return "SKIP";
+  };
+  // WIN iff PRED action matches which side actually settled. SKIP → null.
+  const predResultFor = (r: { ticker: string; side: "YES" | "NO"; marketYesPrice: number; edgePts: number; liveSide: "YES" | "NO" | null; wasCorrect: boolean | null; }): boolean | null => {
+    if (r.wasCorrect == null) return null;
+    const action = predActionFor(r);
+    if (action === "SKIP") return null;
+    const yesWon = (r.side === "YES" && r.wasCorrect === true) || (r.side === "NO" && r.wasCorrect === false);
+    return action === "UP" ? yesWon : !yesWon;
+  };
+
 
   return (
     <div className="border border-border rounded-lg bg-card">
