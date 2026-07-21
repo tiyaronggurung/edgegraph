@@ -1377,6 +1377,7 @@ const PRED_BET_STAKE = 10;
 const PRED_MIN_EDGE_ABS = 3;
 const PRED_MIN_ASK = 0.50;
 const PRED_MAX_ASK = 0.78;
+const PRED_MIN_SIDE_CONF = 0.70;
 
 type PredLockedRecord = {
   action: "UP" | "DOWN" | "SKIP";
