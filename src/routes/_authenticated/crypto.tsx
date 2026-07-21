@@ -1456,16 +1456,19 @@ function PredBetPanel() {
 
   const computeVerdict = (r: any): PredVerdict => {
     const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
+    const sideConf = r.side === "YES" ? r.modelProb : 1 - r.modelProb;
     const edgeOk = Math.abs(r.edgePts) >= PRED_MIN_EDGE_ABS;
     const askOk = sideAsk >= PRED_MIN_ASK && sideAsk <= PRED_MAX_ASK;
     const flipOk = !r.liveSide || r.liveSide === r.side;
-    if (edgeOk && askOk && flipOk) {
+    const confOk = sideConf >= PRED_MIN_SIDE_CONF;
+    if (edgeOk && askOk && flipOk && confOk) {
       return { action: (r.side === "YES" ? "UP" : "DOWN") as "UP" | "DOWN", ask: sideAsk, edge: r.edgePts, reasons: [] as string[] };
     }
     const reasons: string[] = [];
     if (!edgeOk) reasons.push(`edge ${r.edgePts.toFixed(1)}`);
     if (!askOk) reasons.push(`ask ${Math.round(sideAsk * 100)}¢`);
     if (!flipOk) reasons.push("flip");
+    if (!confOk) reasons.push(`conf ${Math.round(sideConf * 100)}%`);
     return { action: "SKIP" as const, ask: sideAsk, edge: r.edgePts, reasons };
   };
 
