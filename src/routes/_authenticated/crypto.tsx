@@ -692,6 +692,18 @@ function ModelAccuracyPanel() {
   });
   const s = q.data;
 
+  // Live auto-trade green-hour stats (real fires from auto_trade_orders,
+  // fresh cutoff — replaces the misleading raw-model green-hour subset).
+  const greenStatsFn = useServerFn(getAutoTradeGreenStats);
+  const greenStatsQ = useQuery({
+    queryKey: ["auto-trade-green-stats"],
+    queryFn: () => greenStatsFn(),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+  });
+  const gs = greenStatsQ.data;
+
   // Locked PRED verdicts. Merges server-persisted locks (device-independent,
   // durable) with localStorage locks (fast/instant), giving server precedence
   // when both exist for the same ticker.
