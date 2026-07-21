@@ -856,23 +856,8 @@ function ModelAccuracyPanel() {
               if (r.wasCorrect === true) { run++; if (run > longestStreak) longestStreak = run; }
               else run = 0;
             }
-            // ---- Green-hour subset (auto-trade whitelist) ----
-            // Mirrors LIVE_GREEN_HOURS_UTC in src/lib/cryptoAutoTrade.functions.ts.
-            const GREEN_HOURS = new Set([8, 11, 12, 16, 19, 20, 21, 22]);
-            const isGreen = (r: { settledAt: string | null }) =>
-              r.settledAt ? GREEN_HOURS.has(new Date(r.settledAt).getUTCHours()) : false;
-            const greenSettled = settledDesc.filter(isGreen);
-            const gTotal = greenSettled.length;
-            const gWins = greenSettled.filter(r => r.wasCorrect === true).length;
-            const gLosses = gTotal - gWins;
-            const nowMs = Date.now();
-            const g24 = greenSettled.filter(r => new Date(r.settledAt!).getTime() >= nowMs - 24 * 3600e3);
-            const g24Wins = g24.filter(r => r.wasCorrect === true).length;
-            const gLast20 = greenSettled.slice(0, 20);
-            const g20Wins = gLast20.filter(r => r.wasCorrect === true).length;
-            const g20Losses = gLast20.length - g20Wins;
-            let gStreak = 0;
-            for (const r of greenSettled) { if (r.wasCorrect === true) gStreak++; else break; }
+            // ---- Green-hour subset now sourced from LIVE auto_trade_orders (gs).
+            // Fresh cutoff — see getAutoTradeGreenStats.
             return (
           <>
           <div className="grid grid-cols-2 md:grid-cols-8 divide-x divide-border">
