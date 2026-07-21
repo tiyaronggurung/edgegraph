@@ -3356,6 +3356,72 @@ export type Database = {
         }
         Relationships: []
       }
+      pred_locks: {
+        Row: {
+          ask: number | null
+          created_at: string
+          edge: number | null
+          id: string
+          locked_at: string
+          meta: Json
+          side: string
+          side_conf: number | null
+          spot: number | null
+          strike: number | null
+          ticker: string
+          time_left_sec: number | null
+          updated_at: string
+          user_id: string
+          v1_fired: boolean
+          v2_action: string | null
+          v2_reason: string | null
+          v2_side: string | null
+          window_start: string
+        }
+        Insert: {
+          ask?: number | null
+          created_at?: string
+          edge?: number | null
+          id?: string
+          locked_at?: string
+          meta?: Json
+          side: string
+          side_conf?: number | null
+          spot?: number | null
+          strike?: number | null
+          ticker: string
+          time_left_sec?: number | null
+          updated_at?: string
+          user_id: string
+          v1_fired?: boolean
+          v2_action?: string | null
+          v2_reason?: string | null
+          v2_side?: string | null
+          window_start: string
+        }
+        Update: {
+          ask?: number | null
+          created_at?: string
+          edge?: number | null
+          id?: string
+          locked_at?: string
+          meta?: Json
+          side?: string
+          side_conf?: number | null
+          spot?: number | null
+          strike?: number | null
+          ticker?: string
+          time_left_sec?: number | null
+          updated_at?: string
+          user_id?: string
+          v1_fired?: boolean
+          v2_action?: string | null
+          v2_reason?: string | null
+          v2_side?: string | null
+          window_start?: string
+        }
+        Relationships: []
+      }
       prediction_closes: {
         Row: {
           ai_prob: number | null
