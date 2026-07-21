@@ -73,7 +73,13 @@ export const Route = createFileRoute("/_authenticated/crypto")({
   // Fire-and-forget prefetch of the three hottest queries so they load in
   // parallel with the JS chunk instead of waiting for the component to mount.
   // Errors are swallowed — useQuery will re-fetch normally if these fail.
-  loader: ({ context }) => {
+  loader: async ({ context }) => {
+    // Only prefetch authed queries when a session actually exists — otherwise
+    // the managed _authenticated gate is mid-redirect to /auth and these
+    // server fns 401 with "No authorization header", blank-screening the app.
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) return;
     context.queryClient.prefetchQuery({ queryKey: ["crypto-trades"], queryFn: () => listMyCryptoTrades() }).catch(() => {});
     context.queryClient.prefetchQuery({ queryKey: ["btc-markets"], queryFn: () => getBtcMarkets() }).catch(() => {});
     context.queryClient.prefetchQuery({ queryKey: ["btc-pred-stats"], queryFn: () => getPredictionStats() }).catch(() => {});
