@@ -954,6 +954,19 @@ function ModelAccuracyPanel() {
                     sub="rough: 45¢ avg win"
                   />
                 </div>
+                <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/5 border-t border-border flex items-center gap-3 flex-wrap">
+                  <span>🧪 PRED v2 shadow (TA-align)</span>
+                  <span className="normal-case text-muted-foreground/80">
+                    fires <span className="font-mono text-foreground">{v2Fires}</span>
+                    {" · "}wr <span className="font-mono text-foreground">{v2Fires ? pct(v2Wins / v2Fires) : "—"}</span>
+                    {" · "}<span className="text-emerald-400 font-mono">{v2Wins}W</span>
+                    {" / "}<span className="text-red-400 font-mono">{v2Losses}L</span>
+                    {" · "}filtered by TA <span className="font-mono text-foreground">{v2SkipsFromTa}</span>
+                    {" · "}base SKIPs <span className="font-mono text-foreground">{v2SkipsFromBase}</span>
+                    {" · "}vs base PRED wr <span className="font-mono text-foreground">{fires ? pct(wins / fires) : "—"}</span>
+                    {v2Fires < 20 && <span className="ml-2 text-amber-500/80">· need ~50 fires for signal</span>}
+                  </span>
+                </div>
               </div>
             );
           })()}
