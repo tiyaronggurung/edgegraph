@@ -993,7 +993,7 @@ function ModelAccuracyPanel() {
                       <th className="text-left p-2" title="Raw model direction: P(YES) ≥ 50%? Historically ~87% correct on BTC move.">Raw dir</th>
                       {/* Live column hidden (kept in data model); replaced by PRED column below */}
                       {/* <th className="text-left p-2" title="Live side = chart+model+drift combined; flips mid-window when chart & anchor drift confirm the opposite direction. Auto-trader probe uses this.">Live</th> */}
-                      <th className="text-left p-2" title="PRED verdict for this 15m window: Value pick where |edge|≥3pt AND ask 50–78¢ AND no live flip. Otherwise SKIP.">PRED</th>
+                      <th className="text-left p-2" title="PRED verdict for this 15m window: Value pick where |edge|≥3pt AND ask 50–78¢ AND side confidence ≥70% AND no live flip. Otherwise SKIP.">PRED</th>
                       <th className="text-left p-2" title="PRED v2 (SHADOW · no live impact): base PRED + TA-align filter. SKIPs when chart verdict opposes the PRED side. Only populated for tickers locked live.">PRED v2</th>
                       <th className="text-right p-2">Strike</th>
                       <th className="text-right p-2">Model%</th>
@@ -1063,15 +1063,17 @@ function ModelAccuracyPanel() {
                             }
                             // Fallback: live PRED formula (no locked record for this ticker).
                             const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
+                            const sideConf = r.side === "YES" ? r.modelProb : 1 - r.modelProb;
                             const edgeOk = Math.abs(r.edgePts) >= 3;
                             const askOk = sideAsk >= 0.50 && sideAsk <= 0.78;
                             const flipOk = !r.liveSide || r.liveSide === r.side;
-                            if (edgeOk && askOk && flipOk) {
+                            const confOk = sideConf >= 0.70;
+                            if (edgeOk && askOk && flipOk && confOk) {
                               const action = r.side === "YES" ? "UP" : "DOWN";
                               return (
                                 <span
                                   className={r.side === "YES" ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}
-                                  title={`PRED ${action} · ask ${Math.round(sideAsk * 100)}¢ · edge ${r.edgePts.toFixed(1)} · live`}
+                                  title={`PRED ${action} · ask ${Math.round(sideAsk * 100)}¢ · edge ${r.edgePts.toFixed(1)} · conf ${Math.round(sideConf * 100)}% · live`}
                                 >
                                   {action}
                                 </span>
@@ -1081,6 +1083,7 @@ function ModelAccuracyPanel() {
                             if (!edgeOk) reasons.push(`edge ${r.edgePts.toFixed(1)}`);
                             if (!askOk) reasons.push(`ask ${Math.round(sideAsk * 100)}¢`);
                             if (!flipOk) reasons.push("flip");
+                            if (!confOk) reasons.push(`conf ${Math.round(sideConf * 100)}%`);
                             return (
                               <span className="text-muted-foreground" title={`SKIP · ${reasons.join(" · ")} · live`}>
                                 SKIP
@@ -1374,6 +1377,7 @@ const PRED_BET_STAKE = 10;
 const PRED_MIN_EDGE_ABS = 3;
 const PRED_MIN_ASK = 0.50;
 const PRED_MAX_ASK = 0.78;
+const PRED_MIN_SIDE_CONF = 0.70;
 
 type PredLockedRecord = {
   action: "UP" | "DOWN" | "SKIP";
@@ -1453,16 +1457,19 @@ function PredBetPanel() {
 
   const computeVerdict = (r: any): PredVerdict => {
     const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
+    const sideConf = r.side === "YES" ? r.modelProb : 1 - r.modelProb;
     const edgeOk = Math.abs(r.edgePts) >= PRED_MIN_EDGE_ABS;
     const askOk = sideAsk >= PRED_MIN_ASK && sideAsk <= PRED_MAX_ASK;
     const flipOk = !r.liveSide || r.liveSide === r.side;
-    if (edgeOk && askOk && flipOk) {
+    const confOk = sideConf >= PRED_MIN_SIDE_CONF;
+    if (edgeOk && askOk && flipOk && confOk) {
       return { action: (r.side === "YES" ? "UP" : "DOWN") as "UP" | "DOWN", ask: sideAsk, edge: r.edgePts, reasons: [] as string[] };
     }
     const reasons: string[] = [];
     if (!edgeOk) reasons.push(`edge ${r.edgePts.toFixed(1)}`);
     if (!askOk) reasons.push(`ask ${Math.round(sideAsk * 100)}¢`);
     if (!flipOk) reasons.push("flip");
+    if (!confOk) reasons.push(`conf ${Math.round(sideConf * 100)}%`);
     return { action: "SKIP" as const, ask: sideAsk, edge: r.edgePts, reasons };
   };
 
