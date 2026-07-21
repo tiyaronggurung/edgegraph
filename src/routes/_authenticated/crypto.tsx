@@ -1830,7 +1830,153 @@ function PredBetPanel() {
   );
 }
 
+// ============================================================
+// GREEN HOURS BET — sibling to Model Bet / PRED Bet.
+// Fires runAutoTrade in LIVE mode with NO force flag, so the server
+// applies ALL existing hard gates: green-hour whitelist (UTC 08,11,12,
+// 16,19-22), σ-dist, TA-outlier kill, price band, flip gate, 7d
+// kill-switch. Exactly the same fires shown in the
+// "🟢 Auto-Trade LIVE fires" card. $10 flat, one attempt per tick.
+// Mutually exclusive with Model Bet / PRED Bet / Auto-Odds / Auto-Mart
+// via the shared AUTO_BET_MUTEX_EVENT.
+// ============================================================
+const GREEN_BET_LS_ENABLED = "crypto.greenBet";
+const GREEN_BET_STAKE = 10;
+const GREEN_HOURS_UTC = new Set<number>([8, 11, 12, 16, 19, 20, 21, 22]);
+
 type PredVerdict = { action: "UP" | "DOWN" | "SKIP"; ask: number; edge: number; reasons: string[] } | null;
+
+function GreenHoursBetPanel() {
+  const runFn = useServerFn(runAutoTrade);
+
+  const [enabled, setEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(GREEN_BET_LS_ENABLED) === "on";
+  });
+  const [firing, setFiring] = useState(false);
+  const [lastFired, setLastFired] = useState<string | null>(null);
+  const [lastSkip, setLastSkip] = useState<string | null>(null);
+  const [nowUtcHour, setNowUtcHour] = useState<number>(() => new Date().getUTCHours());
+
+  useEffect(() => {
+    const h = setInterval(() => setNowUtcHour(new Date().getUTCHours()), 30_000);
+    return () => clearInterval(h);
+  }, []);
+
+  const inGreenHour = GREEN_HOURS_UTC.has(nowUtcHour);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(GREEN_BET_LS_ENABLED, enabled ? "on" : "off");
+  }, [enabled]);
+
+  const toggleOn = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(MODEL_BET_LS_ENABLED, "off");
+      window.localStorage.setItem(PRED_BET_LS_ENABLED, "off");
+      window.localStorage.setItem("crypto.autoOdds", "off");
+      window.localStorage.setItem("crypto.autoMart", "off");
+      window.dispatchEvent(new CustomEvent(AUTO_BET_MUTEX_EVENT, { detail: "greenBet" }));
+    }
+    setEnabled(true);
+    toast.success(`Green Hours Bet ON · $${GREEN_BET_STAKE} · UTC 08,11,12,16,19–22 only`);
+  };
+  const toggleOff = () => {
+    setEnabled(false);
+    toast.info("Green Hours Bet OFF");
+  };
+
+  useEffect(() => {
+    const onMutex = (e: Event) => {
+      const which = (e as CustomEvent).detail;
+      if (which && which !== "greenBet" && typeof window !== "undefined") {
+        if (window.localStorage.getItem(GREEN_BET_LS_ENABLED) === "on") {
+          window.localStorage.setItem(GREEN_BET_LS_ENABLED, "off");
+        }
+        setEnabled(false);
+      }
+    };
+    window.addEventListener(AUTO_BET_MUTEX_EVENT, onMutex as EventListener);
+    return () => window.removeEventListener(AUTO_BET_MUTEX_EVENT, onMutex as EventListener);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    let inFlight = false;
+
+    const tick = async () => {
+      if (cancelled || inFlight) return;
+      // Skip client-side calls entirely outside green hours — saves round-trips.
+      // Server-side gate is still authoritative.
+      const hourUtc = new Date().getUTCHours();
+      if (!GREEN_HOURS_UTC.has(hourUtc)) {
+        setLastSkip(`red hour ${String(hourUtc).padStart(2, "0")}:00 UTC`);
+        return;
+      }
+      inFlight = true;
+      setFiring(true);
+      try {
+        const res = await runFn({ data: {
+          mode: "live",
+          confirm: "I_UNDERSTAND_LIVE",
+          stakeUsd: GREEN_BET_STAKE,
+          maxOrders: 1,
+        } });
+        if (res.placed > 0 && res.orders?.[0]) {
+          const o = res.orders[0];
+          try { playModelBetPing(); } catch { /* noop */ }
+          const label = `${o.ticker} ${o.side} @ ${o.limit_cents}¢`;
+          toast.success(`Green Bet $${GREEN_BET_STAKE}: ${label}`);
+          setLastFired(label);
+        } else {
+          const realReasons = (res.skipReasons ?? []).filter((r: string) => !/^(equity:|force:)/i.test(r));
+          const reason = (realReasons.length ? realReasons : res.skipReasons ?? []).slice(0, 1).join(" · ") || "no candidate";
+          setLastSkip(reason);
+        }
+      } catch (e: any) {
+        toast.error("Green Bet failed", { description: e?.message ?? String(e) });
+      } finally {
+        inFlight = false;
+        setFiring(false);
+      }
+    };
+
+    tick();
+    const h = setInterval(tick, 15_000);
+    return () => { cancelled = true; clearInterval(h); };
+  }, [enabled, runFn]);
+
+  return (
+    <div className="border border-border rounded-lg bg-card">
+      <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={enabled ? toggleOff : toggleOn}
+            className={`text-xs font-semibold px-3 py-1.5 rounded border flex items-center gap-1.5 ${enabled ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${enabled ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground"}`} />
+            {enabled ? `Green Hours Bet ON · $${GREEN_BET_STAKE}` : `Green Hours Bet OFF · $${GREEN_BET_STAKE}`}
+          </button>
+          <span className="text-[11px] text-muted-foreground">
+            LIVE auto-trade · green hours only (UTC 08,11,12,16,19–22) · full gate stack + 7d kill-switch
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`text-[11px] px-2 py-0.5 rounded border ${inGreenHour ? "border-emerald-500/40 text-emerald-300 bg-emerald-500/10" : "border-border text-muted-foreground bg-muted/30"}`}>
+            {inGreenHour ? "🟢 GREEN HOUR" : `⚪ ${String(nowUtcHour).padStart(2, "0")}:00 UTC`}
+          </span>
+          <div className="flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">
+            {firing && <Loader2 className="h-3 w-3 animate-spin" />}
+            {lastFired && <span>last: {lastFired}</span>}
+            {lastSkip && <span className="opacity-60">skip: {lastSkip}</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PredVerdictBox({ verdict, locked, closeTime, ticker }: { verdict: PredVerdict; locked?: boolean; closeTime?: string | null; ticker?: string | null }) {
   const action = verdict?.action ?? "SKIP";
@@ -3479,6 +3625,7 @@ function CryptoPage() {
       </div>
 
       <ModelBetPanel />
+      <GreenHoursBetPanel />
       <PredBetPanel />
 
       {data && <TopPick markets={data.markets} />}
