@@ -350,8 +350,6 @@ export async function runAutoTradeCore(
       } catch { /* non-blocking */ }
     }
 
-    }
-
     const result = await computeBtcMarkets();
     const skipReasons: string[] = [];
 
