@@ -951,8 +951,9 @@ function ModelAccuracyPanel() {
                       <th className="text-right p-2">Settle</th>
                       <th className="text-center p-2" title="Result of the Value pick (locked side)">Result</th>
                       <th className="text-center p-2" title="Result of the PRED action (UP/DOWN) vs actual settle. SKIP → —.">PRED Result</th>
-
+                    </tr>
                   </thead>
+
                   <tbody>
                     {s.recent.map((r) => {
                       const rawSide: "YES" | "NO" = r.modelProb >= 0.5 ? "YES" : "NO";
