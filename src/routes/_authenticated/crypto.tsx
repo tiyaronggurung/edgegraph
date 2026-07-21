@@ -911,65 +911,69 @@ function ModelAccuracyPanel() {
           <div className="border-t border-border">
             <div
               className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/10"
-              title="Model accuracy filtered to auto-trade green hours only (UTC 08, 11, 12, 16, 19, 20, 21, 22). This is what auto-trade actually plays — ignore the wider row above when judging auto-trade edge."
+              title="LIVE auto-trade fires only (auto_trade_orders, mode=live, settled) — filtered to green hours (UTC 08/11/12/16/19–22). Fresh cutoff starting 2026-07-21."
             >
-              🟢 Auto-Trade WR (green hours only · UTC 08/11/12/16/19–22)
+              🟢 Auto-Trade LIVE fires (green hours · since {gs ? new Date(gs.cutoffIso).toISOString().slice(0, 10) : "…"})
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-8 divide-x divide-border">
-              <Cell label="Green settled (7d)" value={String(gTotal)} sub="settled in green hrs" />
-              <Cell label="Correct (7d)" value={`${gWins} / ${gTotal}`} />
-              <Cell
-                label="Win rate (7d)"
-                value={gTotal ? pct(gWins / gTotal) : "—"}
-                sub={gTotal ? (gWins / gTotal >= 0.7 ? "target ≥70%" : gWins / gTotal >= 0.55 ? "above kill-switch" : "kill-switch risk") : ""}
-              />
-              <Cell
-                label="Win rate (24h)"
-                value={g24.length ? pct(g24Wins / g24.length) : "—"}
-                sub={`${g24Wins}/${g24.length}`}
-              />
-              <Cell
-                label={`Last ${gLast20.length} green`}
-                value={gLast20.length ? (
-                  <span>
-                    <span className="font-bold text-emerald-400">{g20Wins}W</span>
-                    <span className="text-muted-foreground"> / </span>
-                    <span className="font-bold text-red-400">{g20Losses}L</span>
-                  </span>
-                ) : "—"}
-                sub={gLast20.length ? `${pct(g20Wins / gLast20.length)} · of last ${gLast20.length}` : "not enough fires"}
-              />
-              <Cell
-                label="Green streak"
-                value={
-                  <span>
-                    <span className="font-bold text-emerald-400">{gStreak}W</span>
-                    {gStreak > 0 && <span className="text-muted-foreground text-xs ml-1">🔥</span>}
-                  </span>
-                }
-                sub="consecutive green wins"
-              />
-              <Cell
-                label="Est P/L ($10)"
-                value={
-                  <span className={gWins * 4.5 - gLosses * 10 >= 0 ? "text-emerald-400" : "text-red-400"}>
-                    {gTotal ? `${gWins * 4.5 - gLosses * 10 >= 0 ? "+" : ""}$${(gWins * 4.5 - gLosses * 10).toFixed(0)}` : "—"}
-                  </span>
-                }
-                sub="rough: 55¢ avg ask"
-              />
-              <Cell
-                label="Kill-switch"
-                value={
-                  gTotal >= 20
-                    ? (gWins / gTotal < 0.55
-                        ? <span className="text-red-400">PAUSE</span>
-                        : <span className="text-emerald-400">LIVE</span>)
-                    : <span className="text-muted-foreground">warm-up</span>
-                }
-                sub={gTotal >= 20 ? "≥55% WR to stay live" : `${gTotal}/20 fires`}
-              />
-            </div>
+            {!gs ? (
+              <div className="p-4 text-xs text-muted-foreground">Loading live fires…</div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-8 divide-x divide-border">
+                <Cell label="Fires (settled)" value={String(gs.settled)} sub={`${gs.totalFires} total`} />
+                <Cell label="W / L" value={`${gs.wins} / ${gs.losses}`} />
+                <Cell
+                  label="Win rate"
+                  value={gs.winRate != null ? pct(gs.winRate) : "—"}
+                  sub={gs.winRate != null ? (gs.winRate >= 0.7 ? "target ≥70%" : gs.winRate >= 0.55 ? "above kill-switch" : "kill-switch risk") : ""}
+                />
+                <Cell
+                  label="Win rate (24h)"
+                  value={gs.last24hFires ? pct(gs.last24hWins / gs.last24hFires) : "—"}
+                  sub={`${gs.last24hWins}/${gs.last24hFires}`}
+                />
+                <Cell
+                  label={`Last ${gs.last20.length} fires`}
+                  value={gs.last20.length ? (
+                    <span>
+                      <span className="font-bold text-emerald-400">{gs.last20.filter(r => r.won).length}W</span>
+                      <span className="text-muted-foreground"> / </span>
+                      <span className="font-bold text-red-400">{gs.last20.filter(r => !r.won).length}L</span>
+                    </span>
+                  ) : "—"}
+                  sub={gs.last20.length ? `${pct(gs.last20.filter(r => r.won).length / gs.last20.length)} · of last ${gs.last20.length}` : "no fires yet"}
+                />
+                <Cell
+                  label="Win streak"
+                  value={
+                    <span>
+                      <span className="font-bold text-emerald-400">{gs.streak}W</span>
+                      {gs.streak > 0 && <span className="text-muted-foreground text-xs ml-1">🔥</span>}
+                    </span>
+                  }
+                  sub="consecutive live wins"
+                />
+                <Cell
+                  label="P/L (real)"
+                  value={
+                    <span className={gs.pnlUsd >= 0 ? "text-emerald-400" : "text-red-400"}>
+                      {gs.settled ? `${gs.pnlUsd >= 0 ? "+" : ""}$${gs.pnlUsd.toFixed(2)}` : "—"}
+                    </span>
+                  }
+                  sub={`24h: ${gs.last24hPnlUsd >= 0 ? "+" : ""}$${gs.last24hPnlUsd.toFixed(2)}`}
+                />
+                <Cell
+                  label="Kill-switch"
+                  value={
+                    gs.killSwitch === "PAUSE"
+                      ? <span className="text-red-400">PAUSE</span>
+                      : gs.killSwitch === "LIVE"
+                        ? <span className="text-emerald-400">LIVE</span>
+                        : <span className="text-muted-foreground">warm-up</span>
+                  }
+                  sub={gs.settled >= 20 ? "≥55% WR to stay live" : `${gs.settled}/20 fires`}
+                />
+              </div>
+            )}
           </div>
           </>
             );
