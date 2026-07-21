@@ -694,8 +694,16 @@ export async function runAutoTradeCore(
           if (isLive) {
             const closeMs = m.closeTime ? Date.parse(m.closeTime) : (Date.now() + m.secondsToClose * 1000);
             const hourUtc = new Date(closeMs).getUTCHours();
-            if (!LIVE_GREEN_HOURS_UTC.has(hourUtc)) {
+          if (!LIVE_GREEN_HOURS_UTC.has(hourUtc)) {
               const r = `red_hour_of_day: ${hourUtc.toString().padStart(2, "0")}:00 UTC not in green-hr whitelist [08,11,12,16,19,20,21,22] (30d backtest: red hrs −$1039)`;
+              skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
+            }
+            // ── Phase 1 gate #1b: sweet-spot sub-gate ──
+            // Historical: fires at 6–10m left = 84% WR / +$496; other times bleed.
+            const sec = m.secondsToClose;
+            if (sec < SWEET_SPOT_MIN_SEC || sec > SWEET_SPOT_MAX_SEC) {
+              const minLeft = (sec / 60).toFixed(1);
+              const r = `off_sweet_spot: ${minLeft}m left — sweet spot is 6–10m left (88% WR, +$517 hist)`;
               skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
             }
           }
