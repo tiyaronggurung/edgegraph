@@ -33,6 +33,7 @@ import { KalshiMaintenanceBanner } from "@/components/KalshiMaintenanceBanner";
 import { PolymarketChip } from "@/components/crypto/PolymarketChip";
 import { useTripleWindowTracker } from "@/hooks/useTripleWindowTracker";
 import { listTripleWindows, type TripleWindowRow } from "@/lib/polymarketTripleWindow.functions";
+import { savePredLock, listPredLocks } from "@/lib/predLocks.functions";
 
 // Lazy-loaded panels: mounted only when scrolled near the viewport (LazyOnVisible).
 // Keeps first paint fast — these panels don't fire queries or parse JS on load.
