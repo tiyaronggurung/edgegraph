@@ -1063,15 +1063,17 @@ function ModelAccuracyPanel() {
                             }
                             // Fallback: live PRED formula (no locked record for this ticker).
                             const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
+                            const sideConf = r.side === "YES" ? r.modelProb : 1 - r.modelProb;
                             const edgeOk = Math.abs(r.edgePts) >= 3;
                             const askOk = sideAsk >= 0.50 && sideAsk <= 0.78;
                             const flipOk = !r.liveSide || r.liveSide === r.side;
-                            if (edgeOk && askOk && flipOk) {
+                            const confOk = sideConf >= 0.70;
+                            if (edgeOk && askOk && flipOk && confOk) {
                               const action = r.side === "YES" ? "UP" : "DOWN";
                               return (
                                 <span
                                   className={r.side === "YES" ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}
-                                  title={`PRED ${action} · ask ${Math.round(sideAsk * 100)}¢ · edge ${r.edgePts.toFixed(1)} · live`}
+                                  title={`PRED ${action} · ask ${Math.round(sideAsk * 100)}¢ · edge ${r.edgePts.toFixed(1)} · conf ${Math.round(sideConf * 100)}% · live`}
                                 >
                                   {action}
                                 </span>
@@ -1081,6 +1083,7 @@ function ModelAccuracyPanel() {
                             if (!edgeOk) reasons.push(`edge ${r.edgePts.toFixed(1)}`);
                             if (!askOk) reasons.push(`ask ${Math.round(sideAsk * 100)}¢`);
                             if (!flipOk) reasons.push("flip");
+                            if (!confOk) reasons.push(`conf ${Math.round(sideConf * 100)}%`);
                             return (
                               <span className="text-muted-foreground" title={`SKIP · ${reasons.join(" · ")} · live`}>
                                 SKIP
