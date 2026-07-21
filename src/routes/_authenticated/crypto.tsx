@@ -1328,7 +1328,7 @@ function PredBetPanel() {
 
 type PredVerdict = { action: "UP" | "DOWN" | "SKIP"; ask: number; edge: number; reasons: string[] } | null;
 
-function PredVerdictBox({ verdict }: { verdict: PredVerdict }) {
+function PredVerdictBox({ verdict, locked }: { verdict: PredVerdict; locked?: boolean }) {
   const action = verdict?.action ?? "SKIP";
   const cfg =
     action === "UP"
@@ -1343,7 +1343,7 @@ function PredVerdictBox({ verdict }: { verdict: PredVerdict }) {
     : `ask ${Math.round(verdict.ask * 100)}¢ · edge ${verdict.edge.toFixed(1)}`;
 
   return (
-    <div className="relative rounded-md p-[2px] overflow-hidden">
+    <div className="relative rounded-md p-[2px] overflow-hidden" title={locked ? "Verdict locked for this window" : undefined}>
       <style>{`@keyframes pred-verdict-spin { to { transform: rotate(360deg); } }`}</style>
       <span
         aria-hidden
@@ -1357,7 +1357,10 @@ function PredVerdictBox({ verdict }: { verdict: PredVerdict }) {
         }}
       />
       <div className={`relative z-10 rounded bg-card px-3 py-1.5 min-w-[110px] text-center ${cfg.text}`}>
-        <div className="text-xs font-bold leading-tight tracking-wider">{cfg.label}</div>
+        <div className="text-xs font-bold leading-tight tracking-wider flex items-center justify-center gap-1">
+          {locked && <span className="text-[9px] opacity-70">🔒</span>}
+          {cfg.label}
+        </div>
         <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">{subtitle}</div>
       </div>
     </div>
