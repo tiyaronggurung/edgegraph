@@ -1300,6 +1300,13 @@ type PredLockedRecord = {
   edge: number;
   reasons: string[];
   lockedAt: number;
+  // ---- Shadow: PRED v2 (TA-align filter, no live behavior change) ----
+  // Captures chart verdict bias at lock time so we can score TA-align
+  // performance side-by-side with base PRED after ~50 fires.
+  taBias?: "up" | "down" | "flat";
+  taScore?: number;               // 0..100 chart verdict score at lock
+  v2Action?: "UP" | "DOWN" | "SKIP";
+  v2Reasons?: string[];
 };
 
 function readPredVerdicts(): Record<string, PredLockedRecord> {
