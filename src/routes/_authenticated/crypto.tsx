@@ -1120,27 +1120,47 @@ function PredBetPanel() {
   const [lastFired, setLastFired] = useState<string | null>(null);
   const [lastSkip, setLastSkip] = useState<string | null>(null);
 
-  const verdict = useMemo(() => {
+  // Locked verdict: snapshot the first pred-formula result for each active
+  // window and hold it fixed until that window closes or a new one starts.
+  const [lockedVerdict, setLockedVerdict] = useState<{ ticker: string; verdict: PredVerdict } | null>(null);
+
+  const activeWindow = useMemo(() => {
     const s = statsQ.data;
     if (!s || !s.recent?.length) return null;
     const now = Date.now();
-    const active = [...s.recent]
+    return [...s.recent]
       .filter((r) => !r.outcome && new Date(r.closeTime).getTime() > now)
-      .sort((a, b) => new Date(a.closeTime).getTime() - new Date(b.closeTime).getTime())[0];
-    if (!active) return null;
-    const sideAsk = active.side === "YES" ? active.marketYesPrice : 1 - active.marketYesPrice;
-    const edgeOk = Math.abs(active.edgePts) >= PRED_MIN_EDGE_ABS;
+      .sort((a, b) => new Date(a.closeTime).getTime() - new Date(b.closeTime).getTime())[0] ?? null;
+  }, [statsQ.data]);
+
+  const computeVerdict = (r: any): PredVerdict => {
+    const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
+    const edgeOk = Math.abs(r.edgePts) >= PRED_MIN_EDGE_ABS;
     const askOk = sideAsk >= PRED_MIN_ASK && sideAsk <= PRED_MAX_ASK;
-    const flipOk = !active.liveSide || active.liveSide === active.side;
+    const flipOk = !r.liveSide || r.liveSide === r.side;
     if (edgeOk && askOk && flipOk) {
-      return { action: (active.side === "YES" ? "UP" : "DOWN") as "UP" | "DOWN", ask: sideAsk, edge: active.edgePts, reasons: [] as string[] };
+      return { action: (r.side === "YES" ? "UP" : "DOWN") as "UP" | "DOWN", ask: sideAsk, edge: r.edgePts, reasons: [] as string[] };
     }
     const reasons: string[] = [];
-    if (!edgeOk) reasons.push(`edge ${active.edgePts.toFixed(1)}`);
+    if (!edgeOk) reasons.push(`edge ${r.edgePts.toFixed(1)}`);
     if (!askOk) reasons.push(`ask ${Math.round(sideAsk * 100)}¢`);
     if (!flipOk) reasons.push("flip");
-    return { action: "SKIP" as const, ask: sideAsk, edge: active.edgePts, reasons };
-  }, [statsQ.data]);
+    return { action: "SKIP" as const, ask: sideAsk, edge: r.edgePts, reasons };
+  };
+
+  const liveVerdict = useMemo(() => activeWindow ? computeVerdict(activeWindow) : null, [activeWindow]);
+
+  useEffect(() => {
+    if (!activeWindow) {
+      if (lockedVerdict) setLockedVerdict(null);
+      return;
+    }
+    if (lockedVerdict?.ticker !== activeWindow.ticker) {
+      setLockedVerdict({ ticker: activeWindow.ticker, verdict: liveVerdict });
+    }
+  }, [activeWindow, liveVerdict, lockedVerdict]);
+
+  const verdict = lockedVerdict?.verdict ?? liveVerdict;
 
   const persistEnabled = async (on: boolean) => {
     try {
@@ -1294,7 +1314,7 @@ function PredBetPanel() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <PredVerdictBox verdict={verdict} />
+          <PredVerdictBox verdict={verdict} locked={!!lockedVerdict} />
           <div className="flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">
             {firing && <Loader2 className="h-3 w-3 animate-spin" />}
             {lastFired && <span>last: {lastFired}</span>}
@@ -1308,7 +1328,7 @@ function PredBetPanel() {
 
 type PredVerdict = { action: "UP" | "DOWN" | "SKIP"; ask: number; edge: number; reasons: string[] } | null;
 
-function PredVerdictBox({ verdict }: { verdict: PredVerdict }) {
+function PredVerdictBox({ verdict, locked }: { verdict: PredVerdict; locked?: boolean }) {
   const action = verdict?.action ?? "SKIP";
   const cfg =
     action === "UP"
@@ -1323,7 +1343,7 @@ function PredVerdictBox({ verdict }: { verdict: PredVerdict }) {
     : `ask ${Math.round(verdict.ask * 100)}¢ · edge ${verdict.edge.toFixed(1)}`;
 
   return (
-    <div className="relative rounded-md p-[2px] overflow-hidden">
+    <div className="relative rounded-md p-[2px] overflow-hidden" title={locked ? "Verdict locked for this window" : undefined}>
       <style>{`@keyframes pred-verdict-spin { to { transform: rotate(360deg); } }`}</style>
       <span
         aria-hidden
@@ -1337,7 +1357,10 @@ function PredVerdictBox({ verdict }: { verdict: PredVerdict }) {
         }}
       />
       <div className={`relative z-10 rounded bg-card px-3 py-1.5 min-w-[110px] text-center ${cfg.text}`}>
-        <div className="text-xs font-bold leading-tight tracking-wider">{cfg.label}</div>
+        <div className="text-xs font-bold leading-tight tracking-wider flex items-center justify-center gap-1">
+          {locked && <span className="text-[9px] opacity-70">🔒</span>}
+          {cfg.label}
+        </div>
         <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">{subtitle}</div>
       </div>
     </div>
