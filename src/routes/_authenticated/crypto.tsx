@@ -2874,6 +2874,7 @@ function CryptoPage() {
       </div>
 
       <ModelBetPanel />
+      <PredBetPanel />
 
       {data && <TopPick markets={data.markets} />}
 
