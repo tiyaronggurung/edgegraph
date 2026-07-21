@@ -950,7 +950,8 @@ function ModelAccuracyPanel() {
                       <th className="text-right p-2">Edge</th>
                       <th className="text-right p-2">Settle</th>
                       <th className="text-center p-2" title="Result of the Value pick (locked side)">Result</th>
-                    </tr>
+                      <th className="text-center p-2" title="Result of the PRED action (UP/DOWN) vs actual settle. SKIP → —.">PRED Result</th>
+
                   </thead>
                   <tbody>
                     {s.recent.map((r) => {
