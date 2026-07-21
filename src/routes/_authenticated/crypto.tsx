@@ -843,7 +843,25 @@ function ModelAccuracyPanel() {
               if (r.wasCorrect === true) { run++; if (run > longestStreak) longestStreak = run; }
               else run = 0;
             }
+            // ---- Green-hour subset (auto-trade whitelist) ----
+            // Mirrors LIVE_GREEN_HOURS_UTC in src/lib/cryptoAutoTrade.functions.ts.
+            const GREEN_HOURS = new Set([8, 11, 12, 16, 19, 20, 21, 22]);
+            const isGreen = (r: { settledAt: string | null }) =>
+              r.settledAt ? GREEN_HOURS.has(new Date(r.settledAt).getUTCHours()) : false;
+            const greenSettled = settledDesc.filter(isGreen);
+            const gTotal = greenSettled.length;
+            const gWins = greenSettled.filter(r => r.wasCorrect === true).length;
+            const gLosses = gTotal - gWins;
+            const nowMs = Date.now();
+            const g24 = greenSettled.filter(r => new Date(r.settledAt!).getTime() >= nowMs - 24 * 3600e3);
+            const g24Wins = g24.filter(r => r.wasCorrect === true).length;
+            const gLast20 = greenSettled.slice(0, 20);
+            const g20Wins = gLast20.filter(r => r.wasCorrect === true).length;
+            const g20Losses = gLast20.length - g20Wins;
+            let gStreak = 0;
+            for (const r of greenSettled) { if (r.wasCorrect === true) gStreak++; else break; }
             return (
+          <>
           <div className="grid grid-cols-2 md:grid-cols-8 divide-x divide-border">
             <Cell label="Tracked (7d)" value={String(s.total)} sub={`${s.settled} settled`} />
             <Cell label="Correct (7d)" value={`${s.correct} / ${s.settled}`} />
@@ -892,8 +910,73 @@ function ModelAccuracyPanel() {
             />
           </div>
 
+          <div className="border-t border-border">
+            <div
+              className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/10"
+              title="Model accuracy filtered to auto-trade green hours only (UTC 08, 11, 12, 16, 19, 20, 21, 22). This is what auto-trade actually plays — ignore the wider row above when judging auto-trade edge."
+            >
+              🟢 Auto-Trade WR (green hours only · UTC 08/11/12/16/19–22)
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-8 divide-x divide-border">
+              <Cell label="Green settled (7d)" value={String(gTotal)} sub="settled in green hrs" />
+              <Cell label="Correct (7d)" value={`${gWins} / ${gTotal}`} />
+              <Cell
+                label="Win rate (7d)"
+                value={gTotal ? pct(gWins / gTotal) : "—"}
+                sub={gTotal ? (gWins / gTotal >= 0.7 ? "target ≥70%" : gWins / gTotal >= 0.55 ? "above kill-switch" : "kill-switch risk") : ""}
+              />
+              <Cell
+                label="Win rate (24h)"
+                value={g24.length ? pct(g24Wins / g24.length) : "—"}
+                sub={`${g24Wins}/${g24.length}`}
+              />
+              <Cell
+                label={`Last ${gLast20.length} green`}
+                value={gLast20.length ? (
+                  <span>
+                    <span className="font-bold text-emerald-400">{g20Wins}W</span>
+                    <span className="text-muted-foreground"> / </span>
+                    <span className="font-bold text-red-400">{g20Losses}L</span>
+                  </span>
+                ) : "—"}
+                sub={gLast20.length ? `${pct(g20Wins / gLast20.length)} · of last ${gLast20.length}` : "not enough fires"}
+              />
+              <Cell
+                label="Green streak"
+                value={
+                  <span>
+                    <span className="font-bold text-emerald-400">{gStreak}W</span>
+                    {gStreak > 0 && <span className="text-muted-foreground text-xs ml-1">🔥</span>}
+                  </span>
+                }
+                sub="consecutive green wins"
+              />
+              <Cell
+                label="Est P/L ($10)"
+                value={
+                  <span className={gWins * 4.5 - gLosses * 10 >= 0 ? "text-emerald-400" : "text-red-400"}>
+                    {gTotal ? `${gWins * 4.5 - gLosses * 10 >= 0 ? "+" : ""}$${(gWins * 4.5 - gLosses * 10).toFixed(0)}` : "—"}
+                  </span>
+                }
+                sub="rough: 55¢ avg ask"
+              />
+              <Cell
+                label="Kill-switch"
+                value={
+                  gTotal >= 20
+                    ? (gWins / gTotal < 0.55
+                        ? <span className="text-red-400">PAUSE</span>
+                        : <span className="text-emerald-400">LIVE</span>)
+                    : <span className="text-muted-foreground">warm-up</span>
+                }
+                sub={gTotal >= 20 ? "≥55% WR to stay live" : `${gTotal}/20 fires`}
+              />
+            </div>
+          </div>
+          </>
             );
           })()}
+
           {(() => {
             const now = Date.now();
             const h24 = now - 24 * 3600e3;
