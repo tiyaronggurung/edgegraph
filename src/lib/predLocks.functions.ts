@@ -52,7 +52,7 @@ export const savePredLock = createServerFn({ method: "POST" })
         v2_action: data.v2_action ?? null,
         v2_side: data.v2_side ?? null,
         v2_reason: data.v2_reason ?? null,
-        meta: data.meta ?? {},
+        meta: (data.meta ?? {}) as never,
       },
       { onConflict: "user_id,window_start,ticker", ignoreDuplicates: true },
     );
