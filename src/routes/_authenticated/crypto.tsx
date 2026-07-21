@@ -1054,6 +1054,25 @@ function ModelAccuracyPanel() {
                             );
                           })()}
                         </td>
+                        <td className="p-2">
+                          {(() => {
+                            // PRED v2 (SHADOW): only shown for tickers locked while live.
+                            const locked = predVerdicts[r.ticker];
+                            if (!locked || !locked.v2Action) {
+                              return <span className="text-muted-foreground/60" title="v2 requires live lock (TA bias captured)">—</span>;
+                            }
+                            const cls = locked.v2Action === "UP"
+                              ? "text-emerald-400 font-semibold"
+                              : locked.v2Action === "DOWN"
+                                ? "text-red-400 font-semibold"
+                                : "text-muted-foreground";
+                            const taTxt = locked.taBias ? `TA ${locked.taBias}${locked.taScore != null ? ` (${locked.taScore.toFixed(0)})` : ""}` : "TA n/a";
+                            const title = locked.v2Action === "SKIP"
+                              ? `v2 SKIP · ${(locked.v2Reasons || []).join(" · ") || "no setup"} · ${taTxt}`
+                              : `v2 ${locked.v2Action} · ${taTxt} · shadow`;
+                            return <span className={cls} title={title}>🧪 {locked.v2Action}</span>;
+                          })()}
+                        </td>
                         <td className="p-2 text-right">{fmt$(r.strike)}</td>
                         <td className="p-2 text-right">{(r.modelProb * 100).toFixed(1)}%</td>
                         <td className="p-2 text-right">{(r.marketYesPrice * 100).toFixed(0)}</td>
