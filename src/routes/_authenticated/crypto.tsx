@@ -1306,6 +1306,44 @@ function PredBetPanel() {
   );
 }
 
+type PredVerdict = { action: "UP" | "DOWN" | "SKIP"; ask: number; edge: number; reasons: string[] } | null;
+
+function PredVerdictBox({ verdict }: { verdict: PredVerdict }) {
+  const action = verdict?.action ?? "SKIP";
+  const cfg =
+    action === "UP"
+      ? { text: "text-emerald-300", ring: "#10b981", label: "UP" }
+      : action === "DOWN"
+      ? { text: "text-rose-300", ring: "#f43f5e", label: "DOWN" }
+      : { text: "text-amber-300", ring: "#f59e0b", label: "SKIP" };
+  const subtitle = !verdict
+    ? "waiting for next window"
+    : action === "SKIP"
+    ? verdict.reasons.slice(0, 2).join(" · ") || "no setup"
+    : `ask ${Math.round(verdict.ask * 100)}¢ · edge ${verdict.edge.toFixed(1)}`;
+
+  return (
+    <div className="relative rounded-md p-[2px] overflow-hidden">
+      <style>{`@keyframes pred-verdict-spin { to { transform: rotate(360deg); } }`}</style>
+      <span
+        aria-hidden
+        className="absolute left-1/2 top-1/2 -z-0"
+        style={{
+          width: "300%",
+          height: "300%",
+          transform: "translate(-50%, -50%)",
+          background: `conic-gradient(from 0deg, transparent 0 55%, ${cfg.ring} 70%, transparent 85% 100%)`,
+          animation: "pred-verdict-spin 2.8s linear infinite",
+        }}
+      />
+      <div className={`relative z-10 rounded bg-card px-3 py-1.5 min-w-[110px] text-center ${cfg.text}`}>
+        <div className="text-xs font-bold leading-tight tracking-wider">{cfg.label}</div>
+        <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">{subtitle}</div>
+      </div>
+    </div>
+  );
+}
+
 
 
 
