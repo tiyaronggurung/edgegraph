@@ -316,7 +316,39 @@ export async function runAutoTradeCore(
       for (const r of ((symRows ?? []) as Array<{ ticker: string; pnl_usd: number | null; settled_at: string | null }>)) {
         perSymbolPnl.set(r.ticker, (perSymbolPnl.get(r.ticker) ?? 0) + (Number(r.pnl_usd) || 0));
         if (r.settled_at && r.settled_at >= cooldownCutoff) cooldownTickers.add(r.ticker);
-      }
+    }
+
+    // ── Phase 1: 7d rolling WR kill-switch on green-hour live fires ──
+    // Auto-pause live fires when the green-hour subset degrades below the
+    // break-even band. Read-only; failure is non-blocking.
+    let killswitchActive = false;
+    let killswitchInfo = "";
+    if (isLive) {
+      try {
+        const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: kRows } = await supabase
+          .from("auto_trade_orders")
+          .select("pnl_usd, settled_at, created_at")
+          .eq("user_id", userId)
+          .eq("mode", "live")
+          .not("settled_at", "is", null)
+          .gte("settled_at", since7d);
+        const rows = (kRows ?? []) as Array<{ pnl_usd: number | null; settled_at: string | null; created_at: string | null }>;
+        const greenRows = rows.filter(r => {
+          const ts = r.created_at ? new Date(r.created_at) : null;
+          return ts && LIVE_GREEN_HOURS_UTC.has(ts.getUTCHours());
+        });
+        if (greenRows.length >= LIVE_KILLSWITCH_MIN_N) {
+          const wins = greenRows.filter(r => (Number(r.pnl_usd) || 0) > 0).length;
+          const wr = wins / greenRows.length;
+          if (wr < LIVE_KILLSWITCH_MIN_WR) {
+            killswitchActive = true;
+            killswitchInfo = `killswitch_7d_wr_low: green-hr 7d WR ${(wr * 100).toFixed(1)}% (${wins}/${greenRows.length}) < ${(LIVE_KILLSWITCH_MIN_WR * 100).toFixed(0)}% — auto-trade paused`;
+          }
+        }
+      } catch { /* non-blocking */ }
+    }
+
     }
 
     const result = await computeBtcMarkets();
