@@ -1844,6 +1844,8 @@ const GREEN_BET_LS_ENABLED = "crypto.greenBet";
 const GREEN_BET_STAKE = 10;
 const GREEN_HOURS_UTC = new Set<number>([8, 11, 12, 16, 19, 20, 21, 22]);
 
+type PredVerdict = { action: "UP" | "DOWN" | "SKIP"; ask: number; edge: number; reasons: string[] } | null;
+
 function GreenHoursBetPanel() {
   const runFn = useServerFn(runAutoTrade);
 
