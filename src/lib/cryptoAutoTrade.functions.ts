@@ -674,6 +674,22 @@ export async function runAutoTradeCore(
           return { m, effectiveEdge: m.edgeAbs + aligned, equityAdj: aligned };
         })
         .filter(({ m, effectiveEdge, equityAdj }) => {
+          // ── Phase 1 gate #0: kill-switch (7d green-hr WR too low) ──
+          if (isLive && killswitchActive) {
+            skipReasons.push(`${m.ticker}: ${killswitchInfo}`); logSkip(m, killswitchInfo); return false;
+          }
+          // ── Phase 1 gate #1: green-hour whitelist (UTC hour of settlement) ──
+          // Uses close time when available, else "now" (fires happen within the
+          // same UTC hour they settle in for 15m windows).
+          if (isLive) {
+            const closeMs = (m as { closeMs?: number; closeIso?: string }).closeMs
+              ?? ((m as { closeIso?: string }).closeIso ? new Date((m as { closeIso: string }).closeIso).getTime() : Date.now());
+            const hourUtc = new Date(closeMs).getUTCHours();
+            if (!LIVE_GREEN_HOURS_UTC.has(hourUtc)) {
+              const r = `red_hour_of_day: ${hourUtc.toString().padStart(2, "0")}:00 UTC not in green-hr whitelist [08,11,12,16,19,20,21,22] (30d backtest: red hrs −$1039)`;
+              skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
+            }
+          }
           if (modelGateActive) {
             const g = modelGateResults.get(`${m.ticker}|${m.side}`);
             if (g && !g.allow) {
