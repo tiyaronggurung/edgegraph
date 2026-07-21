@@ -1120,6 +1120,28 @@ function PredBetPanel() {
   const [lastFired, setLastFired] = useState<string | null>(null);
   const [lastSkip, setLastSkip] = useState<string | null>(null);
 
+  const verdict = useMemo(() => {
+    const s = statsQ.data;
+    if (!s || !s.recent?.length) return null;
+    const now = Date.now();
+    const active = [...s.recent]
+      .filter((r) => !r.outcome && new Date(r.closeTime).getTime() > now)
+      .sort((a, b) => new Date(a.closeTime).getTime() - new Date(b.closeTime).getTime())[0];
+    if (!active) return null;
+    const sideAsk = active.side === "YES" ? active.marketYesPrice : 1 - active.marketYesPrice;
+    const edgeOk = Math.abs(active.edgePts) >= PRED_MIN_EDGE_ABS;
+    const askOk = sideAsk >= PRED_MIN_ASK && sideAsk <= PRED_MAX_ASK;
+    const flipOk = !active.liveSide || active.liveSide === active.side;
+    if (edgeOk && askOk && flipOk) {
+      return { action: (active.side === "YES" ? "UP" : "DOWN") as "UP" | "DOWN", ask: sideAsk, edge: active.edgePts, reasons: [] as string[] };
+    }
+    const reasons: string[] = [];
+    if (!edgeOk) reasons.push(`edge ${active.edgePts.toFixed(1)}`);
+    if (!askOk) reasons.push(`ask ${Math.round(sideAsk * 100)}¢`);
+    if (!flipOk) reasons.push("flip");
+    return { action: "SKIP" as const, ask: sideAsk, edge: active.edgePts, reasons };
+  }, [statsQ.data]);
+
   const persistEnabled = async (on: boolean) => {
     try {
       const { data: u } = await supabase.auth.getUser();
