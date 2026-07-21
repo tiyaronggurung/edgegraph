@@ -684,6 +684,21 @@ function ModelAccuracyPanel() {
   });
   const s = q.data;
 
+  // Locked PRED verdicts persisted by PredBetPanel (localStorage). Re-read on
+  // mount, on cross-tab storage events, and on the custom update event.
+  const [predVerdicts, setPredVerdicts] = useState<Record<string, PredLockedRecord>>({});
+  useEffect(() => {
+    const refresh = () => setPredVerdicts(readPredVerdicts());
+    refresh();
+    const onStorage = (e: StorageEvent) => { if (e.key === PRED_BET_LS_VERDICTS) refresh(); };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("crypto.predBet.verdicts.updated", refresh as EventListener);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("crypto.predBet.verdicts.updated", refresh as EventListener);
+    };
+  }, []);
+
   const listTripleFn = useServerFn(listTripleWindows);
   // Only refetch triple-window when the SET of tickers changes, not on every stats poll.
   const tickers = useMemo(() => (s?.recent ?? []).map(r => r.ticker), [s]);
