@@ -814,7 +814,9 @@ function ModelAccuracyPanel() {
                       <th className="text-left p-2">Ticker</th>
                       <th className="text-left p-2" title="Locked side = model value-pick (p − yesPrice). Historically ~50% (coinflip).">Value pick</th>
                       <th className="text-left p-2" title="Raw model direction: P(YES) ≥ 50%? Historically ~87% correct on BTC move.">Raw dir</th>
-                      <th className="text-left p-2" title="Live side = chart+model+drift combined; flips mid-window when chart & anchor drift confirm the opposite direction. Auto-trader probe uses this.">Live</th>
+                      {/* Live column hidden (kept in data model); replaced by PRED column below */}
+                      {/* <th className="text-left p-2" title="Live side = chart+model+drift combined; flips mid-window when chart & anchor drift confirm the opposite direction. Auto-trader probe uses this.">Live</th> */}
+                      <th className="text-left p-2" title="PRED verdict for this 15m window: Value pick where |edge|≥3pt AND ask 50–78¢ AND no live flip. Otherwise SKIP.">PRED</th>
                       <th className="text-right p-2">Strike</th>
                       <th className="text-right p-2">Model%</th>
                       <th className="text-right p-2">Market¢</th>
