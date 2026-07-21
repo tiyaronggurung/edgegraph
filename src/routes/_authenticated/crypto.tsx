@@ -1361,7 +1361,7 @@ function PredBetPanel() {
 
 type PredVerdict = { action: "UP" | "DOWN" | "SKIP"; ask: number; edge: number; reasons: string[] } | null;
 
-function PredVerdictBox({ verdict, locked, closeTime }: { verdict: PredVerdict; locked?: boolean; closeTime?: string | null }) {
+function PredVerdictBox({ verdict, locked, closeTime, ticker }: { verdict: PredVerdict; locked?: boolean; closeTime?: string | null; ticker?: string | null }) {
   const action = verdict?.action ?? "SKIP";
   const cfg =
     action === "UP"
@@ -1375,13 +1375,15 @@ function PredVerdictBox({ verdict, locked, closeTime }: { verdict: PredVerdict; 
     ? verdict.reasons.slice(0, 2).join(" · ") || "no setup"
     : `ask ${Math.round(verdict.ask * 100)}¢ · edge ${verdict.edge.toFixed(1)}`;
 
+  // One-line local-time label matching the model accuracy "Closed" column:
+  // "Jul 21, 2:15 PM · BTC-15M-..."
   const windowLabel = (() => {
     if (!closeTime) return null;
     const end = new Date(closeTime);
     if (isNaN(end.getTime())) return null;
     const start = new Date(end.getTime() - 15 * 60_000);
-    const fmt = (d: Date) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-    return `${fmt(start)}–${fmt(end)}`;
+    const timePart = start.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
+    return ticker ? `${timePart} · ${ticker}` : timePart;
   })();
 
   return (
