@@ -1120,6 +1120,28 @@ function PredBetPanel() {
   const [lastFired, setLastFired] = useState<string | null>(null);
   const [lastSkip, setLastSkip] = useState<string | null>(null);
 
+  const verdict = useMemo(() => {
+    const s = statsQ.data;
+    if (!s || !s.recent?.length) return null;
+    const now = Date.now();
+    const active = [...s.recent]
+      .filter((r) => !r.outcome && new Date(r.closeTime).getTime() > now)
+      .sort((a, b) => new Date(a.closeTime).getTime() - new Date(b.closeTime).getTime())[0];
+    if (!active) return null;
+    const sideAsk = active.side === "YES" ? active.marketYesPrice : 1 - active.marketYesPrice;
+    const edgeOk = Math.abs(active.edgePts) >= PRED_MIN_EDGE_ABS;
+    const askOk = sideAsk >= PRED_MIN_ASK && sideAsk <= PRED_MAX_ASK;
+    const flipOk = !active.liveSide || active.liveSide === active.side;
+    if (edgeOk && askOk && flipOk) {
+      return { action: (active.side === "YES" ? "UP" : "DOWN") as "UP" | "DOWN", ask: sideAsk, edge: active.edgePts, reasons: [] as string[] };
+    }
+    const reasons: string[] = [];
+    if (!edgeOk) reasons.push(`edge ${active.edgePts.toFixed(1)}`);
+    if (!askOk) reasons.push(`ask ${Math.round(sideAsk * 100)}¢`);
+    if (!flipOk) reasons.push("flip");
+    return { action: "SKIP" as const, ask: sideAsk, edge: active.edgePts, reasons };
+  }, [statsQ.data]);
+
   const persistEnabled = async (on: boolean) => {
     try {
       const { data: u } = await supabase.auth.getUser();
@@ -1271,11 +1293,52 @@ function PredBetPanel() {
             Value pick (raw_dir) · |edge|≥{PRED_MIN_EDGE_ABS}pt · ask {Math.round(PRED_MIN_ASK*100)}–{Math.round(PRED_MAX_ASK*100)}¢ · hold to settle · one bet / ticker
           </span>
         </div>
-        <div className="flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">
-          {firing && <Loader2 className="h-3 w-3 animate-spin" />}
-          {lastFired && <span>last: {lastFired}</span>}
-          {lastSkip && <span className="opacity-60">skip: {lastSkip}</span>}
+        <div className="flex items-center gap-3">
+          <PredVerdictBox verdict={verdict} />
+          <div className="flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">
+            {firing && <Loader2 className="h-3 w-3 animate-spin" />}
+            {lastFired && <span>last: {lastFired}</span>}
+            {lastSkip && <span className="opacity-60">skip: {lastSkip}</span>}
+          </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+type PredVerdict = { action: "UP" | "DOWN" | "SKIP"; ask: number; edge: number; reasons: string[] } | null;
+
+function PredVerdictBox({ verdict }: { verdict: PredVerdict }) {
+  const action = verdict?.action ?? "SKIP";
+  const cfg =
+    action === "UP"
+      ? { text: "text-emerald-300", ring: "#10b981", label: "UP" }
+      : action === "DOWN"
+      ? { text: "text-rose-300", ring: "#f43f5e", label: "DOWN" }
+      : { text: "text-amber-300", ring: "#f59e0b", label: "SKIP" };
+  const subtitle = !verdict
+    ? "waiting for next window"
+    : action === "SKIP"
+    ? verdict.reasons.slice(0, 2).join(" · ") || "no setup"
+    : `ask ${Math.round(verdict.ask * 100)}¢ · edge ${verdict.edge.toFixed(1)}`;
+
+  return (
+    <div className="relative rounded-md p-[2px] overflow-hidden">
+      <style>{`@keyframes pred-verdict-spin { to { transform: rotate(360deg); } }`}</style>
+      <span
+        aria-hidden
+        className="absolute left-1/2 top-1/2 -z-0"
+        style={{
+          width: "300%",
+          height: "300%",
+          transform: "translate(-50%, -50%)",
+          background: `conic-gradient(from 0deg, transparent 0 55%, ${cfg.ring} 70%, transparent 85% 100%)`,
+          animation: "pred-verdict-spin 2.8s linear infinite",
+        }}
+      />
+      <div className={`relative z-10 rounded bg-card px-3 py-1.5 min-w-[110px] text-center ${cfg.text}`}>
+        <div className="text-xs font-bold leading-tight tracking-wider">{cfg.label}</div>
+        <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">{subtitle}</div>
       </div>
     </div>
   );
