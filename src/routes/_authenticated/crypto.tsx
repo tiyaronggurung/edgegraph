@@ -1092,6 +1092,199 @@ function ModelBetPanel() {
 }
 
 
+// ============================================================
+// PRED BET — sibling to Model Bet, uses ONLY the two signals
+// the accuracy-log studies proved carry real edge:
+//   1) value pick = model raw_dir side
+//   2) edge target: |edge_pts| >= 3  AND  side_ask in 50–78¢
+// One bet per ticker · $10 flat · hold to settle (skipLadder).
+// Mutually exclusive with Model Bet / Auto-Odds / Auto-Mart.
+// ============================================================
+const PRED_BET_LS_ENABLED = "crypto.predBet";
+const PRED_BET_LS_TICKERS = "crypto.predBet.tickers";
+const PRED_BET_STAKE = 10;
+const PRED_MIN_EDGE_ABS = 3;
+const PRED_MIN_ASK = 0.50;
+const PRED_MAX_ASK = 0.78;
+
+function PredBetPanel() {
+  const runFn = useServerFn(runAutoTrade);
+  const statsFn = useServerFn(getPredictionStats);
+  const statsQ = useQuery({ queryKey: ["btc-pred-stats"], queryFn: () => statsFn(), refetchInterval: 60_000 });
+
+  const [enabled, setEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(PRED_BET_LS_ENABLED) === "on";
+  });
+  const [firing, setFiring] = useState(false);
+  const [lastFired, setLastFired] = useState<string | null>(null);
+  const [lastSkip, setLastSkip] = useState<string | null>(null);
+
+  const persistEnabled = async (on: boolean) => {
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u?.user?.id;
+      if (!uid) return;
+      if (on) {
+        await supabase.from("auto_odds_settings").upsert({
+          user_id: uid,
+          enabled: true,
+          auto_button_type: "pred_bet",
+          stopped_reason: null,
+        }, { onConflict: "user_id" });
+      } else {
+        await supabase.from("auto_odds_settings")
+          .update({ enabled: false })
+          .eq("user_id", uid)
+          .eq("auto_button_type", "pred_bet");
+      }
+    } catch { /* non-fatal */ }
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(PRED_BET_LS_ENABLED, enabled ? "on" : "off");
+  }, [enabled]);
+
+  const toggleOn = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(MODEL_BET_LS_ENABLED, "off");
+      window.localStorage.setItem("crypto.autoOdds", "off");
+      window.localStorage.setItem("crypto.autoMart", "off");
+      window.dispatchEvent(new CustomEvent(AUTO_BET_MUTEX_EVENT, { detail: "predBet" }));
+    }
+    setEnabled(true);
+    void persistEnabled(true);
+    toast.success(`PRED Bet ON · $${PRED_BET_STAKE} · edge≥${PRED_MIN_EDGE_ABS} · ask ${Math.round(PRED_MIN_ASK*100)}–${Math.round(PRED_MAX_ASK*100)}¢`);
+  };
+  const toggleOff = () => {
+    setEnabled(false);
+    void persistEnabled(false);
+    toast.info("PRED Bet OFF");
+  };
+
+  useEffect(() => {
+    const onMutex = (e: Event) => {
+      const which = (e as CustomEvent).detail;
+      if (which && which !== "predBet" && typeof window !== "undefined") {
+        if (window.localStorage.getItem(PRED_BET_LS_ENABLED) === "on") {
+          window.localStorage.setItem(PRED_BET_LS_ENABLED, "off");
+        }
+        setEnabled(false);
+      }
+    };
+    window.addEventListener(AUTO_BET_MUTEX_EVENT, onMutex as EventListener);
+    return () => window.removeEventListener(AUTO_BET_MUTEX_EVENT, onMutex as EventListener);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    let inFlight = false;
+
+    const readProcessed = (): string[] => {
+      try {
+        const raw = window.localStorage.getItem(PRED_BET_LS_TICKERS);
+        return raw ? JSON.parse(raw) : [];
+      } catch { return []; }
+    };
+    const writeProcessed = (arr: string[]) => {
+      try { window.localStorage.setItem(PRED_BET_LS_TICKERS, JSON.stringify(arr.slice(-100))); } catch { /* ignore */ }
+    };
+
+    const tick = async () => {
+      if (cancelled || inFlight) return;
+      const s = statsQ.data;
+      if (!s) return;
+      const now = Date.now();
+      const processed = new Set(readProcessed());
+
+      const candidates = s.recent.filter(r => {
+        if (r.outcome) return false;
+        if (new Date(r.closeTime).getTime() <= now) return false;
+        if (processed.has(r.ticker)) return false;
+        if (r.liveSide && r.liveSide !== r.side) return false;
+        if (Math.abs(r.edgePts) < PRED_MIN_EDGE_ABS) return false;
+        const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
+        if (sideAsk < PRED_MIN_ASK || sideAsk > PRED_MAX_ASK) return false;
+        return true;
+      });
+      if (candidates.length === 0) return;
+      candidates.sort((a, b) => new Date(a.closeTime).getTime() - new Date(b.closeTime).getTime());
+      const pick = candidates[0];
+      const sideAsk = pick.side === "YES" ? pick.marketYesPrice : 1 - pick.marketYesPrice;
+
+      inFlight = true;
+      setFiring(true);
+      processed.add(pick.ticker);
+      writeProcessed(Array.from(processed));
+      try {
+        const res = await runFn({ data: {
+          mode: "live",
+          confirm: "I_UNDERSTAND_LIVE",
+          stakeUsd: PRED_BET_STAKE,
+          maxOrders: 1,
+          force: true,
+          forceTicker: pick.ticker,
+          forceSide: pick.side,
+          maxEntryCents: Math.round(PRED_MAX_ASK * 100),
+          skipLadder: true,
+        } });
+
+        if (res.placed > 0 && res.orders?.[0]) {
+          const o = res.orders[0];
+          try { playModelBetPing(); } catch { /* noop */ }
+          toast.success(`PRED $${PRED_BET_STAKE}: ${pick.side === "YES" ? "UP" : "DOWN"} ${pick.ticker} @ ${o.limit_cents}¢ · edge ${pick.edgePts.toFixed(1)}`);
+          setLastFired(`${pick.ticker} ${pick.side} @ ${o.limit_cents}¢ · edge ${pick.edgePts.toFixed(1)}`);
+        } else {
+          const realReasons = (res.skipReasons ?? []).filter((r: string) => !/^(equity:|force:)/i.test(r));
+          const reason = (realReasons.length ? realReasons : res.skipReasons ?? []).slice(0, 2).join(" · ") || "no fill";
+          toast.info(`PRED skipped ${pick.ticker}: ${reason}`);
+          setLastSkip(`${pick.ticker} · ask ${(sideAsk*100).toFixed(0)}¢ · ${reason}`);
+        }
+      } catch (e: any) {
+        toast.error(`PRED failed ${pick.ticker}`, { description: e?.message ?? String(e) });
+      } finally {
+        inFlight = false;
+        setFiring(false);
+      }
+    };
+
+    tick();
+    const h = setInterval(tick, 5_000);
+    return () => { cancelled = true; clearInterval(h); };
+  }, [enabled, statsQ.data, runFn]);
+
+  return (
+    <div className="border border-border rounded-lg bg-card">
+      <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={enabled ? toggleOff : toggleOn}
+            className={`text-xs font-semibold px-3 py-1.5 rounded border flex items-center gap-1.5 ${enabled ? "border-fuchsia-500/50 bg-fuchsia-500/15 text-fuchsia-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${enabled ? "bg-fuchsia-400 animate-pulse" : "bg-muted-foreground"}`} />
+            {enabled ? `PRED Bet ON · $${PRED_BET_STAKE}` : `PRED Bet OFF · $${PRED_BET_STAKE}`}
+          </button>
+          <span className="text-[11px] text-muted-foreground">
+            Value pick (raw_dir) · |edge|≥{PRED_MIN_EDGE_ABS}pt · ask {Math.round(PRED_MIN_ASK*100)}–{Math.round(PRED_MAX_ASK*100)}¢ · hold to settle · one bet / ticker
+          </span>
+        </div>
+        <div className="flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">
+          {firing && <Loader2 className="h-3 w-3 animate-spin" />}
+          {lastFired && <span>last: {lastFired}</span>}
+          {lastSkip && <span className="opacity-60">skip: {lastSkip}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+
+
 function OddsFlipAlert() {
   const fn = useServerFn(getRecentOddsFlip);
   const q = useQuery({
@@ -2681,6 +2874,7 @@ function CryptoPage() {
       </div>
 
       <ModelBetPanel />
+      <PredBetPanel />
 
       {data && <TopPick markets={data.markets} />}
 
