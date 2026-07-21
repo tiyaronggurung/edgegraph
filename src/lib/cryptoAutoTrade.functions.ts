@@ -316,6 +316,7 @@ export async function runAutoTradeCore(
       for (const r of ((symRows ?? []) as Array<{ ticker: string; pnl_usd: number | null; settled_at: string | null }>)) {
         perSymbolPnl.set(r.ticker, (perSymbolPnl.get(r.ticker) ?? 0) + (Number(r.pnl_usd) || 0));
         if (r.settled_at && r.settled_at >= cooldownCutoff) cooldownTickers.add(r.ticker);
+      }
     }
 
     // ── Phase 1: 7d rolling WR kill-switch on green-hour live fires ──
