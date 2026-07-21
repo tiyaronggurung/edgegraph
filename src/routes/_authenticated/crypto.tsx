@@ -727,6 +727,28 @@ function ModelAccuracyPanel() {
     </div>
   );
 
+  // ---- PRED action per row: prefer the locked verdict (persisted by
+  // PredBetPanel), else fall back to the live formula for historical rows
+  // never seen while their window was open.
+  const predActionFor = (r: { ticker: string; side: "YES" | "NO"; marketYesPrice: number; edgePts: number; liveSide: "YES" | "NO" | null; }): "UP" | "DOWN" | "SKIP" => {
+    const locked = predVerdicts[r.ticker];
+    if (locked) return locked.action;
+    const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
+    const edgeOk = Math.abs(r.edgePts) >= 3;
+    const askOk = sideAsk >= 0.50 && sideAsk <= 0.78;
+    const flipOk = !r.liveSide || r.liveSide === r.side;
+    if (edgeOk && askOk && flipOk) return r.side === "YES" ? "UP" : "DOWN";
+    return "SKIP";
+  };
+  // WIN iff PRED action matches which side actually settled. SKIP → null.
+  const predResultFor = (r: { ticker: string; side: "YES" | "NO"; marketYesPrice: number; edgePts: number; liveSide: "YES" | "NO" | null; wasCorrect: boolean | null; }): boolean | null => {
+    if (r.wasCorrect == null) return null;
+    const action = predActionFor(r);
+    if (action === "SKIP") return null;
+    const yesWon = (r.side === "YES" && r.wasCorrect === true) || (r.side === "NO" && r.wasCorrect === false);
+    return action === "UP" ? yesWon : !yesWon;
+  };
+
 
   return (
     <div className="border border-border rounded-lg bg-card">
@@ -815,6 +837,96 @@ function ModelAccuracyPanel() {
 
             );
           })()}
+          {(() => {
+            const now = Date.now();
+            const h24 = now - 24 * 3600e3;
+            const h12 = now - 12 * 3600e3;
+            const settledDesc = s.recent
+              .filter(r => r.wasCorrect !== null && r.settledAt)
+              .slice()
+              .sort((a, b) => (b.settledAt ?? "").localeCompare(a.settledAt ?? ""));
+            let fires = 0, wins = 0, losses = 0, skipped = 0;
+            let w24 = 0, l24 = 0, w12 = 0, l12 = 0;
+            const results: boolean[] = [];
+            for (const r of settledDesc) {
+              const action = predActionFor(r);
+              if (action === "SKIP") { skipped++; continue; }
+              const res = predResultFor(r);
+              if (res == null) continue;
+              fires++;
+              if (res) wins++; else losses++;
+              const t = new Date(r.settledAt!).getTime();
+              if (t >= h24) { if (res) w24++; else l24++; }
+              if (t >= h12) { if (res) w12++; else l12++; }
+              results.push(res);
+            }
+            const last20 = results.slice(0, 20);
+            const w20 = last20.filter(Boolean).length;
+            const l20 = last20.length - w20;
+            let cur = 0;
+            for (const x of results) { if (x) cur++; else break; }
+            let best = 0, run = 0;
+            for (const x of results) { if (x) { run++; if (run > best) best = run; } else run = 0; }
+            const settled24 = w24 + l24;
+            const settled12 = w12 + l12;
+            return (
+              <div className="border-t border-border">
+                <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/10">
+                  PRED accuracy (fires only · SKIPs excluded)
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-8 divide-x divide-border">
+                  <Cell label="PRED fires (7d)" value={String(fires)} sub={`${skipped} skipped`} />
+                  <Cell label="Correct (7d)" value={`${wins} / ${fires}`} />
+                  <Cell
+                    label="Win rate (7d)"
+                    value={fires ? pct(wins / fires) : "—"}
+                    sub={fires ? (wins / fires >= 0.5 ? "above coin flip" : "below coin flip") : ""}
+                  />
+                  <Cell
+                    label="Win rate (24h)"
+                    value={settled24 ? pct(w24 / settled24) : "—"}
+                    sub={`${w24}/${settled24}`}
+                  />
+                  <Cell
+                    label="Win rate (12h)"
+                    value={settled12 ? pct(w12 / settled12) : "—"}
+                    sub={`${w12}/${settled12}`}
+                  />
+                  <Cell
+                    label={`Last ${last20.length} fires`}
+                    value={last20.length ? (
+                      <span>
+                        <span className="font-bold text-emerald-400">{w20}W</span>
+                        <span className="text-muted-foreground"> / </span>
+                        <span className="font-bold text-red-400">{l20}L</span>
+                      </span>
+                    ) : "—"}
+                    sub={last20.length ? `${pct(w20 / last20.length)} · of last ${last20.length}` : "not enough fires"}
+                  />
+                  <Cell
+                    label="PRED streak"
+                    value={
+                      <span>
+                        <span className="font-bold text-emerald-400">{cur}W</span>
+                        {cur > 0 && <span className="text-muted-foreground text-xs ml-1">🔥</span>}
+                      </span>
+                    }
+                    sub={best > 0 ? `best: ${best}W (7d)` : "no wins yet"}
+                  />
+                  <Cell
+                    label="Est P/L ($10)"
+                    value={
+                      <span className={wins - losses >= 0 ? "text-emerald-400" : "text-red-400"}>
+                        {fires ? `${(wins * 10 * 0.45 - losses * 10) >= 0 ? "+" : ""}$${(wins * 10 * 0.45 - losses * 10).toFixed(0)}` : "—"}
+                      </span>
+                    }
+                    sub="rough: 45¢ avg win"
+                  />
+                </div>
+              </div>
+            );
+          })()}
+
           {s.recent.length > 0 && (
             <div className="border-t border-border">
               <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/10 flex items-center justify-between">
@@ -838,8 +950,10 @@ function ModelAccuracyPanel() {
                       <th className="text-right p-2">Edge</th>
                       <th className="text-right p-2">Settle</th>
                       <th className="text-center p-2" title="Result of the Value pick (locked side)">Result</th>
+                      <th className="text-center p-2" title="Result of the PRED action (UP/DOWN) vs actual settle. SKIP → —.">PRED Result</th>
                     </tr>
                   </thead>
+
                   <tbody>
                     {s.recent.map((r) => {
                       const rawSide: "YES" | "NO" = r.modelProb >= 0.5 ? "YES" : "NO";
@@ -931,6 +1045,16 @@ function ModelAccuracyPanel() {
                           {r.wasCorrect === true && <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>}
                           {r.wasCorrect === false && <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>}
                           {r.wasCorrect === null && <span className="text-muted-foreground">pending</span>}
+                        </td>
+                        <td className="p-2 text-center">
+                          {(() => {
+                            const action = predActionFor(r);
+                            if (action === "SKIP") return <span className="text-muted-foreground">—</span>;
+                            const res = predResultFor(r);
+                            if (res === true) return <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>;
+                            if (res === false) return <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>;
+                            return <span className="text-muted-foreground">pending</span>;
+                          })()}
                         </td>
                       </tr>
                       );
