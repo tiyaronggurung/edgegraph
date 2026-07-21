@@ -1053,29 +1053,19 @@ function ModelAccuracyPanel() {
                                 : `PRED ${locked.action} · ask ${Math.round(locked.ask * 100)}¢ · edge ${locked.edge.toFixed(1)} · locked`;
                               return <span className={cls} title={title}>🔒 {locked.action}</span>;
                             }
-                            // Fallback: live PRED formula (no locked record for this ticker).
-                            const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
-                            const edgeOk = Math.abs(r.edgePts) >= 3;
-                            const askOk = sideAsk >= 0.50 && sideAsk <= 0.78;
-                            const flipOk = !r.liveSide || r.liveSide === r.side;
-                            if (edgeOk && askOk && flipOk) {
-                              const action = r.side === "YES" ? "UP" : "DOWN";
-                              return (
-                                <span
-                                  className={r.side === "YES" ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}
-                                  title={`PRED ${action} · ask ${Math.round(sideAsk * 100)}¢ · edge ${r.edgePts.toFixed(1)} · live`}
-                                >
-                                  {action}
-                                </span>
-                              );
-                            }
-                            const reasons: string[] = [];
-                            if (!edgeOk) reasons.push(`edge ${r.edgePts.toFixed(1)}`);
-                            if (!askOk) reasons.push(`ask ${Math.round(sideAsk * 100)}¢`);
-                            if (!flipOk) reasons.push("flip");
+                            // Fallback: no locked record for this ticker
+                            // (historical row seen after settle). We lack
+                            // T-15m ask/edge, so gating by settle-time price
+                            // would spuriously SKIP most rows. Show the
+                            // model's side as PRED action so results score.
+                            const action = r.side === "YES" ? "UP" : "DOWN";
+                            const settleAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
                             return (
-                              <span className="text-muted-foreground" title={`SKIP · ${reasons.join(" · ")} · live`}>
-                                SKIP
+                              <span
+                                className={r.side === "YES" ? "text-emerald-400/80" : "text-red-400/80"}
+                                title={`PRED ${action} · historical (no live lock) · settle ask ${Math.round(settleAsk * 100)}¢ · edge ${r.edgePts.toFixed(1)}`}
+                              >
+                                {action}
                               </span>
                             );
                           })()}
