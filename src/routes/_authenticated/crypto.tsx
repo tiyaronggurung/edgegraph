@@ -767,14 +767,18 @@ function ModelAccuracyPanel() {
   // ---- PRED action per row: prefer the locked verdict (persisted by
   // PredBetPanel), else fall back to the live formula for historical rows
   // never seen while their window was open.
-  const predActionFor = (r: { ticker: string; side: "YES" | "NO"; marketYesPrice: number; edgePts: number; liveSide: "YES" | "NO" | null; }): "UP" | "DOWN" | "SKIP" => {
+  const predActionFor = (r: { ticker: string; side: "YES" | "NO"; modelProb: number; marketYesPrice: number; edgePts: number; liveSide: "YES" | "NO" | null; }): "UP" | "DOWN" | "SKIP" => {
     const locked = predVerdicts[r.ticker];
     if (locked) return locked.action;
+    // Fallback for rows never seen while their window was open — mirror the
+    // LIVE PredBetPanel gate exactly (edge, ask band, flip, side-confidence).
     const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
-    const edgeOk = Math.abs(r.edgePts) >= 3;
-    const askOk = sideAsk >= 0.50 && sideAsk <= 0.78;
+    const sideConf = r.side === "YES" ? r.modelProb : 1 - r.modelProb;
+    const edgeOk = Math.abs(r.edgePts) >= PRED_MIN_EDGE_ABS;
+    const askOk = sideAsk >= PRED_MIN_ASK && sideAsk <= PRED_MAX_ASK;
     const flipOk = !r.liveSide || r.liveSide === r.side;
-    if (edgeOk && askOk && flipOk) return r.side === "YES" ? "UP" : "DOWN";
+    const confOk = sideConf >= PRED_MIN_SIDE_CONF;
+    if (edgeOk && askOk && flipOk && confOk) return r.side === "YES" ? "UP" : "DOWN";
     return "SKIP";
   };
   // WIN iff PRED action matches which side actually settled. SKIP → null.
