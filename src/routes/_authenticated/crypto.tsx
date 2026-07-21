@@ -1226,6 +1226,15 @@ function PredBetPanel() {
     }
     if (lockedVerdict?.ticker !== activeWindow.ticker) {
       setLockedVerdict({ ticker: activeWindow.ticker, verdict: liveVerdict });
+      if (liveVerdict) {
+        writePredVerdict(activeWindow.ticker, {
+          action: liveVerdict.action,
+          ask: liveVerdict.ask,
+          edge: liveVerdict.edge,
+          reasons: liveVerdict.reasons,
+          lockedAt: Date.now(),
+        });
+      }
     }
   }, [activeWindow, liveVerdict, lockedVerdict]);
 
