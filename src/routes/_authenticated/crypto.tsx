@@ -691,12 +691,42 @@ function ModelAccuracyPanel() {
   });
   const s = q.data;
 
-  // Locked PRED verdicts persisted by PredBetPanel (localStorage). Re-read on
-  // mount, on cross-tab storage events, and on the custom update event.
+  // Locked PRED verdicts. Merges server-persisted locks (device-independent,
+  // durable) with localStorage locks (fast/instant), giving server precedence
+  // when both exist for the same ticker.
   const [predVerdicts, setPredVerdicts] = useState<Record<string, PredLockedRecord>>({});
+  const listPredLocksFn = useServerFn(listPredLocks);
+  const predLocksQ = useQuery({
+    queryKey: ["pred-locks"],
+    queryFn: () => listPredLocksFn(),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
   useEffect(() => {
-    const refresh = () => setPredVerdicts(readPredVerdicts());
-    refresh();
+    const local = readPredVerdicts();
+    const serverRows = predLocksQ.data?.rows ?? [];
+    const merged: Record<string, PredLockedRecord> = { ...local };
+    for (const row of serverRows) {
+      const action = (row.side ?? "SKIP") as "UP" | "DOWN" | "SKIP";
+      const v2Action = ((row.v2_action ?? row.side) ?? "SKIP") as "UP" | "DOWN" | "SKIP";
+      merged[row.ticker] = {
+        action,
+        ask: Number(row.ask ?? 0),
+        edge: Number(row.edge ?? 0),
+        reasons: [],
+        lockedAt: row.locked_at ? new Date(row.locked_at).getTime() : Date.now(),
+        taScore: undefined,
+        v2Action,
+        v2Reasons: row.v2_reason ? String(row.v2_reason).split(",") : [],
+      };
+    }
+    setPredVerdicts(merged);
+  }, [predLocksQ.data]);
+  useEffect(() => {
+    const refresh = () => {
+      const local = readPredVerdicts();
+      setPredVerdicts((prev) => ({ ...prev, ...local }));
+    };
     const onStorage = (e: StorageEvent) => { if (e.key === PRED_BET_LS_VERDICTS) refresh(); };
     window.addEventListener("storage", onStorage);
     window.addEventListener("crypto.predBet.verdicts.updated", refresh as EventListener);
