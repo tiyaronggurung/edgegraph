@@ -728,17 +728,15 @@ function ModelAccuracyPanel() {
   );
 
   // ---- PRED action per row: prefer the locked verdict (persisted by
-  // PredBetPanel), else fall back to the live formula for historical rows
-  // never seen while their window was open.
+  // PredBetPanel). For historical rows without a locked record we don't
+  // have T-15m snapshot data (ask/edge at lock time), so gating by the
+  // *settle-time* ask would incorrectly SKIP most rows (market pins near
+  // 1¢/99¢ at close). Fall back to the model's picked side so PRED Result
+  // is scoreable across the full history.
   const predActionFor = (r: { ticker: string; side: "YES" | "NO"; marketYesPrice: number; edgePts: number; liveSide: "YES" | "NO" | null; }): "UP" | "DOWN" | "SKIP" => {
     const locked = predVerdicts[r.ticker];
     if (locked) return locked.action;
-    const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
-    const edgeOk = Math.abs(r.edgePts) >= 3;
-    const askOk = sideAsk >= 0.50 && sideAsk <= 0.78;
-    const flipOk = !r.liveSide || r.liveSide === r.side;
-    if (edgeOk && askOk && flipOk) return r.side === "YES" ? "UP" : "DOWN";
-    return "SKIP";
+    return r.side === "YES" ? "UP" : "DOWN";
   };
   // WIN iff PRED action matches which side actually settled. SKIP → null.
   const predResultFor = (r: { ticker: string; side: "YES" | "NO"; marketYesPrice: number; edgePts: number; liveSide: "YES" | "NO" | null; wasCorrect: boolean | null; }): boolean | null => {
