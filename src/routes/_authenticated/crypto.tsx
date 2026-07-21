@@ -782,7 +782,7 @@ function ModelAccuracyPanel() {
     return "SKIP";
   };
   // WIN iff PRED action matches which side actually settled. SKIP → null.
-  const predResultFor = (r: { ticker: string; side: "YES" | "NO"; marketYesPrice: number; edgePts: number; liveSide: "YES" | "NO" | null; wasCorrect: boolean | null; }): boolean | null => {
+  const predResultFor = (r: { ticker: string; side: "YES" | "NO"; modelProb: number; marketYesPrice: number; edgePts: number; liveSide: "YES" | "NO" | null; wasCorrect: boolean | null; }): boolean | null => {
     if (r.wasCorrect == null) return null;
     const action = predActionFor(r);
     if (action === "SKIP") return null;
