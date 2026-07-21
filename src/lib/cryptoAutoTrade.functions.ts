@@ -44,6 +44,18 @@ const LIVE_LATE_SL_FRAC = 0.20;           // #2 tighter SL fraction near expiry 
 const LIVE_COINFLIP_BAND = 0.05;          // #4 |ask - 0.5| below this = coinflip zone
 const LIVE_COINFLIP_MIN_SIGMA = 1.5;      // #4 need this much sigma to trade coinflip prices
 
+// ── Phase 1: Green-hour whitelist gate (live only) ──
+// 30d backtest by UTC settlement hour: these 8 hours net +$928 @ 70.7% WR.
+// All other hours net −$1039. Live fires outside this set are skipped with
+// reason `red_hour_of_day` and shadow-logged (would_have_* filled at settle).
+// Re-tune monthly by re-running the hour-of-day WR/P&L analysis.
+const LIVE_GREEN_HOURS_UTC = new Set<number>([8, 11, 12, 16, 19, 20, 21, 22]);
+// 7d rolling WR kill-switch on green-hour live fires. If ≥20 settled fires
+// in the last 7d land below this WR, all live auto-trade fires pause with
+// reason `killswitch_7d_wr_low` until the rolling window recovers.
+const LIVE_KILLSWITCH_MIN_N = 20;
+const LIVE_KILLSWITCH_MIN_WR = 0.55;
+
 // ── Kalshi-leaned primary + model-side disagreement probe ──
 // Primary bet follows the leg Kalshi prices as favorite (yesPrice ≥ threshold
 // → YES, ≤ 1-threshold → NO). Model gates still evaluate on the model-picked
@@ -305,6 +317,37 @@ export async function runAutoTradeCore(
         perSymbolPnl.set(r.ticker, (perSymbolPnl.get(r.ticker) ?? 0) + (Number(r.pnl_usd) || 0));
         if (r.settled_at && r.settled_at >= cooldownCutoff) cooldownTickers.add(r.ticker);
       }
+    }
+
+    // ── Phase 1: 7d rolling WR kill-switch on green-hour live fires ──
+    // Auto-pause live fires when the green-hour subset degrades below the
+    // break-even band. Read-only; failure is non-blocking.
+    let killswitchActive = false;
+    let killswitchInfo = "";
+    if (isLive) {
+      try {
+        const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: kRows } = await supabase
+          .from("auto_trade_orders")
+          .select("pnl_usd, settled_at, created_at")
+          .eq("user_id", userId)
+          .eq("mode", "live")
+          .not("settled_at", "is", null)
+          .gte("settled_at", since7d);
+        const rows = (kRows ?? []) as Array<{ pnl_usd: number | null; settled_at: string | null; created_at: string | null }>;
+        const greenRows = rows.filter(r => {
+          const ts = r.created_at ? new Date(r.created_at) : null;
+          return ts && LIVE_GREEN_HOURS_UTC.has(ts.getUTCHours());
+        });
+        if (greenRows.length >= LIVE_KILLSWITCH_MIN_N) {
+          const wins = greenRows.filter(r => (Number(r.pnl_usd) || 0) > 0).length;
+          const wr = wins / greenRows.length;
+          if (wr < LIVE_KILLSWITCH_MIN_WR) {
+            killswitchActive = true;
+            killswitchInfo = `killswitch_7d_wr_low: green-hr 7d WR ${(wr * 100).toFixed(1)}% (${wins}/${greenRows.length}) < ${(LIVE_KILLSWITCH_MIN_WR * 100).toFixed(0)}% — auto-trade paused`;
+          }
+        }
+      } catch { /* non-blocking */ }
     }
 
     const result = await computeBtcMarkets();
@@ -630,6 +673,21 @@ export async function runAutoTradeCore(
           return { m, effectiveEdge: m.edgeAbs + aligned, equityAdj: aligned };
         })
         .filter(({ m, effectiveEdge, equityAdj }) => {
+          // ── Phase 1 gate #0: kill-switch (7d green-hr WR too low) ──
+          if (isLive && killswitchActive) {
+            skipReasons.push(`${m.ticker}: ${killswitchInfo}`); logSkip(m, killswitchInfo); return false;
+          }
+          // ── Phase 1 gate #1: green-hour whitelist (UTC hour of settlement) ──
+          // Uses close time when available, else "now" (fires happen within the
+          // same UTC hour they settle in for 15m windows).
+          if (isLive) {
+            const closeMs = m.closeTime ? Date.parse(m.closeTime) : (Date.now() + m.secondsToClose * 1000);
+            const hourUtc = new Date(closeMs).getUTCHours();
+            if (!LIVE_GREEN_HOURS_UTC.has(hourUtc)) {
+              const r = `red_hour_of_day: ${hourUtc.toString().padStart(2, "0")}:00 UTC not in green-hr whitelist [08,11,12,16,19,20,21,22] (30d backtest: red hrs −$1039)`;
+              skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
+            }
+          }
           if (modelGateActive) {
             const g = modelGateResults.get(`${m.ticker}|${m.side}`);
             if (g && !g.allow) {
