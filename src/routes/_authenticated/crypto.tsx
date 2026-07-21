@@ -1135,10 +1135,46 @@ function ModelBetPanel() {
 // ============================================================
 const PRED_BET_LS_ENABLED = "crypto.predBet";
 const PRED_BET_LS_TICKERS = "crypto.predBet.tickers";
+const PRED_BET_LS_VERDICTS = "crypto.predBet.verdicts";
+const PRED_BET_VERDICTS_MAX = 500;
 const PRED_BET_STAKE = 10;
 const PRED_MIN_EDGE_ABS = 3;
 const PRED_MIN_ASK = 0.50;
 const PRED_MAX_ASK = 0.78;
+
+type PredLockedRecord = {
+  action: "UP" | "DOWN" | "SKIP";
+  ask: number;
+  edge: number;
+  reasons: string[];
+  lockedAt: number;
+};
+
+function readPredVerdicts(): Record<string, PredLockedRecord> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(PRED_BET_LS_VERDICTS);
+    return raw ? (JSON.parse(raw) as Record<string, PredLockedRecord>) : {};
+  } catch { return {}; }
+}
+
+function writePredVerdict(ticker: string, rec: PredLockedRecord) {
+  if (typeof window === "undefined") return;
+  try {
+    const all = readPredVerdicts();
+    if (all[ticker]) return; // never overwrite once locked
+    all[ticker] = rec;
+    const entries = Object.entries(all);
+    if (entries.length > PRED_BET_VERDICTS_MAX) {
+      entries.sort((a, b) => (a[1].lockedAt ?? 0) - (b[1].lockedAt ?? 0));
+      const trimmed = Object.fromEntries(entries.slice(-PRED_BET_VERDICTS_MAX));
+      window.localStorage.setItem(PRED_BET_LS_VERDICTS, JSON.stringify(trimmed));
+    } else {
+      window.localStorage.setItem(PRED_BET_LS_VERDICTS, JSON.stringify(all));
+    }
+    window.dispatchEvent(new CustomEvent("crypto.predBet.verdicts.updated"));
+  } catch { /* ignore */ }
+}
 
 function PredBetPanel() {
   const runFn = useServerFn(runAutoTrade);
