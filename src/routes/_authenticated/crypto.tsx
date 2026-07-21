@@ -1763,8 +1763,9 @@ function PredVerdictBox({ verdict, locked, closeTime, ticker }: { verdict: PredV
     if (!closeTime) return null;
     const end = new Date(closeTime);
     if (isNaN(end.getTime())) return null;
-    const start = new Date(end.getTime() - 15 * 60_000);
-    const timePart = start.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
+    // Match the Model Accuracy Log "Closed" column: show the window CLOSE
+    // time (the ticker's settle moment), not the window open time.
+    const timePart = end.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
     return ticker ? `${timePart} · ${ticker}` : timePart;
   })();
 
