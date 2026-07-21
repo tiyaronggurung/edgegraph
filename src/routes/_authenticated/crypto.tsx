@@ -1348,6 +1348,15 @@ function PredBetPanel() {
   const [lastFired, setLastFired] = useState<string | null>(null);
   const [lastSkip, setLastSkip] = useState<string | null>(null);
 
+  // Shadow-only: chart verdict at lock time drives PRED v2 (TA-align).
+  // No influence on live PRED fires — pure logging for A/B comparison.
+  const chartV = useChartVerdict();
+  const taBiasNow: "up" | "down" | "flat" = !chartV.ready
+    ? "flat"
+    : chartV.score >= 55 ? "up"
+    : chartV.score <= 45 ? "down"
+    : "flat";
+
   // Locked verdict: snapshot the first pred-formula result for each active
   // window and hold it fixed until that window closes or a new one starts.
   const [lockedVerdict, setLockedVerdict] = useState<{ ticker: string; verdict: PredVerdict } | null>(null);
@@ -1386,16 +1395,35 @@ function PredBetPanel() {
     if (lockedVerdict?.ticker !== activeWindow.ticker) {
       setLockedVerdict({ ticker: activeWindow.ticker, verdict: liveVerdict });
       if (liveVerdict) {
+        // ---- PRED v2 (shadow): base action + TA-align filter ----
+        // v2 SKIPs when: base SKIPs, OR TA bias directly opposes the action.
+        // Neutral TA ("flat") is allowed (permissive align-or-neutral).
+        let v2Action: "UP" | "DOWN" | "SKIP" = liveVerdict.action;
+        const v2Reasons: string[] = [...liveVerdict.reasons];
+        if (liveVerdict.action !== "SKIP") {
+          const disagree =
+            (liveVerdict.action === "UP" && taBiasNow === "down") ||
+            (liveVerdict.action === "DOWN" && taBiasNow === "up");
+          if (disagree) {
+            v2Action = "SKIP";
+            v2Reasons.push(`ta ${taBiasNow}`);
+          }
+        }
         writePredVerdict(activeWindow.ticker, {
           action: liveVerdict.action,
           ask: liveVerdict.ask,
           edge: liveVerdict.edge,
           reasons: liveVerdict.reasons,
           lockedAt: Date.now(),
+          taBias: taBiasNow,
+          taScore: chartV.ready ? chartV.score : undefined,
+          v2Action,
+          v2Reasons,
         });
       }
     }
-  }, [activeWindow, liveVerdict, lockedVerdict]);
+  }, [activeWindow, liveVerdict, lockedVerdict, taBiasNow, chartV.ready, chartV.score]);
+
 
   const verdict = lockedVerdict?.verdict ?? liveVerdict;
 
