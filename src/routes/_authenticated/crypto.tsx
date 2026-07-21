@@ -1093,6 +1093,16 @@ function ModelAccuracyPanel() {
                             return <span className="text-muted-foreground">pending</span>;
                           })()}
                         </td>
+                        <td className="p-2 text-center">
+                          {(() => {
+                            const action = predV2ActionFor(r);
+                            if (action === "SKIP") return <span className="text-muted-foreground/60">—</span>;
+                            const res = predV2ResultFor(r);
+                            if (res === true) return <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>;
+                            if (res === false) return <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>;
+                            return <span className="text-muted-foreground">pending</span>;
+                          })()}
+                        </td>
                       </tr>
                       );
                     })}
