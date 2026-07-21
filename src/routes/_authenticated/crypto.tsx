@@ -881,8 +881,21 @@ function ModelAccuracyPanel() {
                         */}
                         <td className="p-2">
                           {(() => {
-                            // PRED formula (matches PredBetPanel.computeVerdict):
-                            // Value pick side · |edge|≥3pt · ask 50–78¢ · no live flip
+                            // Prefer the locked verdict persisted by PredBetPanel;
+                            // fall back to live formula for historical rows never seen while open.
+                            const locked = predVerdicts[r.ticker];
+                            if (locked) {
+                              const cls = locked.action === "UP"
+                                ? "text-emerald-400 font-semibold"
+                                : locked.action === "DOWN"
+                                  ? "text-red-400 font-semibold"
+                                  : "text-muted-foreground";
+                              const title = locked.action === "SKIP"
+                                ? `PRED SKIP · ${(locked.reasons || []).join(" · ") || "no setup"} · locked`
+                                : `PRED ${locked.action} · ask ${Math.round(locked.ask * 100)}¢ · edge ${locked.edge.toFixed(1)} · locked`;
+                              return <span className={cls} title={title}>🔒 {locked.action}</span>;
+                            }
+                            // Fallback: live PRED formula (no locked record for this ticker).
                             const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
                             const edgeOk = Math.abs(r.edgePts) >= 3;
                             const askOk = sideAsk >= 0.50 && sideAsk <= 0.78;
@@ -892,7 +905,7 @@ function ModelAccuracyPanel() {
                               return (
                                 <span
                                   className={r.side === "YES" ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}
-                                  title={`PRED ${action} · ask ${Math.round(sideAsk * 100)}¢ · edge ${r.edgePts.toFixed(1)}`}
+                                  title={`PRED ${action} · ask ${Math.round(sideAsk * 100)}¢ · edge ${r.edgePts.toFixed(1)} · live`}
                                 >
                                   {action}
                                 </span>
@@ -903,7 +916,7 @@ function ModelAccuracyPanel() {
                             if (!askOk) reasons.push(`ask ${Math.round(sideAsk * 100)}¢`);
                             if (!flipOk) reasons.push("flip");
                             return (
-                              <span className="text-muted-foreground" title={`SKIP · ${reasons.join(" · ")}`}>
+                              <span className="text-muted-foreground" title={`SKIP · ${reasons.join(" · ")} · live`}>
                                 SKIP
                               </span>
                             );
