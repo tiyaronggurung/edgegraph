@@ -960,6 +960,7 @@ function ModelAccuracyPanel() {
                       {/* Live column hidden (kept in data model); replaced by PRED column below */}
                       {/* <th className="text-left p-2" title="Live side = chart+model+drift combined; flips mid-window when chart & anchor drift confirm the opposite direction. Auto-trader probe uses this.">Live</th> */}
                       <th className="text-left p-2" title="PRED verdict for this 15m window: Value pick where |edge|≥3pt AND ask 50–78¢ AND no live flip. Otherwise SKIP.">PRED</th>
+                      <th className="text-left p-2" title="PRED v2 (SHADOW · no live impact): base PRED + TA-align filter. SKIPs when chart verdict opposes the PRED side. Only populated for tickers locked live.">PRED v2</th>
                       <th className="text-right p-2">Strike</th>
                       <th className="text-right p-2">Model%</th>
                       <th className="text-right p-2">Market¢</th>
@@ -967,6 +968,7 @@ function ModelAccuracyPanel() {
                       <th className="text-right p-2">Settle</th>
                       <th className="text-center p-2" title="Result of the Value pick (locked side)">Result</th>
                       <th className="text-center p-2" title="Result of the PRED action (UP/DOWN) vs actual settle. SKIP → —.">PRED Result</th>
+                      <th className="text-center p-2" title="SHADOW: result of PRED v2 (TA-align). SKIP → —.">v2 Result</th>
                     </tr>
                   </thead>
 
