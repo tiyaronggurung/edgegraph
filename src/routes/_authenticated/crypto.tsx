@@ -1347,7 +1347,7 @@ function PredBetPanel() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <PredVerdictBox verdict={verdict} locked={!!lockedVerdict} />
+          <PredVerdictBox verdict={verdict} locked={!!lockedVerdict} closeTime={activeWindow?.closeTime ?? null} />
           <div className="flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">
             {firing && <Loader2 className="h-3 w-3 animate-spin" />}
             {lastFired && <span>last: {lastFired}</span>}
@@ -1361,7 +1361,7 @@ function PredBetPanel() {
 
 type PredVerdict = { action: "UP" | "DOWN" | "SKIP"; ask: number; edge: number; reasons: string[] } | null;
 
-function PredVerdictBox({ verdict, locked }: { verdict: PredVerdict; locked?: boolean }) {
+function PredVerdictBox({ verdict, locked, closeTime }: { verdict: PredVerdict; locked?: boolean; closeTime?: string | null }) {
   const action = verdict?.action ?? "SKIP";
   const cfg =
     action === "UP"
@@ -1374,6 +1374,15 @@ function PredVerdictBox({ verdict, locked }: { verdict: PredVerdict; locked?: bo
     : action === "SKIP"
     ? verdict.reasons.slice(0, 2).join(" · ") || "no setup"
     : `ask ${Math.round(verdict.ask * 100)}¢ · edge ${verdict.edge.toFixed(1)}`;
+
+  const windowLabel = (() => {
+    if (!closeTime) return null;
+    const end = new Date(closeTime);
+    if (isNaN(end.getTime())) return null;
+    const start = new Date(end.getTime() - 15 * 60_000);
+    const fmt = (d: Date) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+    return `${fmt(start)}–${fmt(end)}`;
+  })();
 
   return (
     <div className="relative rounded-md p-[2px] overflow-hidden" title={locked ? "Verdict locked for this window" : undefined}>
@@ -1394,6 +1403,9 @@ function PredVerdictBox({ verdict, locked }: { verdict: PredVerdict; locked?: bo
           {locked && <span className="text-[9px] opacity-70">🔒</span>}
           {cfg.label}
         </div>
+        {windowLabel && (
+          <div className="text-[9px] text-muted-foreground/80 leading-tight mt-0.5 tabular-nums">{windowLabel}</div>
+        )}
         <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">{subtitle}</div>
       </div>
     </div>
