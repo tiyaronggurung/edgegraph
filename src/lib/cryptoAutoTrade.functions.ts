@@ -681,8 +681,7 @@ export async function runAutoTradeCore(
           // Uses close time when available, else "now" (fires happen within the
           // same UTC hour they settle in for 15m windows).
           if (isLive) {
-            const closeMs = (m as { closeMs?: number; closeIso?: string }).closeMs
-              ?? ((m as { closeIso?: string }).closeIso ? new Date((m as { closeIso: string }).closeIso).getTime() : Date.now());
+            const closeMs = m.closeTime ? Date.parse(m.closeTime) : (Date.now() + m.secondsToClose * 1000);
             const hourUtc = new Date(closeMs).getUTCHours();
             if (!LIVE_GREEN_HOURS_UTC.has(hourUtc)) {
               const r = `red_hour_of_day: ${hourUtc.toString().padStart(2, "0")}:00 UTC not in green-hr whitelist [08,11,12,16,19,20,21,22] (30d backtest: red hrs −$1039)`;
