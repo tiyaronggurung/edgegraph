@@ -684,6 +684,21 @@ function ModelAccuracyPanel() {
   });
   const s = q.data;
 
+  // Locked PRED verdicts persisted by PredBetPanel (localStorage). Re-read on
+  // mount, on cross-tab storage events, and on the custom update event.
+  const [predVerdicts, setPredVerdicts] = useState<Record<string, PredLockedRecord>>({});
+  useEffect(() => {
+    const refresh = () => setPredVerdicts(readPredVerdicts());
+    refresh();
+    const onStorage = (e: StorageEvent) => { if (e.key === PRED_BET_LS_VERDICTS) refresh(); };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("crypto.predBet.verdicts.updated", refresh as EventListener);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("crypto.predBet.verdicts.updated", refresh as EventListener);
+    };
+  }, []);
+
   const listTripleFn = useServerFn(listTripleWindows);
   // Only refetch triple-window when the SET of tickers changes, not on every stats poll.
   const tickers = useMemo(() => (s?.recent ?? []).map(r => r.ticker), [s]);
@@ -866,8 +881,21 @@ function ModelAccuracyPanel() {
                         */}
                         <td className="p-2">
                           {(() => {
-                            // PRED formula (matches PredBetPanel.computeVerdict):
-                            // Value pick side · |edge|≥3pt · ask 50–78¢ · no live flip
+                            // Prefer the locked verdict persisted by PredBetPanel;
+                            // fall back to live formula for historical rows never seen while open.
+                            const locked = predVerdicts[r.ticker];
+                            if (locked) {
+                              const cls = locked.action === "UP"
+                                ? "text-emerald-400 font-semibold"
+                                : locked.action === "DOWN"
+                                  ? "text-red-400 font-semibold"
+                                  : "text-muted-foreground";
+                              const title = locked.action === "SKIP"
+                                ? `PRED SKIP · ${(locked.reasons || []).join(" · ") || "no setup"} · locked`
+                                : `PRED ${locked.action} · ask ${Math.round(locked.ask * 100)}¢ · edge ${locked.edge.toFixed(1)} · locked`;
+                              return <span className={cls} title={title}>🔒 {locked.action}</span>;
+                            }
+                            // Fallback: live PRED formula (no locked record for this ticker).
                             const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
                             const edgeOk = Math.abs(r.edgePts) >= 3;
                             const askOk = sideAsk >= 0.50 && sideAsk <= 0.78;
@@ -877,7 +905,7 @@ function ModelAccuracyPanel() {
                               return (
                                 <span
                                   className={r.side === "YES" ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}
-                                  title={`PRED ${action} · ask ${Math.round(sideAsk * 100)}¢ · edge ${r.edgePts.toFixed(1)}`}
+                                  title={`PRED ${action} · ask ${Math.round(sideAsk * 100)}¢ · edge ${r.edgePts.toFixed(1)} · live`}
                                 >
                                   {action}
                                 </span>
@@ -888,7 +916,7 @@ function ModelAccuracyPanel() {
                             if (!askOk) reasons.push(`ask ${Math.round(sideAsk * 100)}¢`);
                             if (!flipOk) reasons.push("flip");
                             return (
-                              <span className="text-muted-foreground" title={`SKIP · ${reasons.join(" · ")}`}>
+                              <span className="text-muted-foreground" title={`SKIP · ${reasons.join(" · ")} · live`}>
                                 SKIP
                               </span>
                             );
@@ -1135,10 +1163,46 @@ function ModelBetPanel() {
 // ============================================================
 const PRED_BET_LS_ENABLED = "crypto.predBet";
 const PRED_BET_LS_TICKERS = "crypto.predBet.tickers";
+const PRED_BET_LS_VERDICTS = "crypto.predBet.verdicts";
+const PRED_BET_VERDICTS_MAX = 500;
 const PRED_BET_STAKE = 10;
 const PRED_MIN_EDGE_ABS = 3;
 const PRED_MIN_ASK = 0.50;
 const PRED_MAX_ASK = 0.78;
+
+type PredLockedRecord = {
+  action: "UP" | "DOWN" | "SKIP";
+  ask: number;
+  edge: number;
+  reasons: string[];
+  lockedAt: number;
+};
+
+function readPredVerdicts(): Record<string, PredLockedRecord> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(PRED_BET_LS_VERDICTS);
+    return raw ? (JSON.parse(raw) as Record<string, PredLockedRecord>) : {};
+  } catch { return {}; }
+}
+
+function writePredVerdict(ticker: string, rec: PredLockedRecord) {
+  if (typeof window === "undefined") return;
+  try {
+    const all = readPredVerdicts();
+    if (all[ticker]) return; // never overwrite once locked
+    all[ticker] = rec;
+    const entries = Object.entries(all);
+    if (entries.length > PRED_BET_VERDICTS_MAX) {
+      entries.sort((a, b) => (a[1].lockedAt ?? 0) - (b[1].lockedAt ?? 0));
+      const trimmed = Object.fromEntries(entries.slice(-PRED_BET_VERDICTS_MAX));
+      window.localStorage.setItem(PRED_BET_LS_VERDICTS, JSON.stringify(trimmed));
+    } else {
+      window.localStorage.setItem(PRED_BET_LS_VERDICTS, JSON.stringify(all));
+    }
+    window.dispatchEvent(new CustomEvent("crypto.predBet.verdicts.updated"));
+  } catch { /* ignore */ }
+}
 
 function PredBetPanel() {
   const runFn = useServerFn(runAutoTrade);
@@ -1190,6 +1254,15 @@ function PredBetPanel() {
     }
     if (lockedVerdict?.ticker !== activeWindow.ticker) {
       setLockedVerdict({ ticker: activeWindow.ticker, verdict: liveVerdict });
+      if (liveVerdict) {
+        writePredVerdict(activeWindow.ticker, {
+          action: liveVerdict.action,
+          ask: liveVerdict.ask,
+          edge: liveVerdict.edge,
+          reasons: liveVerdict.reasons,
+          lockedAt: Date.now(),
+        });
+      }
     }
   }, [activeWindow, liveVerdict, lockedVerdict]);
 
