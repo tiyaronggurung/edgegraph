@@ -14,6 +14,8 @@ export const Route = createFileRoute("/_authenticated/crypto-sandbox")({
       { name: "description", content: "Paper-money sandbox for Model, PRED, and Green Hours auto-bet strategies. No real money is placed." },
       { property: "og:title", content: "Paper Sandbox — BTC 15-min" },
       { property: "og:description", content: "Paper-money sandbox for Model, PRED, and Green Hours auto-bet strategies. No real money is placed." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: CryptoPaperPage,

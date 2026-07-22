@@ -71,6 +71,10 @@ export const Route = createFileRoute("/_authenticated/crypto")({
     meta: [
       { title: "Crypto Predictions — BTC 15min Up/Down — EdgeGraph AI" },
       { name: "description", content: "Live model predictions for Kalshi BTC 15-minute up/down markets with edge vs market price." },
+      { property: "og:title", content: "Crypto Predictions — BTC 15min Up/Down — EdgeGraph AI" },
+      { property: "og:description", content: "Live model predictions for Kalshi BTC 15-minute up/down markets with edge vs market price." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   // Fire-and-forget prefetch of the three hottest queries so they load in

@@ -18,6 +18,8 @@ export const Route = createFileRoute("/_authenticated/crypto-paper")({
       { name: "description", content: "$100 paper bankroll with per-button fill logs for Model, PRED, and Green Hours bets." },
       { property: "og:title", content: "Paper Trading — BettingGraph" },
       { property: "og:description", content: "$100 paper bankroll with per-button fill logs for Model, PRED, and Green Hours bets." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: PaperTradingPage,
