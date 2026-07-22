@@ -2397,7 +2397,7 @@ function BigFlipMonitor() {
             lastToastKey.current = key;
             const ask = row.min_ask_cents ?? row.new_yes;
             const conf = row.model_side_conf != null ? `${(Number(row.model_side_conf) * 100).toFixed(0)}%` : "?";
-            toast.success(`🎯 CHEAP FLIP → ${row.to_side} @ ${ask}¢ · PAPER $10`, {
+            toast.success(`🎯 CHEAP FLIP → ${row.to_side} @ ${ask}¢ · LIVE $10`, {
               description: `model conf ${conf} · ${row.seconds_to_close}s left`,
             });
             try { playOrderPlaced(); } catch { /* noop */ }
