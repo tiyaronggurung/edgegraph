@@ -17,7 +17,7 @@ export interface PaperFillRow {
   id: string;
   ticker: string;
   close_time: string;
-  button: "model" | "pred" | "green_hours" | "manual" | "t5m";
+  button: "model" | "pred" | "green_hours" | "manual" | "t5m" | "cheap_flip";
   side: "YES" | "NO";
   contracts: number;
   fill_price_cents: number;
