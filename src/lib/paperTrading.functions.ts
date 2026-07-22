@@ -82,11 +82,11 @@ export const getPaperStats = createServerFn({ method: "GET" })
       .from("paper_fills")
       .select("button,status,pnl_cents")
       .eq("user_id", context.userId);
-    const rows = (data ?? []) as Array<{ button: "model"|"pred"|"green_hours"|"manual"|"t5m"; status: string; pnl_cents: number | null }>;
+    const rows = (data ?? []) as Array<{ button: "model"|"pred"|"green_hours"|"manual"|"t5m"|"cheap_flip"; status: string; pnl_cents: number | null }>;
     const empty = () => ({ fires: 0, wins: 0, losses: 0, pnlCents: 0 });
     const stats: PaperStats = {
       total: { fires: 0, wins: 0, losses: 0, open: 0, pnlCents: 0 },
-      byButton: { model: empty(), pred: empty(), green_hours: empty(), manual: empty(), t5m: empty() },
+      byButton: { model: empty(), pred: empty(), green_hours: empty(), manual: empty(), t5m: empty(), cheap_flip: empty() },
     };
     for (const r of rows) {
       stats.total.fires += 1;
