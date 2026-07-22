@@ -1388,7 +1388,8 @@ function ModelBetPanel() {
   }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    // Always-on paper auto-runner — fires regardless of the Model Bet toggle
+    // because all 3 bet buttons are locked to mode:"paper" and touch no real money.
     if (typeof window === "undefined") return;
     let cancelled = false;
     let inFlight = false;
@@ -1732,7 +1733,7 @@ function PredBetPanel() {
   }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    // Always-on paper auto-runner for PRED (paper mode only).
     if (typeof window === "undefined") return;
     let cancelled = false;
     let inFlight = false;
@@ -1916,7 +1917,7 @@ function GreenHoursBetPanel() {
   }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    // Always-on paper auto-runner for Green Hours (paper mode only).
     if (typeof window === "undefined") return;
     let cancelled = false;
     let inFlight = false;
