@@ -136,6 +136,11 @@ function PaperTradingPage() {
         <GreenHoursBetPanel />
       </div>
 
+      {/* Multi-TF shadow (pure logging, no live impact) */}
+      <MultiTfShadowPanel />
+
+
+
 
 
 
