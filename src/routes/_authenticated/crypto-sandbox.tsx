@@ -58,6 +58,7 @@ function CryptoPaperPage() {
         </div>
       </div>
 
+      <T5mBetPanel />
       <ModelBetPanel />
       <GreenHoursBetPanel />
       <PredBetPanel />
