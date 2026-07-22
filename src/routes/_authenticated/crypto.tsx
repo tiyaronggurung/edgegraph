@@ -3545,7 +3545,7 @@ export function PaperBalanceBadge() {
   const label = cents != null ? `$${(cents / 100).toFixed(2)}` : q.isLoading ? "…" : "—";
   return (
     <Link
-      to="/crypto/paper"
+      to="/crypto-paper"
       title={bankrupt ? "Paper bankrupt — go reset" : "Paper balance (click to view fill log)"}
       className={`flex items-center gap-1.5 px-3 py-1.5 border rounded bg-card text-xs font-mono tabular-nums ${bankrupt ? "border-red-500/50 bg-red-500/10" : "border-border"}`}
     >

@@ -41,7 +41,7 @@ function CryptoPaperPage() {
         <div className="flex items-center gap-2">
           <PaperBalanceBadge />
           <Link
-            to="/crypto/paper"
+            to="/crypto-paper"
             className="text-xs uppercase tracking-wider px-3 py-1.5 border border-border rounded hover:bg-card"
           >
             Logs & P&L →
