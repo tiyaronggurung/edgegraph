@@ -204,27 +204,22 @@ export async function settleDuePredictions(): Promise<{ settled: number }> {
 
     if (!due?.length) return { settled: 0 };
 
-    // Prefer Kalshi's official settlement (result + expiration_value).
-    // Fall back to Coinbase spot only when Kalshi hasn't finalized yet.
+    // Kalshi's official settlement (result + expiration_value) is the ONLY
+    // source of truth. Coinbase spot at close_time can differ from Kalshi's
+    // expiration_value by a few dollars and flip the outcome near-strike
+    // (mislabels our model as wrong when it was right). If Kalshi hasn't
+    // finalized yet, leave the row pending — the cron re-runs each minute.
     const results = await Promise.all(due.map(async (r) => {
       const kalshi = await fetchKalshiSettlement(r.ticker as string);
       if (kalshi?.finalized && kalshi.result) {
         return { r, settle: kalshi.expirationValue, outcome: kalshi.result.toUpperCase() as "YES" | "NO" };
       }
-      const closeSec = Math.floor(new Date(r.close_time as string).getTime() / 1000);
-      const settle = await priceAt(closeSec);
-      return { r, settle, outcome: null as "YES" | "NO" | null };
+      return { r, settle: null as number | null, outcome: null as "YES" | "NO" | null };
     }));
 
     let settled = 0;
-    await Promise.all(results.map(async ({ r, settle, outcome: kalshiOutcome }) => {
-      let outcome: "YES" | "NO";
-      if (kalshiOutcome) {
-        outcome = kalshiOutcome;
-      } else {
-        if (settle == null) return;
-        outcome = settle >= Number(r.strike) ? "YES" : "NO";
-      }
+    await Promise.all(results.map(async ({ r, settle, outcome }) => {
+      if (!outcome) return;
       const wasCorrect = outcome === r.side;
       await supabaseAdmin
         .from("btc_model_predictions")
@@ -239,6 +234,7 @@ export async function settleDuePredictions(): Promise<{ settled: number }> {
     }));
 
     return { settled };
+
   } catch (e) {
     console.warn("settleDuePredictions failed:", e);
     return { settled: 0 };
