@@ -3725,8 +3725,12 @@ function CryptoPage() {
 
       {/* Model / PRED / Green Hours bet panels moved to /crypto-paper (paper-only sandbox).
           Components remain exported from this file so the real-money path is preserved. */}
-
       {data && <TopPick markets={data.markets} />}
+
+      {/* Multi-TF shadow (pure logging, no live impact) */}
+      <MultiTfShadowPanel />
+
+
 
       {data && (
         <div className="space-y-2">
