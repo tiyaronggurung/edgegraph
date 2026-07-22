@@ -35,6 +35,7 @@ import { useTripleWindowTracker } from "@/hooks/useTripleWindowTracker";
 import { listTripleWindows, type TripleWindowRow } from "@/lib/polymarketTripleWindow.functions";
 import { savePredLock, listPredLocks } from "@/lib/predLocks.functions";
 import { getAutoTradeGreenStats } from "@/lib/autoTradeGreenStats.functions";
+import { recordPaperFire, getPaperBalance, settleMyPaperFills } from "@/lib/paperTrading.functions";
 
 // Lazy-loaded panels: mounted only when scrolled near the viewport (LazyOnVisible).
 // Keeps first paint fast — these panels don't fire queries or parse JS on load.
@@ -1437,6 +1438,14 @@ function ModelBetPanel() {
           try { playModelBetPing(); } catch { /* noop */ }
           toast.success(`Model Bet $${stake}: ${pick.side === "YES" ? "UP" : "DOWN"} ${pick.ticker} @ ${o.limit_cents}¢`);
           setLastFired(`${pick.ticker} ${pick.side} @ ${o.limit_cents}¢`);
+          try {
+            const r = await recordPaperFire({ data: {
+              ticker: o.ticker, closeTime: o.close_time, button: "model",
+              side: o.side, contracts: o.contracts, fillPriceCents: o.limit_cents,
+              snapshot: { edge: pick.edgePts, prob: pick.modelProb, sideConf: (pick as any).sideConfidence ?? null },
+            }});
+            if (!r.ok) toast.warning(`Paper: ${r.reason}`);
+          } catch (e: any) { /* silent — trade still logged in auto_trade_orders */ }
         } else {
           const realReasons = (res.skipReasons ?? []).filter((r: string) => !/^(equity:|force:)/i.test(r));
           toast.info(`Model Bet skipped ${pick.ticker}: ${(realReasons.length ? realReasons : res.skipReasons ?? []).slice(0, 2).join(" · ") || "no fill"}`);
@@ -1781,6 +1790,14 @@ function PredBetPanel() {
           try { playModelBetPing(); } catch { /* noop */ }
           toast.success(`PRED $${PRED_BET_STAKE}: ${pick.side === "YES" ? "UP" : "DOWN"} ${pick.ticker} @ ${o.limit_cents}¢ · edge ${pick.edgePts.toFixed(1)}`);
           setLastFired(`${pick.ticker} ${pick.side} @ ${o.limit_cents}¢ · edge ${pick.edgePts.toFixed(1)}`);
+          try {
+            const r = await recordPaperFire({ data: {
+              ticker: o.ticker, closeTime: o.close_time, button: "pred",
+              side: o.side, contracts: o.contracts, fillPriceCents: o.limit_cents,
+              snapshot: { edge: pick.edgePts, sideAsk, marketYesPrice: pick.marketYesPrice },
+            }});
+            if (!r.ok) toast.warning(`Paper: ${r.reason}`);
+          } catch { /* silent */ }
         } else {
           const realReasons = (res.skipReasons ?? []).filter((r: string) => !/^(equity:|force:)/i.test(r));
           const reason = (realReasons.length ? realReasons : res.skipReasons ?? []).slice(0, 2).join(" · ") || "no fill";
@@ -1927,6 +1944,14 @@ function GreenHoursBetPanel() {
           const label = `${o.ticker} ${o.side} @ ${o.limit_cents}¢`;
           toast.success(`Green Bet $${GREEN_BET_STAKE}: ${label}`);
           setLastFired(label);
+          try {
+            const r = await recordPaperFire({ data: {
+              ticker: o.ticker, closeTime: o.close_time, button: "green_hours",
+              side: o.side, contracts: o.contracts, fillPriceCents: o.limit_cents,
+              snapshot: { edge: o.edge_pts, prob: o.model_prob, sigmaDist: o.sigma_distance },
+            }});
+            if (!r.ok) toast.warning(`Paper: ${r.reason}`);
+          } catch { /* silent */ }
         } else {
           const realReasons = (res.skipReasons ?? []).filter((r: string) => !/^(equity:|force:)/i.test(r));
           const reason = (realReasons.length ? realReasons : res.skipReasons ?? []).slice(0, 1).join(" · ") || "no candidate";
@@ -3499,6 +3524,36 @@ function KalshiBalanceBadge() {
   );
 }
 
+function PaperBalanceBadge() {
+  const balFn = useServerFn(getPaperBalance);
+  const settleFn = useServerFn(settleMyPaperFills);
+  const q = useQuery({
+    queryKey: ["paperBalance"],
+    queryFn: () => balFn(),
+    refetchInterval: 15_000,
+    staleTime: 10_000,
+  });
+  // Opportunistically settle due paper fills in the background.
+  useEffect(() => {
+    const h = setInterval(() => { settleFn().catch(() => {}); }, 60_000);
+    settleFn().catch(() => {});
+    return () => clearInterval(h);
+  }, [settleFn]);
+  const cents = q.data?.balance_cents ?? null;
+  const bankrupt = !!q.data?.bankrupt_at;
+  const label = cents != null ? `$${(cents / 100).toFixed(2)}` : q.isLoading ? "…" : "—";
+  return (
+    <Link
+      to="/crypto/paper"
+      title={bankrupt ? "Paper bankrupt — go reset" : "Paper balance (click to view fill log)"}
+      className={`flex items-center gap-1.5 px-3 py-1.5 border rounded bg-card text-xs font-mono tabular-nums ${bankrupt ? "border-red-500/50 bg-red-500/10" : "border-border"}`}
+    >
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Paper</span>
+      <span className={bankrupt ? "text-red-300 font-semibold" : "text-sky-300 font-semibold"}>{label}</span>
+    </Link>
+  );
+}
+
 function CryptoPage() {
   const qc = useQueryClient();
   const marketsFn = useServerFn(getBtcMarkets);
@@ -3615,6 +3670,7 @@ function CryptoPage() {
         </div>
         <div className="flex items-center gap-2">
           <KalshiBalanceBadge />
+          <PaperBalanceBadge />
           <button onClick={() => q.refetch()} className="flex items-center gap-1 text-xs uppercase tracking-wider px-3 py-1.5 border border-border rounded hover:bg-card">
             {q.isFetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
           </button>

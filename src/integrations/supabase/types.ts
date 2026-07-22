@@ -3221,6 +3221,90 @@ export type Database = {
         }
         Relationships: []
       }
+      paper_balances: {
+        Row: {
+          balance_cents: number
+          bankrupt_at: string | null
+          created_at: string
+          starting_cents: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance_cents?: number
+          bankrupt_at?: string | null
+          created_at?: string
+          starting_cents?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance_cents?: number
+          bankrupt_at?: string | null
+          created_at?: string
+          starting_cents?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      paper_fills: {
+        Row: {
+          button: string
+          close_time: string
+          contracts: number
+          created_at: string
+          entry_snapshot: Json
+          fill_price_cents: number
+          id: string
+          payout_cents: number | null
+          pnl_cents: number | null
+          settled_at: string | null
+          side: string
+          stake_cents: number
+          status: string
+          ticker: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          button: string
+          close_time: string
+          contracts: number
+          created_at?: string
+          entry_snapshot?: Json
+          fill_price_cents: number
+          id?: string
+          payout_cents?: number | null
+          pnl_cents?: number | null
+          settled_at?: string | null
+          side: string
+          stake_cents?: number
+          status?: string
+          ticker: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          button?: string
+          close_time?: string
+          contracts?: number
+          created_at?: string
+          entry_snapshot?: Json
+          fill_price_cents?: number
+          id?: string
+          payout_cents?: number | null
+          pnl_cents?: number | null
+          settled_at?: string | null
+          side?: string
+          stake_cents?: number
+          status?: string
+          ticker?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       patterns: {
         Row: {
           best_use: string | null
