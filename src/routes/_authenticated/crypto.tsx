@@ -296,17 +296,51 @@ function TopPick({ markets }: { markets: BtcMarket[] }) {
       No high-edge BTC 15m market right now. Model needs ≥3pt edge to issue a top pick.
     </div>
   );
+  const upProb = pick.modelYesProb * 100;
+  const downProb = 100 - upProb;
+  const spotVsStrike = pick.spot - pick.strike;
   return (
     <div className="border border-[color:var(--color-primary)]/60 rounded-lg bg-[color:var(--color-primary)]/5 p-4">
-      <div className="flex items-center gap-2 mb-1">
-        <Zap className="h-4 w-4 text-[color:var(--color-primary)]" />
-        <span className="text-xs uppercase tracking-wider text-[color:var(--color-primary)]">Model Top Pick</span>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2">
+          <Zap className="h-4 w-4 text-[color:var(--color-primary)]" />
+          <span className="text-xs uppercase tracking-wider text-[color:var(--color-primary)]">Model Top Pick</span>
+        </div>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">closes {fmtTime(pick.closeTime)} · {fmtCountdown(pick.secondsToClose)}</span>
       </div>
-      <div className="text-lg font-bold">
-        Bet BTC goes <span className="text-[color:var(--color-primary)]">{dirLabel(pick.side)}</span> from strike {fmt$(pick.strike)} · closes {fmtTime(pick.closeTime)}
+
+      {/* Realtime BTC price + strike delta */}
+      <div className="flex items-baseline gap-3 mb-3">
+        <span className="text-2xl font-bold tabular-nums">{fmt$(pick.spot)}</span>
+        <span className={`text-sm font-semibold tabular-nums ${spotVsStrike >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+          {spotVsStrike >= 0 ? "+" : ""}{fmt$(spotVsStrike)} vs strike {fmt$(pick.strike)}
+        </span>
       </div>
-      <div className="text-sm text-muted-foreground mt-1">
-        Spot {fmt$(pick.spot)} · Model {(pick.modelYesProb*100).toFixed(1)}% vs market {(pick.yesPrice*100).toFixed(0)}¢ · edge {pick.edgePts>=0?"+":""}{pick.edgePts.toFixed(1)}pts
+
+      {/* Realtime UP / DOWN probability bar */}
+      <div className="mb-3">
+        <div className="flex h-6 w-full overflow-hidden rounded border border-border">
+          <div
+            className="flex items-center justify-start pl-2 bg-emerald-500/25 text-emerald-300 text-xs font-bold tabular-nums transition-all"
+            style={{ width: `${Math.max(upProb, 6)}%` }}
+          >
+            ▲ {upProb.toFixed(1)}%
+          </div>
+          <div
+            className="flex items-center justify-end pr-2 bg-rose-500/25 text-rose-300 text-xs font-bold tabular-nums transition-all"
+            style={{ width: `${Math.max(downProb, 6)}%` }}
+          >
+            {downProb.toFixed(1)}% ▼
+          </div>
+        </div>
+        <div className="flex justify-between text-[10px] uppercase tracking-wider text-muted-foreground mt-1">
+          <span>Model UP</span>
+          <span>Model DOWN</span>
+        </div>
+      </div>
+
+      <div className="text-sm font-semibold">
+        Bet BTC goes <span className="text-[color:var(--color-primary)]">{dirLabel(pick.side)}</span> · market {(pick.yesPrice*100).toFixed(0)}¢ · edge {pick.edgePts>=0?"+":""}{pick.edgePts.toFixed(1)}pts
       </div>
     </div>
   );
