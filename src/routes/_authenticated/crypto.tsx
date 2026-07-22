@@ -2371,7 +2371,7 @@ function BigFlipMonitor() {
     const key = `${r.ticker}:${r.flipAt}`;
     if (lastToastKey.current === key) return;
     lastToastKey.current = key;
-    toast.success(`🎯 CHEAP FLIP → ${r.toSide} @ ${r.minAskCents ?? r.newYes}¢ · PAPER $10`, {
+    toast.success(`🎯 CHEAP FLIP → ${r.toSide} @ ${r.minAskCents ?? r.newYes}¢ · LIVE $10`, {
       description: `model conf ${r.modelSideConf != null ? (r.modelSideConf * 100).toFixed(0) : "?"}% · ${r.secondsToClose}s left`,
     });
     try { playOrderPlaced(); } catch { /* noop */ }
@@ -2397,7 +2397,7 @@ function BigFlipMonitor() {
             lastToastKey.current = key;
             const ask = row.min_ask_cents ?? row.new_yes;
             const conf = row.model_side_conf != null ? `${(Number(row.model_side_conf) * 100).toFixed(0)}%` : "?";
-            toast.success(`🎯 CHEAP FLIP → ${row.to_side} @ ${ask}¢ · PAPER $10`, {
+            toast.success(`🎯 CHEAP FLIP → ${row.to_side} @ ${ask}¢ · LIVE $10`, {
               description: `model conf ${conf} · ${row.seconds_to_close}s left`,
             });
             try { playOrderPlaced(); } catch { /* noop */ }
@@ -2459,7 +2459,7 @@ function BigFlipMonitor() {
     return (
       <div className="mt-1 rounded border border-border/50 bg-muted/10 px-2 py-1 text-[10px] font-mono text-muted-foreground flex items-center gap-2">
         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
-        <span>Cheap-flip hunter · PAPER $10 · arm T-9m→T-3m · ask ≤15¢ · model conf ≥70% · cap 6/day · {r.rejectReason ? `skip: ${r.rejectReason}` : "waiting for setup"}</span>
+        <span>Cheap-flip hunter · LIVE $10 · always on · arm T-9m→T-3m · ask ≤15¢ · model conf ≥70% · cap 6/day · {r.rejectReason ? `skip: ${r.rejectReason}` : "waiting for setup"}</span>
       </div>
     );
   }
@@ -2478,7 +2478,7 @@ function BigFlipMonitor() {
       <span className="text-muted-foreground">·</span>
       <span>{r.secondsToClose}s</span>
       <span className="text-muted-foreground">·</span>
-      <span className="text-[10px] uppercase text-muted-foreground">paper only</span>
+      <span className="text-[10px] uppercase text-yellow-300 font-semibold">LIVE $10</span>
       <span className="text-muted-foreground ml-auto">{r.ageSeconds}s ago</span>
     </div>
   );

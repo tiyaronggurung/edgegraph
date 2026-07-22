@@ -1641,8 +1641,11 @@ export type Database = {
       big_flip_signals: {
         Row: {
           detected_at: string
+          fill_count: number | null
+          fill_price_cents: number | null
           flip_at: string
           id: number
+          kalshi_trade_id: string | null
           min_ask_cents: number | null
           model_side_conf: number | null
           new_no: number
@@ -1663,8 +1666,11 @@ export type Database = {
         }
         Insert: {
           detected_at?: string
+          fill_count?: number | null
+          fill_price_cents?: number | null
           flip_at: string
           id?: number
+          kalshi_trade_id?: string | null
           min_ask_cents?: number | null
           model_side_conf?: number | null
           new_no: number
@@ -1685,8 +1691,11 @@ export type Database = {
         }
         Update: {
           detected_at?: string
+          fill_count?: number | null
+          fill_price_cents?: number | null
           flip_at?: string
           id?: number
+          kalshi_trade_id?: string | null
           min_ask_cents?: number | null
           model_side_conf?: number | null
           new_no?: number
@@ -1705,7 +1714,15 @@ export type Database = {
           user_id?: string
           yes_delta?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "big_flip_signals_kalshi_trade_id_fkey"
+            columns: ["kalshi_trade_id"]
+            isOneToOne: false
+            referencedRelation: "crypto_trades"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       btc_calibration: {
         Row: {
