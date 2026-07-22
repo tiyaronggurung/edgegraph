@@ -98,7 +98,7 @@ export const runMultiTfShadow = createServerFn({ method: "POST" }).handler(async
     // TA score (uses same 1m real candles pipeline)
     let taScore = 0; let taReasons: any = null;
     try {
-      const ta = computeTaScore(markets.candles, m.strike, spot);
+      const ta = computeTaScore(markets.candles, candles5m300);
       taScore = ta.score;
       taReasons = ta.reasons;
     } catch {}
