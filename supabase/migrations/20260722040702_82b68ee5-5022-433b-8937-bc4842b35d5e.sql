@@ -1,0 +1,2 @@
+ALTER TABLE public.paper_fills DROP CONSTRAINT paper_fills_button_check;
+ALTER TABLE public.paper_fills ADD CONSTRAINT paper_fills_button_check CHECK (button = ANY (ARRAY['model'::text, 'pred'::text, 'green_hours'::text, 'manual'::text]));
