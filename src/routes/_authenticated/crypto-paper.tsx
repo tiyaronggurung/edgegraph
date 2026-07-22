@@ -29,16 +29,17 @@ export const Route = createFileRoute("/_authenticated/crypto-paper")({
   component: PaperTradingPage,
 });
 
-type ButtonKind = "model" | "pred" | "green_hours" | "manual" | "t5m";
+type ButtonKind = "model" | "pred" | "green_hours" | "manual" | "t5m" | "cheap_flip";
 type PaperFillRow = import("@/lib/paperTrading.functions").PaperFillRow;
-const BUTTON_ORDER: ButtonKind[] = ["model", "pred", "green_hours", "t5m", "manual"];
-const buttonLabel: Record<ButtonKind, string> = { model: "Model", pred: "PRED", green_hours: "Green Hours", manual: "Manual", t5m: "T-5m" };
+const BUTTON_ORDER: ButtonKind[] = ["model", "pred", "green_hours", "t5m", "cheap_flip", "manual"];
+const buttonLabel: Record<ButtonKind, string> = { model: "Model", pred: "PRED", green_hours: "Green Hours", manual: "Manual", t5m: "T-5m", cheap_flip: "Cheap Flip" };
 const buttonTint: Record<ButtonKind, string> = {
   model: "border-sky-500/40 bg-sky-500/10",
   pred: "border-fuchsia-500/40 bg-fuchsia-500/10",
   green_hours: "border-emerald-500/40 bg-emerald-500/10",
   manual: "border-amber-500/40 bg-amber-500/10",
   t5m: "border-cyan-500/40 bg-cyan-500/10",
+  cheap_flip: "border-yellow-500/40 bg-yellow-500/10",
 };
 
 const fmtUsd = (cents: number) => `${cents < 0 ? "-" : ""}$${(Math.abs(cents) / 100).toFixed(2)}`;
