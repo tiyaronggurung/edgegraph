@@ -898,6 +898,12 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
       try { return getChartVerdict(recent, candles5m); }
       catch (e) { console.warn("chart verdict failed:", e); return null; }
     })();
+    // Real TA engine (live-wired): EMA9/21/55/145/169 stack + VWAP + RSI + MACD + BB + patterns.
+    // One computation per snapshot; every market in this snapshot shares it.
+    const taScoreRes: TaScoreResult | null = (() => {
+      try { return computeTaScore(recent, candles5m); }
+      catch (e) { console.warn("ta score failed:", e); return null; }
+    })();
 
     // Apply regime knobs to σ and drift before they feed the diffusion model.
     const sigma = sigmaRaw * (regimeState?.sigmaMult ?? 1);
