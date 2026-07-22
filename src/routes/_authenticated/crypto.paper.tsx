@@ -217,7 +217,7 @@ function StatCard({ label, value, sub, tone }: { label: string; value: string; s
   );
 }
 
-function bestButton(stats: NonNullable<ReturnType<typeof getPaperStats> extends (...args: any[]) => Promise<infer R> ? R : never>): string {
+function bestButton(stats: import("@/lib/paperTrading.functions").PaperStats): string {
   const entries = Object.entries(stats.byButton) as Array<["model" | "pred" | "green_hours", { pnlCents: number; fires: number }]>;
   const withFires = entries.filter(([, v]) => v.fires > 0);
   if (!withFires.length) return "—";
