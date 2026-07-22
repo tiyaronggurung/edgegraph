@@ -2450,6 +2450,180 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_multi_tf_decision_log: {
+        Row: {
+          above_session_vwap: boolean | null
+          atr_5m: number | null
+          bias_1h: string | null
+          bias_monthly: string | null
+          bias_weekly: string | null
+          conflict_reason: string | null
+          created_at: string
+          decision_state: string
+          eligible_to_fire: boolean | null
+          engine_version: string
+          expected_value_after_fees: number | null
+          id: string
+          kalshi_ask: number | null
+          kalshi_bid: number | null
+          mae_usd: number | null
+          mfe_usd: number | null
+          model_prob: number | null
+          multi_tf_result: string | null
+          multi_tf_side: string | null
+          nearest_resistance_distance: number | null
+          nearest_resistance_status: string | null
+          nearest_resistance_touches: number | null
+          nearest_resistance_usd: number | null
+          nearest_support_distance: number | null
+          nearest_support_status: string | null
+          nearest_support_touches: number | null
+          nearest_support_usd: number | null
+          proposed_side: string | null
+          range_pct_24h: number | null
+          range_pct_monthly: number | null
+          range_pct_weekly: number | null
+          seconds_to_close: number
+          settled_close: number | null
+          settled_outcome: string | null
+          side_at_t_minus_1m: string | null
+          side_at_t_minus_2m: string | null
+          side_at_t_minus_30s: string | null
+          side_at_t_minus_3m: string | null
+          side_at_t_minus_5m: string | null
+          side_confidence: number | null
+          side_flip_count: number | null
+          snapshot_at: string
+          spot_price: number | null
+          strike_distance_atr: number | null
+          strike_distance_usd: number | null
+          strike_price: number | null
+          structure_1m: string | null
+          structure_5m: string | null
+          ta_only_result: string | null
+          ta_only_side: string | null
+          ta_reasons: Json | null
+          ta_score: number | null
+          window_close_at: string
+          window_open_at: string
+          window_ticker: string
+        }
+        Insert: {
+          above_session_vwap?: boolean | null
+          atr_5m?: number | null
+          bias_1h?: string | null
+          bias_monthly?: string | null
+          bias_weekly?: string | null
+          conflict_reason?: string | null
+          created_at?: string
+          decision_state: string
+          eligible_to_fire?: boolean | null
+          engine_version?: string
+          expected_value_after_fees?: number | null
+          id?: string
+          kalshi_ask?: number | null
+          kalshi_bid?: number | null
+          mae_usd?: number | null
+          mfe_usd?: number | null
+          model_prob?: number | null
+          multi_tf_result?: string | null
+          multi_tf_side?: string | null
+          nearest_resistance_distance?: number | null
+          nearest_resistance_status?: string | null
+          nearest_resistance_touches?: number | null
+          nearest_resistance_usd?: number | null
+          nearest_support_distance?: number | null
+          nearest_support_status?: string | null
+          nearest_support_touches?: number | null
+          nearest_support_usd?: number | null
+          proposed_side?: string | null
+          range_pct_24h?: number | null
+          range_pct_monthly?: number | null
+          range_pct_weekly?: number | null
+          seconds_to_close: number
+          settled_close?: number | null
+          settled_outcome?: string | null
+          side_at_t_minus_1m?: string | null
+          side_at_t_minus_2m?: string | null
+          side_at_t_minus_30s?: string | null
+          side_at_t_minus_3m?: string | null
+          side_at_t_minus_5m?: string | null
+          side_confidence?: number | null
+          side_flip_count?: number | null
+          snapshot_at?: string
+          spot_price?: number | null
+          strike_distance_atr?: number | null
+          strike_distance_usd?: number | null
+          strike_price?: number | null
+          structure_1m?: string | null
+          structure_5m?: string | null
+          ta_only_result?: string | null
+          ta_only_side?: string | null
+          ta_reasons?: Json | null
+          ta_score?: number | null
+          window_close_at: string
+          window_open_at: string
+          window_ticker: string
+        }
+        Update: {
+          above_session_vwap?: boolean | null
+          atr_5m?: number | null
+          bias_1h?: string | null
+          bias_monthly?: string | null
+          bias_weekly?: string | null
+          conflict_reason?: string | null
+          created_at?: string
+          decision_state?: string
+          eligible_to_fire?: boolean | null
+          engine_version?: string
+          expected_value_after_fees?: number | null
+          id?: string
+          kalshi_ask?: number | null
+          kalshi_bid?: number | null
+          mae_usd?: number | null
+          mfe_usd?: number | null
+          model_prob?: number | null
+          multi_tf_result?: string | null
+          multi_tf_side?: string | null
+          nearest_resistance_distance?: number | null
+          nearest_resistance_status?: string | null
+          nearest_resistance_touches?: number | null
+          nearest_resistance_usd?: number | null
+          nearest_support_distance?: number | null
+          nearest_support_status?: string | null
+          nearest_support_touches?: number | null
+          nearest_support_usd?: number | null
+          proposed_side?: string | null
+          range_pct_24h?: number | null
+          range_pct_monthly?: number | null
+          range_pct_weekly?: number | null
+          seconds_to_close?: number
+          settled_close?: number | null
+          settled_outcome?: string | null
+          side_at_t_minus_1m?: string | null
+          side_at_t_minus_2m?: string | null
+          side_at_t_minus_30s?: string | null
+          side_at_t_minus_3m?: string | null
+          side_at_t_minus_5m?: string | null
+          side_confidence?: number | null
+          side_flip_count?: number | null
+          snapshot_at?: string
+          spot_price?: number | null
+          strike_distance_atr?: number | null
+          strike_distance_usd?: number | null
+          strike_price?: number | null
+          structure_1m?: string | null
+          structure_5m?: string | null
+          ta_only_result?: string | null
+          ta_only_side?: string | null
+          ta_reasons?: Json | null
+          ta_score?: number | null
+          window_close_at?: string
+          window_open_at?: string
+          window_ticker?: string
+        }
+        Relationships: []
+      }
       btc_odds_tape: {
         Row: {
           id: number
