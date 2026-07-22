@@ -1030,13 +1030,20 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         // than Kalshi (we read spot+time live; their book lags).
         if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining, tentativeSide);
 
-        // (g) LIVE professional TA blend — no shadow. The EMA9/21/55/145/169,
-        // VWAP, RSI, MACD, Bollinger, and candle-pattern engine moves the actual
-        // model probability before the side/edge/gates are computed. This is the
-        // shared source for the displayed Model Pick, PRED, paper, and live paths.
+        // (g) LIVE professional TA confluence blend (ta-v2). Confluence-weighted
+        // score across EMA / VWAP / structure / MACD / RSI / candles / BB + an
+        // acceleration bonus. Blend is scaled by confidence so weak/noisy
+        // signals (|score| < 20) barely move probability, while high-conviction
+        // reads (|score| >= 60) can shift the model up to ±25 pts. Rejection
+        // wicks add a directional kicker on top.
         {
           const ta = taScoreRes?.score ?? 0;
-          let taDelta = ta * 0.002; // ±20 probability pts at a full ±100 TA score.
+          const conf = taScoreRes?.confidence ?? 0;
+          // Confidence gate: 0 below 20, ramp to 1.0 by 60. Below 20 the score
+          // is effectively noise; above 60 the confluence is loud enough to move p.
+          const confWeight = Math.max(0, Math.min(1, (conf - 20) / 40));
+          // Max blend: ±25 pts at a full 100 signed score with full confidence.
+          let taDelta = (ta / 100) * 0.25 * confWeight;
           if (taScoreRes?.vwapRejectedAgainstUp) taDelta -= 0.08;
           if (taScoreRes?.vwapRejectedAgainstDown) taDelta += 0.08;
           if (Number.isFinite(taDelta) && Math.abs(taDelta) >= 0.005) {
