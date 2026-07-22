@@ -1290,7 +1290,7 @@ const MODEL_BET_LS_STAKE = "crypto.modelBet.stake";
 const MODEL_BET_LS_TICKERS = "crypto.modelBet.tickers";
 const AUTO_BET_MUTEX_EVENT = "crypto.autoBet.mutex";
 
-function ModelBetPanel() {
+export function ModelBetPanel() {
   const runFn = useServerFn(runAutoTrade);
   const statsFn = useServerFn(getPredictionStats);
   const statsQ = useQuery({ queryKey: ["btc-pred-stats"], queryFn: () => statsFn(), refetchInterval: 60_000 });
@@ -1549,7 +1549,7 @@ function writePredVerdict(ticker: string, rec: PredLockedRecord) {
   } catch { /* ignore */ }
 }
 
-function PredBetPanel() {
+export function PredBetPanel() {
   const runFn = useServerFn(runAutoTrade);
   const statsFn = useServerFn(getPredictionStats);
   const statsQ = useQuery({ queryKey: ["btc-pred-stats"], queryFn: () => statsFn(), refetchInterval: 60_000 });
@@ -1862,7 +1862,7 @@ const GREEN_HOURS_UTC = new Set<number>([8, 11, 12, 16, 19, 20, 21, 22]);
 
 type PredVerdict = { action: "UP" | "DOWN" | "SKIP"; ask: number; edge: number; reasons: string[] } | null;
 
-function GreenHoursBetPanel() {
+export function GreenHoursBetPanel() {
   const runFn = useServerFn(runAutoTrade);
 
   const [enabled, setEnabled] = useState<boolean>(() => {
@@ -3525,7 +3525,7 @@ function KalshiBalanceBadge() {
   );
 }
 
-function PaperBalanceBadge() {
+export function PaperBalanceBadge() {
   const balFn = useServerFn(getPaperBalance);
   const settleFn = useServerFn(settleMyPaperFills);
   const q = useQuery({
@@ -3671,16 +3671,20 @@ function CryptoPage() {
         </div>
         <div className="flex items-center gap-2">
           <KalshiBalanceBadge />
-          <PaperBalanceBadge />
+          <Link
+            to="/crypto-paper"
+            className="text-xs uppercase tracking-wider px-3 py-1.5 border border-emerald-500/40 text-emerald-400 rounded hover:bg-emerald-500/10"
+          >
+            Paper Sandbox →
+          </Link>
           <button onClick={() => q.refetch()} className="flex items-center gap-1 text-xs uppercase tracking-wider px-3 py-1.5 border border-border rounded hover:bg-card">
             {q.isFetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
           </button>
         </div>
       </div>
 
-      <ModelBetPanel />
-      <GreenHoursBetPanel />
-      <PredBetPanel />
+      {/* Model / PRED / Green Hours bet panels moved to /crypto-paper (paper-only sandbox).
+          Components remain exported from this file so the real-money path is preserved. */}
 
       {data && <TopPick markets={data.markets} />}
 

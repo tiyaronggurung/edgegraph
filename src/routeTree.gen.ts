@@ -24,6 +24,7 @@ import { Route as AuthenticatedModelValidationRouteImport } from './routes/_auth
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCryptoPaperRouteImport } from './routes/_authenticated/crypto-paper'
 import { Route as AuthenticatedCryptoRouteImport } from './routes/_authenticated/crypto'
 import { Route as AuthenticatedChartRouteImport } from './routes/_authenticated/chart'
 import { Route as AuthenticatedBacktestRouteImport } from './routes/_authenticated/backtest'
@@ -130,6 +131,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCryptoPaperRoute =
+  AuthenticatedCryptoPaperRouteImport.update({
+    id: '/crypto-paper',
+    path: '/crypto-paper',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedCryptoRoute = AuthenticatedCryptoRouteImport.update({
   id: '/crypto',
   path: '/crypto',
@@ -307,6 +314,7 @@ export interface FileRoutesByFullPath {
   '/backtest': typeof AuthenticatedBacktestRoute
   '/chart': typeof AuthenticatedChartRoute
   '/crypto': typeof AuthenticatedCryptoRouteWithChildren
+  '/crypto-paper': typeof AuthenticatedCryptoPaperRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/live': typeof AuthenticatedLiveRoute
@@ -352,6 +360,7 @@ export interface FileRoutesByTo {
   '/backtest': typeof AuthenticatedBacktestRoute
   '/chart': typeof AuthenticatedChartRoute
   '/crypto': typeof AuthenticatedCryptoRouteWithChildren
+  '/crypto-paper': typeof AuthenticatedCryptoPaperRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/live': typeof AuthenticatedLiveRoute
@@ -399,6 +408,7 @@ export interface FileRoutesById {
   '/_authenticated/backtest': typeof AuthenticatedBacktestRoute
   '/_authenticated/chart': typeof AuthenticatedChartRoute
   '/_authenticated/crypto': typeof AuthenticatedCryptoRouteWithChildren
+  '/_authenticated/crypto-paper': typeof AuthenticatedCryptoPaperRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/live': typeof AuthenticatedLiveRoute
@@ -446,6 +456,7 @@ export interface FileRouteTypes {
     | '/backtest'
     | '/chart'
     | '/crypto'
+    | '/crypto-paper'
     | '/dashboard'
     | '/history'
     | '/live'
@@ -491,6 +502,7 @@ export interface FileRouteTypes {
     | '/backtest'
     | '/chart'
     | '/crypto'
+    | '/crypto-paper'
     | '/dashboard'
     | '/history'
     | '/live'
@@ -537,6 +549,7 @@ export interface FileRouteTypes {
     | '/_authenticated/backtest'
     | '/_authenticated/chart'
     | '/_authenticated/crypto'
+    | '/_authenticated/crypto-paper'
     | '/_authenticated/dashboard'
     | '/_authenticated/history'
     | '/_authenticated/live'
@@ -709,6 +722,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/crypto-paper': {
+      id: '/_authenticated/crypto-paper'
+      path: '/crypto-paper'
+      fullPath: '/crypto-paper'
+      preLoaderRoute: typeof AuthenticatedCryptoPaperRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/crypto': {
@@ -934,6 +954,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedBacktestRoute: typeof AuthenticatedBacktestRoute
   AuthenticatedChartRoute: typeof AuthenticatedChartRoute
   AuthenticatedCryptoRoute: typeof AuthenticatedCryptoRouteWithChildren
+  AuthenticatedCryptoPaperRoute: typeof AuthenticatedCryptoPaperRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedLiveRoute: typeof AuthenticatedLiveRoute
@@ -951,6 +972,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBacktestRoute: AuthenticatedBacktestRoute,
   AuthenticatedChartRoute: AuthenticatedChartRoute,
   AuthenticatedCryptoRoute: AuthenticatedCryptoRouteWithChildren,
+  AuthenticatedCryptoPaperRoute: AuthenticatedCryptoPaperRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedLiveRoute: AuthenticatedLiveRoute,
