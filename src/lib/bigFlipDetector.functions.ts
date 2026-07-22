@@ -2,20 +2,26 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // ============================================================================
-// CHEAP-FLIP HUNTER  (formerly "Big Flip" 25c-jump detector, retired 2026-07-22)
+// CHEAP-FLIP HUNTER — LIVE MONEY (always on, no toggle)
 // ----------------------------------------------------------------------------
-// Fires PAPER $10 stakes when a Kalshi 15-min BTC market has a side quoted at
-// <= 15c inside the "sweet spot" (T-9m to T-3m) AND the model actually likes
-// that cheap side (side confidence >= 0.70).
+// Fires a REAL $10 Kalshi IOC buy when a 15-min BTC market has a side quoted
+// at <= 15c inside the "sweet spot" (T-9m to T-3m) AND the model actually
+// likes that cheap side (side confidence >= 0.70).
+//
+// Runs 24/7 via /api/public/hooks/big-flip-tick cron for every user with
+// Kalshi creds configured. No enable button, no user opt-in — it is always on.
 //
 // Every fire and every skip is logged into `big_flip_signals` with
-// trigger_kind='cheap_flip_15c' so we can audit fill quality and skip reasons.
+// trigger_kind='cheap_flip_15c' for skip/fire audit UI.
+// Live fills land in `crypto_trades` with inputs_snapshot.source='cheap_flip_hunter'
+// so we can query settlement status (auto-settled by the crypto_trades polling job).
 //
 // Safety rails (per-user, per UTC day):
 //   - max 6 fires/day
 //   - halt if today's cheap_flip P/L <= -$60
 //   - halt after 3 consecutive settled losses (auto-clears after 4h)
 //   - respects existing big_flip_killswitch
+//   - respects global KALSHI_LIVE_ENABLED env flag (if 'false', logs a skip)
 // ============================================================================
 
 const TRIGGER_KIND = "cheap_flip_15c" as const;
@@ -24,10 +30,10 @@ const MIN_MODEL_SIDE_CONF = 0.70;
 const ARM_MIN_SECONDS = 3 * 60;   // T-3m
 const ARM_MAX_SECONDS = 9 * 60;   // T-9m
 const DAILY_FIRE_CAP = 6;
-const DAILY_LOSS_CAP_CENTS = -6000; // -$60
+const DAILY_LOSS_CAP_USD = -60;   // -$60
 const CONSECUTIVE_LOSS_CAP = 3;
 const CONSECUTIVE_HALT_HOURS = 4;
-const STAKE_CENTS = 1000; // $10 flat
+const STAKE_CENTS = 1000;         // $10 flat
 
 export interface CheapFlipSignal {
   ok: boolean;
@@ -43,7 +49,6 @@ export interface CheapFlipSignal {
   passed: boolean;
   rejectReason: string | null;
   ageSeconds: number | null;
-  // cheap-flip specifics
   minAskCents: number | null;
   modelSideConf: number | null;
 }
@@ -65,17 +70,17 @@ async function isConsecutiveLossHalt(
   userId: string,
 ): Promise<{ halt: boolean; reason: string | null }> {
   const { data: last } = await supabase
-    .from("paper_fills")
-    .select("status,settled_at")
+    .from("crypto_trades")
+    .select("outcome,created_at,inputs_snapshot")
     .eq("user_id", userId)
-    .eq("button", "cheap_flip")
-    .in("status", ["won", "lost"])
-    .order("settled_at", { ascending: false })
+    .eq("inputs_snapshot->>source", "cheap_flip_hunter")
+    .not("outcome", "is", null)
+    .order("created_at", { ascending: false })
     .limit(CONSECUTIVE_LOSS_CAP);
-  const rows = (last ?? []) as Array<{ status: string; settled_at: string }>;
+  const rows = (last ?? []) as Array<{ outcome: string; created_at: string }>;
   if (rows.length < CONSECUTIVE_LOSS_CAP) return { halt: false, reason: null };
-  if (!rows.every(r => r.status === "lost")) return { halt: false, reason: null };
-  const lastSettled = new Date(rows[0].settled_at).getTime();
+  if (!rows.every(r => r.outcome === "loss")) return { halt: false, reason: null };
+  const lastSettled = new Date(rows[0].created_at).getTime();
   const cutoff = Date.now() - CONSECUTIVE_HALT_HOURS * 60 * 60 * 1000;
   if (lastSettled < cutoff) return { halt: false, reason: null };
   return {
@@ -90,7 +95,7 @@ export async function runBigFlipForUser(
   supabase: any,
   userId: string,
 ): Promise<CheapFlipSignal> {
-  // Latest ticker + latest tape snapshot for this user.
+  // Latest tape snapshot.
   const { data: tapeRows } = await supabase
     .from("btc_odds_tape")
     .select("ticker,yes_cents,no_cents,spot,strike,seconds_to_close,snapped_at")
@@ -135,11 +140,14 @@ export async function runBigFlipForUser(
   // --- Gate 3: model agreement (side + confidence >= 0.70) ---------------
   const { data: pred } = await supabase
     .from("btc_model_predictions")
-    .select("side,model_prob")
+    .select("side,model_prob,event_ticker,close_time")
     .eq("ticker", ticker)
     .maybeSingle();
   const modelSide = (pred?.side ?? null) as "YES" | "NO" | null;
   const modelProb = pred?.model_prob != null ? Number(pred.model_prob) : null;
+  const eventTicker = (pred as any)?.event_ticker ?? null;
+  const closeTimeIso = (pred as any)?.close_time
+    ?? new Date(new Date(flipAt).getTime() + stc * 1000).toISOString();
   if (!modelSide || modelProb == null) {
     return { ...base, toSide: cheapSide, rejectReason: "no model prediction yet" };
   }
@@ -179,18 +187,18 @@ export async function runBigFlipForUser(
   const dayStartIso = dayStart.toISOString();
 
   const { data: todays } = await supabase
-    .from("paper_fills")
-    .select("status,pnl_cents")
+    .from("crypto_trades")
+    .select("id,outcome,pnl_usd")
     .eq("user_id", userId)
-    .eq("button", "cheap_flip")
+    .eq("inputs_snapshot->>source", "cheap_flip_hunter")
     .gte("created_at", dayStartIso);
-  const todaysRows = (todays ?? []) as Array<{ status: string; pnl_cents: number | null }>;
+  const todaysRows = (todays ?? []) as Array<{ id: string; outcome: string | null; pnl_usd: number | null }>;
   if (todaysRows.length >= DAILY_FIRE_CAP) {
     return { ...base, toSide: cheapSide, modelSideConf: modelProb, rejectReason: `daily cap: ${todaysRows.length}/${DAILY_FIRE_CAP} fires used` };
   }
-  const todayPnl = todaysRows.reduce((s, r) => s + (r.pnl_cents ?? 0), 0);
-  if (todayPnl <= DAILY_LOSS_CAP_CENTS) {
-    return { ...base, toSide: cheapSide, modelSideConf: modelProb, rejectReason: `daily loss cap: $${(todayPnl / 100).toFixed(2)}` };
+  const todayPnl = todaysRows.reduce((s, r) => s + (Number(r.pnl_usd ?? 0)), 0);
+  if (todayPnl <= DAILY_LOSS_CAP_USD) {
+    return { ...base, toSide: cheapSide, modelSideConf: modelProb, rejectReason: `daily loss cap: $${todayPnl.toFixed(2)}` };
   }
 
   // --- Gate 7: 3-in-a-row consecutive-loss circuit breaker ---------------
@@ -199,67 +207,75 @@ export async function runBigFlipForUser(
     return { ...base, toSide: cheapSide, modelSideConf: modelProb, rejectReason: `circuit breaker: ${cbr.reason}` };
   }
 
-  // -----------------------------------------------------------------------
-  // ALL GATES PASSED — fire paper stake + log the signal.
-  // -----------------------------------------------------------------------
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-  // Debit paper balance
-  const { data: balRow } = await supabaseAdmin
-    .from("paper_balances")
-    .select("balance_cents,starting_cents,bankrupt_at")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (!balRow) {
-    await supabaseAdmin.from("paper_balances").insert({ user_id: userId });
+  // --- Gate 8: global KALSHI_LIVE_ENABLED --------------------------------
+  const liveEnabled = String(process.env.KALSHI_LIVE_ENABLED ?? "").toLowerCase() === "true";
+  if (!liveEnabled) {
+    return { ...base, toSide: cheapSide, modelSideConf: modelProb, rejectReason: "KALSHI_LIVE_ENABLED not true" };
   }
-  const currentBal = (balRow?.balance_cents as number | undefined) ?? 50000;
-  if ((balRow?.bankrupt_at as string | null) || currentBal < STAKE_CENTS) {
-    // Log the miss so we can see the trap fired but stake was unavailable.
+
+  // -----------------------------------------------------------------------
+  // ALL GATES PASSED — fire LIVE Kalshi IOC $10 buy.
+  // -----------------------------------------------------------------------
+  const contracts = Math.max(1, Math.floor(STAKE_CENTS / cheapAsk));
+  const stakeUsd = (contracts * cheapAsk) / 100;
+
+  let fillCount = 0;
+  let filledCents = cheapAsk;
+  let orderErr: string | null = null;
+  let tradeId: string | null = null;
+  try {
+    const { submitKalshiBuy } = await import("./cryptoTrades.functions");
+    const out = await submitKalshiBuy(supabase, userId, {
+      ticker,
+      eventTicker: eventTicker ?? undefined,
+      side: cheapSide,
+      contracts,
+      limitPriceCents: cheapAsk,
+      strike: tape.strike,
+      spot: tape.spot,
+      modelProb,
+      marketYesPrice: yesAsk / 100,
+      stakeUsd,
+      closeTime: closeTimeIso,
+      inputsSnapshot: {
+        source: "cheap_flip_hunter",
+        yes_ask: yesAsk,
+        no_ask: noAsk,
+        model_side: modelSide,
+        model_prob: modelProb,
+        seconds_to_close: stc,
+        spot: tape.spot,
+        strike: tape.strike,
+        arm_window: [ARM_MIN_SECONDS, ARM_MAX_SECONDS],
+        max_ask_cents: MAX_ASK_CENTS,
+        min_model_conf: MIN_MODEL_SIDE_CONF,
+      },
+    });
+    fillCount = out.fillCount;
+    filledCents = out.filledCents;
+    tradeId = out.tradeId;
+  } catch (e: any) {
+    orderErr = e?.message ?? String(e);
+  }
+
+  // If the IOC returned 0 fills OR errored, log a skip row and bail.
+  if (orderErr || fillCount <= 0) {
     await supabase.from("big_flip_signals").insert({
       user_id: userId, ticker, strike: tape.strike, spot: tape.spot,
       prev_yes: yesAsk, new_yes: yesAsk, prev_no: noAsk, new_no: noAsk,
       yes_delta: 0, to_side: cheapSide, seconds_to_close: stc,
-      passed_rules: false, reject_reason: "paper bankrupt or insufficient balance",
+      passed_rules: false,
+      reject_reason: orderErr ? `kalshi error: ${orderErr}` : `IOC 0-fill @ ${cheapAsk}¢`,
       flip_at: flipAt, trigger_kind: TRIGGER_KIND,
       min_ask_cents: cheapAsk, model_side_conf: modelProb,
     });
-    return { ...base, toSide: cheapSide, modelSideConf: modelProb, rejectReason: "paper bankrupt or insufficient balance" };
+    return {
+      ...base, toSide: cheapSide, modelSideConf: modelProb,
+      rejectReason: orderErr ? `kalshi error: ${orderErr}` : `IOC 0-fill @ ${cheapAsk}¢`,
+    };
   }
 
-  const contracts = Math.max(1, Math.floor((STAKE_CENTS) / cheapAsk));
-  const closeTime = new Date(new Date(flipAt).getTime() + stc * 1000).toISOString();
-  const newBal = currentBal - STAKE_CENTS;
-
-  await supabaseAdmin
-    .from("paper_balances")
-    .update({ balance_cents: newBal, bankrupt_at: newBal <= 0 ? new Date().toISOString() : null })
-    .eq("user_id", userId);
-
-  const { data: fill } = await supabaseAdmin
-    .from("paper_fills")
-    .insert({
-      user_id: userId,
-      ticker,
-      close_time: closeTime,
-      button: "cheap_flip",
-      side: cheapSide,
-      contracts,
-      fill_price_cents: cheapAsk,
-      stake_cents: STAKE_CENTS,
-      entry_snapshot: {
-        source: "cheap_flip_hunter",
-        yes_ask: yesAsk, no_ask: noAsk,
-        model_side: modelSide, model_prob: modelProb,
-        seconds_to_close: stc,
-        spot: tape.spot, strike: tape.strike,
-      },
-      status: "open",
-    })
-    .select("id")
-    .single();
-
-  // Log the signal (passed_rules=true) — used for skip/fire audit UI.
+  // Log the passing signal — used for skip/fire audit UI + one-per-window gate.
   await supabase.from("big_flip_signals").insert({
     user_id: userId, ticker, strike: tape.strike, spot: tape.spot,
     prev_yes: yesAsk, new_yes: yesAsk, prev_no: noAsk, new_no: noAsk,
@@ -267,7 +283,10 @@ export async function runBigFlipForUser(
     passed_rules: true, reject_reason: null,
     flip_at: flipAt, trigger_kind: TRIGGER_KIND,
     min_ask_cents: cheapAsk, model_side_conf: modelProb,
-    paper_fill_id: fill?.id ?? null,
+    paper_fill_id: null,
+    kalshi_trade_id: tradeId,
+    fill_count: fillCount,
+    fill_price_cents: filledCents,
   });
 
   return {
@@ -275,7 +294,7 @@ export async function runBigFlipForUser(
     prevYes: yesAsk, newYes: yesAsk, yesDelta: 0,
     spot: tape.spot, strike: tape.strike, secondsToClose: stc,
     flipAt, passed: true, rejectReason: null, ageSeconds,
-    minAskCents: cheapAsk, modelSideConf: modelProb,
+    minAskCents: filledCents, modelSideConf: modelProb,
   };
 }
 
