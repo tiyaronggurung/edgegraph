@@ -1008,8 +1008,22 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         // than Kalshi (we read spot+time live; their book lags).
         if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining, tentativeSide);
 
+        // (g) LIVE professional TA blend — no shadow. The EMA9/21/55/145/169,
+        // VWAP, RSI, MACD, Bollinger, and candle-pattern engine moves the actual
+        // model probability before the side/edge/gates are computed. This is the
+        // shared source for the displayed Model Pick, PRED, paper, and live paths.
+        {
+          const ta = taScoreRes?.score ?? 0;
+          let taDelta = ta * 0.002; // ±20 probability pts at a full ±100 TA score.
+          if (taScoreRes?.vwapRejectedAgainstUp) taDelta -= 0.08;
+          if (taScoreRes?.vwapRejectedAgainstDown) taDelta += 0.08;
+          if (Number.isFinite(taDelta) && Math.abs(taDelta) >= 0.005) {
+            p = Math.max(0.02, Math.min(0.98, p + taDelta));
+          }
+        }
+
         const rawEdgePts = (p - yesPrice) * 100;
-        const side: "YES" | "NO" = tentativeSide;
+        const side: "YES" | "NO" = lockedPre ?? (p >= 0.5 ? "YES" : "NO");
         // Edge is reported toward the locked side: positive = still favorable,
         // negative = model has since drifted against the original pick.
         const edgePts = side === "YES" ? rawEdgePts : -rawEdgePts;
@@ -1202,6 +1216,17 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               liveSide: m.liveSide,
               chartVerdict: m.chartVerdict,
               chartStrength: m.chartStrength,
+              taScore: m.taScore,
+              taReasons: m.taReasons,
+              taVwapDistPct: m.taVwapDistPct,
+              taTrendAlignScore: m.taTrendAlignScore,
+              taRsi1m: m.taRsi1m,
+              taRsi5m: m.taRsi5m,
+              taMacd5mHist: m.taMacd5mHist,
+              taBb5mPctB: m.taBb5mPctB,
+              taVwapRejUp: m.taVwapRejUp,
+              taVwapRejDown: m.taVwapRejDown,
+              taEngineVersion: TA_ENGINE_VERSION,
               physicsProb: m.physicsProb,
               independentProb: m.independentProb,
               jumpFeatures: jumpByTicker.get(m.ticker),
