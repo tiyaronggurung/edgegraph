@@ -1549,7 +1549,7 @@ function writePredVerdict(ticker: string, rec: PredLockedRecord) {
   } catch { /* ignore */ }
 }
 
-function PredBetPanel() {
+export function PredBetPanel() {
   const runFn = useServerFn(runAutoTrade);
   const statsFn = useServerFn(getPredictionStats);
   const statsQ = useQuery({ queryKey: ["btc-pred-stats"], queryFn: () => statsFn(), refetchInterval: 60_000 });
