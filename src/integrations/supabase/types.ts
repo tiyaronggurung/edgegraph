@@ -3428,6 +3428,69 @@ export type Database = {
         }
         Relationships: []
       }
+      model_loss_autopsy: {
+        Row: {
+          chart_verdict: string | null
+          close_time: string
+          created_at: string
+          edge_pts: number | null
+          failure_tags: string[]
+          flip_count: number | null
+          id: string
+          model_prob: number
+          model_side: string
+          outcome: string
+          primary_tag: string | null
+          snapshot_seconds_to_close: number | null
+          spot_at_snapshot: number | null
+          strike: number | null
+          strike_distance_pct: number | null
+          ta_engine_version: string | null
+          ta_score: number | null
+          ticker: string
+        }
+        Insert: {
+          chart_verdict?: string | null
+          close_time: string
+          created_at?: string
+          edge_pts?: number | null
+          failure_tags?: string[]
+          flip_count?: number | null
+          id?: string
+          model_prob: number
+          model_side: string
+          outcome: string
+          primary_tag?: string | null
+          snapshot_seconds_to_close?: number | null
+          spot_at_snapshot?: number | null
+          strike?: number | null
+          strike_distance_pct?: number | null
+          ta_engine_version?: string | null
+          ta_score?: number | null
+          ticker: string
+        }
+        Update: {
+          chart_verdict?: string | null
+          close_time?: string
+          created_at?: string
+          edge_pts?: number | null
+          failure_tags?: string[]
+          flip_count?: number | null
+          id?: string
+          model_prob?: number
+          model_side?: string
+          outcome?: string
+          primary_tag?: string | null
+          snapshot_seconds_to_close?: number | null
+          spot_at_snapshot?: number | null
+          strike?: number | null
+          strike_distance_pct?: number | null
+          ta_engine_version?: string | null
+          ta_score?: number | null
+          ticker?: string
+        }
+        Relationships: []
+      }
       paper_balances: {
         Row: {
           balance_cents: number
@@ -4234,6 +4297,7 @@ export type Database = {
           read_ct: number
         }[]
       }
+      run_loss_autopsy: { Args: never; Returns: number }
     }
     Enums: {
       [_ in never]: never
