@@ -3525,7 +3525,7 @@ function KalshiBalanceBadge() {
   );
 }
 
-function PaperBalanceBadge() {
+export function PaperBalanceBadge() {
   const balFn = useServerFn(getPaperBalance);
   const settleFn = useServerFn(settleMyPaperFills);
   const q = useQuery({
