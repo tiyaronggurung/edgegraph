@@ -748,6 +748,28 @@ export async function runAutoTradeCore(
             }
           }
 
+          // ── LIVE TA hard skip gate (real EMA/VWAP/RSI/MACD/BB/patterns) ──
+          // Applies to every path (live + paper). Skip when TA strongly opposes
+          // the side we're about to bet, or when VWAP has just rejected against us.
+          {
+            const ta = m.taScore ?? 0;
+            const vwapAgainst =
+              (m.side === "YES" && m.taVwapRejUp) ||
+              (m.side === "NO" && m.taVwapRejDown);
+            // Score is signed: +100 = strongly up, -100 = strongly down.
+            const sideSign = m.side === "YES" ? 1 : -1;
+            const alignedTa = ta * sideSign; // >0 aligns with our side
+            if (alignedTa <= -40) {
+              const r = `ta_hard_skip: TA score ${ta} opposes ${m.side} (aligned ${alignedTa}) — ${m.taReasons?.slice(0, 4).join(",") ?? ""}`;
+              skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
+            }
+            if (vwapAgainst) {
+              const r = `ta_vwap_reject: VWAP rejection against ${m.side} on last 1m candles`;
+              skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false;
+            }
+          }
+
+
           if (m.secondsToClose < minSeconds) { const r = `${m.secondsToClose}s < ${minSeconds}s`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (m.secondsToClose > maxSeconds) { const r = `fresh_market_warmup: ${m.secondsToClose}s > ${maxSeconds}s (wait ${LIVE_MARKET_WARMUP_SEC}s after new strike opens)`; skipReasons.push(`${m.ticker}: ${r}`); logSkip(m, r); return false; }
           if (equity) {
@@ -1285,6 +1307,12 @@ export async function runAutoTradeCore(
           settle_spike_would_skip: Boolean((result as any).__spikeByTicker?.get?.(m.ticker)?.wouldSkip),
           funding_rate_at_fire: ((result as any).__funding?.rate ?? null),
           funding_zscore_30d: ((result as any).__funding?.z ?? null),
+          ctx_vwap_distance_pct: m.taVwapDistPct ?? null,
+          ctx_trend_alignment_score: m.taTrendAlignScore ?? null,
+          ctx_rsi_1h: m.taRsi5m ?? null,
+          ctx_macd_15m_hist: m.taMacd5mHist ?? null,
+          ctx_bb_5m_pctb: m.taBb5mPctB ?? null,
+          ctx_engine_version: "ta-v1",
 
 
 

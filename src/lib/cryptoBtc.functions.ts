@@ -7,6 +7,7 @@ import { evaluateBtcEntry, type BtcEntryGateDecision } from "./btcEntryGate";
 import { getBtcGateConfig } from "./btcGateConfig.server";
 import { logBtcGateDecision } from "./btcGateLog.server";
 import { getChartVerdict } from "./ta/chartVerdict";
+import { computeTaScore, TA_ENGINE_VERSION, type TaScoreResult } from "./ta/taEngine";
 
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
 const COINBASE = "https://api.exchange.coinbase.com";
@@ -130,6 +131,18 @@ export interface BtcMarket {
   liveFlipped: boolean;         // true if liveSide != locked side this tick
   chartVerdict: "YES" | "NO" | "neutral";
   chartStrength: number;        // 0..1 confidence from combined 1m+5m verdict
+  // Real TA score −100..+100 (EMA9/21/55/145/169 stack + VWAP + RSI + MACD + BB + patterns).
+  // Positive = up bias, negative = down bias. Used as a hard skip gate in auto-trade.
+  taScore: number;
+  taReasons: string[];
+  taVwapDistPct: number | null;
+  taTrendAlignScore: number;
+  taRsi1m: number | null;
+  taRsi5m: number | null;
+  taMacd5mHist: number | null;
+  taBb5mPctB: number | null;
+  taVwapRejUp: boolean;   // last-2 candles rejected off VWAP downward → bad for UP bets
+  taVwapRejDown: boolean; // last-2 candles rejected off VWAP upward → bad for DOWN bets
   // Shared central-gate decision (side confidence + live agreement + positive edge).
   // Reported alongside the legacy `gateAction`/`gateReason` so callers can
   // enforce the same universal gate. Nullable if config lookup failed.
@@ -885,6 +898,12 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
       try { return getChartVerdict(recent, candles5m); }
       catch (e) { console.warn("chart verdict failed:", e); return null; }
     })();
+    // Real TA engine (live-wired): EMA9/21/55/145/169 stack + VWAP + RSI + MACD + BB + patterns.
+    // One computation per snapshot; every market in this snapshot shares it.
+    const taScoreRes: TaScoreResult | null = (() => {
+      try { return computeTaScore(recent, candles5m); }
+      catch (e) { console.warn("ta score failed:", e); return null; }
+    })();
 
     // Apply regime knobs to σ and drift before they feed the diffusion model.
     const sigma = sigmaRaw * (regimeState?.sigmaMult ?? 1);
@@ -1118,6 +1137,16 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           liveFlipped: liveSide !== side,
           chartVerdict: cvDir as "YES" | "NO" | "neutral",
           chartStrength: cvConf,
+          taScore: taScoreRes?.score ?? 0,
+          taReasons: taScoreRes?.reasons ?? [],
+          taVwapDistPct: taScoreRes?.vwapDistPct ?? null,
+          taTrendAlignScore: taScoreRes?.trendAlignScore ?? 0,
+          taRsi1m: taScoreRes?.rsi1m ?? null,
+          taRsi5m: taScoreRes?.rsi5m ?? null,
+          taMacd5mHist: taScoreRes?.macd5mHist ?? null,
+          taBb5mPctB: taScoreRes?.bb5mPctB ?? null,
+          taVwapRejUp: taScoreRes?.vwapRejectedAgainstUp ?? false,
+          taVwapRejDown: taScoreRes?.vwapRejectedAgainstDown ?? false,
           entryGate,
         });
 
