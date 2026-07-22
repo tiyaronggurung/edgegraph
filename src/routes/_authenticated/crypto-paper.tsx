@@ -12,6 +12,7 @@ import {
 } from "@/lib/paperTrading.functions";
 import { KalshiOddsWidget } from "@/components/crypto/KalshiOddsWidget";
 import { ModelBetPanel, PredBetPanel, GreenHoursBetPanel } from "@/routes/_authenticated/crypto";
+import { MultiTfShadowPanel } from "@/components/MultiTfShadowPanel";
 
 export const Route = createFileRoute("/_authenticated/crypto-paper")({
   head: () => ({
