@@ -1733,7 +1733,7 @@ function PredBetPanel() {
   }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    // Always-on paper auto-runner for PRED (paper mode only).
     if (typeof window === "undefined") return;
     let cancelled = false;
     let inFlight = false;
