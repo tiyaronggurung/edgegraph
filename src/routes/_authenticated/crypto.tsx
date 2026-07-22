@@ -1944,6 +1944,14 @@ function GreenHoursBetPanel() {
           const label = `${o.ticker} ${o.side} @ ${o.limit_cents}¢`;
           toast.success(`Green Bet $${GREEN_BET_STAKE}: ${label}`);
           setLastFired(label);
+          try {
+            const r = await recordPaperFire({ data: {
+              ticker: o.ticker, closeTime: o.close_time, button: "green_hours",
+              side: o.side, contracts: o.contracts, fillPriceCents: o.limit_cents,
+              snapshot: { edge: o.edge_pts, prob: o.model_prob, sigmaDist: o.sigma_distance },
+            }});
+            if (!r.ok) toast.warning(`Paper: ${r.reason}`);
+          } catch { /* silent */ }
         } else {
           const realReasons = (res.skipReasons ?? []).filter((r: string) => !/^(equity:|force:)/i.test(r));
           const reason = (realReasons.length ? realReasons : res.skipReasons ?? []).slice(0, 1).join(" · ") || "no candidate";
