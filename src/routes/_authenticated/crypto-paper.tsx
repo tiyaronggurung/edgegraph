@@ -90,7 +90,7 @@ function PaperTradingPage() {
 
   // Group fills by button
   const byButton = useMemo(() => {
-    const g: Record<ButtonKind, PaperFillRow[]> = { model: [], pred: [], green_hours: [], manual: [], t5m: [] };
+    const g: Record<ButtonKind, PaperFillRow[]> = { model: [], pred: [], green_hours: [], manual: [], t5m: [], cheap_flip: [] };
     for (const f of fills) if (g[f.button]) g[f.button].push(f);
     return g;
   }, [fills]);
