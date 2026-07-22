@@ -131,6 +131,18 @@ export interface BtcMarket {
   liveFlipped: boolean;         // true if liveSide != locked side this tick
   chartVerdict: "YES" | "NO" | "neutral";
   chartStrength: number;        // 0..1 confidence from combined 1m+5m verdict
+  // Real TA score −100..+100 (EMA9/21/55/145/169 stack + VWAP + RSI + MACD + BB + patterns).
+  // Positive = up bias, negative = down bias. Used as a hard skip gate in auto-trade.
+  taScore: number;
+  taReasons: string[];
+  taVwapDistPct: number | null;
+  taTrendAlignScore: number;
+  taRsi1m: number | null;
+  taRsi5m: number | null;
+  taMacd5mHist: number | null;
+  taBb5mPctB: number | null;
+  taVwapRejUp: boolean;   // last-2 candles rejected off VWAP downward → bad for UP bets
+  taVwapRejDown: boolean; // last-2 candles rejected off VWAP upward → bad for DOWN bets
   // Shared central-gate decision (side confidence + live agreement + positive edge).
   // Reported alongside the legacy `gateAction`/`gateReason` so callers can
   // enforce the same universal gate. Nullable if config lookup failed.
