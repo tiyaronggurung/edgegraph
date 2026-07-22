@@ -218,11 +218,94 @@ function PaperTradingPage() {
         </div>
       </div>
 
+      {/* Unified fill log — matches real-money auto_trade_orders columns */}
+      <AllFillsLog rows={fills} />
+
       {/* Three scrollable per-button fill logs */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {BUTTON_ORDER.map(b => (
           <ButtonLogPanel key={b} button={b} rows={byButton[b]} tint={buttonTint[b]} />
         ))}
+      </div>
+    </div>
+  );
+}
+
+function AllFillsLog({ rows }: { rows: PaperFillRow[] }) {
+  return (
+    <div className="border border-border rounded-lg bg-card">
+      <div className="px-4 py-2 border-b border-border flex items-center justify-between">
+        <div className="text-sm font-semibold">All Paper Fills</div>
+        <div className="text-[11px] text-muted-foreground">{rows.length} fills · newest first</div>
+      </div>
+      <div className="max-h-[520px] overflow-auto">
+        {rows.length === 0 ? (
+          <div className="px-4 py-8 text-center text-xs text-muted-foreground">No paper fills yet.</div>
+        ) : (
+          <table className="w-full text-[11px]">
+            <thead className="bg-muted/40 text-muted-foreground sticky top-0">
+              <tr>
+                <th className="text-left px-2 py-1.5 font-medium">Placed</th>
+                <th className="text-left px-2 py-1.5 font-medium">Source</th>
+                <th className="text-left px-2 py-1.5 font-medium">Ticker</th>
+                <th className="text-left px-2 py-1.5 font-medium">Side</th>
+                <th className="text-right px-2 py-1.5 font-medium">Stake</th>
+                <th className="text-right px-2 py-1.5 font-medium">Limit</th>
+                <th className="text-right px-2 py-1.5 font-medium">Edge</th>
+                <th className="text-right px-2 py-1.5 font-medium">Safety</th>
+                <th className="text-left px-2 py-1.5 font-medium">Status</th>
+                <th className="text-right px-2 py-1.5 font-medium">PnL</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(f => {
+                const snap: any = f.entry_snapshot ?? {};
+                const edge = typeof snap.edge === "number" ? snap.edge : null;
+                const limit = typeof snap.sideAsk === "number"
+                  ? Math.round(snap.sideAsk * 100)
+                  : (typeof snap.marketYesPrice === "number" ? Math.round(snap.marketYesPrice * 100) : f.fill_price_cents);
+                const safety = typeof snap.sideConf === "number" ? snap.sideConf : null;
+                return (
+                  <tr key={f.id} className="border-t border-border/40">
+                    <td className="px-2 py-1 text-muted-foreground whitespace-nowrap">
+                      {new Date(f.created_at).toLocaleString([], { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td className="px-2 py-1">
+                      <span className={`inline-block text-[9px] px-1.5 py-0.5 rounded border ${
+                        f.button === "model" ? "border-sky-500/50 bg-sky-500/10 text-sky-300" :
+                        f.button === "pred" ? "border-fuchsia-500/50 bg-fuchsia-500/10 text-fuchsia-300" :
+                        "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
+                      }`}>{buttonLabel[f.button]}</span>
+                    </td>
+                    <td className="px-2 py-1 font-mono text-[10px] text-muted-foreground whitespace-nowrap">{f.ticker}</td>
+                    <td className={`px-2 py-1 font-semibold ${f.side === "YES" ? "text-emerald-400" : "text-red-400"}`}>
+                      {f.side === "YES" ? "UP" : "DOWN"}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums">{fmtUsd(f.stake_cents)}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">{limit}¢</td>
+                    <td className={`px-2 py-1 text-right tabular-nums ${edge == null ? "text-muted-foreground" : edge >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {edge == null ? "—" : `${edge >= 0 ? "+" : ""}${edge.toFixed(1)}`}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
+                      {safety == null ? "—" : `${(safety * 100).toFixed(0)}%`}
+                    </td>
+                    <td className="px-2 py-1">
+                      <span className={`inline-block text-[9px] px-1 py-0.5 rounded border ${
+                        f.status === "won" ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300" :
+                        f.status === "lost" ? "border-red-500/50 bg-red-500/10 text-red-300" :
+                        f.status === "void" ? "border-muted-foreground/40 bg-muted/30 text-muted-foreground" :
+                        "border-sky-500/50 bg-sky-500/10 text-sky-300"
+                      }`}>{f.status}</span>
+                    </td>
+                    <td className={`px-2 py-1 text-right tabular-nums font-semibold ${f.pnl_cents == null ? "text-muted-foreground" : f.pnl_cents >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {f.pnl_cents == null ? "—" : `${f.pnl_cents >= 0 ? "+" : ""}${fmtUsd(f.pnl_cents)}`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
