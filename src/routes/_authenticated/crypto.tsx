@@ -2042,6 +2042,215 @@ export function GreenHoursBetPanel() {
   );
 }
 
+// ============================================================
+// T-5m KALSHI CONFIRMATION BET (paper only) — verdict-driven fire.
+// Rule: model firm (side conf ≥ 65%) AND Kalshi ask on model side ≥ 55¢
+// AND time-to-close between 3:00 and 5:00 minutes.
+// One shot per window, $10 flat, hold to settle. Paper only.
+// Sandbox-only — mutex with other paper bet panels.
+// ============================================================
+const T5M_BET_LS_ENABLED = "crypto.t5mBet";
+const T5M_BET_LS_TICKERS = "crypto.t5mBet.tickers";
+const T5M_BET_STAKE = 10;
+const T5M_MIN_SIDE_CONF = 0.65;
+const T5M_MIN_ASK = 0.55;
+const T5M_MAX_ASK = 0.99;
+const T5M_WIN_MIN_MS = 180_000; // T-3m
+const T5M_WIN_MAX_MS = 300_000; // T-5m
+
+export function T5mBetPanel() {
+  const runFn = useServerFn(runAutoTrade);
+  const statsFn = useServerFn(getPredictionStats);
+  const statsQ = useQuery({ queryKey: ["btc-pred-stats"], queryFn: () => statsFn(), refetchInterval: 30_000 });
+
+  const [enabled, setEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(T5M_BET_LS_ENABLED) === "on";
+  });
+  const [firing, setFiring] = useState(false);
+  const [lastFired, setLastFired] = useState<string | null>(null);
+  const [lastSkip, setLastSkip] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const h = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(h);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(T5M_BET_LS_ENABLED, enabled ? "on" : "off");
+  }, [enabled]);
+
+  const toggleOn = () => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(AUTO_BET_MUTEX_EVENT, { detail: "t5mBet" }));
+    }
+    setEnabled(true);
+    toast.success(`T-5m Confirmation ON · $${T5M_BET_STAKE} · paper only`);
+  };
+  const toggleOff = () => {
+    setEnabled(false);
+    toast.info("T-5m Confirmation OFF");
+  };
+
+  useEffect(() => {
+    const onMutex = (e: Event) => {
+      const which = (e as CustomEvent).detail;
+      if (which && which !== "t5mBet" && typeof window !== "undefined") {
+        if (window.localStorage.getItem(T5M_BET_LS_ENABLED) === "on") {
+          window.localStorage.setItem(T5M_BET_LS_ENABLED, "off");
+        }
+        setEnabled(false);
+      }
+    };
+    window.addEventListener(AUTO_BET_MUTEX_EVENT, onMutex as EventListener);
+    return () => window.removeEventListener(AUTO_BET_MUTEX_EVENT, onMutex as EventListener);
+  }, []);
+
+  // Compute current verdict for the soonest active window.
+  const verdict = useMemo(() => {
+    const s = statsQ.data;
+    if (!s?.recent?.length) return null as null | {
+      ticker: string; closeTime: string; action: "UP" | "DOWN" | "WAIT" | "SKIP";
+      sideAsk: number; sideConf: number; msLeft: number; reasons: string[]; side: "YES" | "NO";
+    };
+    const active = [...s.recent]
+      .filter(r => !r.outcome && new Date(r.closeTime).getTime() > now)
+      .sort((a, b) => new Date(a.closeTime).getTime() - new Date(b.closeTime).getTime())[0];
+    if (!active) return null;
+    const msLeft = new Date(active.closeTime).getTime() - now;
+    const sideAsk = active.side === "YES" ? active.marketYesPrice : 1 - active.marketYesPrice;
+    const sideConf = active.side === "YES" ? active.modelProb : 1 - active.modelProb;
+    const reasons: string[] = [];
+    const confOk = sideConf >= T5M_MIN_SIDE_CONF;
+    const askOk = sideAsk >= T5M_MIN_ASK && sideAsk <= T5M_MAX_ASK;
+    const flipOk = !active.liveSide || active.liveSide === active.side;
+    const inWin = msLeft <= T5M_WIN_MAX_MS && msLeft >= T5M_WIN_MIN_MS;
+    if (!confOk) reasons.push(`conf ${Math.round(sideConf * 100)}%`);
+    if (!askOk) reasons.push(`ask ${Math.round(sideAsk * 100)}¢`);
+    if (!flipOk) reasons.push("flip");
+    if (!inWin) reasons.push(msLeft > T5M_WIN_MAX_MS ? "too early" : "too late");
+    const action: "UP" | "DOWN" | "WAIT" | "SKIP" =
+      confOk && askOk && flipOk && inWin
+        ? (active.side === "YES" ? "UP" : "DOWN")
+        : (msLeft > T5M_WIN_MAX_MS && confOk && askOk && flipOk ? "WAIT" : "SKIP");
+    return { ticker: active.ticker, closeTime: active.closeTime, action, sideAsk, sideConf, msLeft, reasons, side: active.side as "YES" | "NO" };
+  }, [statsQ.data, now]);
+
+  // Paper auto-runner: fires once per ticker when verdict crosses into fire zone.
+  useEffect(() => {
+    if (!enabled) return;
+    if (typeof window === "undefined") return;
+    if (!verdict || (verdict.action !== "UP" && verdict.action !== "DOWN")) return;
+    if (firing) return;
+
+    const readProcessed = (): string[] => {
+      try { return JSON.parse(window.localStorage.getItem(T5M_BET_LS_TICKERS) || "[]"); } catch { return []; }
+    };
+    const writeProcessed = (arr: string[]) => {
+      try { window.localStorage.setItem(T5M_BET_LS_TICKERS, JSON.stringify(arr.slice(-100))); } catch { /* ignore */ }
+    };
+    const processed = new Set(readProcessed());
+    if (processed.has(verdict.ticker)) return;
+
+    let cancelled = false;
+    (async () => {
+      setFiring(true);
+      processed.add(verdict.ticker);
+      writeProcessed(Array.from(processed));
+      try {
+        const res = await runFn({ data: {
+          mode: "paper",
+          stakeUsd: T5M_BET_STAKE,
+          maxOrders: 1,
+          force: true,
+          forceTicker: verdict.ticker,
+          forceSide: verdict.side,
+          maxEntryCents: Math.round(T5M_MAX_ASK * 100),
+          skipLadder: true,
+        } });
+        if (cancelled) return;
+        if (res.placed > 0 && res.orders?.[0]) {
+          const o = res.orders[0];
+          try { playModelBetPing(); } catch { /* noop */ }
+          const label = `${verdict.action} ${verdict.ticker} @ ${o.limit_cents}¢ · conf ${Math.round(verdict.sideConf * 100)}%`;
+          toast.success(`T-5m paper $${T5M_BET_STAKE}: ${label}`);
+          setLastFired(label);
+          try {
+            const r = await recordPaperFire({ data: {
+              ticker: o.ticker, closeTime: o.close_time, button: "t5m" as any,
+              side: o.side, contracts: o.contracts, fillPriceCents: o.limit_cents,
+              snapshot: { sideAsk: verdict.sideAsk, sideConf: verdict.sideConf, msLeft: verdict.msLeft },
+            }});
+            if (!r.ok) toast.warning(`Paper: ${r.reason}`);
+          } catch { /* silent */ }
+        } else {
+          const reason = (res.skipReasons ?? []).slice(0, 2).join(" · ") || "no fill";
+          toast.info(`T-5m skipped ${verdict.ticker}: ${reason}`);
+          setLastSkip(`${verdict.ticker} · ${reason}`);
+        }
+      } catch (e: any) {
+        toast.error(`T-5m failed ${verdict?.ticker}`, { description: e?.message ?? String(e) });
+      } finally {
+        if (!cancelled) setFiring(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [enabled, verdict, firing, runFn]);
+
+  const mmss = (ms: number) => {
+    if (!Number.isFinite(ms) || ms < 0) return "--:--";
+    const s = Math.floor(ms / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  };
+  const actionColor =
+    verdict?.action === "UP" ? "text-emerald-300 border-emerald-500/40 bg-emerald-500/10" :
+    verdict?.action === "DOWN" ? "text-red-300 border-red-500/40 bg-red-500/10" :
+    verdict?.action === "WAIT" ? "text-amber-300 border-amber-500/40 bg-amber-500/10" :
+    "text-muted-foreground border-border bg-muted/30";
+
+  return (
+    <div className="border border-border rounded-lg bg-card">
+      <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={enabled ? toggleOff : toggleOn}
+            className={`text-xs font-semibold px-3 py-1.5 rounded border flex items-center gap-1.5 ${enabled ? "border-sky-500/50 bg-sky-500/15 text-sky-300" : "border-border bg-muted/30 hover:bg-muted/50"}`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${enabled ? "bg-sky-400 animate-pulse" : "bg-muted-foreground"}`} />
+            {enabled ? `T-5m Confirmation ON · $${T5M_BET_STAKE}` : `T-5m Confirmation OFF · $${T5M_BET_STAKE}`}
+          </button>
+          <span className="text-[11px] text-muted-foreground">
+            Paper only · model conf ≥ {Math.round(T5M_MIN_SIDE_CONF*100)}% · Kalshi ask ≥ {Math.round(T5M_MIN_ASK*100)}¢ · fire T-5m → T-3m · hold to settle
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className={`px-3 py-1.5 rounded border text-[11px] font-mono ${actionColor}`}>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm">{verdict?.action ?? "—"}</span>
+              {verdict && <span className="opacity-70">T-{mmss(verdict.msLeft)}</span>}
+            </div>
+            {verdict && (
+              <div className="opacity-80 mt-0.5">
+                conf {Math.round(verdict.sideConf * 100)}% · ask {Math.round(verdict.sideAsk * 100)}¢
+                {verdict.action === "SKIP" && verdict.reasons.length > 0 && <> · {verdict.reasons.slice(0,2).join(" · ")}</>}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">
+            {firing && <Loader2 className="h-3 w-3 animate-spin" />}
+            {lastFired && <span>last: {lastFired}</span>}
+            {lastSkip && <span className="opacity-60">skip: {lastSkip}</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
 function PredVerdictBox({ verdict, locked, closeTime, ticker }: { verdict: PredVerdict; locked?: boolean; closeTime?: string | null; ticker?: string | null }) {
   const action = verdict?.action ?? "SKIP";
   const cfg =

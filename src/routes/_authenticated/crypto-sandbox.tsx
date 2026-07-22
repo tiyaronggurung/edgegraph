@@ -4,6 +4,7 @@ import {
   ModelBetPanel,
   PredBetPanel,
   GreenHoursBetPanel,
+  T5mBetPanel,
   PaperBalanceBadge,
 } from "./crypto";
 
@@ -57,6 +58,7 @@ function CryptoPaperPage() {
         </div>
       </div>
 
+      <T5mBetPanel />
       <ModelBetPanel />
       <GreenHoursBetPanel />
       <PredBetPanel />
