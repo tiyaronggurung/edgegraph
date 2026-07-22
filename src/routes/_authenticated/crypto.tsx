@@ -1438,6 +1438,14 @@ function ModelBetPanel() {
           try { playModelBetPing(); } catch { /* noop */ }
           toast.success(`Model Bet $${stake}: ${pick.side === "YES" ? "UP" : "DOWN"} ${pick.ticker} @ ${o.limit_cents}¢`);
           setLastFired(`${pick.ticker} ${pick.side} @ ${o.limit_cents}¢`);
+          try {
+            const r = await recordPaperFire({ data: {
+              ticker: o.ticker, closeTime: o.close_time, button: "model",
+              side: o.side, contracts: o.contracts, fillPriceCents: o.limit_cents,
+              snapshot: { edge: pick.edgePts, prob: pick.modelProb, sideConf: (pick as any).sideConfidence ?? null },
+            }});
+            if (!r.ok) toast.warning(`Paper: ${r.reason}`);
+          } catch (e: any) { /* silent — trade still logged in auto_trade_orders */ }
         } else {
           const realReasons = (res.skipReasons ?? []).filter((r: string) => !/^(equity:|force:)/i.test(r));
           toast.info(`Model Bet skipped ${pick.ticker}: ${(realReasons.length ? realReasons : res.skipReasons ?? []).slice(0, 2).join(" · ") || "no fill"}`);
