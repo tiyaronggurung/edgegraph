@@ -2478,7 +2478,7 @@ function BigFlipMonitor() {
       <span className="text-muted-foreground">·</span>
       <span>{r.secondsToClose}s</span>
       <span className="text-muted-foreground">·</span>
-      <span className="text-[10px] uppercase text-muted-foreground">paper only</span>
+      <span className="text-[10px] uppercase text-yellow-300 font-semibold">LIVE $10</span>
       <span className="text-muted-foreground ml-auto">{r.ageSeconds}s ago</span>
     </div>
   );
