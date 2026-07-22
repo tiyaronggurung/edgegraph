@@ -3500,6 +3500,36 @@ function KalshiBalanceBadge() {
   );
 }
 
+function PaperBalanceBadge() {
+  const balFn = useServerFn(getPaperBalance);
+  const settleFn = useServerFn(settleMyPaperFills);
+  const q = useQuery({
+    queryKey: ["paperBalance"],
+    queryFn: () => balFn(),
+    refetchInterval: 15_000,
+    staleTime: 10_000,
+  });
+  // Opportunistically settle due paper fills in the background.
+  useEffect(() => {
+    const h = setInterval(() => { settleFn().catch(() => {}); }, 60_000);
+    settleFn().catch(() => {});
+    return () => clearInterval(h);
+  }, [settleFn]);
+  const cents = q.data?.balance_cents ?? null;
+  const bankrupt = !!q.data?.bankrupt_at;
+  const label = cents != null ? `$${(cents / 100).toFixed(2)}` : q.isLoading ? "…" : "—";
+  return (
+    <Link
+      to="/crypto/paper"
+      title={bankrupt ? "Paper bankrupt — go reset" : "Paper balance (click to view fill log)"}
+      className={`flex items-center gap-1.5 px-3 py-1.5 border rounded bg-card text-xs font-mono tabular-nums ${bankrupt ? "border-red-500/50 bg-red-500/10" : "border-border"}`}
+    >
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Paper</span>
+      <span className={bankrupt ? "text-red-300 font-semibold" : "text-sky-300 font-semibold"}>{label}</span>
+    </Link>
+  );
+}
+
 function CryptoPage() {
   const qc = useQueryClient();
   const marketsFn = useServerFn(getBtcMarkets);
