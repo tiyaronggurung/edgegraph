@@ -26,14 +26,15 @@ export const Route = createFileRoute("/_authenticated/crypto-paper")({
   component: PaperTradingPage,
 });
 
-type ButtonKind = "model" | "pred" | "green_hours";
+type ButtonKind = "model" | "pred" | "green_hours" | "manual";
 type PaperFillRow = import("@/lib/paperTrading.functions").PaperFillRow;
-const BUTTON_ORDER: ButtonKind[] = ["model", "pred", "green_hours"];
-const buttonLabel: Record<ButtonKind, string> = { model: "Model", pred: "PRED", green_hours: "Green Hours" };
+const BUTTON_ORDER: ButtonKind[] = ["model", "pred", "green_hours", "manual"];
+const buttonLabel: Record<ButtonKind, string> = { model: "Model", pred: "PRED", green_hours: "Green Hours", manual: "Manual" };
 const buttonTint: Record<ButtonKind, string> = {
   model: "border-sky-500/40 bg-sky-500/10",
   pred: "border-fuchsia-500/40 bg-fuchsia-500/10",
   green_hours: "border-emerald-500/40 bg-emerald-500/10",
+  manual: "border-amber-500/40 bg-amber-500/10",
 };
 
 const fmtUsd = (cents: number) => `${cents < 0 ? "-" : ""}$${(Math.abs(cents) / 100).toFixed(2)}`;
@@ -84,7 +85,7 @@ function PaperTradingPage() {
 
   // Group fills by button
   const byButton = useMemo(() => {
-    const g: Record<ButtonKind, PaperFillRow[]> = { model: [], pred: [], green_hours: [] };
+    const g: Record<ButtonKind, PaperFillRow[]> = { model: [], pred: [], green_hours: [], manual: [] };
     for (const f of fills) if (g[f.button]) g[f.button].push(f);
     return g;
   }, [fills]);
@@ -98,7 +99,7 @@ function PaperTradingPage() {
       const cur = map.get(key) ?? {
         key, day, sortKey: new Date(key).getTime(),
         pnlCents: 0, wins: 0, losses: 0, fires: 0,
-        byBtn: { model: 0, pred: 0, green_hours: 0 },
+        byBtn: { model: 0, pred: 0, green_hours: 0, manual: 0 },
       };
       cur.fires += 1;
       if (f.status === "won") cur.wins += 1;
