@@ -125,8 +125,17 @@ function PaperTradingPage() {
       {/* Live Kalshi odds — clickable UP/DOWN places a $10 paper bet */}
       <KalshiOddsWidget enableBetting />
 
-      {/* Auto-settle: silently settle due fills every 30s while page is open */}
+      {/* Auto-settle: silently settle due fills every 5s while page is open */}
       <AutoSettler />
+
+      {/* Auto-fire loops (paper mode): Model fires every new window; PRED / Green only when their criteria pass */}
+      <div className="grid gap-3 md:grid-cols-3">
+        <ModelBetPanel />
+        <PredBetPanel />
+        <GreenHoursBetPanel />
+      </div>
+
+
 
 
       {/* Balance */}
