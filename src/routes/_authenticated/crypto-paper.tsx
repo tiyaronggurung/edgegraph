@@ -242,6 +242,28 @@ function PaperTradingPage() {
   );
 }
 
+function AutoSettler() {
+  const settleFn = useServerFn(settleMyPaperFills);
+  const qc = useQueryClient();
+  useEffect(() => {
+    let stopped = false;
+    const tick = async () => {
+      try {
+        const r: any = await settleFn();
+        if (!stopped && r?.settled > 0) {
+          qc.invalidateQueries({ queryKey: ["paperBalance"] });
+          qc.invalidateQueries({ queryKey: ["paperFills"] });
+          qc.invalidateQueries({ queryKey: ["paperStats"] });
+        }
+      } catch { /* silent */ }
+    };
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => { stopped = true; clearInterval(id); };
+  }, [settleFn, qc]);
+  return null;
+}
+
 function AllFillsLog({ rows }: { rows: PaperFillRow[] }) {
   return (
     <div className="border border-border rounded-lg bg-card">
