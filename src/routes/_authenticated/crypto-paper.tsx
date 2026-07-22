@@ -11,7 +11,7 @@ import {
   settleMyPaperFills,
 } from "@/lib/paperTrading.functions";
 import { KalshiOddsWidget } from "@/components/crypto/KalshiOddsWidget";
-import { ModelBetPanel, PredBetPanel, GreenHoursBetPanel } from "@/routes/_authenticated/crypto";
+import { ModelBetPanel, PredBetPanel, GreenHoursBetPanel, T5mBetPanel } from "@/routes/_authenticated/crypto";
 import { MultiTfShadowPanel } from "@/components/MultiTfShadowPanel";
 
 export const Route = createFileRoute("/_authenticated/crypto-paper")({
@@ -130,11 +130,12 @@ function PaperTradingPage() {
       {/* Auto-settle: silently settle due fills every 5s while page is open */}
       <AutoSettler />
 
-      {/* Auto-fire loops (paper mode): Model fires every new window; PRED / Green only when their criteria pass */}
-      <div className="grid gap-3 md:grid-cols-3">
+      {/* Auto-fire loops (paper mode): Model / PRED / Green Hours / T-5m Confirmation */}
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <ModelBetPanel />
         <PredBetPanel />
         <GreenHoursBetPanel />
+        <T5mBetPanel />
       </div>
 
       {/* Multi-TF shadow (pure logging, no live impact) */}
@@ -225,6 +226,7 @@ function PaperTradingPage() {
                   <th className="text-right px-3 py-2 font-medium">Model</th>
                   <th className="text-right px-3 py-2 font-medium">PRED</th>
                   <th className="text-right px-3 py-2 font-medium">Green</th>
+                  <th className="text-right px-3 py-2 font-medium">T-5m</th>
                   <th className="text-right px-3 py-2 font-medium">Net</th>
                 </tr>
               </thead>
@@ -237,6 +239,7 @@ function PaperTradingPage() {
                     <td className={`px-3 py-1.5 text-right tabular-nums ${d.byBtn.model >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fmtUsd(d.byBtn.model)}</td>
                     <td className={`px-3 py-1.5 text-right tabular-nums ${d.byBtn.pred >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fmtUsd(d.byBtn.pred)}</td>
                     <td className={`px-3 py-1.5 text-right tabular-nums ${d.byBtn.green_hours >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fmtUsd(d.byBtn.green_hours)}</td>
+                    <td className={`px-3 py-1.5 text-right tabular-nums ${d.byBtn.t5m >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fmtUsd(d.byBtn.t5m)}</td>
                     <td className={`px-3 py-1.5 text-right tabular-nums font-semibold ${d.pnlCents >= 0 ? "text-emerald-400" : "text-red-400"}`}>{d.pnlCents >= 0 ? "+" : ""}{fmtUsd(d.pnlCents)}</td>
                   </tr>
                 ))}
@@ -325,6 +328,7 @@ function AllFillsLog({ rows }: { rows: PaperFillRow[] }) {
                         f.button === "model" ? "border-sky-500/50 bg-sky-500/10 text-sky-300" :
                         f.button === "pred" ? "border-fuchsia-500/50 bg-fuchsia-500/10 text-fuchsia-300" :
                         f.button === "manual" ? "border-amber-500/50 bg-amber-500/10 text-amber-300" :
+                        f.button === "t5m" ? "border-cyan-500/50 bg-cyan-500/10 text-cyan-300" :
                         "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
                       }`}>{buttonLabel[f.button]}</span>
                     </td>
