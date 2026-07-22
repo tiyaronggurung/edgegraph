@@ -2459,22 +2459,26 @@ function BigFlipMonitor() {
     return (
       <div className="mt-1 rounded border border-border/50 bg-muted/10 px-2 py-1 text-[10px] font-mono text-muted-foreground flex items-center gap-2">
         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
-        <span>Big-flip monitor · LIVE $10 · 24/7 cron · Δ≥25¢ · halt after 4 losing 15m windows of last 10 · {r.rejectReason ? `last rejected: ${r.rejectReason}` : "no signal"}</span>
+        <span>Cheap-flip hunter · PAPER $10 · arm T-9m→T-3m · ask ≤15¢ · model conf ≥70% · cap 6/day · {r.rejectReason ? `skip: ${r.rejectReason}` : "waiting for setup"}</span>
       </div>
     );
   }
   const toColor = r.toSide === "YES" ? "text-emerald-300" : "text-red-300";
   const borderColor = r.toSide === "YES" ? "border-emerald-500/60 bg-emerald-500/15" : "border-red-500/60 bg-red-500/15";
+  const ask = r.minAskCents ?? r.newYes;
+  const conf = r.modelSideConf != null ? `${(r.modelSideConf * 100).toFixed(0)}%` : "?";
   return (
     <div className={`mt-1 rounded border px-2 py-1.5 text-[11px] font-mono flex items-center gap-2 ${borderColor}`}>
       <Zap className={`h-3 w-3 ${toColor}`} />
-      <span className={`font-semibold ${toColor}`}>BIG FLIP → {r.toSide}</span>
+      <span className={`font-semibold ${toColor}`}>CHEAP FLIP → {r.toSide}</span>
       <span className="text-muted-foreground">·</span>
-      <span>{r.prevYes}¢→<span className={`font-bold ${toColor}`}>{r.newYes}¢</span> (Δ{r.yesDelta})</span>
+      <span><span className={`font-bold ${toColor}`}>{ask}¢</span> ask</span>
+      <span className="text-muted-foreground">·</span>
+      <span>model {conf}</span>
       <span className="text-muted-foreground">·</span>
       <span>{r.secondsToClose}s</span>
       <span className="text-muted-foreground">·</span>
-      <span className="text-[10px] uppercase text-muted-foreground">shadow only</span>
+      <span className="text-[10px] uppercase text-muted-foreground">paper only</span>
       <span className="text-muted-foreground ml-auto">{r.ageSeconds}s ago</span>
     </div>
   );
