@@ -11,7 +11,7 @@ import {
   settleMyPaperFills,
 } from "@/lib/paperTrading.functions";
 
-export const Route = createFileRoute("/_authenticated/crypto/paper")({
+export const Route = createFileRoute("/_authenticated/crypto-paper")({
   head: () => ({
     meta: [
       { title: "Paper Trading — BettingGraph" },

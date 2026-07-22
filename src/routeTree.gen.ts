@@ -25,6 +25,7 @@ import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/l
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCryptoSandboxRouteImport } from './routes/_authenticated/crypto-sandbox'
+import { Route as AuthenticatedCryptoPaperRouteImport } from './routes/_authenticated/crypto-paper'
 import { Route as AuthenticatedCryptoRouteImport } from './routes/_authenticated/crypto'
 import { Route as AuthenticatedChartRouteImport } from './routes/_authenticated/chart'
 import { Route as AuthenticatedBacktestRouteImport } from './routes/_authenticated/backtest'
@@ -33,7 +34,6 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
 import { Route as ApiPublicSendDailyDigestsRouteImport } from './routes/api/public/send-daily-digests'
 import { Route as ApiHealthKalshiRouteImport } from './routes/api/health/kalshi'
-import { Route as AuthenticatedCryptoPaperRouteImport } from './routes/_authenticated/crypto.paper'
 import { Route as AuthenticatedAnalysisIdRouteImport } from './routes/_authenticated/analysis.$id'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
@@ -137,6 +137,12 @@ const AuthenticatedCryptoSandboxRoute =
     path: '/crypto-sandbox',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedCryptoPaperRoute =
+  AuthenticatedCryptoPaperRouteImport.update({
+    id: '/crypto-paper',
+    path: '/crypto-paper',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedCryptoRoute = AuthenticatedCryptoRouteImport.update({
   id: '/crypto',
   path: '/crypto',
@@ -178,12 +184,6 @@ const ApiHealthKalshiRoute = ApiHealthKalshiRouteImport.update({
   path: '/api/health/kalshi',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedCryptoPaperRoute =
-  AuthenticatedCryptoPaperRouteImport.update({
-    id: '/paper',
-    path: '/paper',
-    getParentRoute: () => AuthenticatedCryptoRoute,
-  } as any)
 const AuthenticatedAnalysisIdRoute = AuthenticatedAnalysisIdRouteImport.update({
   id: '/analysis/$id',
   path: '/analysis/$id',
@@ -313,7 +313,8 @@ export interface FileRoutesByFullPath {
   '/analyze': typeof AuthenticatedAnalyzeRoute
   '/backtest': typeof AuthenticatedBacktestRoute
   '/chart': typeof AuthenticatedChartRoute
-  '/crypto': typeof AuthenticatedCryptoRouteWithChildren
+  '/crypto': typeof AuthenticatedCryptoRoute
+  '/crypto-paper': typeof AuthenticatedCryptoPaperRoute
   '/crypto-sandbox': typeof AuthenticatedCryptoSandboxRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
@@ -325,7 +326,6 @@ export interface FileRoutesByFullPath {
   '/strategies': typeof AuthenticatedStrategiesRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/analysis/$id': typeof AuthenticatedAnalysisIdRoute
-  '/crypto/paper': typeof AuthenticatedCryptoPaperRoute
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
@@ -359,7 +359,8 @@ export interface FileRoutesByTo {
   '/analyze': typeof AuthenticatedAnalyzeRoute
   '/backtest': typeof AuthenticatedBacktestRoute
   '/chart': typeof AuthenticatedChartRoute
-  '/crypto': typeof AuthenticatedCryptoRouteWithChildren
+  '/crypto': typeof AuthenticatedCryptoRoute
+  '/crypto-paper': typeof AuthenticatedCryptoPaperRoute
   '/crypto-sandbox': typeof AuthenticatedCryptoSandboxRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/history': typeof AuthenticatedHistoryRoute
@@ -371,7 +372,6 @@ export interface FileRoutesByTo {
   '/strategies': typeof AuthenticatedStrategiesRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/analysis/$id': typeof AuthenticatedAnalysisIdRoute
-  '/crypto/paper': typeof AuthenticatedCryptoPaperRoute
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
@@ -407,7 +407,8 @@ export interface FileRoutesById {
   '/_authenticated/analyze': typeof AuthenticatedAnalyzeRoute
   '/_authenticated/backtest': typeof AuthenticatedBacktestRoute
   '/_authenticated/chart': typeof AuthenticatedChartRoute
-  '/_authenticated/crypto': typeof AuthenticatedCryptoRouteWithChildren
+  '/_authenticated/crypto': typeof AuthenticatedCryptoRoute
+  '/_authenticated/crypto-paper': typeof AuthenticatedCryptoPaperRoute
   '/_authenticated/crypto-sandbox': typeof AuthenticatedCryptoSandboxRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
@@ -419,7 +420,6 @@ export interface FileRoutesById {
   '/_authenticated/strategies': typeof AuthenticatedStrategiesRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/_authenticated/analysis/$id': typeof AuthenticatedAnalysisIdRoute
-  '/_authenticated/crypto/paper': typeof AuthenticatedCryptoPaperRoute
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
@@ -456,6 +456,7 @@ export interface FileRouteTypes {
     | '/backtest'
     | '/chart'
     | '/crypto'
+    | '/crypto-paper'
     | '/crypto-sandbox'
     | '/dashboard'
     | '/history'
@@ -467,7 +468,6 @@ export interface FileRouteTypes {
     | '/strategies'
     | '/email/unsubscribe'
     | '/analysis/$id'
-    | '/crypto/paper'
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
@@ -502,6 +502,7 @@ export interface FileRouteTypes {
     | '/backtest'
     | '/chart'
     | '/crypto'
+    | '/crypto-paper'
     | '/crypto-sandbox'
     | '/dashboard'
     | '/history'
@@ -513,7 +514,6 @@ export interface FileRouteTypes {
     | '/strategies'
     | '/email/unsubscribe'
     | '/analysis/$id'
-    | '/crypto/paper'
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
@@ -549,6 +549,7 @@ export interface FileRouteTypes {
     | '/_authenticated/backtest'
     | '/_authenticated/chart'
     | '/_authenticated/crypto'
+    | '/_authenticated/crypto-paper'
     | '/_authenticated/crypto-sandbox'
     | '/_authenticated/dashboard'
     | '/_authenticated/history'
@@ -560,7 +561,6 @@ export interface FileRouteTypes {
     | '/_authenticated/strategies'
     | '/email/unsubscribe'
     | '/_authenticated/analysis/$id'
-    | '/_authenticated/crypto/paper'
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
@@ -731,6 +731,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCryptoSandboxRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/crypto-paper': {
+      id: '/_authenticated/crypto-paper'
+      path: '/crypto-paper'
+      fullPath: '/crypto-paper'
+      preLoaderRoute: typeof AuthenticatedCryptoPaperRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/crypto': {
       id: '/_authenticated/crypto'
       path: '/crypto'
@@ -786,13 +793,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/health/kalshi'
       preLoaderRoute: typeof ApiHealthKalshiRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/crypto/paper': {
-      id: '/_authenticated/crypto/paper'
-      path: '/paper'
-      fullPath: '/crypto/paper'
-      preLoaderRoute: typeof AuthenticatedCryptoPaperRouteImport
-      parentRoute: typeof AuthenticatedCryptoRoute
     }
     '/_authenticated/analysis/$id': {
       id: '/_authenticated/analysis/$id'
@@ -937,23 +937,13 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AuthenticatedCryptoRouteChildren {
-  AuthenticatedCryptoPaperRoute: typeof AuthenticatedCryptoPaperRoute
-}
-
-const AuthenticatedCryptoRouteChildren: AuthenticatedCryptoRouteChildren = {
-  AuthenticatedCryptoPaperRoute: AuthenticatedCryptoPaperRoute,
-}
-
-const AuthenticatedCryptoRouteWithChildren =
-  AuthenticatedCryptoRoute._addFileChildren(AuthenticatedCryptoRouteChildren)
-
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAnalyzeRoute: typeof AuthenticatedAnalyzeRoute
   AuthenticatedBacktestRoute: typeof AuthenticatedBacktestRoute
   AuthenticatedChartRoute: typeof AuthenticatedChartRoute
-  AuthenticatedCryptoRoute: typeof AuthenticatedCryptoRouteWithChildren
+  AuthenticatedCryptoRoute: typeof AuthenticatedCryptoRoute
+  AuthenticatedCryptoPaperRoute: typeof AuthenticatedCryptoPaperRoute
   AuthenticatedCryptoSandboxRoute: typeof AuthenticatedCryptoSandboxRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
@@ -971,7 +961,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAnalyzeRoute: AuthenticatedAnalyzeRoute,
   AuthenticatedBacktestRoute: AuthenticatedBacktestRoute,
   AuthenticatedChartRoute: AuthenticatedChartRoute,
-  AuthenticatedCryptoRoute: AuthenticatedCryptoRouteWithChildren,
+  AuthenticatedCryptoRoute: AuthenticatedCryptoRoute,
+  AuthenticatedCryptoPaperRoute: AuthenticatedCryptoPaperRoute,
   AuthenticatedCryptoSandboxRoute: AuthenticatedCryptoSandboxRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
