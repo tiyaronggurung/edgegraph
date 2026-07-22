@@ -2390,13 +2390,15 @@ function BigFlipMonitor() {
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "big_flip_signals", filter: `user_id=eq.${uid}` },
           (payload) => {
-            const row = payload.new as { ticker: string; to_side: string; prev_yes: number; new_yes: number; yes_delta: number; seconds_to_close: number; passed_rules: boolean; flip_at: string };
-            if (!row.passed_rules) return;
+            const row = payload.new as { ticker: string; to_side: string; min_ask_cents: number | null; new_yes: number; model_side_conf: number | null; seconds_to_close: number; passed_rules: boolean; flip_at: string; trigger_kind: string };
+            if (!row.passed_rules || row.trigger_kind !== "cheap_flip_15c") return;
             const key = `${row.ticker}:${row.flip_at}`;
             if (lastToastKey.current === key) return;
             lastToastKey.current = key;
-            toast.success(`🚨 BIG FLIP → ${row.to_side} · LIVE $10`, {
-              description: `${row.prev_yes}¢ → ${row.new_yes}¢ (Δ${row.yes_delta}) · ${row.seconds_to_close}s left`,
+            const ask = row.min_ask_cents ?? row.new_yes;
+            const conf = row.model_side_conf != null ? `${(Number(row.model_side_conf) * 100).toFixed(0)}%` : "?";
+            toast.success(`🎯 CHEAP FLIP → ${row.to_side} @ ${ask}¢ · PAPER $10`, {
+              description: `model conf ${conf} · ${row.seconds_to_close}s left`,
             });
             try { playOrderPlaced(); } catch { /* noop */ }
           },
