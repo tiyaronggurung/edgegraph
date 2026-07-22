@@ -114,7 +114,7 @@ export const recordPaperFire = createServerFn({ method: "POST" })
     side: "YES" | "NO";
     contracts: number;
     fillPriceCents: number;
-    snapshot?: Record<string, unknown>;
+    snapshot?: JsonValue;
   }) => d)
   .handler(async ({ context, data }): Promise<{ ok: true; fillId: string; balanceCents: number } | { ok: false; reason: string; balanceCents: number }> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
