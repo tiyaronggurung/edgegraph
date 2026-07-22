@@ -1018,38 +1018,23 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         const cal = applyCalib ? applyCalib(p, secondsToClose, calibState) : { p, deltaPts: 0, bucket: "ge600", active: false };
         p = cal.p;
 
-        // Locked side: first snapshot picks UP/DOWN for the window based on
-        // the MODEL's own directional probability, not on value-vs-Kalshi.
-        // Kalshi's next-window strike ≡ BTC price at window open (anchor), so
-        // p >= 0.5 means "model says BTC finishes above the open" → YES.
-        const lockedPre = lockedSides.get(m.ticker);
-        const tentativeSide: "YES" | "NO" = lockedPre ?? (p >= 0.5 ? "YES" : "NO");
+        // ── FREEZE-SIDE GUARD REMOVED (2026-07-22 rollback) ──
+        // The lockedSide-first behavior kept the model stuck on the first
+        // snapshot's pick even when live probability drifted across 50%.
+        // Side now always follows the current calibrated probability.
+        const tentativeSide: "YES" | "NO" = p >= 0.5 ? "YES" : "NO";
 
         // (c) Asymmetric blend toward market in the final 2 minutes — only when
         // model trails market on the locked side, never when we're MORE confident
         // than Kalshi (we read spot+time live; their book lags).
         if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining, tentativeSide);
 
-        // (g) LIVE professional TA confluence blend (ta-v2). Confluence-weighted
-        // score across EMA / VWAP / structure / MACD / RSI / candles / BB + an
-        // acceleration bonus. Blend is scaled by confidence so weak/noisy
-        // signals (|score| < 20) barely move probability, while high-conviction
-        // reads (|score| >= 60) can shift the model up to ±25 pts. Rejection
-        // wicks add a directional kicker on top.
-        {
-          const ta = taScoreRes?.score ?? 0;
-          const conf = taScoreRes?.confidence ?? 0;
-          // Confidence gate: 0 below 20, ramp to 1.0 by 60. Below 20 the score
-          // is effectively noise; above 60 the confluence is loud enough to move p.
-          const confWeight = Math.max(0, Math.min(1, (conf - 20) / 40));
-          // Max blend: ±25 pts at a full 100 signed score with full confidence.
-          let taDelta = (ta / 100) * 0.25 * confWeight;
-          if (taScoreRes?.vwapRejectedAgainstUp) taDelta -= 0.08;
-          if (taScoreRes?.vwapRejectedAgainstDown) taDelta += 0.08;
-          if (Number.isFinite(taDelta) && Math.abs(taDelta) >= 0.005) {
-            p = Math.max(0.02, Math.min(0.98, p + taDelta));
-          }
-        }
+        // ── TA-IN-PROBABILITY BLEND REMOVED (2026-07-22 rollback) ──
+        // Blending ta_score_v2 into model_prob (±25pt shift) broke calibration:
+        // the 70–85% confidence bucket collapsed from ~60% WR to ~25% WR after
+        // it went live. TA is now consumed as a VETO only (see entry gate
+        // post-processing below). Fields are still populated for display.
+
 
         const rawEdgePts = (p - yesPrice) * 100;
         const side: "YES" | "NO" = lockedPre ?? (p >= 0.5 ? "YES" : "NO");
