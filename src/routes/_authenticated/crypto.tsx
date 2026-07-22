@@ -18,6 +18,7 @@ import { recomputeShadowSim, getShadowSimReport, type ShadowSimGateStat } from "
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
+import { MultiTfShadowPanel } from "@/components/MultiTfShadowPanel";
 import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
 import { NextStakeBanner } from "@/components/crypto/NextStakeBanner";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
