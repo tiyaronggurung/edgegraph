@@ -11,6 +11,8 @@ export interface PaperBalance {
   net_pnl_cents: number;
 }
 
+type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue };
+
 export interface PaperFillRow {
   id: string;
   ticker: string;
@@ -25,7 +27,7 @@ export interface PaperFillRow {
   pnl_cents: number | null;
   settled_at: string | null;
   created_at: string;
-  entry_snapshot: Record<string, unknown>;
+  entry_snapshot: JsonValue;
 }
 
 export interface PaperStats {
