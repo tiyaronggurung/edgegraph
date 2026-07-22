@@ -7,6 +7,7 @@ import { evaluateBtcEntry, type BtcEntryGateDecision } from "./btcEntryGate";
 import { getBtcGateConfig } from "./btcGateConfig.server";
 import { logBtcGateDecision } from "./btcGateLog.server";
 import { getChartVerdict } from "./ta/chartVerdict";
+import { computeTaScore, TA_ENGINE_VERSION, type TaScoreResult } from "./ta/taEngine";
 
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
 const COINBASE = "https://api.exchange.coinbase.com";
