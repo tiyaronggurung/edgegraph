@@ -1862,7 +1862,7 @@ const GREEN_HOURS_UTC = new Set<number>([8, 11, 12, 16, 19, 20, 21, 22]);
 
 type PredVerdict = { action: "UP" | "DOWN" | "SKIP"; ask: number; edge: number; reasons: string[] } | null;
 
-function GreenHoursBetPanel() {
+export function GreenHoursBetPanel() {
   const runFn = useServerFn(runAutoTrade);
 
   const [enabled, setEnabled] = useState<boolean>(() => {
