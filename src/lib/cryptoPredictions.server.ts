@@ -23,6 +23,17 @@ export interface SnapshotInput {
   liveSide?: "YES" | "NO";
   chartVerdict?: "YES" | "NO" | "neutral";
   chartStrength?: number;
+  taScore?: number;
+  taReasons?: string[];
+  taVwapDistPct?: number | null;
+  taTrendAlignScore?: number;
+  taRsi1m?: number | null;
+  taRsi5m?: number | null;
+  taMacd5mHist?: number | null;
+  taBb5mPctB?: number | null;
+  taVwapRejUp?: boolean;
+  taVwapRejDown?: boolean;
+  taEngineVersion?: string;
   // Phase 1: probability decomposition. Physics = diffusion+drift only.
   // Independent = physics + options + micro, but no Kalshi market blend and
   // no calibration. Both stored for the ablation report; gates ignore them.
@@ -98,6 +109,17 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         live_side: input.liveSide ?? input.side,
         chart_verdict: input.chartVerdict ?? null,
         chart_strength: input.chartStrength ?? null,
+        ta_score: input.taScore ?? null,
+        ta_reasons: (input.taReasons ?? null) as never,
+        ta_vwap_dist_pct: input.taVwapDistPct ?? null,
+        ta_trend_alignment_score: input.taTrendAlignScore ?? null,
+        ta_rsi_1m: input.taRsi1m ?? null,
+        ta_rsi_5m: input.taRsi5m ?? null,
+        ta_macd_5m_hist: input.taMacd5mHist ?? null,
+        ta_bb_5m_pctb: input.taBb5mPctB ?? null,
+        ta_vwap_rej_up: input.taVwapRejUp ?? false,
+        ta_vwap_rej_down: input.taVwapRejDown ?? false,
+        ta_engine_version: input.taEngineVersion ?? null,
         time_bucket: timeBucketOf(input.secondsToClose),
         physics_prob: input.physicsProb ?? null,
         independent_prob: input.independentProb ?? null,
@@ -127,6 +149,17 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         live_side: nextLive,
         chart_verdict: input.chartVerdict ?? null,
         chart_strength: input.chartStrength ?? null,
+        ta_score: input.taScore ?? null,
+        ta_reasons: (input.taReasons ?? null) as never,
+        ta_vwap_dist_pct: input.taVwapDistPct ?? null,
+        ta_trend_alignment_score: input.taTrendAlignScore ?? null,
+        ta_rsi_1m: input.taRsi1m ?? null,
+        ta_rsi_5m: input.taRsi5m ?? null,
+        ta_macd_5m_hist: input.taMacd5mHist ?? null,
+        ta_bb_5m_pctb: input.taBb5mPctB ?? null,
+        ta_vwap_rej_up: input.taVwapRejUp ?? false,
+        ta_vwap_rej_down: input.taVwapRejDown ?? false,
+        ta_engine_version: input.taEngineVersion ?? null,
         time_bucket: timeBucketOf(input.secondsToClose),
         physics_prob: input.physicsProb ?? null,
         independent_prob: input.independentProb ?? null,
@@ -239,6 +272,17 @@ export interface PredictionStatsResult {
     flipCount: number;
     chartVerdict: "YES" | "NO" | "neutral" | null;
     chartStrength: number | null;
+    taScore: number | null;
+    taReasons: string[];
+    taVwapDistPct: number | null;
+    taTrendAlignScore: number | null;
+    taRsi1m: number | null;
+    taRsi5m: number | null;
+    taMacd5mHist: number | null;
+    taBb5mPctB: number | null;
+    taVwapRejUp: boolean;
+    taVwapRejDown: boolean;
+    taEngineVersion: string | null;
   }>;
 }
 
@@ -255,7 +299,7 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
 
   const { data: rows } = await supabaseAdmin
     .from("btc_model_predictions")
-    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, settled_at, live_side, flip_count, chart_verdict, chart_strength")
+    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, settled_at, live_side, flip_count, chart_verdict, chart_strength, ta_score, ta_reasons, ta_vwap_dist_pct, ta_trend_alignment_score, ta_rsi_1m, ta_rsi_5m, ta_macd_5m_hist, ta_bb_5m_pctb, ta_vwap_rej_up, ta_vwap_rej_down, ta_engine_version")
     .gte("close_time", cutoff)
     .order("close_time", { ascending: false })
     .limit(500);
@@ -306,6 +350,17 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
       flipCount: Number(r.flip_count ?? 0),
       chartVerdict: (r.chart_verdict as "YES" | "NO" | "neutral" | null) ?? null,
       chartStrength: r.chart_strength != null ? Number(r.chart_strength) : null,
+      taScore: r.ta_score != null ? Number(r.ta_score) : null,
+      taReasons: Array.isArray(r.ta_reasons) ? (r.ta_reasons as unknown[]).map(String) : [],
+      taVwapDistPct: r.ta_vwap_dist_pct != null ? Number(r.ta_vwap_dist_pct) : null,
+      taTrendAlignScore: r.ta_trend_alignment_score != null ? Number(r.ta_trend_alignment_score) : null,
+      taRsi1m: r.ta_rsi_1m != null ? Number(r.ta_rsi_1m) : null,
+      taRsi5m: r.ta_rsi_5m != null ? Number(r.ta_rsi_5m) : null,
+      taMacd5mHist: r.ta_macd_5m_hist != null ? Number(r.ta_macd_5m_hist) : null,
+      taBb5mPctB: r.ta_bb_5m_pctb != null ? Number(r.ta_bb_5m_pctb) : null,
+      taVwapRejUp: Boolean(r.ta_vwap_rej_up),
+      taVwapRejDown: Boolean(r.ta_vwap_rej_down),
+      taEngineVersion: (r.ta_engine_version as string | null) ?? null,
     })),
   };
 }

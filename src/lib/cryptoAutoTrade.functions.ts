@@ -624,7 +624,7 @@ export async function runAutoTradeCore(
         if (top.length === 0) {
           skipReasons.push("force: no tradeable market with valid quotes");
         } else {
-          skipReasons.push(`force: picked ${top.length} market(s): ${top.map(t => `${t.ticker} ${t.side} edge=${t.edgeAbs.toFixed(1)}pts`).join("; ")} (gates bypassed)`);
+          skipReasons.push(`force: picked ${top.length} market(s): ${top.map(t => `${t.ticker} ${t.side} edge=${t.edgeAbs.toFixed(1)}pts`).join("; ")} (selection forced; TA/wrong-side/risk guards still apply)`);
         }
       }
       candidates = top;
@@ -983,6 +983,27 @@ export async function runAutoTradeCore(
         const sideProbGuard = side === "YES" ? m.modelYesProb : 1 - m.modelYesProb;
         if (!Number.isFinite(sideProbGuard) || sideProbGuard < 0.5) {
           skipReasons.push(`${m.ticker}: wrong-side — model gives ${side} only ${((sideProbGuard || 0) * 100).toFixed(0)}% (need ≥50%) — skip`);
+          continue;
+        }
+      }
+
+      // #1b — Real TA hard guard (unconditional; force/live/paper all paths).
+      // Force mode is used by the paper/Model/PRED buttons to choose a ticker,
+      // but it must NOT bypass professional chart checks. This is the same
+      // EMA/VWAP/RSI/MACD/BB engine attached to every BTC snapshot.
+      {
+        const ta = Number(m.taScore ?? 0);
+        const sideSign = side === "YES" ? 1 : -1;
+        const alignedTa = ta * sideSign;
+        const vwapAgainst =
+          (side === "YES" && Boolean(m.taVwapRejUp)) ||
+          (side === "NO" && Boolean(m.taVwapRejDown));
+        if (alignedTa <= -40) {
+          skipReasons.push(`${m.ticker}: ta_hard_skip — TA score ${ta} opposes ${side} (aligned ${alignedTa}) — ${(m.taReasons ?? []).slice(0, 4).join(",")}`);
+          continue;
+        }
+        if (vwapAgainst) {
+          skipReasons.push(`${m.ticker}: ta_vwap_reject — VWAP rejection against ${side} on last 1m candles`);
           continue;
         }
       }

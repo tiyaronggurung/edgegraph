@@ -1767,6 +1767,8 @@ export function PredBetPanel() {
         if (Math.abs(r.edgePts) < PRED_MIN_EDGE_ABS) return false;
         const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
         if (sideAsk < PRED_MIN_ASK || sideAsk > PRED_MAX_ASK) return false;
+        const sideConf = r.side === "YES" ? r.modelProb : 1 - r.modelProb;
+        if (sideConf < PRED_MIN_SIDE_CONF) return false;
         return true;
       });
       if (candidates.length === 0) return;

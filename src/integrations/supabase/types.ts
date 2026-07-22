@@ -2347,6 +2347,17 @@ export type Database = {
           snapshot_seconds_to_close: number
           spot_at_snapshot: number
           strike: number
+          ta_bb_5m_pctb: number | null
+          ta_engine_version: string | null
+          ta_macd_5m_hist: number | null
+          ta_reasons: Json | null
+          ta_rsi_1m: number | null
+          ta_rsi_5m: number | null
+          ta_score: number | null
+          ta_trend_alignment_score: number | null
+          ta_vwap_dist_pct: number | null
+          ta_vwap_rej_down: boolean
+          ta_vwap_rej_up: boolean
           theory_yes_prob: number | null
           ticker: string
           time_bucket: string | null
@@ -2378,6 +2389,17 @@ export type Database = {
           snapshot_seconds_to_close: number
           spot_at_snapshot: number
           strike: number
+          ta_bb_5m_pctb?: number | null
+          ta_engine_version?: string | null
+          ta_macd_5m_hist?: number | null
+          ta_reasons?: Json | null
+          ta_rsi_1m?: number | null
+          ta_rsi_5m?: number | null
+          ta_score?: number | null
+          ta_trend_alignment_score?: number | null
+          ta_vwap_dist_pct?: number | null
+          ta_vwap_rej_down?: boolean
+          ta_vwap_rej_up?: boolean
           theory_yes_prob?: number | null
           ticker: string
           time_bucket?: string | null
@@ -2409,6 +2431,17 @@ export type Database = {
           snapshot_seconds_to_close?: number
           spot_at_snapshot?: number
           strike?: number
+          ta_bb_5m_pctb?: number | null
+          ta_engine_version?: string | null
+          ta_macd_5m_hist?: number | null
+          ta_reasons?: Json | null
+          ta_rsi_1m?: number | null
+          ta_rsi_5m?: number | null
+          ta_score?: number | null
+          ta_trend_alignment_score?: number | null
+          ta_vwap_dist_pct?: number | null
+          ta_vwap_rej_down?: boolean
+          ta_vwap_rej_up?: boolean
           theory_yes_prob?: number | null
           ticker?: string
           time_bucket?: string | null
