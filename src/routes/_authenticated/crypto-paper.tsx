@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import {
   getPaperBalance,
@@ -26,14 +26,15 @@ export const Route = createFileRoute("/_authenticated/crypto-paper")({
   component: PaperTradingPage,
 });
 
-type ButtonKind = "model" | "pred" | "green_hours";
+type ButtonKind = "model" | "pred" | "green_hours" | "manual";
 type PaperFillRow = import("@/lib/paperTrading.functions").PaperFillRow;
-const BUTTON_ORDER: ButtonKind[] = ["model", "pred", "green_hours"];
-const buttonLabel: Record<ButtonKind, string> = { model: "Model", pred: "PRED", green_hours: "Green Hours" };
+const BUTTON_ORDER: ButtonKind[] = ["model", "pred", "green_hours", "manual"];
+const buttonLabel: Record<ButtonKind, string> = { model: "Model", pred: "PRED", green_hours: "Green Hours", manual: "Manual" };
 const buttonTint: Record<ButtonKind, string> = {
   model: "border-sky-500/40 bg-sky-500/10",
   pred: "border-fuchsia-500/40 bg-fuchsia-500/10",
   green_hours: "border-emerald-500/40 bg-emerald-500/10",
+  manual: "border-amber-500/40 bg-amber-500/10",
 };
 
 const fmtUsd = (cents: number) => `${cents < 0 ? "-" : ""}$${(Math.abs(cents) / 100).toFixed(2)}`;
@@ -84,7 +85,7 @@ function PaperTradingPage() {
 
   // Group fills by button
   const byButton = useMemo(() => {
-    const g: Record<ButtonKind, PaperFillRow[]> = { model: [], pred: [], green_hours: [] };
+    const g: Record<ButtonKind, PaperFillRow[]> = { model: [], pred: [], green_hours: [], manual: [] };
     for (const f of fills) if (g[f.button]) g[f.button].push(f);
     return g;
   }, [fills]);
@@ -98,7 +99,7 @@ function PaperTradingPage() {
       const cur = map.get(key) ?? {
         key, day, sortKey: new Date(key).getTime(),
         pnlCents: 0, wins: 0, losses: 0, fires: 0,
-        byBtn: { model: 0, pred: 0, green_hours: 0 },
+        byBtn: { model: 0, pred: 0, green_hours: 0, manual: 0 },
       };
       cur.fires += 1;
       if (f.status === "won") cur.wins += 1;
@@ -120,8 +121,12 @@ function PaperTradingPage() {
         <Link to="/crypto" className="text-xs text-sky-400 hover:underline">← Back to Crypto</Link>
       </div>
 
-      {/* Live Kalshi odds — read-only, matches Kalshi UI */}
-      <KalshiOddsWidget />
+      {/* Live Kalshi odds — clickable UP/DOWN places a $10 paper bet */}
+      <KalshiOddsWidget enableBetting />
+
+      {/* Auto-settle: silently settle due fills every 30s while page is open */}
+      <AutoSettler />
+
 
       {/* Balance */}
       <div className="border border-border rounded-lg bg-card p-4">
@@ -237,6 +242,28 @@ function PaperTradingPage() {
   );
 }
 
+function AutoSettler() {
+  const settleFn = useServerFn(settleMyPaperFills);
+  const qc = useQueryClient();
+  useEffect(() => {
+    let stopped = false;
+    const tick = async () => {
+      try {
+        const r: any = await settleFn();
+        if (!stopped && r?.settled > 0) {
+          qc.invalidateQueries({ queryKey: ["paperBalance"] });
+          qc.invalidateQueries({ queryKey: ["paperFills"] });
+          qc.invalidateQueries({ queryKey: ["paperStats"] });
+        }
+      } catch { /* silent */ }
+    };
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => { stopped = true; clearInterval(id); };
+  }, [settleFn, qc]);
+  return null;
+}
+
 function AllFillsLog({ rows }: { rows: PaperFillRow[] }) {
   return (
     <div className="border border-border rounded-lg bg-card">
@@ -280,6 +307,7 @@ function AllFillsLog({ rows }: { rows: PaperFillRow[] }) {
                       <span className={`inline-block text-[9px] px-1.5 py-0.5 rounded border ${
                         f.button === "model" ? "border-sky-500/50 bg-sky-500/10 text-sky-300" :
                         f.button === "pred" ? "border-fuchsia-500/50 bg-fuchsia-500/10 text-fuchsia-300" :
+                        f.button === "manual" ? "border-amber-500/50 bg-amber-500/10 text-amber-300" :
                         "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
                       }`}>{buttonLabel[f.button]}</span>
                     </td>
