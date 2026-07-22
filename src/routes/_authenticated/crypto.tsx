@@ -1422,8 +1422,7 @@ function ModelBetPanel() {
       writeProcessed(Array.from(processed));
       try {
         const res = await runFn({ data: {
-          mode: "live",
-          confirm: "I_UNDERSTAND_LIVE",
+          mode: "paper",
           stakeUsd: stake,
           maxOrders: 1,
           force: true,
@@ -1767,8 +1766,7 @@ function PredBetPanel() {
       writeProcessed(Array.from(processed));
       try {
         const res = await runFn({ data: {
-          mode: "live",
-          confirm: "I_UNDERSTAND_LIVE",
+          mode: "paper",
           stakeUsd: PRED_BET_STAKE,
           maxOrders: 1,
           force: true,
@@ -1919,8 +1917,7 @@ function GreenHoursBetPanel() {
       setFiring(true);
       try {
         const res = await runFn({ data: {
-          mode: "live",
-          confirm: "I_UNDERSTAND_LIVE",
+          mode: "paper",
           stakeUsd: GREEN_BET_STAKE,
           maxOrders: 1,
         } });
