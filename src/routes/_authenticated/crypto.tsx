@@ -18,6 +18,7 @@ import { recomputeShadowSim, getShadowSimReport, type ShadowSimGateStat } from "
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
+import { MultiTfShadowPanel } from "@/components/MultiTfShadowPanel";
 import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
 import { NextStakeBanner } from "@/components/crypto/NextStakeBanner";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
@@ -3725,8 +3726,12 @@ function CryptoPage() {
 
       {/* Model / PRED / Green Hours bet panels moved to /crypto-paper (paper-only sandbox).
           Components remain exported from this file so the real-money path is preserved. */}
-
       {data && <TopPick markets={data.markets} />}
+
+      {/* Multi-TF shadow (pure logging, no live impact) */}
+      <MultiTfShadowPanel />
+
+
 
       {data && (
         <div className="space-y-2">
