@@ -142,6 +142,9 @@ function PaperTradingPage() {
       {/* Multi-TF shadow (pure logging, no live impact) */}
       <MultiTfShadowPanel />
 
+      {/* Loss autopsy — read-only failure-mode tagger */}
+      <LossAutopsyPanel />
+
 
 
 
