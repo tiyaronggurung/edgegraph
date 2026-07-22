@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import {
   getPaperBalance,
@@ -121,8 +121,12 @@ function PaperTradingPage() {
         <Link to="/crypto" className="text-xs text-sky-400 hover:underline">← Back to Crypto</Link>
       </div>
 
-      {/* Live Kalshi odds — read-only, matches Kalshi UI */}
-      <KalshiOddsWidget />
+      {/* Live Kalshi odds — clickable UP/DOWN places a $10 paper bet */}
+      <KalshiOddsWidget enableBetting />
+
+      {/* Auto-settle: silently settle due fills every 30s while page is open */}
+      <AutoSettler />
+
 
       {/* Balance */}
       <div className="border border-border rounded-lg bg-card p-4">
