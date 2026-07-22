@@ -166,7 +166,7 @@ function PaperTradingPage() {
               </button>
               <button
                 onClick={() => {
-                  if (window.confirm("Reset paper balance to $100 and void all open fills?")) resetM.mutate();
+                  if (window.confirm("Reset paper balance to $500 and void all open fills?")) resetM.mutate();
                 }}
                 disabled={resetM.isPending}
                 className="text-xs font-semibold px-3 py-1.5 rounded border border-amber-500/50 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
