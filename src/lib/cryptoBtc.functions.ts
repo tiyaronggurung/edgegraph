@@ -214,10 +214,23 @@ async function kalshiFetch(path: string): Promise<any> {
 }
 
 async function fetchBtcCandles(): Promise<BtcCandle[]> {
+  // Coinbase returns up to 300 candles per call. At granularity=60 that's 5h
+  // of 1m data — enough for EMA169 (170 bars), MACD (35 bars), and RSI/BB.
   const res = await fetch(`${COINBASE}/products/BTC-USD/candles?granularity=60`, {
     headers: { Accept: "application/json", "User-Agent": "edgegraph/1.0" },
   });
   if (!res.ok) throw new Error(`Coinbase ${res.status}`);
+  const rows = (await res.json()) as number[][];
+  return rows.map(([t, l, h, o, c, v]) => ({ t, o, h, l, c, v })).sort((a, b) => a.t - b.t);
+}
+
+async function fetchBtcCandles5m(): Promise<BtcCandle[]> {
+  // True 5m candles from Coinbase (granularity=300 = 25h of history).
+  // We need ≥35 bars for MACD 5m, ≥20 for BB — this gives 300, plenty for both.
+  const res = await fetch(`${COINBASE}/products/BTC-USD/candles?granularity=300`, {
+    headers: { Accept: "application/json", "User-Agent": "edgegraph/1.0" },
+  });
+  if (!res.ok) throw new Error(`Coinbase 5m ${res.status}`);
   const rows = (await res.json()) as number[][];
   return rows.map(([t, l, h, o, c, v]) => ({ t, o, h, l, c, v })).sort((a, b) => a.t - b.t);
 }
@@ -824,12 +837,18 @@ function optionsImpliedProb(
 // public server routes without auth). getBtcMarkets is a thin wrapper.
 export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
 
-    const [evJson, candles] = await Promise.all([
+    const [evJson, candles, candles5mReal] = await Promise.all([
       kalshiFetch(`/events?status=open&with_nested_markets=true&series_ticker=KXBTC15M&limit=50`),
       fetchBtcCandles().catch(() => [] as BtcCandle[]),
+      fetchBtcCandles5m().catch(() => [] as BtcCandle[]),
     ]);
 
+    // `recent` (60 1m) — used by legacy σ/drift math that has been tuned for
+    // that window; do not widen or the sigma calcs shift under everything else.
     const recent = candles.slice(-60);
+    // `taCandles1m` — full 300 1m candles (5h). Feeds the TA engine so EMA169,
+    // RSI14, MACD, and Bollinger can actually compute instead of returning null.
+    const taCandles1m = candles;
     const candleSpot = recent.length ? recent[recent.length - 1].c : 0;
     // (a) Consolidated multi-venue spot (Coinbase + Binance + Kraken median).
     const { median: spot, ticks: venueTicks } = await fetchConsolidatedSpotDetailed(candleSpot);
@@ -875,9 +894,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
     })();
 
     // ── Chart verdict (global, once per request) ───────────────────────────
-    // Feed the same 1m candles + a 5-bucket 5m aggregation into the existing
-    // TA verdict engine. Used ONLY for the live-side flip logic below; the
-    // locked snapshot side is not touched.
+    // Legacy chart verdict still uses the short bucketed 5m array — do NOT
+    // switch it to the real 5m feed without re-tuning its thresholds.
     const candles5m: BtcCandle[] = (() => {
       if (recent.length < 5) return [];
       const buckets: BtcCandle[] = [];
@@ -898,12 +916,16 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
       try { return getChartVerdict(recent, candles5m); }
       catch (e) { console.warn("chart verdict failed:", e); return null; }
     })();
-    // Real TA engine (live-wired): EMA9/21/55/145/169 stack + VWAP + RSI + MACD + BB + patterns.
-    // One computation per snapshot; every market in this snapshot shares it.
+    // Real TA engine v2 (live-wired): confluence scorer across EMA9/21/55/145/169,
+    // VWAP, structure, MACD, RSI, Bollinger, candles, plus acceleration deltas.
+    // Uses the DEEP 1m (300 bars) + REAL 5m (300 bars) feeds so every indicator
+    // can actually compute instead of falling back to null.
+    const taSource5m = candles5mReal.length >= 35 ? candles5mReal : candles5m;
     const taScoreRes: TaScoreResult | null = (() => {
-      try { return computeTaScore(recent, candles5m); }
+      try { return computeTaScore(taCandles1m, taSource5m); }
       catch (e) { console.warn("ta score failed:", e); return null; }
     })();
+
 
     // Apply regime knobs to σ and drift before they feed the diffusion model.
     const sigma = sigmaRaw * (regimeState?.sigmaMult ?? 1);
@@ -1008,13 +1030,20 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         // than Kalshi (we read spot+time live; their book lags).
         if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining, tentativeSide);
 
-        // (g) LIVE professional TA blend — no shadow. The EMA9/21/55/145/169,
-        // VWAP, RSI, MACD, Bollinger, and candle-pattern engine moves the actual
-        // model probability before the side/edge/gates are computed. This is the
-        // shared source for the displayed Model Pick, PRED, paper, and live paths.
+        // (g) LIVE professional TA confluence blend (ta-v2). Confluence-weighted
+        // score across EMA / VWAP / structure / MACD / RSI / candles / BB + an
+        // acceleration bonus. Blend is scaled by confidence so weak/noisy
+        // signals (|score| < 20) barely move probability, while high-conviction
+        // reads (|score| >= 60) can shift the model up to ±25 pts. Rejection
+        // wicks add a directional kicker on top.
         {
           const ta = taScoreRes?.score ?? 0;
-          let taDelta = ta * 0.002; // ±20 probability pts at a full ±100 TA score.
+          const conf = taScoreRes?.confidence ?? 0;
+          // Confidence gate: 0 below 20, ramp to 1.0 by 60. Below 20 the score
+          // is effectively noise; above 60 the confluence is loud enough to move p.
+          const confWeight = Math.max(0, Math.min(1, (conf - 20) / 40));
+          // Max blend: ±25 pts at a full 100 signed score with full confidence.
+          let taDelta = (ta / 100) * 0.25 * confWeight;
           if (taScoreRes?.vwapRejectedAgainstUp) taDelta -= 0.08;
           if (taScoreRes?.vwapRejectedAgainstDown) taDelta += 0.08;
           if (Number.isFinite(taDelta) && Math.abs(taDelta) >= 0.005) {

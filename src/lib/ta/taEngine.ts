@@ -1,13 +1,27 @@
-// Real TA engine — live-wired, not shadow.
-// Pulls EMA/RSI/MACD/VWAP/ATR/Bollinger + candle patterns off 1m + 5m
-// candles that are already fetched upstream. Pure functions, no I/O.
+// Real TA engine v2 — confluence scorer, live-wired.
+// Weighted 100-pt confluence across the seven indicator families a discretionary
+// trader would watch on a 15m BTC market, plus rate-of-change ("acceleration")
+// on the three that reveal fading momentum before the price flips.
 //
-// Output: a single -100..+100 directional score used as a hard skip gate
-// in cryptoAutoTrade. Positive = YES/up bias, negative = NO/down bias.
+// Output: signed −100..+100 (direction) + 0..100 confidence + a per-component
+// breakdown in `reasons` so the UI/DB can show WHAT drove the number.
 
 import type { Candle } from "./chartSignals";
 
-export const TA_ENGINE_VERSION = "ta-v1";
+export const TA_ENGINE_VERSION = "ta-v2";
+
+// ── Component weights (sum = 100) ────────────────────────────────────────
+// EMA structure is the heaviest — matches the user's multi-EMA screenshot.
+const W_EMA = 25;
+const W_VWAP = 20;
+const W_STRUCT = 20;
+const W_MACD = 15;
+const W_RSI = 10;
+const W_CANDLE = 5;
+const W_BB = 5;
+// Acceleration is a bonus (not part of the base 100) — up to ±15 pts to
+// reward "widening" signals and penalize "fading" ones.
+const W_ACCEL_MAX = 15;
 
 // ── Indicators ────────────────────────────────────────────────────────────
 export function emaSeries(values: number[], period: number): number[] {
@@ -53,6 +67,7 @@ export function macd(values: number[], fast = 12, slow = 26, signal = 9) {
     signal: sig[sig.length - 1],
     hist: hist[hist.length - 1],
     prevHist: hist.length >= 2 ? hist[hist.length - 2] : 0,
+    prev2Hist: hist.length >= 3 ? hist[hist.length - 3] : 0,
   };
 }
 
@@ -78,17 +93,30 @@ export function bollinger(values: number[], period = 20, mult = 2) {
   const upper = mean + mult * sd, lower = mean - mult * sd;
   const price = values[values.length - 1];
   const pctB = upper !== lower ? (price - lower) / (upper - lower) : 0.5;
-  return { upper, lower, mean, sd, pctB };
+  const bandwidth = mean > 0 ? (upper - lower) / mean : 0;
+  return { upper, lower, mean, sd, pctB, bandwidth };
 }
 
-// Session VWAP over the given candles (already scoped to session by caller).
+// Session VWAP over the given candles. If timestamps are present, restart at
+// midnight UTC so we get a real intraday VWAP rather than an all-history mean.
 export function sessionVwap(candles: Candle[]): number | null {
   if (candles.length === 0) return null;
+  const last = candles[candles.length - 1];
+  const lastDay = last.t ? Math.floor(last.t / 86400) : null;
   let pv = 0, vv = 0;
   for (const c of candles) {
+    if (lastDay !== null && c.t && Math.floor(c.t / 86400) !== lastDay) continue;
     const typical = (c.h + c.l + c.c) / 3;
     pv += typical * (c.v || 1);
     vv += c.v || 1;
+  }
+  if (vv === 0) {
+    // Fallback: use all candles if today's session had no volume yet.
+    for (const c of candles) {
+      const typical = (c.h + c.l + c.c) / 3;
+      pv += typical * (c.v || 1);
+      vv += c.v || 1;
+    }
   }
   return vv > 0 ? pv / vv : null;
 }
@@ -103,6 +131,17 @@ export function bearEngulfing(cs: Candle[]): boolean {
   if (cs.length < 2) return false;
   const a = cs[cs.length - 2], b = cs[cs.length - 1];
   return a.c > a.o && b.c < b.o && b.o >= a.c && b.c <= a.o;
+}
+function strongClose(cs: Candle[]): number {
+  // +1 = last candle closed in top 20% of its range, −1 = bottom 20%, 0 else.
+  if (cs.length < 1) return 0;
+  const c = cs[cs.length - 1];
+  const range = c.h - c.l;
+  if (range <= 0) return 0;
+  const pos = (c.c - c.l) / range;
+  if (pos >= 0.8) return 1;
+  if (pos <= 0.2) return -1;
+  return 0;
 }
 
 // Higher-high + higher-low over last N closed candles → uptrend structure.
@@ -121,136 +160,308 @@ export function structure(cs: Candle[], n = 5): "up" | "down" | "flat" {
 
 // ── TA verdict score −100..+100 ──────────────────────────────────────────
 export interface TaScoreResult {
-  score: number;                       // −100..+100
-  reasons: string[];
+  score: number;                       // −100..+100 signed direction
+  confidence: number;                  // 0..100 magnitude / how loud
+  reasons: string[];                   // per-component breakdown, e.g. "ema:+22"
+  breakdown: Record<string, number>;   // machine-readable per-component scores
   vwapDistPct: number | null;          // (price - vwap)/vwap * 100
+  vwapDistDeltaPct: number | null;     // rate-of-change of vwap distance across last 5 candles
   trendAlignScore: number;             // −100..+100 (EMA stack alignment)
+  emaGapPct: number | null;            // EMA9 − EMA21 as % of price (signed)
+  emaGapWideningPct: number | null;    // Δ(EMA9−EMA21) over last 5 candles as % of price
   rsi1m: number | null;
   rsi5m: number | null;
   macd5mHist: number | null;
+  macd5mHistDelta: number | null;      // hist - prevHist (acceleration)
   bb5mPctB: number | null;
+  bb5mBandwidth: number | null;        // squeeze detector
   atr1m: number | null;
   vwapRejectedAgainstUp: boolean;      // last candle rejected off VWAP downward
   vwapRejectedAgainstDown: boolean;    // last candle rejected off VWAP upward
 }
 
-function emaStackScore(closes: Candle[]): { score: number; reason: string } {
-  if (closes.length < 170) return { score: 0, reason: "ema-stack:insufficient" };
-  const vals = closes.map(c => c.c);
-  const e9 = emaSeries(vals, 9).at(-1)!;
-  const e21 = emaSeries(vals, 21).at(-1)!;
-  const e55 = emaSeries(vals, 55).at(-1)!;
-  const e145 = emaSeries(vals, 145).at(-1)!;
-  const e169 = emaSeries(vals, 169).at(-1)!;
+// ── Component scorers (each returns signed −W..+W) ────────────────────────
+function scoreEmaStack(closes1m: Candle[]): {
+  score: number;
+  reason: string;
+  trendAlignScore: number;
+  emaGapPct: number | null;
+  emaGapWideningPct: number | null;
+} {
+  const vals = closes1m.map(c => c.c);
+  if (vals.length < 30) {
+    return { score: 0, reason: `ema:0(need30,have${vals.length})`, trendAlignScore: 0, emaGapPct: null, emaGapWideningPct: null };
+  }
+  const need169 = vals.length >= 170;
+  const need55 = vals.length >= 60;
+  const e9 = emaSeries(vals, 9);
+  const e21 = emaSeries(vals, 21);
+  const e55 = need55 ? emaSeries(vals, 55) : null;
+  const e145 = vals.length >= 150 ? emaSeries(vals, 145) : null;
+  const e169 = need169 ? emaSeries(vals, 169) : null;
   const price = vals[vals.length - 1];
-  const up = price > e9 && e9 > e21 && e21 > e55 && e55 > e145 && e145 > e169;
-  const down = price < e9 && e9 < e21 && e21 < e55 && e55 < e145 && e145 < e169;
-  if (up) return { score: 100, reason: "ema-stack:full-up" };
-  if (down) return { score: -100, reason: "ema-stack:full-down" };
-  // Partial: count monotonic pairs
-  const ups = [price > e9, e9 > e21, e21 > e55, e55 > e145, e145 > e169].filter(Boolean).length;
-  const downs = [price < e9, e9 < e21, e21 < e55, e55 < e145, e145 < e169].filter(Boolean).length;
-  const raw = (ups - downs) / 5 * 100;
-  return { score: raw, reason: `ema-stack:partial(${ups}up/${downs}dn)` };
+  const g9 = e9.at(-1)!;
+  const g21 = e21.at(-1)!;
+  const g55 = e55?.at(-1) ?? null;
+  const g145 = e145?.at(-1) ?? null;
+  const g169 = e169?.at(-1) ?? null;
+
+  // Alignment: how many adjacent EMA pairs are in the correct order for UP.
+  const upPairs = [
+    price > g9,
+    g9 > g21,
+    ...(g55 != null ? [g21 > g55] : []),
+    ...(g55 != null && g145 != null ? [g55 > g145] : []),
+    ...(g145 != null && g169 != null ? [g145 > g169] : []),
+  ];
+  const downPairs = [
+    price < g9,
+    g9 < g21,
+    ...(g55 != null ? [g21 < g55] : []),
+    ...(g55 != null && g145 != null ? [g55 < g145] : []),
+    ...(g145 != null && g169 != null ? [g145 < g169] : []),
+  ];
+  const totalPairs = upPairs.length;
+  const upsAligned = upPairs.filter(Boolean).length;
+  const downsAligned = downPairs.filter(Boolean).length;
+  const align = (upsAligned - downsAligned) / totalPairs; // −1..+1
+  const score = Math.round(align * W_EMA);
+
+  const trendAlignScore = Math.round(align * 100);
+
+  const emaGapPct = price > 0 ? ((g9 - g21) / price) * 100 : null;
+
+  // Acceleration: is the 9/21 gap widening in the direction of the trend?
+  const prevIdx = vals.length - 6;
+  let emaGapWideningPct: number | null = null;
+  if (prevIdx > 0) {
+    const prevG9 = e9[prevIdx];
+    const prevG21 = e21[prevIdx];
+    const prevPrice = vals[prevIdx];
+    const prevGap = prevPrice > 0 ? ((prevG9 - prevG21) / prevPrice) * 100 : 0;
+    if (emaGapPct != null) emaGapWideningPct = emaGapPct - prevGap;
+  }
+
+  const reason = `ema:${score >= 0 ? "+" : ""}${score}(${upsAligned}/${totalPairs}up)`;
+  return { score, reason, trendAlignScore, emaGapPct, emaGapWideningPct };
 }
 
-export function computeTaScore(candles1m: Candle[], candles5m: Candle[]): TaScoreResult {
-  const reasons: string[] = [];
-  const closes1 = candles1m.map(c => c.c);
-  const closes5 = candles5m.map(c => c.c);
-  const price = closes1.at(-1) ?? closes5.at(-1) ?? null;
-
-  // Weighted vote to a signed score.
-  let score = 0;
-
-  // 1) EMA stack on 1m (heaviest weight — the multi-EMA screenshot the user showed)
-  const stack = emaStackScore(candles1m);
-  score += stack.score * 0.30;
-  reasons.push(stack.reason);
-
-  // 2) 5m structure: higher-highs/lows
-  const s5 = structure(candles5m, 5);
-  if (s5 === "up") { score += 20; reasons.push("5m-struct:up"); }
-  else if (s5 === "down") { score -= 20; reasons.push("5m-struct:down"); }
-
-  // 3) 1m structure
-  const s1 = structure(candles1m, 5);
-  if (s1 === "up") { score += 10; reasons.push("1m-struct:up"); }
-  else if (s1 === "down") { score -= 10; reasons.push("1m-struct:down"); }
-
-  // 4) MACD 5m histogram sign + flip
-  const m5 = macd(closes5);
-  let macd5mHist: number | null = null;
-  if (m5) {
-    macd5mHist = m5.hist;
-    if (m5.hist > 0 && m5.hist >= m5.prevHist) { score += 12; reasons.push("macd5m:bull-rising"); }
-    else if (m5.hist > 0) { score += 6; reasons.push("macd5m:bull"); }
-    else if (m5.hist < 0 && m5.hist <= m5.prevHist) { score -= 12; reasons.push("macd5m:bear-falling"); }
-    else if (m5.hist < 0) { score -= 6; reasons.push("macd5m:bear"); }
-  }
-
-  // 5) RSI: 1m + 5m — extreme overbought/oversold gives directional pushback
-  const r1 = rsi(closes1, 14);
-  const r5 = rsi(closes5, 14);
-  if (r5 !== null) {
-    if (r5 >= 70) { score -= 8; reasons.push(`rsi5m:${r5.toFixed(0)}-ob`); }
-    else if (r5 <= 30) { score += 8; reasons.push(`rsi5m:${r5.toFixed(0)}-os`); }
-    else if (r5 > 55) { score += 4; reasons.push(`rsi5m:${r5.toFixed(0)}-bull`); }
-    else if (r5 < 45) { score -= 4; reasons.push(`rsi5m:${r5.toFixed(0)}-bear`); }
-  }
-
-  // 6) Bollinger 5m position (pctB): riding upper band = trending up
-  const bb5 = bollinger(closes5, 20, 2);
-  const bb5mPctB = bb5?.pctB ?? null;
-  if (bb5) {
-    if (bb5.pctB >= 0.95) { score += 6; reasons.push("bb5m:upper-ride"); }
-    else if (bb5.pctB <= 0.05) { score -= 6; reasons.push("bb5m:lower-ride"); }
-  }
-
-  // 7) VWAP side + rejection
+function scoreVwap(candles1m: Candle[]): {
+  score: number;
+  reason: string;
+  vwapDistPct: number | null;
+  vwapDistDeltaPct: number | null;
+  vwapRejectedAgainstUp: boolean;
+  vwapRejectedAgainstDown: boolean;
+} {
   const vwap = sessionVwap(candles1m);
-  let vwapDistPct: number | null = null;
-  let vwapRejectedAgainstUp = false;
-  let vwapRejectedAgainstDown = false;
-  if (vwap !== null && price !== null) {
-    vwapDistPct = ((price - vwap) / vwap) * 100;
-    if (price > vwap) { score += 10; reasons.push(`vwap:above(+${vwapDistPct.toFixed(2)}%)`); }
-    else if (price < vwap) { score -= 10; reasons.push(`vwap:below(${vwapDistPct.toFixed(2)}%)`); }
+  const price = candles1m.at(-1)?.c ?? null;
+  if (vwap == null || price == null) {
+    return { score: 0, reason: "vwap:0(nodata)", vwapDistPct: null, vwapDistDeltaPct: null, vwapRejectedAgainstUp: false, vwapRejectedAgainstDown: false };
+  }
+  const distPct = ((price - vwap) / vwap) * 100;
 
-    // Last 2 candles: did we tag VWAP from one side and close back to the other? = rejection.
-    const tail = candles1m.slice(-2);
-    for (const c of tail) {
-      const body = Math.abs(c.c - c.o);
-      if (body <= 0) continue;
-      // Wick pierced above vwap but closed below → bearish rejection = bad for UP bets
-      if (c.h > vwap && c.c < vwap && (c.h - Math.max(c.c, c.o)) > body) {
-        vwapRejectedAgainstUp = true;
-        score -= 15; reasons.push("vwap:rejected-up");
-      }
-      if (c.l < vwap && c.c > vwap && (Math.min(c.c, c.o) - c.l) > body) {
-        vwapRejectedAgainstDown = true;
-        score += 15; reasons.push("vwap:rejected-down");
-      }
+  // Scale: 0.05% above → half weight, ≥0.15% → full weight. Symmetric.
+  const mag = Math.min(1, Math.abs(distPct) / 0.15);
+  let base = Math.sign(distPct) * mag * W_VWAP;
+
+  // Rejection check on last 2 candles.
+  let rejUp = false, rejDown = false;
+  const tail = candles1m.slice(-2);
+  for (const c of tail) {
+    const body = Math.abs(c.c - c.o);
+    if (body <= 0) continue;
+    if (c.h > vwap && c.c < vwap && (c.h - Math.max(c.c, c.o)) > body) rejUp = true;
+    if (c.l < vwap && c.c > vwap && (Math.min(c.c, c.o) - c.l) > body) rejDown = true;
+  }
+  if (rejUp) base -= W_VWAP * 0.75;
+  if (rejDown) base += W_VWAP * 0.75;
+  const score = Math.round(Math.max(-W_VWAP * 1.5, Math.min(W_VWAP * 1.5, base)));
+
+  // Distance acceleration: is price pushing further from VWAP over last 5?
+  let vwapDistDeltaPct: number | null = null;
+  if (candles1m.length >= 6) {
+    const prevPrice = candles1m[candles1m.length - 6].c;
+    const prevDist = ((prevPrice - vwap) / vwap) * 100;
+    vwapDistDeltaPct = distPct - prevDist;
+  }
+
+  const tag = rejUp ? "+rejUp" : rejDown ? "+rejDown" : "";
+  const reason = `vwap:${score >= 0 ? "+" : ""}${score}(${distPct.toFixed(2)}%${tag})`;
+  return { score, reason, vwapDistPct: distPct, vwapDistDeltaPct, vwapRejectedAgainstUp: rejUp, vwapRejectedAgainstDown: rejDown };
+}
+
+function scoreStructure(c1m: Candle[], c5m: Candle[]): { score: number; reason: string } {
+  const s5 = structure(c5m, 5);
+  const s1 = structure(c1m, 5);
+  let s = 0;
+  if (s5 === "up") s += W_STRUCT * 0.6;
+  else if (s5 === "down") s -= W_STRUCT * 0.6;
+  if (s1 === "up") s += W_STRUCT * 0.4;
+  else if (s1 === "down") s -= W_STRUCT * 0.4;
+  // Divergence penalty: 1m and 5m disagree = low-conviction environment.
+  if ((s1 === "up" && s5 === "down") || (s1 === "down" && s5 === "up")) s *= 0.3;
+  const score = Math.round(s);
+  return { score, reason: `struct:${score >= 0 ? "+" : ""}${score}(1m=${s1}/5m=${s5})` };
+}
+
+function scoreMacd(closes5m: number[]): { score: number; reason: string; hist: number | null; delta: number | null } {
+  const m = macd(closes5m);
+  if (!m) return { score: 0, reason: `macd:0(need35,have${closes5m.length})`, hist: null, delta: null };
+  const delta = m.hist - m.prevHist;
+  let s = 0;
+  if (m.hist > 0 && delta > 0) s = W_MACD;              // bull + accelerating
+  else if (m.hist > 0 && delta <= 0) s = W_MACD * 0.4;   // bull but fading
+  else if (m.hist < 0 && delta < 0) s = -W_MACD;         // bear + accelerating
+  else if (m.hist < 0 && delta >= 0) s = -W_MACD * 0.4;  // bear but fading
+  const score = Math.round(s);
+  const tag = m.hist > 0
+    ? (delta > 0 ? "bull↑" : "bull↓")
+    : (delta < 0 ? "bear↓" : "bear↑");
+  return { score, reason: `macd:${score >= 0 ? "+" : ""}${score}(${tag})`, hist: m.hist, delta };
+}
+
+function scoreRsi(closes5m: number[], closes1m: number[]): { score: number; reason: string; r5: number | null; r1: number | null } {
+  const r5 = rsi(closes5m, 14);
+  const r1 = rsi(closes1m, 14);
+  let s = 0;
+  const label: string[] = [];
+  if (r5 != null) {
+    // 55–70 = bull momentum, 30–45 = bear momentum. Extremes = pushback.
+    if (r5 >= 70) { s -= W_RSI * 0.4; label.push(`5m=${r5.toFixed(0)}ob`); }
+    else if (r5 >= 55) { s += W_RSI * 0.7; label.push(`5m=${r5.toFixed(0)}↑`); }
+    else if (r5 <= 30) { s += W_RSI * 0.4; label.push(`5m=${r5.toFixed(0)}os`); }
+    else if (r5 <= 45) { s -= W_RSI * 0.7; label.push(`5m=${r5.toFixed(0)}↓`); }
+    else label.push(`5m=${r5.toFixed(0)}flat`);
+  }
+  if (r1 != null) {
+    if (r1 >= 60) s += W_RSI * 0.3;
+    else if (r1 <= 40) s -= W_RSI * 0.3;
+  }
+  s = Math.max(-W_RSI, Math.min(W_RSI, s));
+  const score = Math.round(s);
+  return { score, reason: `rsi:${score >= 0 ? "+" : ""}${score}(${label.join(",")})`, r5, r1 };
+}
+
+function scoreCandles(c1m: Candle[]): { score: number; reason: string } {
+  let s = 0;
+  const tags: string[] = [];
+  if (bullEngulfing(c1m)) { s += W_CANDLE; tags.push("bull-engulf"); }
+  if (bearEngulfing(c1m)) { s -= W_CANDLE; tags.push("bear-engulf"); }
+  const sc = strongClose(c1m);
+  if (sc !== 0) {
+    s += sc * W_CANDLE * 0.5;
+    tags.push(sc > 0 ? "strong-close↑" : "strong-close↓");
+  }
+  s = Math.max(-W_CANDLE, Math.min(W_CANDLE, s));
+  const score = Math.round(s);
+  return { score, reason: `candle:${score >= 0 ? "+" : ""}${score}${tags.length ? `(${tags.join("/")})` : ""}` };
+}
+
+function scoreBollinger(closes5m: number[]): { score: number; reason: string; pctB: number | null; bandwidth: number | null } {
+  const bb = bollinger(closes5m, 20, 2);
+  if (!bb) return { score: 0, reason: `bb:0(need20,have${closes5m.length})`, pctB: null, bandwidth: null };
+  let s = 0;
+  const tags: string[] = [];
+  // Riding upper (%B ≥ 0.9) = trending up; riding lower (≤ 0.1) = trending down.
+  if (bb.pctB >= 0.9) { s += W_BB; tags.push("upper-ride"); }
+  else if (bb.pctB <= 0.1) { s -= W_BB; tags.push("lower-ride"); }
+  // Squeeze = low conviction — zero out contribution.
+  if (bb.bandwidth < 0.003) { s *= 0.2; tags.push("squeeze"); }
+  const score = Math.round(s);
+  return { score, reason: `bb:${score >= 0 ? "+" : ""}${score}(%B=${bb.pctB.toFixed(2)}${tags.length ? `,${tags.join(",")}` : ""})`, pctB: bb.pctB, bandwidth: bb.bandwidth };
+}
+
+// ── Master scorer ────────────────────────────────────────────────────────
+export function computeTaScore(candles1m: Candle[], candles5m: Candle[]): TaScoreResult {
+  const closes1m = candles1m.map(c => c.c);
+  const closes5m = candles5m.map(c => c.c);
+
+  const ema = scoreEmaStack(candles1m);
+  const vwap = scoreVwap(candles1m);
+  const struc = scoreStructure(candles1m, candles5m);
+  const mac = scoreMacd(closes5m);
+  const rs = scoreRsi(closes5m, closes1m);
+  const cand = scoreCandles(candles1m);
+  const bb = scoreBollinger(closes5m);
+
+  // Base confluence sum.
+  let score = ema.score + vwap.score + struc.score + mac.score + rs.score + cand.score + bb.score;
+
+  // ── Acceleration bonus (±W_ACCEL_MAX) ─────────────────────────────────
+  // Reward when momentum indicators are actively widening in the score's
+  // direction; penalize when they're fading. This captures "moves reverse
+  // when momentum slows, not when indicators flip" (user's spec).
+  let accel = 0;
+  const dirSign = score >= 0 ? 1 : -1;
+  // EMA9-21 gap widening in trend direction
+  if (ema.emaGapWideningPct != null && ema.emaGapPct != null) {
+    const widening = Math.sign(ema.emaGapPct) === Math.sign(ema.emaGapWideningPct)
+      && Math.sign(ema.emaGapPct) === dirSign;
+    if (widening) accel += W_ACCEL_MAX * 0.5 * dirSign;
+    else if (Math.sign(ema.emaGapWideningPct) === -dirSign) accel += W_ACCEL_MAX * 0.25 * -dirSign;
+  }
+  // MACD histogram accelerating in trend direction
+  if (mac.delta != null && mac.hist != null) {
+    if (Math.sign(mac.delta) === dirSign && Math.sign(mac.hist) === dirSign) {
+      accel += W_ACCEL_MAX * 0.35 * dirSign;
+    } else if (Math.sign(mac.delta) === -dirSign) {
+      accel += W_ACCEL_MAX * 0.2 * -dirSign;
     }
   }
-
-  // 8) Engulfing on 1m
-  if (bullEngulfing(candles1m)) { score += 8; reasons.push("1m:bull-engulf"); }
-  if (bearEngulfing(candles1m)) { score -= 8; reasons.push("1m:bear-engulf"); }
+  // VWAP distance opening up in trend direction
+  if (vwap.vwapDistDeltaPct != null) {
+    if (Math.sign(vwap.vwapDistDeltaPct) === dirSign) accel += W_ACCEL_MAX * 0.15 * dirSign;
+    else accel += W_ACCEL_MAX * 0.1 * -dirSign;
+  }
+  accel = Math.max(-W_ACCEL_MAX, Math.min(W_ACCEL_MAX, accel));
+  const accelInt = Math.round(accel);
+  score += accelInt;
 
   score = Math.max(-100, Math.min(100, Math.round(score)));
 
+  // Confidence = magnitude of the raw signed score (before the ±100 clamp).
+  const confidence = Math.min(100, Math.abs(score));
+
+  const breakdown: Record<string, number> = {
+    ema: ema.score,
+    vwap: vwap.score,
+    struct: struc.score,
+    macd: mac.score,
+    rsi: rs.score,
+    candle: cand.score,
+    bb: bb.score,
+    accel: accelInt,
+  };
+
+  const reasons = [
+    `total:${score >= 0 ? "+" : ""}${score}(conf=${confidence})`,
+    ema.reason, vwap.reason, struc.reason, mac.reason, rs.reason, cand.reason, bb.reason,
+    `accel:${accelInt >= 0 ? "+" : ""}${accelInt}`,
+    ...(ema.emaGapWideningPct != null ? [`emaGapΔ=${ema.emaGapWideningPct.toFixed(3)}%`] : []),
+    ...(mac.delta != null ? [`macdΔ=${mac.delta.toFixed(2)}`] : []),
+    ...(vwap.vwapDistDeltaPct != null ? [`vwapΔ=${vwap.vwapDistDeltaPct.toFixed(3)}%`] : []),
+    `n1m=${closes1m.length}/n5m=${closes5m.length}`,
+  ];
+
   return {
     score,
+    confidence,
     reasons,
-    vwapDistPct,
-    trendAlignScore: Math.round(stack.score),
-    rsi1m: r1,
-    rsi5m: r5,
-    macd5mHist,
-    bb5mPctB,
+    breakdown,
+    vwapDistPct: vwap.vwapDistPct,
+    vwapDistDeltaPct: vwap.vwapDistDeltaPct,
+    trendAlignScore: ema.trendAlignScore,
+    emaGapPct: ema.emaGapPct,
+    emaGapWideningPct: ema.emaGapWideningPct,
+    rsi1m: rs.r1,
+    rsi5m: rs.r5,
+    macd5mHist: mac.hist,
+    macd5mHistDelta: mac.delta,
+    bb5mPctB: bb.pctB,
+    bb5mBandwidth: bb.bandwidth,
     atr1m: atr(candles1m, 14),
-    vwapRejectedAgainstUp,
-    vwapRejectedAgainstDown,
+    vwapRejectedAgainstUp: vwap.vwapRejectedAgainstUp,
+    vwapRejectedAgainstDown: vwap.vwapRejectedAgainstDown,
   };
 }
