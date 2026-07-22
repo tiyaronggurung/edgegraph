@@ -11,6 +11,7 @@ import {
   settleMyPaperFills,
 } from "@/lib/paperTrading.functions";
 import { KalshiOddsWidget } from "@/components/crypto/KalshiOddsWidget";
+import { ModelBetPanel, PredBetPanel, GreenHoursBetPanel } from "@/routes/_authenticated/crypto";
 
 export const Route = createFileRoute("/_authenticated/crypto-paper")({
   head: () => ({
@@ -124,8 +125,17 @@ function PaperTradingPage() {
       {/* Live Kalshi odds — clickable UP/DOWN places a $10 paper bet */}
       <KalshiOddsWidget enableBetting />
 
-      {/* Auto-settle: silently settle due fills every 30s while page is open */}
+      {/* Auto-settle: silently settle due fills every 5s while page is open */}
       <AutoSettler />
+
+      {/* Auto-fire loops (paper mode): Model fires every new window; PRED / Green only when their criteria pass */}
+      <div className="grid gap-3 md:grid-cols-3">
+        <ModelBetPanel />
+        <PredBetPanel />
+        <GreenHoursBetPanel />
+      </div>
+
+
 
 
       {/* Balance */}
@@ -156,7 +166,7 @@ function PaperTradingPage() {
               </button>
               <button
                 onClick={() => {
-                  if (window.confirm("Reset paper balance to $100 and void all open fills?")) resetM.mutate();
+                  if (window.confirm("Reset paper balance to $500 and void all open fills?")) resetM.mutate();
                 }}
                 disabled={resetM.isPending}
                 className="text-xs font-semibold px-3 py-1.5 rounded border border-amber-500/50 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
