@@ -13,6 +13,7 @@ import {
 import { KalshiOddsWidget } from "@/components/crypto/KalshiOddsWidget";
 import { ModelBetPanel, PredBetPanel, GreenHoursBetPanel, T5mBetPanel } from "@/routes/_authenticated/crypto";
 import { MultiTfShadowPanel } from "@/components/MultiTfShadowPanel";
+import { LossAutopsyPanel } from "@/components/crypto/LossAutopsyPanel";
 
 export const Route = createFileRoute("/_authenticated/crypto-paper")({
   head: () => ({
@@ -140,6 +141,9 @@ function PaperTradingPage() {
 
       {/* Multi-TF shadow (pure logging, no live impact) */}
       <MultiTfShadowPanel />
+
+      {/* Loss autopsy — read-only failure-mode tagger */}
+      <LossAutopsyPanel />
 
 
 
