@@ -281,6 +281,7 @@ function AllFillsLog({ rows }: { rows: PaperFillRow[] }) {
                       <span className={`inline-block text-[9px] px-1.5 py-0.5 rounded border ${
                         f.button === "model" ? "border-sky-500/50 bg-sky-500/10 text-sky-300" :
                         f.button === "pred" ? "border-fuchsia-500/50 bg-fuchsia-500/10 text-fuchsia-300" :
+                        f.button === "manual" ? "border-amber-500/50 bg-amber-500/10 text-amber-300" :
                         "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
                       }`}>{buttonLabel[f.button]}</span>
                     </td>
