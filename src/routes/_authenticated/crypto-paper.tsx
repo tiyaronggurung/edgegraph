@@ -120,6 +120,9 @@ function PaperTradingPage() {
         <Link to="/crypto" className="text-xs text-sky-400 hover:underline">← Back to Crypto</Link>
       </div>
 
+      {/* Live Kalshi odds — read-only, matches Kalshi UI */}
+      <KalshiOddsWidget />
+
       {/* Balance */}
       <div className="border border-border rounded-lg bg-card p-4">
         {bal ? (
