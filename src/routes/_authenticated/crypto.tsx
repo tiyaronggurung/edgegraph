@@ -2371,7 +2371,7 @@ function BigFlipMonitor() {
     const key = `${r.ticker}:${r.flipAt}`;
     if (lastToastKey.current === key) return;
     lastToastKey.current = key;
-    toast.success(`🎯 CHEAP FLIP → ${r.toSide} @ ${r.minAskCents ?? r.newYes}¢ · PAPER $10`, {
+    toast.success(`🎯 CHEAP FLIP → ${r.toSide} @ ${r.minAskCents ?? r.newYes}¢ · LIVE $10`, {
       description: `model conf ${r.modelSideConf != null ? (r.modelSideConf * 100).toFixed(0) : "?"}% · ${r.secondsToClose}s left`,
     });
     try { playOrderPlaced(); } catch { /* noop */ }
