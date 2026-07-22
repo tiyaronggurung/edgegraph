@@ -1137,6 +1137,16 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           liveFlipped: liveSide !== side,
           chartVerdict: cvDir as "YES" | "NO" | "neutral",
           chartStrength: cvConf,
+          taScore: taScoreRes?.score ?? 0,
+          taReasons: taScoreRes?.reasons ?? [],
+          taVwapDistPct: taScoreRes?.vwapDistPct ?? null,
+          taTrendAlignScore: taScoreRes?.trendAlignScore ?? 0,
+          taRsi1m: taScoreRes?.rsi1m ?? null,
+          taRsi5m: taScoreRes?.rsi5m ?? null,
+          taMacd5mHist: taScoreRes?.macd5mHist ?? null,
+          taBb5mPctB: taScoreRes?.bb5mPctB ?? null,
+          taVwapRejUp: taScoreRes?.vwapRejectedAgainstUp ?? false,
+          taVwapRejDown: taScoreRes?.vwapRejectedAgainstDown ?? false,
           entryGate,
         });
 
