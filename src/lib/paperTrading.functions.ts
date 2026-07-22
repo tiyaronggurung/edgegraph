@@ -32,7 +32,7 @@ export interface PaperFillRow {
 
 export interface PaperStats {
   total: { fires: number; wins: number; losses: number; open: number; pnlCents: number };
-  byButton: Record<"model" | "pred" | "green_hours" | "manual" | "t5m", { fires: number; wins: number; losses: number; pnlCents: number }>;
+  byButton: Record<"model" | "pred" | "green_hours" | "manual" | "t5m" | "cheap_flip", { fires: number; wins: number; losses: number; pnlCents: number }>;
 }
 
 async function ensureBalance(supabase: any, userId: string): Promise<PaperBalance> {
