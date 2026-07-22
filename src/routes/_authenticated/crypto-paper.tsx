@@ -11,7 +11,7 @@ import {
   settleMyPaperFills,
 } from "@/lib/paperTrading.functions";
 import { KalshiOddsWidget } from "@/components/crypto/KalshiOddsWidget";
-import { ModelBetPanel, PredBetPanel, GreenHoursBetPanel } from "@/routes/_authenticated/crypto";
+import { ModelBetPanel, PredBetPanel, GreenHoursBetPanel, T5mBetPanel } from "@/routes/_authenticated/crypto";
 import { MultiTfShadowPanel } from "@/components/MultiTfShadowPanel";
 
 export const Route = createFileRoute("/_authenticated/crypto-paper")({
@@ -28,15 +28,16 @@ export const Route = createFileRoute("/_authenticated/crypto-paper")({
   component: PaperTradingPage,
 });
 
-type ButtonKind = "model" | "pred" | "green_hours" | "manual";
+type ButtonKind = "model" | "pred" | "green_hours" | "manual" | "t5m";
 type PaperFillRow = import("@/lib/paperTrading.functions").PaperFillRow;
-const BUTTON_ORDER: ButtonKind[] = ["model", "pred", "green_hours", "manual"];
-const buttonLabel: Record<ButtonKind, string> = { model: "Model", pred: "PRED", green_hours: "Green Hours", manual: "Manual" };
+const BUTTON_ORDER: ButtonKind[] = ["model", "pred", "green_hours", "t5m", "manual"];
+const buttonLabel: Record<ButtonKind, string> = { model: "Model", pred: "PRED", green_hours: "Green Hours", manual: "Manual", t5m: "T-5m" };
 const buttonTint: Record<ButtonKind, string> = {
   model: "border-sky-500/40 bg-sky-500/10",
   pred: "border-fuchsia-500/40 bg-fuchsia-500/10",
   green_hours: "border-emerald-500/40 bg-emerald-500/10",
   manual: "border-amber-500/40 bg-amber-500/10",
+  t5m: "border-cyan-500/40 bg-cyan-500/10",
 };
 
 const fmtUsd = (cents: number) => `${cents < 0 ? "-" : ""}$${(Math.abs(cents) / 100).toFixed(2)}`;
@@ -87,7 +88,7 @@ function PaperTradingPage() {
 
   // Group fills by button
   const byButton = useMemo(() => {
-    const g: Record<ButtonKind, PaperFillRow[]> = { model: [], pred: [], green_hours: [], manual: [] };
+    const g: Record<ButtonKind, PaperFillRow[]> = { model: [], pred: [], green_hours: [], manual: [], t5m: [] };
     for (const f of fills) if (g[f.button]) g[f.button].push(f);
     return g;
   }, [fills]);
@@ -101,7 +102,7 @@ function PaperTradingPage() {
       const cur = map.get(key) ?? {
         key, day, sortKey: new Date(key).getTime(),
         pnlCents: 0, wins: 0, losses: 0, fires: 0,
-        byBtn: { model: 0, pred: 0, green_hours: 0, manual: 0 },
+        byBtn: { model: 0, pred: 0, green_hours: 0, manual: 0, t5m: 0 },
       };
       cur.fires += 1;
       if (f.status === "won") cur.wins += 1;
@@ -129,11 +130,12 @@ function PaperTradingPage() {
       {/* Auto-settle: silently settle due fills every 5s while page is open */}
       <AutoSettler />
 
-      {/* Auto-fire loops (paper mode): Model fires every new window; PRED / Green only when their criteria pass */}
-      <div className="grid gap-3 md:grid-cols-3">
+      {/* Auto-fire loops (paper mode): Model / PRED / Green Hours / T-5m Confirmation */}
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <ModelBetPanel />
         <PredBetPanel />
         <GreenHoursBetPanel />
+        <T5mBetPanel />
       </div>
 
       {/* Multi-TF shadow (pure logging, no live impact) */}
@@ -224,6 +226,7 @@ function PaperTradingPage() {
                   <th className="text-right px-3 py-2 font-medium">Model</th>
                   <th className="text-right px-3 py-2 font-medium">PRED</th>
                   <th className="text-right px-3 py-2 font-medium">Green</th>
+                  <th className="text-right px-3 py-2 font-medium">T-5m</th>
                   <th className="text-right px-3 py-2 font-medium">Net</th>
                 </tr>
               </thead>
@@ -236,6 +239,7 @@ function PaperTradingPage() {
                     <td className={`px-3 py-1.5 text-right tabular-nums ${d.byBtn.model >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fmtUsd(d.byBtn.model)}</td>
                     <td className={`px-3 py-1.5 text-right tabular-nums ${d.byBtn.pred >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fmtUsd(d.byBtn.pred)}</td>
                     <td className={`px-3 py-1.5 text-right tabular-nums ${d.byBtn.green_hours >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fmtUsd(d.byBtn.green_hours)}</td>
+                    <td className={`px-3 py-1.5 text-right tabular-nums ${d.byBtn.t5m >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fmtUsd(d.byBtn.t5m)}</td>
                     <td className={`px-3 py-1.5 text-right tabular-nums font-semibold ${d.pnlCents >= 0 ? "text-emerald-400" : "text-red-400"}`}>{d.pnlCents >= 0 ? "+" : ""}{fmtUsd(d.pnlCents)}</td>
                   </tr>
                 ))}
@@ -324,6 +328,7 @@ function AllFillsLog({ rows }: { rows: PaperFillRow[] }) {
                         f.button === "model" ? "border-sky-500/50 bg-sky-500/10 text-sky-300" :
                         f.button === "pred" ? "border-fuchsia-500/50 bg-fuchsia-500/10 text-fuchsia-300" :
                         f.button === "manual" ? "border-amber-500/50 bg-amber-500/10 text-amber-300" :
+                        f.button === "t5m" ? "border-cyan-500/50 bg-cyan-500/10 text-cyan-300" :
                         "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
                       }`}>{buttonLabel[f.button]}</span>
                     </td>
