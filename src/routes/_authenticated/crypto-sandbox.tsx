@@ -4,6 +4,7 @@ import {
   ModelBetPanel,
   PredBetPanel,
   GreenHoursBetPanel,
+  T5mBetPanel,
   PaperBalanceBadge,
 } from "./crypto";
 
