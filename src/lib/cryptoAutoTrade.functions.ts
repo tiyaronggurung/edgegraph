@@ -1307,6 +1307,12 @@ export async function runAutoTradeCore(
           settle_spike_would_skip: Boolean((result as any).__spikeByTicker?.get?.(m.ticker)?.wouldSkip),
           funding_rate_at_fire: ((result as any).__funding?.rate ?? null),
           funding_zscore_30d: ((result as any).__funding?.z ?? null),
+          ctx_vwap_distance_pct: m.taVwapDistPct ?? null,
+          ctx_trend_alignment_score: m.taTrendAlignScore ?? null,
+          ctx_rsi_1h: m.taRsi5m ?? null,
+          ctx_macd_15m_hist: m.taMacd5mHist ?? null,
+          ctx_bb_5m_pctb: m.taBb5mPctB ?? null,
+          ctx_engine_version: "ta-v1",
 
 
 
