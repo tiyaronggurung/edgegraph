@@ -1037,9 +1037,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
 
 
         const rawEdgePts = (p - yesPrice) * 100;
-        const side: "YES" | "NO" = lockedPre ?? (p >= 0.5 ? "YES" : "NO");
-        // Edge is reported toward the locked side: positive = still favorable,
-        // negative = model has since drifted against the original pick.
+        // Side always follows current calibrated model prob (no freeze-side).
+        const side: "YES" | "NO" = p >= 0.5 ? "YES" : "NO";
         const edgePts = side === "YES" ? rawEdgePts : -rawEdgePts;
         const edgeAbs = Math.abs(edgePts);
         const kelly = quarterKelly(p, yesPrice);
@@ -1062,16 +1061,14 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         const tWhale = edgeParts.whale;
 
         const gapAnalysis = computeGapAnalysis({ spot, strike, side, sigmaEff, secondsToClose, micro });
-        // Chosen-side confidence: how strongly current calibrated P(YES) still
-        // backs the LOCKED side. Feeds the new side-confidence gate.
         const sideConf = side === "YES" ? p : 1 - p;
         const { gateAction, gateReason } = evaluateGate({
           side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap: gapAnalysis,
           sideConf,
         });
 
-        // ── liveSide MUST be computed BEFORE the shared entry gate ──
-        const rawDir: "YES" | "NO" = p >= 0.5 ? "YES" : "NO";
+        // liveSide == side now (freeze-side guard removed).
+        const rawDir: "YES" | "NO" = side;
         const cvDir = chartVerdict?.combined.direction ?? "neutral";
         const cvConf = chartVerdict?.combined.confidence ?? 0;
         const elapsedMinLive = 15 - minsRemaining;
@@ -1080,21 +1077,12 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           const denom = windowOpen * sigmaEff * Math.sqrt(em);
           return denom > 0 ? (spot - windowOpen) / denom : 0;
         })();
-        const zSign: "YES" | "NO" | null =
-          anchorZLive > 0.5 ? "YES" : anchorZLive < -0.5 ? "NO" : null;
-        const canFlip =
-          !!lockedPre &&
-          rawDir !== lockedPre &&
-          cvDir === rawDir && cvConf >= 0.5 &&
-          zSign === rawDir &&
-          elapsedMinLive >= 3 &&
-          secondsToClose >= 90;
-        const liveSide: "YES" | "NO" = canFlip ? rawDir : side;
+        const liveSide: "YES" | "NO" = side;
 
         // ── Shared central gate (universal — every automatic path uses this) ──
         const yesAskDollars = Number(m.yes_ask_dollars ?? 0);
         const noAskDollars = Number(m.no_ask_dollars ?? 0);
-        const entryGate = evaluateBtcEntry({
+        let entryGate = evaluateBtcEntry({
           lockedSide: side,
           liveSide,
           modelProb: p,
@@ -1102,6 +1090,47 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           noAsk: noAskDollars > 0 && noAskDollars < 1 ? noAskDollars : null,
           config: btcGateCfg,
         });
+
+        // ── TA VETO (post-gate override) ─────────────────────────────
+        // TA does NOT push probability anymore. It can only VETO a BET when
+        // strongly opposing near the strike (chop zone), where the model is
+        // easily whipsawed by the last tick.
+        if (entryGate.action === "BET" && taScoreRes) {
+          const taDir: "YES" | "NO" | null =
+            taScoreRes.score >= 40 ? "YES" : taScoreRes.score <= -40 ? "NO" : null;
+          const nearStrike = Math.abs(sigDist) < 0.30;
+          if (taDir && taDir !== side && nearStrike) {
+            entryGate = {
+              ...entryGate,
+              action: "PASS",
+              reason: `ta_veto — TA score ${taScoreRes.score.toFixed(0)} opposes ${side} near strike (σ-dist ${sigDist.toFixed(2)})`,
+              allReasons: [...entryGate.allReasons, `ta_veto (score=${taScoreRes.score.toFixed(0)}, σ=${sigDist.toFixed(2)})`],
+            };
+          }
+        }
+
+        // ── KALSHI TIMING GATE (post-gate override) ──────────────────
+        // Only fire when the market ask is in the sweet band [0.40, 0.75]
+        // AND time-to-close is 2–6 minutes. Outside this window edge is
+        // eaten by fees, price run-up, or last-second reversion.
+        if (entryGate.action === "BET") {
+          const ask = entryGate.selectedSideAsk;
+          const timingOK = secondsToClose >= 120 && secondsToClose <= 360;
+          const priceOK = ask !== null && ask >= 0.40 && ask <= 0.75;
+          if (!timingOK || !priceOK) {
+            const why: string[] = [];
+            if (!timingOK) why.push(`ttc ${secondsToClose}s outside [120, 360]`);
+            if (!priceOK) why.push(`ask ${ask !== null ? (ask * 100).toFixed(0) + "¢" : "n/a"} outside [40¢, 75¢]`);
+            entryGate = {
+              ...entryGate,
+              action: "PASS",
+              reason: `timing_gate — ${why.join(" · ")}`,
+              allReasons: [...entryGate.allReasons, `timing_gate (${why.join(", ")})`],
+            };
+          }
+        }
+
+
 
         // Fire-and-forget log; never throws, idempotent by 60s bucket.
         void logBtcGateDecision({
