@@ -2459,7 +2459,7 @@ function BigFlipMonitor() {
     return (
       <div className="mt-1 rounded border border-border/50 bg-muted/10 px-2 py-1 text-[10px] font-mono text-muted-foreground flex items-center gap-2">
         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
-        <span>Cheap-flip hunter · PAPER $10 · arm T-9m→T-3m · ask ≤15¢ · model conf ≥70% · cap 6/day · {r.rejectReason ? `skip: ${r.rejectReason}` : "waiting for setup"}</span>
+        <span>Cheap-flip hunter · LIVE $10 · always on · arm T-9m→T-3m · ask ≤15¢ · model conf ≥70% · cap 6/day · {r.rejectReason ? `skip: ${r.rejectReason}` : "waiting for setup"}</span>
       </div>
     );
   }
