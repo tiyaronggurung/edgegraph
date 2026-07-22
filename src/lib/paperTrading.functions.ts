@@ -17,7 +17,7 @@ export interface PaperFillRow {
   id: string;
   ticker: string;
   close_time: string;
-  button: "model" | "pred" | "green_hours";
+  button: "model" | "pred" | "green_hours" | "manual";
   side: "YES" | "NO";
   contracts: number;
   fill_price_cents: number;
@@ -32,7 +32,7 @@ export interface PaperFillRow {
 
 export interface PaperStats {
   total: { fires: number; wins: number; losses: number; open: number; pnlCents: number };
-  byButton: Record<"model" | "pred" | "green_hours", { fires: number; wins: number; losses: number; pnlCents: number }>;
+  byButton: Record<"model" | "pred" | "green_hours" | "manual", { fires: number; wins: number; losses: number; pnlCents: number }>;
 }
 
 async function ensureBalance(supabase: any, userId: string): Promise<PaperBalance> {
@@ -82,11 +82,11 @@ export const getPaperStats = createServerFn({ method: "GET" })
       .from("paper_fills")
       .select("button,status,pnl_cents")
       .eq("user_id", context.userId);
-    const rows = (data ?? []) as Array<{ button: "model"|"pred"|"green_hours"; status: string; pnl_cents: number | null }>;
+    const rows = (data ?? []) as Array<{ button: "model"|"pred"|"green_hours"|"manual"; status: string; pnl_cents: number | null }>;
     const empty = () => ({ fires: 0, wins: 0, losses: 0, pnlCents: 0 });
     const stats: PaperStats = {
       total: { fires: 0, wins: 0, losses: 0, open: 0, pnlCents: 0 },
-      byButton: { model: empty(), pred: empty(), green_hours: empty() },
+      byButton: { model: empty(), pred: empty(), green_hours: empty(), manual: empty() },
     };
     for (const r of rows) {
       stats.total.fires += 1;
@@ -110,7 +110,7 @@ export const recordPaperFire = createServerFn({ method: "POST" })
   .inputValidator((d: {
     ticker: string;
     closeTime: string;
-    button: "model" | "pred" | "green_hours";
+    button: "model" | "pred" | "green_hours" | "manual";
     side: "YES" | "NO";
     contracts: number;
     fillPriceCents: number;
