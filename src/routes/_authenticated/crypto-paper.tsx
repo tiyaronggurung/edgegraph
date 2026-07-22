@@ -10,6 +10,7 @@ import {
   resetPaperBalance,
   settleMyPaperFills,
 } from "@/lib/paperTrading.functions";
+import { KalshiOddsWidget } from "@/components/crypto/KalshiOddsWidget";
 
 export const Route = createFileRoute("/_authenticated/crypto-paper")({
   head: () => ({
