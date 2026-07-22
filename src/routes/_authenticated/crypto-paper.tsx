@@ -258,7 +258,7 @@ function AutoSettler() {
       } catch { /* silent */ }
     };
     tick();
-    const id = setInterval(tick, 30_000);
+    const id = setInterval(tick, 5_000);
     return () => { stopped = true; clearInterval(id); };
   }, [settleFn, qc]);
   return null;
