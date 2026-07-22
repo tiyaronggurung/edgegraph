@@ -1290,7 +1290,7 @@ const MODEL_BET_LS_STAKE = "crypto.modelBet.stake";
 const MODEL_BET_LS_TICKERS = "crypto.modelBet.tickers";
 const AUTO_BET_MUTEX_EVENT = "crypto.autoBet.mutex";
 
-function ModelBetPanel() {
+export function ModelBetPanel() {
   const runFn = useServerFn(runAutoTrade);
   const statsFn = useServerFn(getPredictionStats);
   const statsQ = useQuery({ queryKey: ["btc-pred-stats"], queryFn: () => statsFn(), refetchInterval: 60_000 });
