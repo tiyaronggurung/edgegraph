@@ -2179,7 +2179,7 @@ export function T5mBetPanel() {
           setLastFired(label);
           try {
             const r = await recordPaperFire({ data: {
-              ticker: o.ticker, closeTime: o.close_time, button: "t5m" as any,
+              ticker: o.ticker, closeTime: o.close_time, button: "t5m",
               side: o.side, contracts: o.contracts, fillPriceCents: o.limit_cents,
               snapshot: { sideAsk: verdict.sideAsk, sideConf: verdict.sideConf, msLeft: verdict.msLeft },
             }});
