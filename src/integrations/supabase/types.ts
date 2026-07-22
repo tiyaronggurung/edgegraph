@@ -1643,8 +1643,11 @@ export type Database = {
           detected_at: string
           flip_at: string
           id: number
+          min_ask_cents: number | null
+          model_side_conf: number | null
           new_no: number
           new_yes: number
+          paper_fill_id: string | null
           passed_rules: boolean
           prev_no: number
           prev_yes: number
@@ -1654,6 +1657,7 @@ export type Database = {
           strike: number
           ticker: string
           to_side: string
+          trigger_kind: string
           user_id: string
           yes_delta: number
         }
@@ -1661,8 +1665,11 @@ export type Database = {
           detected_at?: string
           flip_at: string
           id?: number
+          min_ask_cents?: number | null
+          model_side_conf?: number | null
           new_no: number
           new_yes: number
+          paper_fill_id?: string | null
           passed_rules: boolean
           prev_no: number
           prev_yes: number
@@ -1672,6 +1679,7 @@ export type Database = {
           strike: number
           ticker: string
           to_side: string
+          trigger_kind?: string
           user_id: string
           yes_delta: number
         }
@@ -1679,8 +1687,11 @@ export type Database = {
           detected_at?: string
           flip_at?: string
           id?: number
+          min_ask_cents?: number | null
+          model_side_conf?: number | null
           new_no?: number
           new_yes?: number
+          paper_fill_id?: string | null
           passed_rules?: boolean
           prev_no?: number
           prev_yes?: number
@@ -1690,6 +1701,7 @@ export type Database = {
           strike?: number
           ticker?: string
           to_side?: string
+          trigger_kind?: string
           user_id?: string
           yes_delta?: number
         }

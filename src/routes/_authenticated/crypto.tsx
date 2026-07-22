@@ -2371,8 +2371,8 @@ function BigFlipMonitor() {
     const key = `${r.ticker}:${r.flipAt}`;
     if (lastToastKey.current === key) return;
     lastToastKey.current = key;
-    toast.success(`🚨 BIG FLIP → ${r.toSide} · LIVE $10`, {
-      description: `${r.prevYes}¢ → ${r.newYes}¢ (Δ${r.yesDelta}) · ${r.secondsToClose}s left`,
+    toast.success(`🎯 CHEAP FLIP → ${r.toSide} @ ${r.minAskCents ?? r.newYes}¢ · PAPER $10`, {
+      description: `model conf ${r.modelSideConf != null ? (r.modelSideConf * 100).toFixed(0) : "?"}% · ${r.secondsToClose}s left`,
     });
     try { playOrderPlaced(); } catch { /* noop */ }
   }, [q.data]);
@@ -2390,13 +2390,15 @@ function BigFlipMonitor() {
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "big_flip_signals", filter: `user_id=eq.${uid}` },
           (payload) => {
-            const row = payload.new as { ticker: string; to_side: string; prev_yes: number; new_yes: number; yes_delta: number; seconds_to_close: number; passed_rules: boolean; flip_at: string };
-            if (!row.passed_rules) return;
+            const row = payload.new as { ticker: string; to_side: string; min_ask_cents: number | null; new_yes: number; model_side_conf: number | null; seconds_to_close: number; passed_rules: boolean; flip_at: string; trigger_kind: string };
+            if (!row.passed_rules || row.trigger_kind !== "cheap_flip_15c") return;
             const key = `${row.ticker}:${row.flip_at}`;
             if (lastToastKey.current === key) return;
             lastToastKey.current = key;
-            toast.success(`🚨 BIG FLIP → ${row.to_side} · LIVE $10`, {
-              description: `${row.prev_yes}¢ → ${row.new_yes}¢ (Δ${row.yes_delta}) · ${row.seconds_to_close}s left`,
+            const ask = row.min_ask_cents ?? row.new_yes;
+            const conf = row.model_side_conf != null ? `${(Number(row.model_side_conf) * 100).toFixed(0)}%` : "?";
+            toast.success(`🎯 CHEAP FLIP → ${row.to_side} @ ${ask}¢ · PAPER $10`, {
+              description: `model conf ${conf} · ${row.seconds_to_close}s left`,
             });
             try { playOrderPlaced(); } catch { /* noop */ }
           },
@@ -2457,22 +2459,26 @@ function BigFlipMonitor() {
     return (
       <div className="mt-1 rounded border border-border/50 bg-muted/10 px-2 py-1 text-[10px] font-mono text-muted-foreground flex items-center gap-2">
         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
-        <span>Big-flip monitor · LIVE $10 · 24/7 cron · Δ≥25¢ · halt after 4 losing 15m windows of last 10 · {r.rejectReason ? `last rejected: ${r.rejectReason}` : "no signal"}</span>
+        <span>Cheap-flip hunter · PAPER $10 · arm T-9m→T-3m · ask ≤15¢ · model conf ≥70% · cap 6/day · {r.rejectReason ? `skip: ${r.rejectReason}` : "waiting for setup"}</span>
       </div>
     );
   }
   const toColor = r.toSide === "YES" ? "text-emerald-300" : "text-red-300";
   const borderColor = r.toSide === "YES" ? "border-emerald-500/60 bg-emerald-500/15" : "border-red-500/60 bg-red-500/15";
+  const ask = r.minAskCents ?? r.newYes;
+  const conf = r.modelSideConf != null ? `${(r.modelSideConf * 100).toFixed(0)}%` : "?";
   return (
     <div className={`mt-1 rounded border px-2 py-1.5 text-[11px] font-mono flex items-center gap-2 ${borderColor}`}>
       <Zap className={`h-3 w-3 ${toColor}`} />
-      <span className={`font-semibold ${toColor}`}>BIG FLIP → {r.toSide}</span>
+      <span className={`font-semibold ${toColor}`}>CHEAP FLIP → {r.toSide}</span>
       <span className="text-muted-foreground">·</span>
-      <span>{r.prevYes}¢→<span className={`font-bold ${toColor}`}>{r.newYes}¢</span> (Δ{r.yesDelta})</span>
+      <span><span className={`font-bold ${toColor}`}>{ask}¢</span> ask</span>
+      <span className="text-muted-foreground">·</span>
+      <span>model {conf}</span>
       <span className="text-muted-foreground">·</span>
       <span>{r.secondsToClose}s</span>
       <span className="text-muted-foreground">·</span>
-      <span className="text-[10px] uppercase text-muted-foreground">shadow only</span>
+      <span className="text-[10px] uppercase text-muted-foreground">paper only</span>
       <span className="text-muted-foreground ml-auto">{r.ageSeconds}s ago</span>
     </div>
   );
