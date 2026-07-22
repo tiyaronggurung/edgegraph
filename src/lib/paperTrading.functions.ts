@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const STAKE_CENTS = 1000; // $10 flat
-const STARTING_CENTS = 10000; // $100
+const STARTING_CENTS = 50000; // $500
 
 export interface PaperBalance {
   balance_cents: number;
