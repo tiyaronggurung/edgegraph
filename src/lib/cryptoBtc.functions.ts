@@ -214,10 +214,23 @@ async function kalshiFetch(path: string): Promise<any> {
 }
 
 async function fetchBtcCandles(): Promise<BtcCandle[]> {
+  // Coinbase returns up to 300 candles per call. At granularity=60 that's 5h
+  // of 1m data — enough for EMA169 (170 bars), MACD (35 bars), and RSI/BB.
   const res = await fetch(`${COINBASE}/products/BTC-USD/candles?granularity=60`, {
     headers: { Accept: "application/json", "User-Agent": "edgegraph/1.0" },
   });
   if (!res.ok) throw new Error(`Coinbase ${res.status}`);
+  const rows = (await res.json()) as number[][];
+  return rows.map(([t, l, h, o, c, v]) => ({ t, o, h, l, c, v })).sort((a, b) => a.t - b.t);
+}
+
+async function fetchBtcCandles5m(): Promise<BtcCandle[]> {
+  // True 5m candles from Coinbase (granularity=300 = 25h of history).
+  // We need ≥35 bars for MACD 5m, ≥20 for BB — this gives 300, plenty for both.
+  const res = await fetch(`${COINBASE}/products/BTC-USD/candles?granularity=300`, {
+    headers: { Accept: "application/json", "User-Agent": "edgegraph/1.0" },
+  });
+  if (!res.ok) throw new Error(`Coinbase 5m ${res.status}`);
   const rows = (await res.json()) as number[][];
   return rows.map(([t, l, h, o, c, v]) => ({ t, o, h, l, c, v })).sort((a, b) => a.t - b.t);
 }
