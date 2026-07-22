@@ -1388,7 +1388,8 @@ function ModelBetPanel() {
   }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    // Always-on paper auto-runner — fires regardless of the Model Bet toggle
+    // because all 3 bet buttons are locked to mode:"paper" and touch no real money.
     if (typeof window === "undefined") return;
     let cancelled = false;
     let inFlight = false;
