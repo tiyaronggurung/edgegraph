@@ -1790,6 +1790,14 @@ function PredBetPanel() {
           try { playModelBetPing(); } catch { /* noop */ }
           toast.success(`PRED $${PRED_BET_STAKE}: ${pick.side === "YES" ? "UP" : "DOWN"} ${pick.ticker} @ ${o.limit_cents}¢ · edge ${pick.edgePts.toFixed(1)}`);
           setLastFired(`${pick.ticker} ${pick.side} @ ${o.limit_cents}¢ · edge ${pick.edgePts.toFixed(1)}`);
+          try {
+            const r = await recordPaperFire({ data: {
+              ticker: o.ticker, closeTime: o.close_time, button: "pred",
+              side: o.side, contracts: o.contracts, fillPriceCents: o.limit_cents,
+              snapshot: { edge: pick.edgePts, sideAsk, marketYesPrice: pick.marketYesPrice },
+            }});
+            if (!r.ok) toast.warning(`Paper: ${r.reason}`);
+          } catch { /* silent */ }
         } else {
           const realReasons = (res.skipReasons ?? []).filter((r: string) => !/^(equity:|force:)/i.test(r));
           const reason = (realReasons.length ? realReasons : res.skipReasons ?? []).slice(0, 2).join(" · ") || "no fill";
