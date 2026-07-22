@@ -7,7 +7,7 @@ import {
   PaperBalanceBadge,
 } from "./crypto";
 
-export const Route = createFileRoute("/_authenticated/crypto-paper")({
+export const Route = createFileRoute("/_authenticated/crypto-sandbox")({
   head: () => ({
     meta: [
       { title: "Paper Sandbox — BTC 15-min" },
