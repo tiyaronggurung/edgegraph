@@ -10,6 +10,7 @@ import {
   resetPaperBalance,
   settleMyPaperFills,
 } from "@/lib/paperTrading.functions";
+import { KalshiOddsWidget } from "@/components/crypto/KalshiOddsWidget";
 
 export const Route = createFileRoute("/_authenticated/crypto-paper")({
   head: () => ({
@@ -118,6 +119,9 @@ function PaperTradingPage() {
         </div>
         <Link to="/crypto" className="text-xs text-sky-400 hover:underline">← Back to Crypto</Link>
       </div>
+
+      {/* Live Kalshi odds — read-only, matches Kalshi UI */}
+      <KalshiOddsWidget />
 
       {/* Balance */}
       <div className="border border-border rounded-lg bg-card p-4">
