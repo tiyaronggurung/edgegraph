@@ -1415,8 +1415,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           independentProb: adj.p,
 
           requiredEdgePts,
-          gateAction,
-          gateReason,
+          gateAction: finalGateAction,
+          gateReason: finalGateReason,
           sideConf,
           thresholdParts: { base: tBase, calib: tCalib, time: tTime, spread: tSpread, regime: tRegime, whale: tWhale },
           gapAnalysis,
@@ -1436,6 +1436,10 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           taVwapRejUp: taScoreRes?.vwapRejectedAgainstUp ?? false,
           taVwapRejDown: taScoreRes?.vwapRejectedAgainstDown ?? false,
           entryGate,
+          studying,
+          studyingSecondsLeft,
+          strikeVerdict,
+          strikeVerdictReason,
         });
 
       }
