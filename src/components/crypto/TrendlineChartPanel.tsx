@@ -90,20 +90,20 @@ export function TrendlineChartPanel() {
       >
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] uppercase tracking-wider text-white/60">
-            BTC 1m · TA v2 · Trendlines
+            BTC {TF_LABEL[tf]} · TA v2 · Trendlines
           </span>
-          {data?.isWedge && (
+          {tf === "1m" && shadow?.isWedge && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
-              WEDGE · {data.wedgeBias?.toUpperCase()}
+              WEDGE · {shadow.wedgeBias?.toUpperCase()}
             </span>
           )}
-          {data?.spikeDetected && (
+          {tf === "1m" && shadow?.spikeDetected && (
             <span className={`text-[10px] px-1.5 py-0.5 rounded border flex items-center gap-1 ${
-              data.spikeDirection === "up"
+              shadow.spikeDirection === "up"
                 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
                 : "bg-rose-500/20 text-rose-300 border-rose-500/40"
             }`}>
-              <Zap className="h-3 w-3" /> SPIKE {data.spikeDirection?.toUpperCase()} · {data.spikeBreakPct.toFixed(2)}%
+              <Zap className="h-3 w-3" /> SPIKE {shadow.spikeDirection?.toUpperCase()} · {shadow.spikeBreakPct.toFixed(2)}%
             </span>
           )}
         </div>
@@ -120,44 +120,80 @@ export function TrendlineChartPanel() {
 
       {open && (
         <>
-          <Legend visible={visible} setVisible={setVisible} strike={data?.strike ?? null} />
-          <TaChart data={data} visible={visible} />
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+            <span className="text-[10px] text-white/40 mr-1">TF:</span>
+            {TF_LIST.map(t => (
+              <button
+                key={t}
+                onClick={() => setTf(t)}
+                className={`px-2 py-0.5 rounded text-[10px] font-mono border transition ${
+                  tf === t
+                    ? "bg-white/10 border-white/40 text-white"
+                    : "bg-transparent border-white/10 text-white/50 hover:text-white/80 hover:border-white/20"
+                }`}
+              >
+                {TF_LABEL[t]}
+              </button>
+            ))}
+            <span className="mx-1 h-3 w-px bg-white/10" />
+            <button
+              onClick={() => setFibOn(v => !v)}
+              className={`px-2 py-0.5 rounded text-[10px] font-mono border transition ${
+                fibOn
+                  ? "bg-yellow-400/10 border-yellow-400/40 text-yellow-200"
+                  : "bg-transparent border-white/10 text-white/40 hover:text-white/70"
+              }`}
+              title="Fibonacci retracements over the visible viewport"
+            >
+              Fib {fibOn ? "on" : "off"}
+            </button>
+            {candlesData?.source && (
+              <span className="ml-auto text-[9px] text-white/30 font-mono">
+                src: {candlesData.source} · {candles.length}
+              </span>
+            )}
+          </div>
+
+          <Legend visible={visible} setVisible={setVisible} strike={shadow?.strike ?? null} />
+          <TaChart candles={candles} shadow={shadow ?? null} tf={tf} visible={visible} fibOn={fibOn} />
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
-            <Stat label="Spot"          value={data?.spot != null ? `$${data.spot.toFixed(0)}` : "—"} />
-            <Stat label="Strike"        value={data?.strike != null ? `$${data.strike.toFixed(0)}` : "—"} />
+            <Stat label="Spot"          value={shadow?.spot != null ? `$${shadow.spot.toFixed(0)}` : "—"} />
+            <Stat label="Strike"        value={shadow?.strike != null ? `$${shadow.strike.toFixed(0)}` : "—"} />
             <Stat
               label="Δ Strike"
               value={
-                data?.spot != null && data?.strike != null
-                  ? `${(data.spot - data.strike) >= 0 ? "+" : ""}$${(data.spot - data.strike).toFixed(2)} ${data.spot >= data.strike ? "above" : "below"}`
+                shadow?.spot != null && shadow?.strike != null
+                  ? `${(shadow.spot - shadow.strike) >= 0 ? "+" : ""}$${(shadow.spot - shadow.strike).toFixed(2)} ${shadow.spot >= shadow.strike ? "above" : "below"}`
                   : "—"
               }
               icon={
-                data?.spot != null && data?.strike != null ? (
-                  data.spot >= data.strike
+                shadow?.spot != null && shadow?.strike != null ? (
+                  shadow.spot >= shadow.strike
                     ? <TrendingUp className="h-3 w-3 text-emerald-400" />
                     : <TrendingDown className="h-3 w-3 text-rose-400" />
                 ) : undefined
               }
             />
-            <Stat label="Upper line"    value={data?.upperAtNow != null ? `$${data.upperAtNow.toFixed(0)}` : "—"} />
-            <Stat label="Lower line"    value={data?.lowerAtNow != null ? `$${data.lowerAtNow.toFixed(0)}` : "—"} />
-            <Stat label="→ Upper"       value={data?.distToUpperPct != null ? `${data.distToUpperPct.toFixed(3)}%` : "—"}
+            <Stat label="Upper line"    value={shadow?.upperAtNow != null ? `$${shadow.upperAtNow.toFixed(0)}` : "—"} />
+            <Stat label="Lower line"    value={shadow?.lowerAtNow != null ? `$${shadow.lowerAtNow.toFixed(0)}` : "—"} />
+            <Stat label="→ Upper"       value={shadow?.distToUpperPct != null ? `${shadow.distToUpperPct.toFixed(3)}%` : "—"}
                   icon={<TrendingUp className="h-3 w-3 text-emerald-400" />} />
-            <Stat label="→ Lower"       value={data?.distToLowerPct != null ? `${data.distToLowerPct.toFixed(3)}%` : "—"}
+            <Stat label="→ Lower"       value={shadow?.distToLowerPct != null ? `${shadow.distToLowerPct.toFixed(3)}%` : "—"}
                   icon={<TrendingDown className="h-3 w-3 text-rose-400" />} />
-            <Stat label="Channel width" value={data?.channelWidthPct != null ? `${data.channelWidthPct.toFixed(2)}%` : "—"} />
-            <Stat label="Swings used"   value={data ? String(data.swingsUsed) : "—"} />
+            <Stat label="Channel width" value={shadow?.channelWidthPct != null ? `${shadow.channelWidthPct.toFixed(2)}%` : "—"} />
+            <Stat label="Swings used"   value={shadow ? String(shadow.swingsUsed) : "—"} />
           </div>
 
           <p className="text-[10px] text-white/40 mt-2">
-            Scroll horizontally to see the full 300-minute window · toggle series in the legend · sub-panels show RSI(14) and MACD(12/26/9). Shadow mode — no trading impact until WR ≥65% over 3–5 days.
+            Drag to pan · wheel to zoom · switch TF above · Fib is drawn from the highest high / lowest low currently visible.
+            Shadow mode — no trading impact until WR ≥65% over 3–5 days.
           </p>
         </>
       )}
     </div>
   );
+
 }
 
 function Legend({
