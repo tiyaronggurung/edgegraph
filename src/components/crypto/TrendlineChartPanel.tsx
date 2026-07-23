@@ -145,7 +145,7 @@ export function TrendlineChartPanel() {
             BTC {TF_LABEL[tf]} · TA v2 · Trendlines
           </span>
           {(() => {
-            const ours = shadow?.spot ?? null;
+            const ours = composite?.spot ?? shadow?.spot ?? null;
             const k = kalshi?.impliedSpot ?? null;
             const diff = ours != null && k != null ? ours - k : null;
             const diffCls =
