@@ -1,7 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { usePlan } from "@/hooks/usePlan";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Menu, X, Zap, LogOut, ChevronDown, Sparkles, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -106,6 +107,29 @@ export function AppNav() {
   const { tier, isAdmin } = usePlan();
   const [open, setOpen] = useState(false);
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const queryClient = useQueryClient();
+
+  // Warm the /crypto trendline/chart cache when the user hovers or focuses
+  // the nav link, so the chart is ready by the time they click through.
+  const prefetchCrypto = useCallback(() => {
+    const qc = queryClient;
+    Promise.all([
+      import("@/lib/trendlineShadow.functions").then(({ evalTrendlineShadow }) =>
+        qc.prefetchQuery({
+          queryKey: ["trendline-shadow"],
+          queryFn: () => evalTrendlineShadow(),
+          staleTime: 25_000,
+        }),
+      ),
+      import("@/lib/cryptoBtc.functions").then(({ getBtcMarkets }) =>
+        qc.prefetchQuery({
+          queryKey: ["btc-markets"],
+          queryFn: () => getBtcMarkets(),
+          staleTime: 10_000,
+        }),
+      ),
+    ]).catch(() => {});
+  }, [queryClient]);
 
   return (
     <nav className="sticky top-0 z-40 border-b border-border bg-[oklch(0.13_0_0/0.85)] backdrop-blur">
@@ -123,6 +147,9 @@ export function AppNav() {
                 key={item.label}
                 to={item.to}
                 search={item.search as never}
+                onMouseEnter={item.to === "/crypto" ? prefetchCrypto : undefined}
+                onFocus={item.to === "/crypto" ? prefetchCrypto : undefined}
+                onTouchStart={item.to === "/crypto" ? prefetchCrypto : undefined}
                 className={cn(
                   "px-3 py-1.5 text-xs uppercase tracking-wider rounded transition",
                   path.startsWith(item.to)
