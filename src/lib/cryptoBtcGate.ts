@@ -86,7 +86,12 @@ export interface GateInput {
   // True when the live per-tick directional call disagrees with the locked
   // side. Same 9.4% loser bucket — the model wants to flip but can't.
   liveFlipped?: boolean;
-}
+  // Optional geometry for the near-strike deadband. When spot is within
+  // NEAR_STRIKE_DEADBAND_PCT of strike AND <60s remain, we skip — this
+  // kills the 17% `near_strike_flip` autopsy bucket (last-minute chop).
+  spot?: number;
+  strike?: number;
+
 
 export interface GateResult {
   gateAction: "BET" | "PASS";
