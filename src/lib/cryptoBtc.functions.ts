@@ -1289,15 +1289,122 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           }
         }
 
-        // ── STRIKE STUDY WARM-UP (first 150s of every 15m window) ────────
-        // For the first 150 seconds we OBSERVE only. No bet fires. After the
-        // warm-up we emit a strike verdict (SOLID / WEAK / CHOPPY) from the
-        // full stack (chart, TA, sigma distance, recent chop). CHOPPY keeps
-        // the window skipped for the rest of its life.
+        // ── STRIKE STUDY ENGINE (first 150s of every 15m window) ─────────
+        // Live-analyze all TA tools *relative to this window's strike*:
+        //   • Trendline break events (spot vs upper/lower over last 3 x 1m)
+        //   • S/R proximity (nearest support & resistance vs strike)
+        //   • Strike-cross count in the last 150s (chop signal)
+        //   • Spot-side stability (% of last-3-candle closes above vs below strike)
+        //   • Structure bias (HH/HL vs LH/LL) + VWAP position vs strike
+        //   • Chart verdict + TA v2 alignment with the selected side
+        // During warm-up we OBSERVE only (no bet). At t≥150s we emit a rich
+        // SOLID / WEAK / CHOPPY verdict from all findings above.
         const WARMUP_SECONDS = 150;
         const windowElapsedSec = Math.max(0, Math.round((now - openMs) / 1000));
         const studying = windowElapsedSec < WARMUP_SECONDS;
         const studyingSecondsLeft = studying ? Math.max(0, WARMUP_SECONDS - windowElapsedSec) : 0;
+
+        // Build the study report on EVERY tick (used for both warm-up progress
+        // display and post-warm-up verdict). All inputs come from data already
+        // computed for this snapshot — no extra I/O.
+        const study = (() => {
+          const findings: string[] = [];
+
+          // 1. Trendline geometry + break events (last 3 x 1m closes)
+          let trendlineNote = "";
+          let breakoutSide: "up" | "down" | null = null;
+          let trendlineHolds = false;
+          try {
+            const t = detectTrendlines(recent as any);
+            const upperNow = t.upperAtNow;
+            const lowerNow = t.lowerAtNow;
+            const last3 = recent.slice(-3);
+            if (upperNow != null && last3.every(c => c.c > upperNow)) {
+              breakoutSide = "up";
+              trendlineNote = `↑ broke ABOVE upper channel (${upperNow.toFixed(0)}) on last 3 x 1m closes`;
+            } else if (lowerNow != null && last3.every(c => c.c < lowerNow)) {
+              breakoutSide = "down";
+              trendlineNote = `↓ broke BELOW lower channel (${lowerNow.toFixed(0)}) on last 3 x 1m closes`;
+            } else if (upperNow != null && lowerNow != null) {
+              const inside = spot > lowerNow && spot < upperNow;
+              trendlineHolds = inside;
+              trendlineNote = inside
+                ? `inside channel [${lowerNow.toFixed(0)} – ${upperNow.toFixed(0)}]`
+                : `at edge (spot ${spot.toFixed(0)} vs U ${upperNow.toFixed(0)} / L ${lowerNow.toFixed(0)})`;
+            } else {
+              trendlineNote = "insufficient swings for channel";
+            }
+          } catch { trendlineNote = "trendline calc failed"; }
+          if (trendlineNote) findings.push(`trendline: ${trendlineNote}`);
+
+          // 2. Strike crossings in last 150s (chop signal)
+          const studyWindow = recent.slice(-3); // ~3 minutes of 1m candles
+          let crossCount = 0;
+          for (let i = 1; i < studyWindow.length; i++) {
+            const a = studyWindow[i - 1], b = studyWindow[i];
+            const aAbove = a.c > strike;
+            const bAbove = b.c > strike;
+            if (aAbove !== bAbove) crossCount++;
+          }
+          // Also count within-candle crossings (high/low straddles strike)
+          let straddleCount = 0;
+          for (const c of studyWindow) {
+            if (c.h >= strike && c.l <= strike) straddleCount++;
+          }
+          findings.push(`strike-cross: ${crossCount} close-flip${crossCount === 1 ? "" : "s"}, ${straddleCount}/${studyWindow.length} candles straddle strike`);
+
+          // 3. Side-stability during study window
+          const aboveCount = studyWindow.filter(c => c.c > strike).length;
+          const belowCount = studyWindow.filter(c => c.c < strike).length;
+          const sideStable = aboveCount === studyWindow.length || belowCount === studyWindow.length;
+          const stableSide: "above" | "below" | "mixed" =
+            aboveCount === studyWindow.length ? "above"
+            : belowCount === studyWindow.length ? "below" : "mixed";
+          findings.push(`spot-vs-strike: ${aboveCount}↑ / ${belowCount}↓ (${sideStable ? `held ${stableSide}` : "mixed"})`);
+
+          // 4. Chart verdict alignment with model side
+          const chartAligns = cvDir === side && cvConf >= 0.35;
+          const chartOpposes = (cvDir === "YES" || cvDir === "NO") && cvDir !== side && cvConf >= 0.50;
+          findings.push(`chart-verdict: ${cvDir} ${(cvConf * 100).toFixed(0)}% ${chartAligns ? "✓aligns" : chartOpposes ? "✗opposes" : "~neutral"} with ${side}`);
+
+          // 5. TA v2 stack alignment
+          const taScoreVal = taScoreRes?.score ?? 0;
+          const taAligns  = (side === "YES" && taScoreVal >= 25) || (side === "NO" && taScoreVal <= -25);
+          const taOpposes = (side === "YES" && taScoreVal <= -25) || (side === "NO" && taScoreVal >= 25);
+          findings.push(`TA-v2 stack: ${taScoreVal >= 0 ? "+" : ""}${taScoreVal.toFixed(0)} ${taAligns ? "✓aligns" : taOpposes ? "✗opposes" : "~neutral"}`);
+
+          // 6. Sigma distance from strike (physics safety margin)
+          const nearStrike = Math.abs(sigDist) < 0.30;
+          const safeDist   = Math.abs(sigDist) >= 0.60;
+          findings.push(`σ-distance: ${sigDist.toFixed(2)}σ from strike (${safeDist ? "safe cushion" : nearStrike ? "near strike – fragile" : "moderate"})`);
+
+          // 7. Recent-window chop pattern (last 2 outcomes flipping)
+          const recentChop = prevOutcome1 !== null && prevOutcome2 !== null && prevOutcome1 !== prevOutcome2;
+          if (recentChop) findings.push(`history: last 2 outcomes FLIPPED (chop regime)`);
+
+          // 8. Momentum agreement with side (from gapAnalysis)
+          const momOk = gapAnalysis.momentumAlignsWithSide;
+          findings.push(`momentum: ${gapAnalysis.momentumSign > 0 ? "↑" : gapAnalysis.momentumSign < 0 ? "↓" : "—"} ${momOk ? "with" : "vs"} ${side}`);
+
+          return {
+            findings,
+            breakoutSide,
+            trendlineHolds,
+            crossCount,
+            straddleCount,
+            sideStable,
+            stableSide,
+            chartAligns,
+            chartOpposes,
+            taAligns,
+            taOpposes,
+            nearStrike,
+            safeDist,
+            recentChop,
+            momOk,
+            taScoreVal,
+          };
+        })();
 
         let strikeVerdict: "SOLID" | "WEAK" | "CHOPPY" | null = null;
         let strikeVerdictReason = "";
@@ -1306,42 +1413,68 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           entryGate = {
             ...entryGate,
             action: "PASS",
-            reason: `strike_study — observing first 150s (${studyingSecondsLeft}s left)`,
+            reason: `strike_study — observing (${studyingSecondsLeft}s left) · ${study.findings.slice(0, 2).join(" · ")}`,
             allReasons: [...entryGate.allReasons, `strike_study (${studyingSecondsLeft}s left)`],
           };
         } else {
-          // Post-warm-up strike verdict.
-          const nearStrike = Math.abs(sigDist) < 0.30;
-          const safeDist   = Math.abs(sigDist) >= 0.60;
-          const chartAgree = (cvDir === side) && cvConf >= 0.35;
-          const chartOppose = (cvDir === "YES" || cvDir === "NO") && cvDir !== side && cvConf >= 0.50;
-          const taScoreVal = taScoreRes?.score ?? 0;
-          const taAgree  = (side === "YES" && taScoreVal >= 25) || (side === "NO" && taScoreVal <= -25);
-          const taOppose = (side === "YES" && taScoreVal <= -25) || (side === "NO" && taScoreVal >= 25);
-          const recentChop = prevOutcome1 !== null && prevOutcome2 !== null && prevOutcome1 !== prevOutcome2;
+          // ── POST-STUDY VERDICT ─────────────────────────────────────────
+          // Confluence scoring: each aligning signal +1, each opposing −1.
+          // The strike-relative pieces (breakout on our side, side-stability,
+          // strike-cross count) get double weight because they reflect what
+          // ACTUALLY printed against the strike during the study window.
+          const strikeBreakForUs =
+            (study.breakoutSide === "up" && side === "YES") ||
+            (study.breakoutSide === "down" && side === "NO");
+          const strikeBreakAgainst =
+            (study.breakoutSide === "up" && side === "NO") ||
+            (study.breakoutSide === "down" && side === "YES");
+          const sideStableForUs = study.sideStable &&
+            ((study.stableSide === "above" && side === "YES") ||
+             (study.stableSide === "below" && side === "NO"));
+          const sideStableAgainst = study.sideStable &&
+            ((study.stableSide === "above" && side === "NO") ||
+             (study.stableSide === "below" && side === "YES"));
 
-          const agreeCount = (chartAgree ? 1 : 0) + (taAgree ? 1 : 0) + (safeDist ? 1 : 0);
-          const opposeCount = (chartOppose ? 1 : 0) + (taOppose ? 1 : 0);
+          let score = 0;
+          if (strikeBreakForUs)   score += 2;
+          if (strikeBreakAgainst) score -= 2;
+          if (sideStableForUs)    score += 2;
+          if (sideStableAgainst)  score -= 2;
+          if (study.chartAligns)  score += 1;
+          if (study.chartOpposes) score -= 1;
+          if (study.taAligns)     score += 1;
+          if (study.taOpposes)    score -= 1;
+          if (study.safeDist)     score += 1;
+          if (study.momOk)        score += 1; else score -= 1;
 
-          if (nearStrike && !chartAgree && !taAgree && !safeDist) {
+          // Choppiness overrides (strike-relative)
+          const heavyChop = study.crossCount >= 2 || study.straddleCount >= 2;
+          const choppyRegime = heavyChop || (study.recentChop && study.nearStrike);
+          const noConsensus = !study.chartAligns && !study.taAligns && !study.safeDist;
+
+          if (choppyRegime && !strikeBreakForUs) {
             strikeVerdict = "CHOPPY";
-            strikeVerdictReason = `near strike (σ ${sigDist.toFixed(2)}), no chart/TA consensus${recentChop ? ", recent chop" : ""}`;
-          } else if (recentChop && nearStrike && agreeCount < 2) {
+            strikeVerdictReason = heavyChop
+              ? `${study.crossCount} strike-cross${study.crossCount === 1 ? "" : "es"} + ${study.straddleCount} straddle candle${study.straddleCount === 1 ? "" : "s"} during study → chop regime`
+              : `chop history + near strike (σ ${sigDist.toFixed(2)}) + no directional break`;
+          } else if (score <= -2) {
             strikeVerdict = "CHOPPY";
-            strikeVerdictReason = `chop pattern near strike (last 2 outcomes flipped, σ ${sigDist.toFixed(2)})`;
-          } else if (opposeCount >= 2) {
+            strikeVerdictReason = `study score ${score} — signals oppose ${side}`;
+          } else if (study.nearStrike && noConsensus) {
             strikeVerdict = "CHOPPY";
-            strikeVerdictReason = `chart+TA both oppose ${side} — no clean lean`;
-          } else if (agreeCount >= 2) {
+            strikeVerdictReason = `near strike (σ ${sigDist.toFixed(2)}) with no chart/TA/distance confirmation`;
+          } else if (score >= 4) {
             strikeVerdict = "SOLID";
-            const parts: string[] = [];
-            if (safeDist)   parts.push(`σ ${sigDist.toFixed(2)}`);
-            if (chartAgree) parts.push(`chart ${(cvConf*100).toFixed(0)}%`);
-            if (taAgree)    parts.push(`TA ${taScoreVal.toFixed(0)}`);
-            strikeVerdictReason = `${side} confirmed by ${parts.join(" + ")}`;
+            const highlights: string[] = [];
+            if (strikeBreakForUs)  highlights.push(`trendline break for ${side}`);
+            if (sideStableForUs)   highlights.push(`spot held ${study.stableSide} strike`);
+            if (study.safeDist)    highlights.push(`σ ${sigDist.toFixed(2)}`);
+            if (study.chartAligns) highlights.push(`chart ${(cvConf * 100).toFixed(0)}%`);
+            if (study.taAligns)    highlights.push(`TA ${study.taScoreVal.toFixed(0)}`);
+            strikeVerdictReason = `${side} confirmed (score ${score}): ${highlights.join(" + ")}`;
           } else {
             strikeVerdict = "WEAK";
-            strikeVerdictReason = `${side} with limited confirmation (σ ${sigDist.toFixed(2)}, chart ${cvDir} ${(cvConf*100).toFixed(0)}%, TA ${taScoreVal.toFixed(0)})`;
+            strikeVerdictReason = `${side} with mixed evidence (score ${score}, σ ${sigDist.toFixed(2)}, chart ${cvDir} ${(cvConf * 100).toFixed(0)}%, TA ${study.taScoreVal.toFixed(0)})`;
           }
 
           if (strikeVerdict === "CHOPPY") {
@@ -1353,6 +1486,10 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
             };
           }
         }
+
+        const studyFindings = study.findings;
+
+
 
         // Sync legacy gateAction/gateReason with the final entryGate so
         // every downstream consumer (UI badge, auto-trade) sees the same call.
