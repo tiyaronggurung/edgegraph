@@ -42,6 +42,12 @@ export interface SnapshotInput {
   // Phase 1A: jump-detection feature snapshot. Populated when the client
   // supplies a 1s spot buffer; otherwise null. Read-only; not gated on yet.
   jumpFeatures?: unknown;
+  // Original model pick (raw p >= 0.5) frozen at first snapshot. Never
+  // overwritten by Study/Fight. This is the "Model Pick" column in the UI.
+  modelSidePreStudy?: "YES" | "NO";
+  // Post-Study lock (final side chosen by the Fight Window at T+420s).
+  // Written on every snapshot >= T+420s so the latest override sticks.
+  studyLockedSide?: "YES" | "NO" | null;
 }
 
 
