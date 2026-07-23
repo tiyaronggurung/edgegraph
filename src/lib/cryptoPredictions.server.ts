@@ -48,6 +48,15 @@ export interface SnapshotInput {
   // Post-Study lock (final side chosen by the Fight Window at T+420s).
   // Written on every snapshot >= T+420s so the latest override sticks.
   studyLockedSide?: "YES" | "NO" | null;
+  // Phase 2 — shadow EV study enrichment.
+  regimeTag?: string | null;
+  calibrationBucket?: string | null;
+  targetOffsetSeconds?: number | null;
+  priceCeiling?: number | null;
+  minEdgeThreshold?: number | null;
+  minEvThreshold?: number | null;
+  minConfThreshold?: number | null;
+  sideConf?: number | null;
 }
 
 
