@@ -15,6 +15,52 @@ function bucketOf(secondsToClose: number): string {
   return "13m+";
 }
 
+// Canonical target offset for the entry-timing study (seconds before close).
+function targetOffsetOf(bucket: string): number {
+  switch (bucket) {
+    case "30s": return 30;
+    case "1m":  return 60;
+    case "2m":  return 120;
+    case "5m":  return 300;
+    case "10m": return 600;
+    case "13m+": return 840;
+    default: return 0;
+  }
+}
+
+// Probability-calibration bucket for studying whether model prob matches
+// actual win rate. Separate from the time-to-close snapshot bucket.
+function calibrationBucketOf(modelSideProb: number): string {
+  if (modelSideProb >= 0.90) return "p>=0.90";
+  if (modelSideProb >= 0.85) return "p0.85-0.90";
+  if (modelSideProb >= 0.75) return "p0.75-0.85";
+  if (modelSideProb >= 0.65) return "p0.65-0.75";
+  if (modelSideProb >= 0.55) return "p0.55-0.65";
+  return "p<0.55";
+}
+
+// Phase 2 configurable shadow thresholds. These are hard-coded here for now;
+// a future phase can move them to a config table or UI toggles.
+const EV_CONFIG = {
+  minEdgePts: 2.0,          // minimum edge in percentage points
+  minEvPerStake10: 0.0,     // minimum EV on a hypothetical $10 stake
+  minSideConf: 0.70,        // minimum chosen-side confidence
+  // Higher confidence lets us pay a higher price and still expect value.
+  priceCeilingByConf: [
+    { minConf: 0.90, ceiling: 0.80 },
+    { minConf: 0.80, ceiling: 0.75 },
+    { minConf: 0.70, ceiling: 0.70 },
+    { minConf: 0.00, ceiling: 0.65 },
+  ] as { minConf: number; ceiling: number }[],
+};
+
+function priceCeilingForConf(sideConf: number): number {
+  for (const tier of EV_CONFIG.priceCeilingByConf) {
+    if (sideConf >= tier.minConf) return tier.ceiling;
+  }
+  return EV_CONFIG.priceCeilingByConf[EV_CONFIG.priceCeilingByConf.length - 1].ceiling;
+}
+
 // Kalshi fee approximation (per contract, in dollars).
 function feePerContract(ask: number): number {
   if (!Number.isFinite(ask) || ask <= 0 || ask >= 1) return 0;
@@ -40,29 +86,56 @@ export async function logEvDecision(input: SnapshotInput): Promise<void> {
     const evPer10       = evPerContract * contracts;
 
     const bucket = bucketOf(input.secondsToClose);
+    const sideConf = Number.isFinite(input.sideConf as number) ? (input.sideConf as number) : modelSideProb;
+    const edgePts = (modelSideProb - selectedAsk) * 100;
+    const priceCeiling = input.priceCeiling ?? priceCeilingForConf(sideConf);
+    const minEdgeThreshold = input.minEdgeThreshold ?? EV_CONFIG.minEdgePts;
+    const minEvThreshold = input.minEvThreshold ?? EV_CONFIG.minEvPerStake10;
+    const minConfThreshold = input.minConfThreshold ?? EV_CONFIG.minSideConf;
+
+    const passesPrice = selectedAsk <= priceCeiling;
+    const passesEdge  = edgePts >= minEdgeThreshold;
+    const passesEv    = evPer10 >= minEvThreshold;
+    const passesConf  = sideConf >= minConfThreshold;
+    const wouldFireGated = passesPrice && passesEdge && passesEv && passesConf && evPer10 > 0;
 
     const row = {
       ticker: input.ticker,
       event_ticker: input.eventTicker,
       close_time: input.closeTime,
       snapshot_bucket: bucket,
+      target_offset_seconds: input.targetOffsetSeconds ?? targetOffsetOf(bucket),
       seconds_to_close: Math.max(0, Math.round(input.secondsToClose)),
 
       model_prob: modelYes,
       model_side: side,
       model_side_prob: modelSideProb,
+      calibration_bucket: input.calibrationBucket ?? calibrationBucketOf(modelSideProb),
+      side_confidence: sideConf,
 
       kalshi_yes_price: yesAsk,
       kalshi_no_price: 1 - yesAsk,
       selected_side_ask: selectedAsk,
       market_implied_prob: selectedAsk,
       edge_prob: modelSideProb - selectedAsk,
-      edge_pts: (modelSideProb - selectedAsk) * 100,
+      edge_pts: edgePts,
 
       fee_est: fee,
       ev_per_contract: evPerContract,
       ev_per_stake_10: evPer10,
       would_fire: evPer10 > 0,
+
+      price_ceiling: priceCeiling,
+      min_edge_threshold: minEdgeThreshold,
+      min_ev_threshold: minEvThreshold,
+      min_conf_threshold: minConfThreshold,
+      passes_price_ceiling: passesPrice,
+      passes_edge: passesEdge,
+      passes_ev: passesEv,
+      passes_conf: passesConf,
+      would_fire_gated: wouldFireGated,
+
+      regime_tag: input.regimeTag ?? null,
 
       spot_at_snapshot: input.spot ?? null,
       strike: input.strike ?? null,
