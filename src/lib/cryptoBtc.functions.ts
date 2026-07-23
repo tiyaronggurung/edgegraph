@@ -1390,6 +1390,15 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           const momOk = gapAnalysis.momentumAlignsWithSide;
           findings.push(`momentum: ${gapAnalysis.momentumSign > 0 ? "↑" : gapAnalysis.momentumSign < 0 ? "↓" : "—"} ${momOk ? "with" : "vs"} ${side}`);
 
+          // Distance trajectory: early (min 2–4) vs late (min 5–7) avg |dist|
+          const distAt = (c: { c: number }) => Math.abs(c.c - strike);
+          const N = studyWindow.length;
+          const earlySlice = studyWindow.slice(Math.max(0, N - 5), Math.max(0, N - 2)); // ~min 2–4
+          const lateSlice  = studyWindow.slice(Math.max(0, N - 2));                     // ~min 5–7
+          const distEarly = earlySlice.length ? earlySlice.reduce((s,c)=>s+distAt(c),0)/earlySlice.length : 0;
+          const distLate  = lateSlice.length  ? lateSlice.reduce((s,c)=>s+distAt(c),0)/lateSlice.length  : 0;
+          const dominance = N > 0 ? Math.max(aboveCount, belowCount) / N : 0;
+
           return {
             findings,
             breakoutSide,
@@ -1410,7 +1419,11 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
             aboveCount,
             belowCount,
             studyLen: studyWindow.length,
+            dominance,
+            distEarly,
+            distLate,
           };
+
         })();
 
 
@@ -1425,7 +1438,37 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
             allReasons: [...entryGate.allReasons, `strike_study (${studyingSecondsLeft}s left)`],
           };
         } else {
-          // ── POST-STUDY VERDICT ─────────────────────────────────────────
+          // ── HARD GATES (stability-weighted lock, runs BEFORE any verdict) ──
+          // Fixes the "snapshot at T+420s" flaw: a single moment on one side of
+          // strike ≠ proof the side will hold for the remaining ~8 min. If any
+          // of these fire, the window is CHOPPY and no side is locked.
+          const totalInstability = study.crossCount + study.straddleCount;
+          const distFloor = strike * 0.0005; // 0.05% of strike (~$32 at 64k)
+          const spotDist = Math.abs(spot - strike);
+          const reverting = study.distEarly > 0 && study.distLate < study.distEarly * 0.80;
+
+          let hardSkip: string | null = null;
+          if (study.dominance < 0.70) {
+            hardSkip = `dominance ${(study.dominance*100).toFixed(0)}% <70% (${study.aboveCount}↑/${study.belowCount}↓ over ${study.studyLen} min) — no clear side`;
+          } else if (totalInstability >= 5) {
+            hardSkip = `instability ${totalInstability} (${study.crossCount} close-flips + ${study.straddleCount} straddle candles) ≥5 — auto-chop`;
+          } else if (spotDist < distFloor) {
+            hardSkip = `distance $${spotDist.toFixed(0)} < floor $${distFloor.toFixed(0)} (0.05% of strike) — too close to call`;
+          } else if (reverting) {
+            hardSkip = `reverting to strike (avg |dist| late $${study.distLate.toFixed(0)} < early $${study.distEarly.toFixed(0)}) — trajectory shrinking`;
+          }
+
+          if (hardSkip) {
+            strikeVerdict = "CHOPPY";
+            strikeVerdictReason = `hard_gate — ${hardSkip}`;
+            entryGate = {
+              ...entryGate,
+              action: "PASS",
+              reason: `strike_choppy — hard_gate: ${hardSkip}`,
+              allReasons: [...entryGate.allReasons, `hard_gate (${hardSkip})`],
+            };
+          } else {
+
           // Confluence scoring: each aligning signal +1, each opposing −1.
           // The strike-relative pieces (breakout on our side, side-stability,
           // strike-cross count) get double weight because they reflect what
@@ -1577,7 +1620,9 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               allReasons: [...entryGate.allReasons, `strike_choppy (${strikeVerdictReason})`],
             };
           }
+          } // end hard_gate else
         }
+
 
         const studyFindings = study.findings;
 
