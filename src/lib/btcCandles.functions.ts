@@ -28,7 +28,7 @@ export interface CandlesResult {
   source: "cache" | "cache+live" | "live";
 }
 
-async function fetchCoinbaseLive(tf: Exclude<CandleTf, "1w">, limit: number): Promise<TCandle[]> {
+async function fetchCoinbaseLive(tf: CandleTf, limit: number): Promise<TCandle[]> {
   const g = CB_GRANULARITY[tf]!;
   const end = Math.floor(Date.now() / 1000);
   const start = end - Math.min(300, limit) * g;
