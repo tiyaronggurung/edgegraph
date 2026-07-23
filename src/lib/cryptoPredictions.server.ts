@@ -130,6 +130,8 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         physics_prob: input.physicsProb ?? null,
         independent_prob: input.independentProb ?? null,
         jump_features: (input.jumpFeatures ?? null) as never,
+        model_side_pre_study: input.modelSidePreStudy ?? input.side,
+        study_locked_side: input.studyLockedSide ?? null,
       });
 
       return;
