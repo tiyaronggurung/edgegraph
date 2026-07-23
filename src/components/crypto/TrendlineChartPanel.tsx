@@ -266,6 +266,8 @@ function TaChart({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [candleW, setCandleW] = useState<number>(DEFAULT_CW);
+  // Bumped on every scroll — triggers Fib recompute for the new viewport.
+  const [viewportTick, setViewportTick] = useState(0);
   // Force scroll snap when TF changes (new dataset).
   useEffect(() => { setSelectedIdx(null); }, [tf]);
   const priceH = 300;
