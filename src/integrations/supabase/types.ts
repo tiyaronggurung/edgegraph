@@ -1638,6 +1638,72 @@ export type Database = {
         }
         Relationships: []
       }
+      big_flip_lead_shadow: {
+        Row: {
+          brr_proxy: number | null
+          brr_sample_count: number | null
+          cheap_ask_cents: number
+          cheap_side: string
+          created_at: string
+          gate_decision: string
+          gate_reason: string | null
+          id: string
+          lead_delta: number | null
+          live_fired: boolean
+          model_prob: number | null
+          model_side: string | null
+          outcome: string | null
+          pnl_usd: number | null
+          seconds_to_close: number | null
+          spot: number | null
+          strike: number | null
+          ticker: string
+          user_id: string
+        }
+        Insert: {
+          brr_proxy?: number | null
+          brr_sample_count?: number | null
+          cheap_ask_cents: number
+          cheap_side: string
+          created_at?: string
+          gate_decision: string
+          gate_reason?: string | null
+          id?: string
+          lead_delta?: number | null
+          live_fired?: boolean
+          model_prob?: number | null
+          model_side?: string | null
+          outcome?: string | null
+          pnl_usd?: number | null
+          seconds_to_close?: number | null
+          spot?: number | null
+          strike?: number | null
+          ticker: string
+          user_id: string
+        }
+        Update: {
+          brr_proxy?: number | null
+          brr_sample_count?: number | null
+          cheap_ask_cents?: number
+          cheap_side?: string
+          created_at?: string
+          gate_decision?: string
+          gate_reason?: string | null
+          id?: string
+          lead_delta?: number | null
+          live_fired?: boolean
+          model_prob?: number | null
+          model_side?: string | null
+          outcome?: string | null
+          pnl_usd?: number | null
+          seconds_to_close?: number | null
+          spot?: number | null
+          strike?: number | null
+          ticker?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       big_flip_signals: {
         Row: {
           detected_at: string
