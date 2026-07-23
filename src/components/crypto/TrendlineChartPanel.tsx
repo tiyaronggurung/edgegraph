@@ -259,7 +259,8 @@ function TaChart({
 
   const c = computed;
   const nCandles = c.candles.length;
-  const innerW = PAD_L + PAD_R + nCandles * CANDLE_W;
+  const innerW = PAD_L + PAD_R + (nCandles + FUTURE_SLOTS) * CANDLE_W;
+  const lastCandleX = PAD_L + nCandles * CANDLE_W; // right edge of the last real candle
 
   // Scales
   const xFor = (i: number) => PAD_L + i * CANDLE_W + CANDLE_W / 2;
