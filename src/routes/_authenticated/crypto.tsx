@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, useEffect, useRef, lazy } from "react";
 import { LazyOnVisible } from "@/components/LazyOnVisible";
-import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle, ArrowUp, ArrowDown, Volume2, VolumeX } from "lucide-react";
+import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle, ArrowUp, ArrowDown, Volume2, VolumeX, Info } from "lucide-react";
 import { playOrderPlaced, playOrderFilled, playModelBetPing } from "@/lib/orderSounds";
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades, checkKalshiBalance, diagnoseKalshiAuth, type KalshiDiagStep } from "@/lib/cryptoTrades.functions";
@@ -111,6 +111,59 @@ const fmtTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString([
 const fmtCountdown = (s: number) => s <= 0 ? "closed" : `${Math.floor(s/60)}m ${(s%60).toString().padStart(2,"0")}s`;
 // Kalshi BTC 15m: YES = price closes ABOVE strike, NO = at/below. Show "UP" / "DOWN" to users.
 const dirLabel = (side: string) => side === "YES" ? "UP" : "DOWN";
+
+// Build a human-readable "why did Study pick this side?" tooltip from the
+// snapshot fields we already persist. Read-only — no logic change.
+function buildStudyReason(r: {
+  side: "YES" | "NO";
+  modelSidePreStudy?: "YES" | "NO" | null;
+  studyLockedSide?: "YES" | "NO" | null;
+  modelProb: number;
+  marketYesPrice: number;
+  edgePts: number;
+  strike: number;
+  chartVerdict: "YES" | "NO" | "neutral" | null;
+  chartStrength: number | null;
+  taScore: number | null;
+  taReasons: string[];
+  taRsi1m: number | null;
+  taRsi5m: number | null;
+  taMacd5mHist: number | null;
+  taBb5mPctB: number | null;
+  taVwapDistPct: number | null;
+  taTrendAlignScore: number | null;
+  taVwapRejUp: boolean;
+  taVwapRejDown: boolean;
+  flipCount: number;
+}, isStudying: boolean): string {
+  const L: string[] = [];
+  const pickLabel = dirLabel(r.side);
+  L.push(isStudying ? `Study Pick pending — locks at T+420s.` : `Study Pick: ${pickLabel}`);
+  const mp = r.modelSidePreStudy ?? r.side;
+  if (mp !== r.side) L.push(`Overrode Model Pick (${dirLabel(mp)}) — Study won the Fight Window.`);
+  else L.push(`Agrees with Model Pick (${dirLabel(mp)}).`);
+  if (r.studyLockedSide) L.push(`Study locked side: ${dirLabel(r.studyLockedSide)}.`);
+
+  L.push(``);
+  L.push(`— Signals at snapshot —`);
+  L.push(`P(YES) ${(r.modelProb * 100).toFixed(1)}%  ·  Kalshi ${(r.marketYesPrice * 100).toFixed(0)}¢  ·  Edge ${r.edgePts >= 0 ? "+" : ""}${r.edgePts.toFixed(1)}pp`);
+  if (r.chartVerdict) L.push(`Chart: ${r.chartVerdict.toUpperCase()}${r.chartStrength != null ? ` (strength ${(r.chartStrength * 100).toFixed(0)}%)` : ""}`);
+  if (r.taScore != null) L.push(`TA score: ${r.taScore >= 0 ? "+" : ""}${r.taScore.toFixed(0)} (${r.taScore > 15 ? "bullish" : r.taScore < -15 ? "bearish" : "neutral"})`);
+  if (r.taTrendAlignScore != null) L.push(`Trend align: ${r.taTrendAlignScore.toFixed(0)}`);
+  if (r.taRsi1m != null || r.taRsi5m != null) L.push(`RSI 1m/5m: ${r.taRsi1m?.toFixed(0) ?? "—"} / ${r.taRsi5m?.toFixed(0) ?? "—"}`);
+  if (r.taMacd5mHist != null) L.push(`MACD 5m hist: ${r.taMacd5mHist >= 0 ? "+" : ""}${r.taMacd5mHist.toFixed(2)}`);
+  if (r.taBb5mPctB != null) L.push(`BB %B 5m: ${(r.taBb5mPctB * 100).toFixed(0)}%`);
+  if (r.taVwapDistPct != null) L.push(`VWAP dist: ${r.taVwapDistPct >= 0 ? "+" : ""}${(r.taVwapDistPct * 100).toFixed(2)}%`);
+  if (r.taVwapRejUp)   L.push(`VWAP rejection ↑ (bearish for UP)`);
+  if (r.taVwapRejDown) L.push(`VWAP rejection ↓ (bearish for DOWN)`);
+  if (r.flipCount > 0) L.push(`Flip count: ${r.flipCount}${r.flipCount >= 3 ? " ⚠ chop" : ""}`);
+  if (r.taReasons?.length) {
+    L.push(``);
+    L.push(`— TA reasons —`);
+    for (const t of r.taReasons.slice(0, 8)) L.push(`• ${t}`);
+  }
+  return L.join("\n");
+}
 // Kalshi ¢ → American odds (favorites negative, dogs positive).
 const centsToAmerican = (c: number): string => {
   const p = Math.max(0.01, Math.min(0.99, c / 100));
@@ -1226,16 +1279,26 @@ function ModelAccuracyPanel() {
                       const windowOpenMs = new Date(r.closeTime).getTime() - 15 * 60_000;
                       const msSinceOpen = Date.now() - windowOpenMs;
                       const isStudying = msSinceOpen >= 0 && msSinceOpen < 420_000;
+                      const reason = buildStudyReason(r, isStudying);
                       return (
                       <tr key={r.ticker} className="border-t border-border transition-all duration-150 ease-out hover:bg-primary/10 hover:shadow-[inset_2px_0_0_hsl(var(--primary))] hover:scale-[1.005] hover:relative hover:z-10">
                         <td className="p-2">{new Date(r.closeTime).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
                         <td className="p-2 font-mono">{r.ticker}</td>
                         <td className="p-2">
-                          {isStudying ? (
-                            <span className="text-muted-foreground text-[10px]" title="Strike Study in progress · Study Pick locks at T+420s (min 7)">⏳ STUDYING</span>
-                          ) : (
-                            <span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"} title="Study Pick — locked after 420s study; leans to Study on Study/Model disagreement">{dirLabel(r.side)}</span>
-                          )}
+                          <span className="inline-flex items-center gap-1">
+                            {isStudying ? (
+                              <span className="text-muted-foreground text-[10px]" title="Strike Study in progress · Study Pick locks at T+420s (min 7)">⏳ STUDYING</span>
+                            ) : (
+                              <span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"} title="Study Pick — locked after 420s study; leans to Study on Study/Model disagreement">{dirLabel(r.side)}</span>
+                            )}
+                            <span
+                              title={reason}
+                              className="cursor-help text-muted-foreground hover:text-primary"
+                              aria-label="Why this pick"
+                            >
+                              <Info className="h-3 w-3" />
+                            </span>
+                          </span>
                         </td>
                         <td className="p-2">
                           {(() => {
