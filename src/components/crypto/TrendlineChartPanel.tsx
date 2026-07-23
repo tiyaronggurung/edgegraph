@@ -169,6 +169,7 @@ function TaChart({
   const macdH = 70;
   const PAD_L = 52, PAD_R = 72, PAD_T = 10, PAD_B = 6;
   const CANDLE_W = 6; // px per candle in the scrollable area
+  const FUTURE_SLOTS = 30; // empty room to the right of the last candle for upcoming candles
 
   const computed = useMemo(() => {
     if (!data || data.candles.length === 0) return null;
