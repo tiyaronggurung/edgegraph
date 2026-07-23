@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Zap } from "lucide-react";
 import { evalTrendlineShadow, type TrendlineSnapshot } from "@/lib/trendlineShadow.functions";
 import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
+import { getCompositeSpot } from "@/lib/compositeSpot.functions";
 import { getBtcCandles, TF_LIST, type CandleTf } from "@/lib/btcCandles.functions";
 import { detectSpike, detectTrendlines, type TCandle } from "@/lib/ta/trendlines";
 import { emaSeries, rsi, macd, bollinger, sessionVwap } from "@/lib/ta/taEngine";
@@ -51,6 +52,19 @@ export function TrendlineChartPanel() {
   const evalFn = useServerFn(evalTrendlineShadow);
   const candlesFn = useServerFn(getBtcCandles);
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
+  const compositeFn = useServerFn(getCompositeSpot);
+
+  // Composite BTC spot (Coinbase + Binance + Kraken median) — polled every
+  // 1s so the forming candle ticks in near-realtime.
+  const { data: composite } = useQuery({
+    queryKey: ["composite-spot"],
+    queryFn: () => compositeFn(),
+    refetchInterval: 1_000,
+    staleTime: 800,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    refetchIntervalInBackground: false,
+  });
 
   const { data: kalshi } = useQuery({
     queryKey: ["kalshi-implied-spot"],
@@ -91,7 +105,7 @@ export function TrendlineChartPanel() {
   // visibly ticks up/down between server refetches. Only when the live tick
   // still falls inside the last bar's bucket — never invent a new bar.
   const rawCandles = candlesData?.candles ?? shadow?.candles ?? [];
-  const liveSpot = kalshi?.impliedSpot ?? shadow?.spot ?? null;
+  const liveSpot = composite?.spot ?? kalshi?.impliedSpot ?? shadow?.spot ?? null;
   const candles = useMemo<TCandle[]>(() => {
     if (!rawCandles.length || liveSpot == null) return rawCandles;
     const bucketMs =
@@ -131,7 +145,7 @@ export function TrendlineChartPanel() {
             BTC {TF_LABEL[tf]} · TA v2 · Trendlines
           </span>
           {(() => {
-            const ours = shadow?.spot ?? null;
+            const ours = composite?.spot ?? shadow?.spot ?? null;
             const k = kalshi?.impliedSpot ?? null;
             const diff = ours != null && k != null ? ours - k : null;
             const diffCls =
