@@ -7,6 +7,7 @@ import { evaluateBtcEntry, type BtcEntryGateDecision } from "./btcEntryGate";
 import { getBtcGateConfig } from "./btcGateConfig.server";
 import { logBtcGateDecision } from "./btcGateLog.server";
 import { getChartVerdict } from "./ta/chartVerdict";
+import { detectTrendlines, detectSpike } from "./ta/trendlines";
 import { computeTaScore, TA_ENGINE_VERSION, type TaScoreResult } from "./ta/taEngine";
 
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
@@ -1033,10 +1034,41 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         // (f3) Chart Verdict blend — trendlines + S/R + structure (LIVE ±10pt, 2026-07-23).
         // Smaller cap than TA v2 to avoid double-counting overlapping signals.
         // shift = direction_sign * confidence * 0.10
+        //
+        // (f3b) BREAKOUT BOOSTER (2026-07-23): when price is living OUTSIDE the
+        // channel on the strike-favorable side and no spike-rejection has fired,
+        // force chart verdict direction+confidence high. Teaches the model that
+        // "close beyond trendline in the direction of the strike side" is a
+        // strong directional signal — which is what the eye reads on the chart.
         let chartBlendPts = 0;
+        let boosterFired: "up" | "down" | null = null;
         if (chartVerdict?.combined) {
-          const dir = chartVerdict.combined.direction; // "YES" | "NO" | "neutral"
-          const conf = Math.max(0, Math.min(1, chartVerdict.combined.confidence ?? 0));
+          let dir = chartVerdict.combined.direction as "YES" | "NO" | "neutral";
+          let conf = Math.max(0, Math.min(1, chartVerdict.combined.confidence ?? 0));
+
+          // Breakout booster: recompute trendlines on the same 1m candle set.
+          try {
+            const trend = detectTrendlines(recent as any);
+            const spike = detectSpike(recent as any, trend);
+            const upperNow = trend.upperAtNow;
+            const lowerNow = trend.lowerAtNow;
+            const spotAboveStrike = spot > strike;
+            const spotBelowStrike = spot < strike;
+            // Upside breakout: close above upper trendline AND spot > strike
+            // AND no bearish spike-rejection printing against us.
+            if (upperNow != null && spot > upperNow && spotAboveStrike &&
+                !(spike.detected && spike.direction === "down")) {
+              dir = "YES";
+              conf = Math.max(conf, 0.75);
+              boosterFired = "up";
+            } else if (lowerNow != null && spot < lowerNow && spotBelowStrike &&
+                !(spike.detected && spike.direction === "up")) {
+              dir = "NO";
+              conf = Math.max(conf, 0.75);
+              boosterFired = "down";
+            }
+          } catch (e) { /* trendline failure is non-fatal */ }
+
           const sign = dir === "YES" ? 1 : dir === "NO" ? -1 : 0;
           if (sign !== 0 && conf > 0) {
             const shift = sign * conf * 0.10; // ±0.10 max
@@ -1045,6 +1077,7 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
             chartBlendPts = (p - pBefore) * 100;
           }
         }
+        void boosterFired; // reserved for future decision-log field
 
 
         // ── FREEZE-SIDE GUARD REMOVED (2026-07-22 rollback) ──
