@@ -150,6 +150,7 @@ function buildPrompt(d: SoccerPropsInput): string {
 }
 
 export const predictSoccerProps = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => InputSchema.parse(d))
   .handler(async ({ data }): Promise<{ result: SoccerPropsResult | null; error: string | null }> => {
     const key = process.env.LOVABLE_API_KEY;
