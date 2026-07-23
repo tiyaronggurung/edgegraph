@@ -1107,6 +1107,66 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         }
         void boosterFired; // reserved for future decision-log field
 
+        // ── REVERSION SANITY VETOS (2026-07-23) ────────────────────────────
+        // Three soft caps that never flip a pick — they only *moderate*
+        // conviction when the model would otherwise anchor too hard on a
+        // signal that historically mean-reverts inside a 15m window.
+        //   sig1  Oversold/overbought bounce  (RSI extreme + BB %B extreme, ≥8m left)
+        //   sig2  Distance/σ sanity           (spot well within one std-dev of strike)
+        //   sig3  VWAP magnet                 (spot stretched from VWAP toward strike)
+        // Applied as clamps toward the pre-blend prob (never crosses 0.5).
+        {
+          const secLeft = secondsToClose;
+          const minsLeft = Math.max(0, secLeft / 60);
+          // sigmaEff is per-minute stddev of log returns → expected move ≈ spot*σ*sqrt(min).
+          const expectedMoveUsd = spot > 0 && sigmaEff > 0
+            ? spot * sigmaEff * Math.sqrt(Math.max(0.5, minsLeft))
+            : 0;
+          const distSigma = expectedMoveUsd > 0
+            ? Math.abs(spot - strike) / expectedMoveUsd
+            : Infinity;
+
+          // Sig 2 — Distance/σ < 0.6: TA/chart shifts are too aggressive when
+          // the market is well within one std-dev of the strike. Pull p halfway
+          // back toward pre-blend (physics-dominated).
+          if (distSigma < 0.6 && Number.isFinite(distSigma)) {
+            p = pPreBlend + (p - pPreBlend) * 0.5;
+          }
+
+          // Sig 1 — Oversold-bounce cap. NO conviction (=1-p) capped at 0.75
+          // when TA is deep oversold with ≥ 8 min left. Symmetric for YES.
+          const rsi5 = taScoreRes?.rsi5m ?? null;
+          const pctB = taScoreRes?.bb5mPctB ?? null;
+          if (secLeft >= 480 && rsi5 != null && pctB != null) {
+            if (p < 0.5 && rsi5 <= 35 && pctB <= 0.10) {
+              // Deep oversold — cap NO conviction at 75%.
+              p = Math.max(p, 0.25);
+            } else if (p > 0.5 && rsi5 >= 65 && pctB >= 0.90) {
+              // Deep overbought — cap YES conviction at 75%.
+              p = Math.min(p, 0.75);
+            }
+          }
+
+          // Sig 3 — VWAP magnet. When spot is stretched away from VWAP but the
+          // strike sits between spot and VWAP, VWAP acts as a magnet pulling
+          // price back through the strike.
+          const vwapPct = taScoreRes?.vwapDistPct ?? null;
+          if (secLeft >= 480 && vwapPct != null) {
+            const spotBelowStrike = spot < strike;
+            const spotAboveStrike = spot > strike;
+            if (p < 0.5 && vwapPct <= -0.5 && spotBelowStrike) {
+              // NO pick with spot stretched below VWAP AND below strike → VWAP
+              // above pulls through strike. Cap NO at 75%.
+              p = Math.max(p, 0.25);
+            } else if (p > 0.5 && vwapPct >= 0.5 && spotAboveStrike) {
+              // Mirror for YES side.
+              p = Math.min(p, 0.75);
+            }
+          }
+        }
+        // ── end reversion vetos ─────────────────────────────────────────────
+
+
 
         // ── FREEZE-SIDE GUARD REMOVED (2026-07-22 rollback) ──
         // The lockedSide-first behavior kept the model stuck on the first
