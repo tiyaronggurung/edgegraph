@@ -42,6 +42,12 @@ export interface SnapshotInput {
   // Phase 1A: jump-detection feature snapshot. Populated when the client
   // supplies a 1s spot buffer; otherwise null. Read-only; not gated on yet.
   jumpFeatures?: unknown;
+  // Original model pick (raw p >= 0.5) frozen at first snapshot. Never
+  // overwritten by Study/Fight. This is the "Model Pick" column in the UI.
+  modelSidePreStudy?: "YES" | "NO";
+  // Post-Study lock (final side chosen by the Fight Window at T+420s).
+  // Written on every snapshot >= T+420s so the latest override sticks.
+  studyLockedSide?: "YES" | "NO" | null;
 }
 
 
@@ -124,6 +130,8 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         physics_prob: input.physicsProb ?? null,
         independent_prob: input.independentProb ?? null,
         jump_features: (input.jumpFeatures ?? null) as never,
+        model_side_pre_study: input.modelSidePreStudy ?? input.side,
+        study_locked_side: input.studyLockedSide ?? null,
       });
 
       return;
@@ -164,6 +172,9 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         physics_prob: input.physicsProb ?? null,
         independent_prob: input.independentProb ?? null,
         jump_features: (input.jumpFeatures ?? null) as never,
+        ...(input.studyLockedSide ? { study_locked_side: input.studyLockedSide } : {}),
+
+
 
         ...(flipped ? {
           flip_count: Number(existing.flip_count ?? 0) + 1,
@@ -279,6 +290,8 @@ export interface PredictionStatsResult {
     taVwapRejUp: boolean;
     taVwapRejDown: boolean;
     taEngineVersion: string | null;
+    modelSidePreStudy: "YES" | "NO" | null;
+    studyLockedSide: "YES" | "NO" | null;
   }>;
 }
 
@@ -295,7 +308,7 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
 
   const { data: rows } = await supabaseAdmin
     .from("btc_model_predictions")
-    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, settled_at, live_side, flip_count, chart_verdict, chart_strength, ta_score, ta_reasons, ta_vwap_dist_pct, ta_trend_alignment_score, ta_rsi_1m, ta_rsi_5m, ta_macd_5m_hist, ta_bb_5m_pctb, ta_vwap_rej_up, ta_vwap_rej_down, ta_engine_version")
+    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, settled_at, live_side, flip_count, chart_verdict, chart_strength, ta_score, ta_reasons, ta_vwap_dist_pct, ta_trend_alignment_score, ta_rsi_1m, ta_rsi_5m, ta_macd_5m_hist, ta_bb_5m_pctb, ta_vwap_rej_up, ta_vwap_rej_down, ta_engine_version, model_side_pre_study, study_locked_side")
     .gte("close_time", cutoff)
     .order("close_time", { ascending: false })
     .limit(500);
@@ -357,6 +370,8 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
       taVwapRejUp: Boolean(r.ta_vwap_rej_up),
       taVwapRejDown: Boolean(r.ta_vwap_rej_down),
       taEngineVersion: (r.ta_engine_version as string | null) ?? null,
+      modelSidePreStudy: ((r as { model_side_pre_study?: string | null }).model_side_pre_study as "YES" | "NO" | null) ?? (r.side as "YES" | "NO" | null) ?? null,
+      studyLockedSide: ((r as { study_locked_side?: string | null }).study_locked_side as "YES" | "NO" | null) ?? null,
     })),
   };
 }

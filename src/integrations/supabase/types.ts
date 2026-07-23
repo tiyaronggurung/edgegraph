@@ -2469,6 +2469,7 @@ export type Database = {
           live_side: string | null
           market_yes_price: number
           model_prob: number
+          model_side_pre_study: string | null
           outcome: string | null
           physics_prob: number | null
           settle_price: number | null
@@ -2478,6 +2479,7 @@ export type Database = {
           snapshot_seconds_to_close: number
           spot_at_snapshot: number
           strike: number
+          study_locked_side: string | null
           ta_bb_5m_pctb: number | null
           ta_engine_version: string | null
           ta_macd_5m_hist: number | null
@@ -2511,6 +2513,7 @@ export type Database = {
           live_side?: string | null
           market_yes_price: number
           model_prob: number
+          model_side_pre_study?: string | null
           outcome?: string | null
           physics_prob?: number | null
           settle_price?: number | null
@@ -2520,6 +2523,7 @@ export type Database = {
           snapshot_seconds_to_close: number
           spot_at_snapshot: number
           strike: number
+          study_locked_side?: string | null
           ta_bb_5m_pctb?: number | null
           ta_engine_version?: string | null
           ta_macd_5m_hist?: number | null
@@ -2553,6 +2557,7 @@ export type Database = {
           live_side?: string | null
           market_yes_price?: number
           model_prob?: number
+          model_side_pre_study?: string | null
           outcome?: string | null
           physics_prob?: number | null
           settle_price?: number | null
@@ -2562,6 +2567,7 @@ export type Database = {
           snapshot_seconds_to_close?: number
           spot_at_snapshot?: number
           strike?: number
+          study_locked_side?: string | null
           ta_bb_5m_pctb?: number | null
           ta_engine_version?: string | null
           ta_macd_5m_hist?: number | null

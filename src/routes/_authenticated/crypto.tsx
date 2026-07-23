@@ -1200,7 +1200,8 @@ function ModelAccuracyPanel() {
                       <th className="text-left p-2">Closed</th>
                       <th className="text-left p-2">Ticker</th>
                       <th className="text-left p-2" title="Study Pick — locked side after the 420s Strike Study. On Study/Model disagreement the side leans to Study. This is now the pick compared to settlement.">Study Pick</th>
-                      <th className="text-left p-2" title="Raw model direction: P(YES) ≥ 50%? Shown for reference only — no longer the win/loss comparator.">Raw model</th>
+                      <th className="text-left p-2" title="Model Pick — the original raw model pick (p ≥ 50%) frozen at the first snapshot. Never overwritten by Study/Fight. This is the classic model pick shown for a long time.">Model Pick</th>
+                      <th className="text-left p-2" title="Raw model direction (live): P(YES) ≥ 50%? Updates with the current tick — no longer the win/loss comparator.">Raw model</th>
                       {/* Live column hidden (kept in data model) */}
                       <th className="text-right p-2">Strike</th>
                       <th className="text-right p-2">Model%</th>
@@ -1234,6 +1235,21 @@ function ModelAccuracyPanel() {
                           ) : (
                             <span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"} title="Study Pick — locked after 420s study; leans to Study on Study/Model disagreement">{dirLabel(r.side)}</span>
                           )}
+                        </td>
+                        <td className="p-2">
+                          {(() => {
+                            const mp = (r as { modelSidePreStudy?: "YES" | "NO" | null }).modelSidePreStudy ?? r.side;
+                            const mpCorrect: boolean | null = r.wasCorrect == null
+                              ? null
+                              : (r.side === mp ? r.wasCorrect : !r.wasCorrect);
+                            return (
+                              <>
+                                <span className={mp === "YES" ? "text-emerald-400" : "text-red-400"} title="Model Pick — original raw model side frozen at first snapshot; never overridden by Study">{dirLabel(mp)}</span>
+                                {mpCorrect === true && <span className="ml-1 text-[10px] text-emerald-400">✓</span>}
+                                {mpCorrect === false && <span className="ml-1 text-[10px] text-red-400">✗</span>}
+                              </>
+                            );
+                          })()}
                         </td>
                         <td className="p-2">
                           {isStudying ? (

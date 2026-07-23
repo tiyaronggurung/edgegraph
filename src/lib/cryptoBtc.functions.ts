@@ -82,6 +82,10 @@ export interface BtcMarket {
   calibActive: boolean;
   edgePts: number;
   side: "YES" | "NO";
+  // Original raw model pick (p >= 0.5), frozen at first snapshot in DB.
+  modelSidePreStudy: "YES" | "NO";
+  // Post-Study lock (final side chosen at T+420s). null before study lock.
+  studyLockedSide: "YES" | "NO" | null;
   edgeAbs: number;
   kellyFraction: number;     // quarter-Kelly bankroll fraction (display only)
   secondsToClose: number;
@@ -1255,6 +1259,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         // Side always follows current calibrated model prob (no freeze-side).
         // eslint-disable-next-line prefer-const
         let side: "YES" | "NO" = p >= 0.5 ? "YES" : "NO";
+        // Frozen at first snapshot in DB — never overwritten by Study/Fight.
+        const modelSidePreStudy: "YES" | "NO" = side;
         // eslint-disable-next-line prefer-const
         let edgePts = side === "YES" ? rawEdgePts : -rawEdgePts;
         const edgeAbs = Math.abs(edgePts);
@@ -1737,6 +1743,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           calibActive: cal.active,
           modelSource: source,
           edgePts, side, edgeAbs,
+          modelSidePreStudy,
+          studyLockedSide: (windowElapsedSec >= 420 ? side : null) as "YES" | "NO" | null,
           kellyFraction: kelly,
           secondsToClose,
           sigmaDistance: sigDist,
@@ -1840,6 +1848,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               physicsProb: m.physicsProb,
               independentProb: m.independentProb,
               jumpFeatures: jumpByTicker.get(m.ticker),
+              modelSidePreStudy: m.modelSidePreStudy,
+              studyLockedSide: m.studyLockedSide,
             })),
         );
 
