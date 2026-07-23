@@ -88,6 +88,21 @@ export function TrendlineChartPanel() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
             <Stat label="Spot"          value={data?.spot != null ? `$${data.spot.toFixed(0)}` : "—"} />
             <Stat label="Strike"        value={data?.strike != null ? `$${data.strike.toFixed(0)}` : "—"} />
+            <Stat
+              label="Δ Strike"
+              value={
+                data?.spot != null && data?.strike != null
+                  ? `${(data.spot - data.strike) >= 0 ? "+" : ""}$${(data.spot - data.strike).toFixed(2)} ${data.spot >= data.strike ? "above" : "below"}`
+                  : "—"
+              }
+              icon={
+                data?.spot != null && data?.strike != null ? (
+                  data.spot >= data.strike
+                    ? <TrendingUp className="h-3 w-3 text-emerald-400" />
+                    : <TrendingDown className="h-3 w-3 text-rose-400" />
+                ) : undefined
+              }
+            />
             <Stat label="Upper line"    value={data?.upperAtNow != null ? `$${data.upperAtNow.toFixed(0)}` : "—"} />
             <Stat label="Lower line"    value={data?.lowerAtNow != null ? `$${data.lowerAtNow.toFixed(0)}` : "—"} />
             <Stat label="→ Upper"       value={data?.distToUpperPct != null ? `${data.distToUpperPct.toFixed(3)}%` : "—"}
