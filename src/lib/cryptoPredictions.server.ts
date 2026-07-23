@@ -249,6 +249,13 @@ export async function settleDuePredictions(): Promise<{ settled: number }> {
         })
         .eq("id", r.id);
       settled++;
+      // Shadow EV backfill — fire-and-forget.
+      void (async () => {
+        try {
+          const { backfillEvOutcome } = await import("./evDecisionLog.server");
+          await backfillEvOutcome(r.ticker as string, outcome);
+        } catch { /* swallowed */ }
+      })();
     }));
 
     return { settled };
