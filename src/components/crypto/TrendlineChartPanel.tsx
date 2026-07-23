@@ -544,6 +544,7 @@ function TaChart({
         onMouseLeave={endDrag}
         onClickCapture={onClickCapture}
         onWheel={onWheel}
+        onScroll={onScroll}
       >
       <svg
         width={innerW}
@@ -552,6 +553,29 @@ function TaChart({
       >
         {/* ── Price panel ── */}
         <g>
+          {/* Fibonacci retracement grid — from currently visible viewport */}
+          {fibList.map((lvl, i) => {
+            if (lvl.price < c.pMin || lvl.price > c.pMax) return null;
+            const y = yPrice(lvl.price);
+            const stroke = FIB_COLORS[lvl.label] ?? "rgba(148, 163, 184, 0.5)";
+            return (
+              <g key={`fib-${i}`}>
+                <line
+                  x1={PAD_L} y1={y} x2={innerW - PAD_R} y2={y}
+                  stroke={stroke} strokeWidth={1}
+                  strokeDasharray={lvl.kind === "ext" ? "6 6" : "3 4"}
+                  opacity={lvl.ratio === 0.5 || lvl.ratio === 0.618 ? 0.95 : 0.7}
+                />
+                <text
+                  x={PAD_L + 4} y={y - 2}
+                  fill={stroke} fontSize={9} fontFamily="monospace"
+                >
+                  {lvl.label} · ${lvl.price.toFixed(lvl.price > 10_000 ? 0 : 2)}
+                </text>
+              </g>
+            );
+          })}
+
           {/* future/empty zone shading (right of the current candle) */}
           <rect
             x={lastCandleX} y={PAD_T}
