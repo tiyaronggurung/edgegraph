@@ -56,6 +56,7 @@ const ManualTradesPanel = lazy(() => import("@/components/crypto/ManualTradesPan
 const ModelScorecardPanel = lazy(() => import("@/components/crypto/ModelScorecardPanel").then(m => ({ default: m.ModelScorecardPanel })));
 const DailyPerformancePanel = lazy(() => import("@/components/crypto/DailyPerformancePanel").then(m => ({ default: m.DailyPerformancePanel })));
 const ModelAblationPanel = lazy(() => import("@/components/crypto/ModelAblationPanel").then(m => ({ default: m.ModelAblationPanel })));
+const EvReportPanel = lazy(() => import("@/components/crypto/EvReportPanel").then(m => ({ default: m.EvReportPanel })));
 const JumpBacktestPanel = lazy(() => import("@/components/crypto/JumpBacktestPanel").then(m => ({ default: m.JumpBacktestPanel })));
 const JumpRecommendationCard = lazy(() => import("@/components/crypto/JumpRecommendationCard").then(m => ({ default: m.JumpRecommendationCard })));
 const SignedEdgeVetoPanel = lazy(() => import("@/components/crypto/SignedEdgeVetoPanel").then(m => ({ default: m.SignedEdgeVetoPanel })));
@@ -4185,6 +4186,8 @@ function CryptoPage() {
           <LazyOnVisible><DailyPerformancePanel /></LazyOnVisible>
 
           <LazyOnVisible><ModelAblationPanel /></LazyOnVisible>
+
+          <LazyOnVisible><EvReportPanel /></LazyOnVisible>
 
           <LazyOnVisible><JumpBacktestPanel /></LazyOnVisible>
 
