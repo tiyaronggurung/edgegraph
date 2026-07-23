@@ -372,12 +372,27 @@ function TaChart({
             const color = green ? "rgb(74, 222, 128)" : "rgb(248, 113, 113)";
             const bodyTop = yPrice(Math.max(cd.o, cd.c));
             const bodyBot = yPrice(Math.min(cd.o, cd.c));
+            const isSel = selectedIdx === i;
             return (
-              <g key={i}>
+              <g key={i} onClick={(e) => { e.stopPropagation(); setSelectedIdx(i); }} style={{ cursor: "pointer" }}>
+                {/* invisible wide hitbox so tiny candles are still easy to click */}
+                <rect
+                  x={cx - CANDLE_W / 2} y={PAD_T}
+                  width={CANDLE_W} height={priceH - PAD_T - PAD_B}
+                  fill="transparent"
+                />
                 <line x1={cx} y1={yPrice(cd.h)} x2={cx} y2={yPrice(cd.l)}
                   stroke={color} strokeWidth={1} opacity={0.75} />
                 <rect x={cx - bodyW / 2} y={bodyTop} width={bodyW}
                   height={Math.max(1, bodyBot - bodyTop)} fill={color} opacity={0.9} />
+                {isSel && (
+                  <rect
+                    x={cx - CANDLE_W / 2} y={PAD_T}
+                    width={CANDLE_W} height={priceH - PAD_T - PAD_B}
+                    fill="rgba(255,255,255,0.06)"
+                    stroke="rgba(255,255,255,0.5)" strokeWidth={0.8}
+                  />
+                )}
                 {c.spikeFlags[i] && (
                   <circle cx={cx} cy={yPrice(cd.c)} r={3.5}
                     fill="rgb(250, 204, 21)" stroke="rgb(0,0,0)" strokeWidth={0.5} />
