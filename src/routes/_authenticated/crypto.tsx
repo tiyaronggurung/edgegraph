@@ -245,15 +245,34 @@ function MarketRow({
       </div>
 
       <div className="flex flex-col items-end gap-1 min-w-[220px]">
-        <div className="flex items-center gap-2">
-          <div className={`px-2 py-0.5 text-[11px] uppercase tracking-wider border rounded ${sideColor}`}>Model: {dirLabel(m.side)}</div>
-          <div className={`px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider border rounded ${
-            m.gateAction === "BET"
-              ? "bg-[color:var(--color-primary)]/20 text-[color:var(--color-primary)] border-[color:var(--color-primary)]/60"
-              : "bg-muted/30 text-muted-foreground border-border"
-          }`}>
-            {m.gateAction === "BET" ? "✓ BET" : "✕ PASS"}
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <div className={`px-2 py-0.5 text-[11px] uppercase tracking-wider border rounded ${sideColor}`}>
+            {m.studying ? "Model: —" : `Model: ${dirLabel(m.side)}`}
           </div>
+          {m.studying ? (
+            <div className="px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider border rounded bg-amber-500/20 text-amber-300 border-amber-500/60 animate-pulse">
+              ⏳ STUDYING {m.studyingSecondsLeft}s
+            </div>
+          ) : (
+            <div className={`px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider border rounded ${
+              m.gateAction === "BET"
+                ? "bg-[color:var(--color-primary)]/20 text-[color:var(--color-primary)] border-[color:var(--color-primary)]/60"
+                : "bg-muted/30 text-muted-foreground border-border"
+            }`}>
+              {m.gateAction === "BET" ? "✓ BET" : "✕ PASS"}
+            </div>
+          )}
+          {!m.studying && m.strikeVerdict && (
+            <div className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border rounded ${
+              m.strikeVerdict === "SOLID"
+                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/60"
+                : m.strikeVerdict === "CHOPPY"
+                ? "bg-red-500/20 text-red-300 border-red-500/60"
+                : "bg-amber-500/10 text-amber-300 border-amber-500/40"
+            }`} title={m.strikeVerdictReason}>
+              {m.strikeVerdict}
+            </div>
+          )}
         </div>
         <div className="text-sm">Model YES <span className="font-bold">{(m.modelYesProb*100).toFixed(1)}%</span> vs mkt {(m.yesPrice*100).toFixed(0)}¢</div>
         <div className="text-[10px] text-muted-foreground text-right">
