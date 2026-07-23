@@ -48,6 +48,7 @@ import { Route as ApiPublicHooksMarketIntelMatchRouteImport } from './routes/api
 import { Route as ApiPublicHooksMarketContextTickRouteImport } from './routes/api/public/hooks/market-context-tick'
 import { Route as ApiPublicHooksCryptoStudyRouteImport } from './routes/api/public/hooks/crypto-study'
 import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
+import { Route as ApiPublicHooksCandlesIngestRouteImport } from './routes/api/public/hooks/candles-ingest'
 import { Route as ApiPublicHooksBtcCalibrateRouteImport } from './routes/api/public/hooks/btc-calibrate'
 import { Route as ApiPublicHooksBigFlipTickRouteImport } from './routes/api/public/hooks/big-flip-tick'
 import { Route as ApiPublicHooksBackfillTripleWindowRouteImport } from './routes/api/public/hooks/backfill-triple-window'
@@ -268,6 +269,12 @@ const ApiPublicHooksCaptureClosingOddsRoute =
     path: '/api/public/hooks/capture-closing-odds',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksCandlesIngestRoute =
+  ApiPublicHooksCandlesIngestRouteImport.update({
+    id: '/api/public/hooks/candles-ingest',
+    path: '/api/public/hooks/candles-ingest',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksBtcCalibrateRoute =
   ApiPublicHooksBtcCalibrateRouteImport.update({
     id: '/api/public/hooks/btc-calibrate',
@@ -343,6 +350,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/backfill-triple-window': typeof ApiPublicHooksBackfillTripleWindowRoute
   '/api/public/hooks/big-flip-tick': typeof ApiPublicHooksBigFlipTickRoute
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
+  '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
@@ -390,6 +398,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/backfill-triple-window': typeof ApiPublicHooksBackfillTripleWindowRoute
   '/api/public/hooks/big-flip-tick': typeof ApiPublicHooksBigFlipTickRoute
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
+  '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
@@ -439,6 +448,7 @@ export interface FileRoutesById {
   '/api/public/hooks/backfill-triple-window': typeof ApiPublicHooksBackfillTripleWindowRoute
   '/api/public/hooks/big-flip-tick': typeof ApiPublicHooksBigFlipTickRoute
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
+  '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
@@ -488,6 +498,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backfill-triple-window'
     | '/api/public/hooks/big-flip-tick'
     | '/api/public/hooks/btc-calibrate'
+    | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/market-context-tick'
@@ -535,6 +546,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backfill-triple-window'
     | '/api/public/hooks/big-flip-tick'
     | '/api/public/hooks/btc-calibrate'
+    | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/market-context-tick'
@@ -583,6 +595,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backfill-triple-window'
     | '/api/public/hooks/big-flip-tick'
     | '/api/public/hooks/btc-calibrate'
+    | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/market-context-tick'
@@ -616,6 +629,7 @@ export interface RootRouteChildren {
   ApiPublicHooksBackfillTripleWindowRoute: typeof ApiPublicHooksBackfillTripleWindowRoute
   ApiPublicHooksBigFlipTickRoute: typeof ApiPublicHooksBigFlipTickRoute
   ApiPublicHooksBtcCalibrateRoute: typeof ApiPublicHooksBtcCalibrateRoute
+  ApiPublicHooksCandlesIngestRoute: typeof ApiPublicHooksCandlesIngestRoute
   ApiPublicHooksCaptureClosingOddsRoute: typeof ApiPublicHooksCaptureClosingOddsRoute
   ApiPublicHooksCryptoStudyRoute: typeof ApiPublicHooksCryptoStudyRoute
   ApiPublicHooksMarketContextTickRoute: typeof ApiPublicHooksMarketContextTickRoute
@@ -906,6 +920,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCaptureClosingOddsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/candles-ingest': {
+      id: '/api/public/hooks/candles-ingest'
+      path: '/api/public/hooks/candles-ingest'
+      fullPath: '/api/public/hooks/candles-ingest'
+      preLoaderRoute: typeof ApiPublicHooksCandlesIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/btc-calibrate': {
       id: '/api/public/hooks/btc-calibrate'
       path: '/api/public/hooks/btc-calibrate'
@@ -1019,6 +1040,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHooksBackfillTripleWindowRoute,
   ApiPublicHooksBigFlipTickRoute: ApiPublicHooksBigFlipTickRoute,
   ApiPublicHooksBtcCalibrateRoute: ApiPublicHooksBtcCalibrateRoute,
+  ApiPublicHooksCandlesIngestRoute: ApiPublicHooksCandlesIngestRoute,
   ApiPublicHooksCaptureClosingOddsRoute: ApiPublicHooksCaptureClosingOddsRoute,
   ApiPublicHooksCryptoStudyRoute: ApiPublicHooksCryptoStudyRoute,
   ApiPublicHooksMarketContextTickRoute: ApiPublicHooksMarketContextTickRoute,

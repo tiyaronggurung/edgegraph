@@ -36,11 +36,8 @@ async function fetchCoinbase(tf: Exclude<TF, "1w">, limit: number): Promise<Row[
 }
 
 // Aggregate 1d rows into ISO weeks (Mon 00:00 UTC).
-async function build1w(supabaseAdmin: {
-  from: (t: string) => {
-    select: (c: string) => { eq: (k: string, v: string) => { order: (c: string, o: object) => { limit: (n: number) => Promise<{ data: { bucket_start: string; o: number; h: number; l: number; c: number; v: number | null }[] | null }> } } };
-  };
-}): Promise<Row[]> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function build1w(supabaseAdmin: any): Promise<Row[]> {
   const { data } = await supabaseAdmin
     .from("btc_candles")
     .select("bucket_start,o,h,l,c,v")
