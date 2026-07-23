@@ -48,6 +48,16 @@ export function TrendlineChartPanel() {
   const [fibOn, setFibOn] = useState(true);
   const evalFn = useServerFn(evalTrendlineShadow);
   const candlesFn = useServerFn(getBtcCandles);
+  const kalshiFn = useServerFn(getKalshiImpliedSpot);
+
+  const { data: kalshi } = useQuery({
+    queryKey: ["kalshi-implied-spot"],
+    queryFn: () => kalshiFn(),
+    refetchInterval: 5_000,
+    staleTime: 4_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+  });
 
   // Strike / wedge / spike metadata — only meaningful on 1m; keep the existing shadow query.
   const { data: shadow, isFetching: shadowFetching, refetch: refetchShadow } = useQuery<TrendlineSnapshot>({
