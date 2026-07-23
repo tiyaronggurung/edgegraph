@@ -19,6 +19,7 @@ import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
 import { MultiTfShadowPanel } from "@/components/MultiTfShadowPanel";
+import { TrendlineChartPanel } from "@/components/crypto/TrendlineChartPanel";
 import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
 import { NextStakeBanner } from "@/components/crypto/NextStakeBanner";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
@@ -3945,6 +3946,9 @@ function CryptoPage() {
 
       {/* Multi-TF shadow (pure logging, no live impact) */}
       <MultiTfShadowPanel />
+
+      {/* Trendline + spike detector (shadow only) */}
+      <TrendlineChartPanel />
 
 
 
