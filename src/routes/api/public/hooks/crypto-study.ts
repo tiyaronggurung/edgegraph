@@ -7,6 +7,7 @@
 // This ONLY analyzes past trades and writes advisory rows. It never touches
 // auto-trade config, gate settings, or places any orders.
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 
 const AUTO_STUDY_THRESHOLD = 5;
 const STUDY_MODEL = "google/gemini-3-flash-preview";

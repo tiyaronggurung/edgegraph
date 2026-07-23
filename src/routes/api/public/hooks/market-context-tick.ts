@@ -8,6 +8,7 @@
 // Shadow-only. Nothing here reads or blocks trading logic.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { writeMarketContext, type CheckpointType } from "@/lib/marketContext/computeAndWrite.server";
 
 function checkpointForSecondsToClose(s: number): CheckpointType | null {

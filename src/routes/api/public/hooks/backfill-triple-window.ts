@@ -3,6 +3,7 @@
 // client-side final flush in useTripleWindowTracker (which only runs while a
 // user has the crypto page open).
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { createClient } from "@supabase/supabase-js";
 import { fetchKalshiSettlement } from "@/lib/kalshiSettle";
 

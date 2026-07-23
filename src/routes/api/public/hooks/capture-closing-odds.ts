@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 /**

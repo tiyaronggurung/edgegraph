@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { evaluateBtcEntry } from "@/lib/btcEntryGate";
 import { getBtcGateConfig } from "@/lib/btcGateConfig.server";
 import { logBtcGateDecision } from "@/lib/btcGateLog.server";

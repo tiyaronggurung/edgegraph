@@ -10,6 +10,7 @@
 //   browser has never been on the page for a given window, that row stays
 //   uncreated until the client seeds it (same behavior as before).
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { createClient } from "@supabase/supabase-js";
 import { getPolymarketBtcUpDown } from "@/lib/polymarketOdds";
 

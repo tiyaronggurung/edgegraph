@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { planStake, applySettlement, resetSession, isNewUtcDay, type RecoveryState } from "@/lib/martingaleRecovery";
 
 // Public cron endpoint — Martingale Recovery auto trader.

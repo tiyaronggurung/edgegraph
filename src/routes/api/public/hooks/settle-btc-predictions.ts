@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 
 // Public cron endpoint: settles any BTC model predictions whose close_time has
 // passed. Called by pg_cron every minute so rows don't linger on "pending".

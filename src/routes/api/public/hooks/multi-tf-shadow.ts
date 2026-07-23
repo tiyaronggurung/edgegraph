@@ -3,6 +3,7 @@
 // windows whose close time has passed.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { runMultiTfShadow } from "@/lib/multiTfShadow.functions";
 
 export const Route = createFileRoute("/api/public/hooks/multi-tf-shadow")({

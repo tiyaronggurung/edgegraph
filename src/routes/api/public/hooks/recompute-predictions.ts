@@ -3,6 +3,7 @@
 // Public route (auth bypass) — guards with anon apikey header per Lovable convention.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { createClient } from "@supabase/supabase-js";
 import { getProvider } from "@/lib/providers";
 import { computeStatsModel } from "@/lib/models/poissonSoccer";

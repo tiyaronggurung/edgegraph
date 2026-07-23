@@ -1,6 +1,7 @@
 // Cron hook: flip pending → matched | missing | ambiguous on btc_market_intel
 // by joining against settled btc_model_predictions. Called by pg_cron every 5 min.
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 
 export const Route = createFileRoute("/api/public/hooks/market-intel-match")({
   server: {

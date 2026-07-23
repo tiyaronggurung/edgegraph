@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { evaluateAtm, evaluateReentry, atmByTicker, type Row } from "@/lib/oddsShadowCore";
 
 // Public cron endpoint — pg_cron hits this so the shadow trader keeps

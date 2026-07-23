@@ -4,6 +4,7 @@
 // Called daily via pg_cron.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { createClient } from "@supabase/supabase-js";
 import { getProvider } from "@/lib/providers";
 import type { LiveMatchSnapshot } from "@/lib/providers/liveProvider";

@@ -10,6 +10,7 @@
 // the auto_odds_settings table (only pre-enabled users are touched).
 
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { runAutoTradeCore, sellOddsBetCore } from "@/lib/cryptoAutoTrade.functions";
 import { computeBtcMarkets } from "@/lib/cryptoBtc.functions";
 

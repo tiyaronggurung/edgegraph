@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 
 // Server-side cron: runs the big-flip detector + live $10 auto-buy for every
 // user with Kalshi creds set and recent tape activity. Fires 24/7 regardless

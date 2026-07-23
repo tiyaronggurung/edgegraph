@@ -4,6 +4,7 @@
 // market / theory prob, and a correction factor (actual_rate / avg_model_prob,
 // clamped to [0.5, 2.0]) so we can later multiply raw model prob by it.
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 
 function sigmaBucketOf(sigDist: number | null | undefined): string {
   const s = Number(sigDist);

@@ -5,6 +5,7 @@
 // up to a lifetime cap of 5 orders, then only settles. No auth header needed
 // (this prefix bypasses published-site auth — we still validate apikey).
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
 import { evaluateBtcEntry } from "@/lib/btcEntryGate";
 import { getBtcGateConfig } from "@/lib/btcGateConfig.server";
