@@ -1226,16 +1226,26 @@ function ModelAccuracyPanel() {
                       const windowOpenMs = new Date(r.closeTime).getTime() - 15 * 60_000;
                       const msSinceOpen = Date.now() - windowOpenMs;
                       const isStudying = msSinceOpen >= 0 && msSinceOpen < 420_000;
+                      const reason = buildStudyReason(r, isStudying);
                       return (
                       <tr key={r.ticker} className="border-t border-border transition-all duration-150 ease-out hover:bg-primary/10 hover:shadow-[inset_2px_0_0_hsl(var(--primary))] hover:scale-[1.005] hover:relative hover:z-10">
                         <td className="p-2">{new Date(r.closeTime).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
                         <td className="p-2 font-mono">{r.ticker}</td>
                         <td className="p-2">
-                          {isStudying ? (
-                            <span className="text-muted-foreground text-[10px]" title="Strike Study in progress · Study Pick locks at T+420s (min 7)">⏳ STUDYING</span>
-                          ) : (
-                            <span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"} title="Study Pick — locked after 420s study; leans to Study on Study/Model disagreement">{dirLabel(r.side)}</span>
-                          )}
+                          <span className="inline-flex items-center gap-1">
+                            {isStudying ? (
+                              <span className="text-muted-foreground text-[10px]" title="Strike Study in progress · Study Pick locks at T+420s (min 7)">⏳ STUDYING</span>
+                            ) : (
+                              <span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"} title="Study Pick — locked after 420s study; leans to Study on Study/Model disagreement">{dirLabel(r.side)}</span>
+                            )}
+                            <span
+                              title={reason}
+                              className="cursor-help text-muted-foreground hover:text-primary"
+                              aria-label="Why this pick"
+                            >
+                              <Info className="h-3 w-3" />
+                            </span>
+                          </span>
                         </td>
                         <td className="p-2">
                           {(() => {
