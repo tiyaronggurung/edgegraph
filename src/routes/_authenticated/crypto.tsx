@@ -1224,15 +1224,32 @@ function ModelAccuracyPanel() {
                       const rawCorrect: boolean | null = r.wasCorrect == null
                         ? null
                         : (r.side === rawSide ? r.wasCorrect : !r.wasCorrect);
+                      // Suppress Value Pick / Raw dir display while the window is still
+                      // inside the 150s Strike Study warm-up (side hasn't locked yet).
+                      const windowOpenMs = new Date(r.closeTime).getTime() - 15 * 60_000;
+                      const msSinceOpen = Date.now() - windowOpenMs;
+                      const isStudying = msSinceOpen >= 0 && msSinceOpen < 150_000;
                       return (
                       <tr key={r.ticker} className="border-t border-border transition-all duration-150 ease-out hover:bg-primary/10 hover:shadow-[inset_2px_0_0_hsl(var(--primary))] hover:scale-[1.005] hover:relative hover:z-10">
                         <td className="p-2">{new Date(r.closeTime).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
                         <td className="p-2 font-mono">{r.ticker}</td>
-                        <td className="p-2"><span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(r.side)}</span></td>
                         <td className="p-2">
-                          <span className={rawSide === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(rawSide)}</span>
-                          {rawCorrect === true && <span className="ml-1 text-[10px] text-emerald-400">✓</span>}
-                          {rawCorrect === false && <span className="ml-1 text-[10px] text-red-400">✗</span>}
+                          {isStudying ? (
+                            <span className="text-muted-foreground text-[10px]" title="Strike Study in progress · side locks at T+150s">⏳ STUDYING</span>
+                          ) : (
+                            <span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(r.side)}</span>
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {isStudying ? (
+                            <span className="text-muted-foreground text-[10px]">—</span>
+                          ) : (
+                            <>
+                              <span className={rawSide === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(rawSide)}</span>
+                              {rawCorrect === true && <span className="ml-1 text-[10px] text-emerald-400">✓</span>}
+                              {rawCorrect === false && <span className="ml-1 text-[10px] text-red-400">✗</span>}
+                            </>
+                          )}
                         </td>
                         {/* Live column hidden — kept for reference
                         <td className="p-2">
