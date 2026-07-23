@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, useEffect, useRef, lazy } from "react";
 import { LazyOnVisible } from "@/components/LazyOnVisible";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
 import { Activity, ExternalLink, RefreshCw, Loader2, Zap, AlertTriangle, CheckCircle2, XCircle, ArrowUp, ArrowDown, Volume2, VolumeX, Info } from "lucide-react";
 import { playOrderPlaced, playOrderFilled, playModelBetPing } from "@/lib/orderSounds";
 import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.functions";
@@ -1291,13 +1293,21 @@ function ModelAccuracyPanel() {
                             ) : (
                               <span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"} title="Study Pick — locked after 420s study; leans to Study on Study/Model disagreement">{dirLabel(r.side)}</span>
                             )}
-                            <span
-                              title={reason}
-                              className="cursor-help text-muted-foreground hover:text-primary"
-                              aria-label="Why this pick"
-                            >
-                              <Info className="h-3 w-3" />
-                            </span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="cursor-pointer text-muted-foreground hover:text-primary"
+                                  aria-label="Why this pick"
+                                >
+                                  <Info className="h-3 w-3" />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent side="right" align="start" className="max-w-sm text-[11px] whitespace-pre-wrap font-mono leading-relaxed">
+                                {reason}
+                              </PopoverContent>
+                            </Popover>
+
                           </span>
                         </td>
                         <td className="p-2">
