@@ -1854,6 +1854,9 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               jumpFeatures: jumpByTicker.get(m.ticker),
               modelSidePreStudy: m.modelSidePreStudy,
               studyLockedSide: m.studyLockedSide,
+              regimeTag: m.regime,
+              calibrationBucket: m.calibBucket,
+              sideConf: m.sideConf,
             })),
         );
 
