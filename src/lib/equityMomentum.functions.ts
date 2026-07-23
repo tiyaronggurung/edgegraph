@@ -1,6 +1,7 @@
 // Equity momentum signal — SPY, QQQ, ES=F, NQ=F
 // Polled from Finnhub; used as a leading indicator for BTC (display-only at first).
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
