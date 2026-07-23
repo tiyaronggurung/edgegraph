@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Zap } from "lucide-react";
@@ -36,8 +36,12 @@ export function TrendlineChartPanel() {
   const { data, isFetching, refetch } = useQuery<TrendlineSnapshot>({
     queryKey: ["trendline-shadow"],
     queryFn: () => evalFn(),
-    refetchInterval: 10_000,
-    staleTime: 5_000,
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+    gcTime: 10 * 60_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const [visible, setVisible] = useState<Record<string, boolean>>(() =>
