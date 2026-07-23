@@ -117,8 +117,16 @@ export const MIN_SIDE_CONF = 0.90;
 export const NEAR_STRIKE_DEADBAND_PCT = 0.03; // percent, i.e. 0.03%
 export const NEAR_STRIKE_DEADBAND_SECS = 60;
 
+// Losing-Streak Circuit Breaker (2026-07-23).
+// 48h data: baseline WR 50%, after 2L 41%, after 3L 46%. Losses cluster.
+// Soft brake at ≥2 losses (tighter conf + edge floors); hard skip at ≥3.
+export const STREAK_SOFT_LOSSES = 2;   // require conf ≥0.93 + edge ≥5
+export const STREAK_HARD_LOSSES = 3;   // force SKIP one window
+export const STREAK_SOFT_CONF   = 0.93;
+export const STREAK_SOFT_EDGE   = 5.0;
+
 export function evaluateGate(input: GateInput): GateResult {
-  const { side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap, sideConf, liveFlipped, spot, strike } = input;
+  const { side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap, sideConf, liveFlipped, spot, strike, lossStreak } = input;
   const pinRiskFloor = pinRiskFloorSigmas(secondsToClose);
   const currentlyWinning = gap.needsDirection === "hold";
 
