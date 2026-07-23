@@ -109,6 +109,7 @@ export const getLiveSoccerFixtures = createServerFn({ method: "GET" })
 );
 
 export const getMatchStats = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ fixtureId: z.number().int().positive() }).parse(d))
   .handler(async ({ data }): Promise<{ stats: MatchStats | null; error: string | null }> => {
     try {
