@@ -370,6 +370,8 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
       taVwapRejUp: Boolean(r.ta_vwap_rej_up),
       taVwapRejDown: Boolean(r.ta_vwap_rej_down),
       taEngineVersion: (r.ta_engine_version as string | null) ?? null,
+      modelSidePreStudy: ((r as { model_side_pre_study?: string | null }).model_side_pre_study as "YES" | "NO" | null) ?? (r.side as "YES" | "NO" | null) ?? null,
+      studyLockedSide: ((r as { study_locked_side?: string | null }).study_locked_side as "YES" | "NO" | null) ?? null,
     })),
   };
 }
