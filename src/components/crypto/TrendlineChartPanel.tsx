@@ -251,14 +251,23 @@ const MAX_CW = 32;
 const DEFAULT_CW = 6;
 
 function TaChart({
-  data, visible,
+  candles: candlesProp, shadow, tf, visible, fibOn,
 }: {
-  data: TrendlineSnapshot | undefined;
+  candles: TCandle[];
+  shadow: TrendlineSnapshot | null;
+  tf: CandleTf;
   visible: Record<string, boolean>;
+  fibOn: boolean;
 }) {
+  // Alias so the rest of the component (which references `data.strike` etc.)
+  // keeps compiling. `data` here represents the shadow-analysis snapshot only
+  // (strike / wedge / spike / etc.); actual candles come from `candlesProp`.
+  const data = shadow;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [candleW, setCandleW] = useState<number>(DEFAULT_CW);
+  // Force scroll snap when TF changes (new dataset).
+  useEffect(() => { setSelectedIdx(null); }, [tf]);
   const priceH = 300;
   const rsiH = 70;
   const macdH = 70;
@@ -267,8 +276,8 @@ function TaChart({
   const FUTURE_SLOTS = 30; // empty room to the right of the last candle for upcoming candles
 
   const computed = useMemo(() => {
-    if (!data || data.candles.length === 0) return null;
-    const candles = data.candles;
+    if (candlesProp.length === 0) return null;
+    const candles = candlesProp;
     const closes = candles.map(c => c.c);
     const cAsCandle: Candle[] = candles.map(c => ({
       t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: c.v ?? 1,
