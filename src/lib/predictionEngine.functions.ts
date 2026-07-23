@@ -264,7 +264,9 @@ export const predictMatch = createServerFn({ method: "POST" })
   });
 
 // Lightweight list of live fixtures (no per-match stats round-trips).
-export const listLiveFixtures = createServerFn({ method: "GET" }).handler(async () => {
+export const listLiveFixtures = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
   try {
     const matches = await provider.fetchLive();
     return {
