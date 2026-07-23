@@ -52,6 +52,19 @@ export function TrendlineChartPanel() {
   const evalFn = useServerFn(evalTrendlineShadow);
   const candlesFn = useServerFn(getBtcCandles);
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
+  const compositeFn = useServerFn(getCompositeSpot);
+
+  // Composite BTC spot (Coinbase + Binance + Kraken median) — polled every
+  // 1s so the forming candle ticks in near-realtime.
+  const { data: composite } = useQuery({
+    queryKey: ["composite-spot"],
+    queryFn: () => compositeFn(),
+    refetchInterval: 1_000,
+    staleTime: 800,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    refetchIntervalInBackground: false,
+  });
 
   const { data: kalshi } = useQuery({
     queryKey: ["kalshi-implied-spot"],
