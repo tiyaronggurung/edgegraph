@@ -290,6 +290,8 @@ export interface PredictionStatsResult {
     taVwapRejUp: boolean;
     taVwapRejDown: boolean;
     taEngineVersion: string | null;
+    modelSidePreStudy: "YES" | "NO" | null;
+    studyLockedSide: "YES" | "NO" | null;
   }>;
 }
 
