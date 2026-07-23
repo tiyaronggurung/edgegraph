@@ -1739,6 +1739,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           calibActive: cal.active,
           modelSource: source,
           edgePts, side, edgeAbs,
+          modelSidePreStudy,
+          studyLockedSide: (windowElapsedSec >= 420 ? side : null) as "YES" | "NO" | null,
           kellyFraction: kelly,
           secondsToClose,
           sigmaDistance: sigDist,
