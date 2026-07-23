@@ -482,7 +482,7 @@ function TaChart({
   // Trendlines rendered across full width.
   const t0 = c.candles[0].t;
   const tN = c.candles[nCandles - 1].t;
-  const iAtT = (t: number) => (nCandles - 1) * ((t - t0) / (tN - t0 || 1));
+  // (iAtT helper removed — trendlines rendered via slope/intercept directly)
   const upper = c.trend.upper;
   const lower = c.trend.lower;
 
