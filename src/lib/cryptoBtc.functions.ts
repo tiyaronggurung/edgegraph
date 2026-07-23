@@ -160,6 +160,9 @@ export interface BtcMarket {
   strikeVerdict: "SOLID" | "WEAK" | "CHOPPY" | null; // null while studying
   strikeVerdictReason: string;             // human-readable justification
   studyFindings: string[];                 // per-signal notes from the strike-study engine
+  // Phase 2 — macro regime tag from the AI regime classifier (trend/chop/mixed/etc).
+  // Stored on every shadow EV log row for calibration-by-regime studies.
+  regime: string;
 }
 
 
