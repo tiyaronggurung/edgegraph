@@ -1199,20 +1199,15 @@ function ModelAccuracyPanel() {
                     <tr>
                       <th className="text-left p-2">Closed</th>
                       <th className="text-left p-2">Ticker</th>
-                      <th className="text-left p-2" title="Locked side = model value-pick (p − yesPrice). Historically ~50% (coinflip).">Value pick</th>
-                      <th className="text-left p-2" title="Raw model direction: P(YES) ≥ 50%? Historically ~87% correct on BTC move.">Raw dir</th>
-                      {/* Live column hidden (kept in data model); replaced by PRED column below */}
-                      {/* <th className="text-left p-2" title="Live side = chart+model+drift combined; flips mid-window when chart & anchor drift confirm the opposite direction. Auto-trader probe uses this.">Live</th> */}
-                      <th className="text-left p-2" title="PRED verdict for this 15m window: Value pick where |edge|≥3pt AND ask 50–78¢ AND side confidence ≥70% AND no live flip. Otherwise SKIP.">PRED</th>
-                      <th className="text-left p-2" title="PRED v2 (SHADOW · no live impact): base PRED + TA-align filter. SKIPs when chart verdict opposes the PRED side. Only populated for tickers locked live.">PRED v2</th>
+                      <th className="text-left p-2" title="Study Pick — locked side after the 420s Strike Study. On Study/Model disagreement the side leans to Study. This is now the pick compared to settlement.">Study Pick</th>
+                      <th className="text-left p-2" title="Raw model direction: P(YES) ≥ 50%? Shown for reference only — no longer the win/loss comparator.">Raw model</th>
+                      {/* Live column hidden (kept in data model) */}
                       <th className="text-right p-2">Strike</th>
                       <th className="text-right p-2">Model%</th>
                       <th className="text-right p-2">Market¢</th>
                       <th className="text-right p-2">Edge</th>
                       <th className="text-right p-2">Settle</th>
-                      <th className="text-center p-2" title="Result of the Value pick (locked side)">Result</th>
-                      <th className="text-center p-2" title="Result of the PRED action (UP/DOWN) vs actual settle. SKIP → —.">PRED Result</th>
-                      <th className="text-center p-2" title="SHADOW: result of PRED v2 (TA-align). SKIP → —.">v2 Result</th>
+                      <th className="text-center p-2" title="Study Pick vs actual settle. WIN = Study Pick matched settled side.">Result</th>
                     </tr>
                   </thead>
 
@@ -1224,20 +1219,20 @@ function ModelAccuracyPanel() {
                       const rawCorrect: boolean | null = r.wasCorrect == null
                         ? null
                         : (r.side === rawSide ? r.wasCorrect : !r.wasCorrect);
-                      // Suppress Value Pick / Raw dir display while the window is still
-                      // inside the 150s Strike Study warm-up (side hasn't locked yet).
+                      // Suppress Study Pick / Raw model display while the window is still
+                      // inside the 420s Strike Study warm-up (side hasn't locked yet).
                       const windowOpenMs = new Date(r.closeTime).getTime() - 15 * 60_000;
                       const msSinceOpen = Date.now() - windowOpenMs;
-                      const isStudying = msSinceOpen >= 0 && msSinceOpen < 150_000;
+                      const isStudying = msSinceOpen >= 0 && msSinceOpen < 420_000;
                       return (
                       <tr key={r.ticker} className="border-t border-border transition-all duration-150 ease-out hover:bg-primary/10 hover:shadow-[inset_2px_0_0_hsl(var(--primary))] hover:scale-[1.005] hover:relative hover:z-10">
                         <td className="p-2">{new Date(r.closeTime).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
                         <td className="p-2 font-mono">{r.ticker}</td>
                         <td className="p-2">
                           {isStudying ? (
-                            <span className="text-muted-foreground text-[10px]" title="Strike Study in progress · side locks at T+150s">⏳ STUDYING</span>
+                            <span className="text-muted-foreground text-[10px]" title="Strike Study in progress · Study Pick locks at T+420s (min 7)">⏳ STUDYING</span>
                           ) : (
-                            <span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>{dirLabel(r.side)}</span>
+                            <span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"} title="Study Pick — locked after 420s study; leans to Study on Study/Model disagreement">{dirLabel(r.side)}</span>
                           )}
                         </td>
                         <td className="p-2">
@@ -1251,92 +1246,6 @@ function ModelAccuracyPanel() {
                             </>
                           )}
                         </td>
-                        {/* Live column hidden — kept for reference
-                        <td className="p-2">
-                          {r.liveSide ? (
-                            <span className={r.liveSide === "YES" ? "text-emerald-400" : "text-red-400"}>
-                              {dirLabel(r.liveSide)}
-                              {r.flipCount > 0 && <span className="ml-1 text-[10px] text-amber-400" title={`flipped ${r.flipCount}x`}>⟳{r.flipCount}</span>}
-                              {r.chartVerdict && r.chartVerdict !== "neutral" && (
-                                <span className="ml-1 text-[9px] text-muted-foreground" title={`chart ${r.chartVerdict} · strength ${((r.chartStrength ?? 0) * 100).toFixed(0)}%`}>
-                                  ·📈{r.chartVerdict === "YES" ? "↑" : "↓"}
-                                </span>
-                              )}
-                              {twMap.get(r.ticker) && (
-                                <span
-                                  className="ml-1 text-[10px] text-cyan-400 cursor-help border border-cyan-500/40 rounded-full px-1 leading-none"
-                                  title={buildTripleWindowTooltip(twMap.get(r.ticker)!)}
-                                >ⓘ</span>
-                              )}
-                            </span>
-                          ) : <span className="text-muted-foreground">—</span>}
-                        </td>
-                        */}
-                        <td className="p-2">
-                          {(() => {
-                            // Prefer the locked verdict persisted by PredBetPanel;
-                            // fall back to live formula for historical rows never seen while open.
-                            const locked = predVerdicts[r.ticker];
-                            if (locked) {
-                              const cls = locked.action === "UP"
-                                ? "text-emerald-400 font-semibold"
-                                : locked.action === "DOWN"
-                                  ? "text-red-400 font-semibold"
-                                  : "text-muted-foreground";
-                              const title = locked.action === "SKIP"
-                                ? `PRED SKIP · ${(locked.reasons || []).join(" · ") || "no setup"} · locked`
-                                : `PRED ${locked.action} · ask ${Math.round(locked.ask * 100)}¢ · edge ${locked.edge.toFixed(1)} · locked`;
-                              return <span className={cls} title={title}>🔒 {locked.action}</span>;
-                            }
-                            // Fallback: live PRED formula (no locked record for this ticker).
-                            const sideAsk = r.side === "YES" ? r.marketYesPrice : 1 - r.marketYesPrice;
-                            const sideConf = r.side === "YES" ? r.modelProb : 1 - r.modelProb;
-                            const edgeOk = Math.abs(r.edgePts) >= 3;
-                            const askOk = sideAsk >= 0.50 && sideAsk <= 0.78;
-                            const flipOk = !r.liveSide || r.liveSide === r.side;
-                            const confOk = sideConf >= 0.70;
-                            if (edgeOk && askOk && flipOk && confOk) {
-                              const action = r.side === "YES" ? "UP" : "DOWN";
-                              return (
-                                <span
-                                  className={r.side === "YES" ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}
-                                  title={`PRED ${action} · ask ${Math.round(sideAsk * 100)}¢ · edge ${r.edgePts.toFixed(1)} · conf ${Math.round(sideConf * 100)}% · live`}
-                                >
-                                  {action}
-                                </span>
-                              );
-                            }
-                            const reasons: string[] = [];
-                            if (!edgeOk) reasons.push(`edge ${r.edgePts.toFixed(1)}`);
-                            if (!askOk) reasons.push(`ask ${Math.round(sideAsk * 100)}¢`);
-                            if (!flipOk) reasons.push("flip");
-                            if (!confOk) reasons.push(`conf ${Math.round(sideConf * 100)}%`);
-                            return (
-                              <span className="text-muted-foreground" title={`SKIP · ${reasons.join(" · ")} · live`}>
-                                SKIP
-                              </span>
-                            );
-                          })()}
-                        </td>
-                        <td className="p-2">
-                          {(() => {
-                            // PRED v2 (SHADOW): only shown for tickers locked while live.
-                            const locked = predVerdicts[r.ticker];
-                            if (!locked || !locked.v2Action) {
-                              return <span className="text-muted-foreground/60" title="v2 requires live lock (TA bias captured)">—</span>;
-                            }
-                            const cls = locked.v2Action === "UP"
-                              ? "text-emerald-400 font-semibold"
-                              : locked.v2Action === "DOWN"
-                                ? "text-red-400 font-semibold"
-                                : "text-muted-foreground";
-                            const taTxt = locked.taBias ? `TA ${locked.taBias}${locked.taScore != null ? ` (${locked.taScore.toFixed(0)})` : ""}` : "TA n/a";
-                            const title = locked.v2Action === "SKIP"
-                              ? `v2 SKIP · ${(locked.v2Reasons || []).join(" · ") || "no setup"} · ${taTxt}`
-                              : `v2 ${locked.v2Action} · ${taTxt} · shadow`;
-                            return <span className={cls} title={title}>🧪 {locked.v2Action}</span>;
-                          })()}
-                        </td>
                         <td className="p-2 text-right">{fmt$(r.strike)}</td>
                         <td className="p-2 text-right">{(r.modelProb * 100).toFixed(1)}%</td>
                         <td className="p-2 text-right">{(r.marketYesPrice * 100).toFixed(0)}</td>
@@ -1346,26 +1255,6 @@ function ModelAccuracyPanel() {
                           {r.wasCorrect === true && <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>}
                           {r.wasCorrect === false && <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>}
                           {r.wasCorrect === null && <span className="text-muted-foreground">pending</span>}
-                        </td>
-                        <td className="p-2 text-center">
-                          {(() => {
-                            const action = predActionFor(r);
-                            if (action === "SKIP") return <span className="text-muted-foreground">—</span>;
-                            const res = predResultFor(r);
-                            if (res === true) return <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>;
-                            if (res === false) return <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>;
-                            return <span className="text-muted-foreground">pending</span>;
-                          })()}
-                        </td>
-                        <td className="p-2 text-center">
-                          {(() => {
-                            const action = predV2ActionFor(r);
-                            if (action === "SKIP") return <span className="text-muted-foreground/60">—</span>;
-                            const res = predV2ResultFor(r);
-                            if (res === true) return <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>;
-                            if (res === false) return <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>;
-                            return <span className="text-muted-foreground">pending</span>;
-                          })()}
                         </td>
                       </tr>
                       );
