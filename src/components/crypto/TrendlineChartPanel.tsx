@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Zap } from "lucide-react";
 import { evalTrendlineShadow, type TrendlineSnapshot } from "@/lib/trendlineShadow.functions";
 import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
+import { getCompositeSpot } from "@/lib/compositeSpot.functions";
 import { getBtcCandles, TF_LIST, type CandleTf } from "@/lib/btcCandles.functions";
 import { detectSpike, detectTrendlines, type TCandle } from "@/lib/ta/trendlines";
 import { emaSeries, rsi, macd, bollinger, sessionVwap } from "@/lib/ta/taEngine";
