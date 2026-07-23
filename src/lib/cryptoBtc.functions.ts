@@ -148,6 +148,13 @@ export interface BtcMarket {
   // Reported alongside the legacy `gateAction`/`gateReason` so callers can
   // enforce the same universal gate. Nullable if config lookup failed.
   entryGate: BtcEntryGateDecision | null;
+  // ── Strike Study warm-up (first 150s of every 15m window) ────────────────
+  // During warm-up the model OBSERVES only — no bet fires, UI shows STUDYING.
+  // After warm-up a strike verdict is emitted from the full signal stack.
+  studying: boolean;                       // true = first 150s of window
+  studyingSecondsLeft: number;             // seconds remaining in warm-up (0 once done)
+  strikeVerdict: "SOLID" | "WEAK" | "CHOPPY" | null; // null while studying
+  strikeVerdictReason: string;             // human-readable justification
 }
 
 
@@ -1282,6 +1289,78 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           }
         }
 
+        // ── STRIKE STUDY WARM-UP (first 150s of every 15m window) ────────
+        // For the first 150 seconds we OBSERVE only. No bet fires. After the
+        // warm-up we emit a strike verdict (SOLID / WEAK / CHOPPY) from the
+        // full stack (chart, TA, sigma distance, recent chop). CHOPPY keeps
+        // the window skipped for the rest of its life.
+        const WARMUP_SECONDS = 150;
+        const windowElapsedSec = Math.max(0, Math.round((now - openMs) / 1000));
+        const studying = windowElapsedSec < WARMUP_SECONDS;
+        const studyingSecondsLeft = studying ? Math.max(0, WARMUP_SECONDS - windowElapsedSec) : 0;
+
+        let strikeVerdict: "SOLID" | "WEAK" | "CHOPPY" | null = null;
+        let strikeVerdictReason = "";
+
+        if (studying) {
+          entryGate = {
+            ...entryGate,
+            action: "PASS",
+            reason: `strike_study — observing first 150s (${studyingSecondsLeft}s left)`,
+            allReasons: [...entryGate.allReasons, `strike_study (${studyingSecondsLeft}s left)`],
+          };
+        } else {
+          // Post-warm-up strike verdict.
+          const nearStrike = Math.abs(sigDist) < 0.30;
+          const safeDist   = Math.abs(sigDist) >= 0.60;
+          const chartAgree = (cvDir === side) && cvConf >= 0.35;
+          const chartOppose = (cvDir === "YES" || cvDir === "NO") && cvDir !== side && cvConf >= 0.50;
+          const taScoreVal = taScoreRes?.score ?? 0;
+          const taAgree  = (side === "YES" && taScoreVal >= 25) || (side === "NO" && taScoreVal <= -25);
+          const taOppose = (side === "YES" && taScoreVal <= -25) || (side === "NO" && taScoreVal >= 25);
+          const recentChop = prevOutcome1 !== null && prevOutcome2 !== null && prevOutcome1 !== prevOutcome2;
+
+          const agreeCount = (chartAgree ? 1 : 0) + (taAgree ? 1 : 0) + (safeDist ? 1 : 0);
+          const opposeCount = (chartOppose ? 1 : 0) + (taOppose ? 1 : 0);
+
+          if (nearStrike && !chartAgree && !taAgree && !safeDist) {
+            strikeVerdict = "CHOPPY";
+            strikeVerdictReason = `near strike (σ ${sigDist.toFixed(2)}), no chart/TA consensus${recentChop ? ", recent chop" : ""}`;
+          } else if (recentChop && nearStrike && agreeCount < 2) {
+            strikeVerdict = "CHOPPY";
+            strikeVerdictReason = `chop pattern near strike (last 2 outcomes flipped, σ ${sigDist.toFixed(2)})`;
+          } else if (opposeCount >= 2) {
+            strikeVerdict = "CHOPPY";
+            strikeVerdictReason = `chart+TA both oppose ${side} — no clean lean`;
+          } else if (agreeCount >= 2) {
+            strikeVerdict = "SOLID";
+            const parts: string[] = [];
+            if (safeDist)   parts.push(`σ ${sigDist.toFixed(2)}`);
+            if (chartAgree) parts.push(`chart ${(cvConf*100).toFixed(0)}%`);
+            if (taAgree)    parts.push(`TA ${taScoreVal.toFixed(0)}`);
+            strikeVerdictReason = `${side} confirmed by ${parts.join(" + ")}`;
+          } else {
+            strikeVerdict = "WEAK";
+            strikeVerdictReason = `${side} with limited confirmation (σ ${sigDist.toFixed(2)}, chart ${cvDir} ${(cvConf*100).toFixed(0)}%, TA ${taScoreVal.toFixed(0)})`;
+          }
+
+          if (strikeVerdict === "CHOPPY") {
+            entryGate = {
+              ...entryGate,
+              action: "PASS",
+              reason: `strike_choppy — ${strikeVerdictReason}`,
+              allReasons: [...entryGate.allReasons, `strike_choppy (${strikeVerdictReason})`],
+            };
+          }
+        }
+
+        // Sync legacy gateAction/gateReason with the final entryGate so
+        // every downstream consumer (UI badge, auto-trade) sees the same call.
+        const finalGateAction: "BET" | "PASS" = entryGate.action === "BET" ? "BET" : "PASS";
+        const finalGateReason = entryGate.reason || gateReason;
+
+
+
 
 
         // Fire-and-forget log; never throws, idempotent by 60s bucket.
@@ -1336,8 +1415,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           independentProb: adj.p,
 
           requiredEdgePts,
-          gateAction,
-          gateReason,
+          gateAction: finalGateAction,
+          gateReason: finalGateReason,
           sideConf,
           thresholdParts: { base: tBase, calib: tCalib, time: tTime, spread: tSpread, regime: tRegime, whale: tWhale },
           gapAnalysis,
@@ -1357,6 +1436,10 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           taVwapRejUp: taScoreRes?.vwapRejectedAgainstUp ?? false,
           taVwapRejDown: taScoreRes?.vwapRejectedAgainstDown ?? false,
           entryGate,
+          studying,
+          studyingSecondsLeft,
+          strikeVerdict,
+          strikeVerdictReason,
         });
 
       }
