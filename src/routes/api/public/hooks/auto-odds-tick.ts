@@ -46,7 +46,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
+        const __cronAuth = await verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         if (isKalshiMaintenanceWindow()) {
           return Response.json({ ok: true, skipped: "kalshi_maintenance" });
         }

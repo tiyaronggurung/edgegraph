@@ -7,7 +7,7 @@ export const Route = createFileRoute("/api/public/hooks/settle-btc-predictions")
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
+        const __cronAuth = await verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         try {
           const { settleDuePredictions } = await import("@/lib/cryptoPredictions.server");
           const res = await settleDuePredictions();
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/public/hooks/settle-btc-predictions")
         }
       },
       GET: async ({ request }) => {
-        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
+        const __cronAuth = await verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         try {
           const { settleDuePredictions } = await import("@/lib/cryptoPredictions.server");
           const res = await settleDuePredictions();
