@@ -1783,6 +1783,7 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           strikeVerdict,
           strikeVerdictReason,
           studyFindings,
+          regime: regimeState?.regime ?? "mixed",
         });
 
       }
