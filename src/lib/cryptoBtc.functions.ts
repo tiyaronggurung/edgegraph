@@ -1620,7 +1620,9 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               allReasons: [...entryGate.allReasons, `strike_choppy (${strikeVerdictReason})`],
             };
           }
+          } // end hard_gate else
         }
+
 
         const studyFindings = study.findings;
 
