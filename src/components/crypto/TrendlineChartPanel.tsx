@@ -3,15 +3,18 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Zap } from "lucide-react";
 import { evalTrendlineShadow, type TrendlineSnapshot } from "@/lib/trendlineShadow.functions";
+import { getBtcCandles, TF_LIST, type CandleTf } from "@/lib/btcCandles.functions";
 import { detectSpike, detectTrendlines, type TCandle } from "@/lib/ta/trendlines";
 import { emaSeries, rsi, macd, bollinger, sessionVwap } from "@/lib/ta/taEngine";
+import { fibLevels, FIB_COLORS } from "@/lib/ta/fib";
 import type { Candle } from "@/lib/ta/chartSignals";
 
-// Full-fidelity TA chart: 300× 1m candles (~5 hrs), horizontally scrollable,
-// with the same indicator stack our TA v2 engine actually consumes:
-//   EMA 9 / 21 / 55 / 145 / 169, session VWAP, Bollinger bands (20,2),
-//   plus RSI(14) and MACD(12/26/9) as sub-panels below price.
-// Strike line + trendlines + spike dots kept from the shadow layer.
+// Full-fidelity TA chart with multi-timeframe support:
+//   1m / 5m / 15m / 1h / 1d / 1w — sourced from public.btc_candles cache
+//   (topped up live from Coinbase when the cache is stale).
+// Indicators: EMA 9/21/55/145/169, session VWAP, Bollinger, plus RSI + MACD.
+// Overlays: strike line, spike dots, trendlines, and Fibonacci retracements
+// computed from whatever candles are currently in the viewport.
 
 const SERIES: Array<{
   key: "ema9" | "ema21" | "ema55" | "ema145" | "ema169" | "vwap" | "bbUpper" | "bbLower";
@@ -30,10 +33,23 @@ const SERIES: Array<{
   { key: "bbLower",  label: "BB Lower",color: "rgba(148, 163, 184, 0.85)", dash: "3 3", defaultOn: false },
 ];
 
+const TF_LABEL: Record<CandleTf, string> = {
+  "1m": "1m", "5m": "5m", "15m": "15m", "1h": "1H", "1d": "1D", "1w": "1W",
+};
+// Refetch cadence per tf — never more often than the bucket itself.
+const TF_REFETCH_MS: Record<CandleTf, number> = {
+  "1m": 15_000, "5m": 60_000, "15m": 120_000, "1h": 5 * 60_000, "1d": 30 * 60_000, "1w": 60 * 60_000,
+};
+
 export function TrendlineChartPanel() {
   const [open, setOpen] = useState(true);
+  const [tf, setTf] = useState<CandleTf>("1m");
+  const [fibOn, setFibOn] = useState(true);
   const evalFn = useServerFn(evalTrendlineShadow);
-  const { data, isFetching, refetch } = useQuery<TrendlineSnapshot>({
+  const candlesFn = useServerFn(getBtcCandles);
+
+  // Strike / wedge / spike metadata — only meaningful on 1m; keep the existing shadow query.
+  const { data: shadow, isFetching: shadowFetching, refetch: refetchShadow } = useQuery<TrendlineSnapshot>({
     queryKey: ["trendline-shadow"],
     queryFn: () => evalFn(),
     refetchInterval: 30_000,
@@ -43,6 +59,24 @@ export function TrendlineChartPanel() {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
+
+  // Candles per-tf. keepPreviousData → switching tf keeps old chart visible
+  // until new candles arrive, so the chart never blanks out.
+  const { data: candlesData, isFetching: candlesFetching } = useQuery({
+    queryKey: ["btc-candles", tf],
+    queryFn: () => candlesFn({ data: { tf, limit: tf === "1m" ? 500 : 300 } }),
+    refetchInterval: TF_REFETCH_MS[tf],
+    staleTime: TF_REFETCH_MS[tf] - 2_000,
+    gcTime: 30 * 60_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+
+  const candles = candlesData?.candles ?? shadow?.candles ?? [];
+  const isFetching = candlesFetching || shadowFetching;
+  const refetch = () => { refetchShadow(); };
+
 
   const [visible, setVisible] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(SERIES.map(s => [s.key, s.defaultOn]))
