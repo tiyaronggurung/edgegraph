@@ -1407,8 +1407,12 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
             recentChop,
             momOk,
             taScoreVal,
+            aboveCount,
+            belowCount,
+            studyLen: studyWindow.length,
           };
         })();
+
 
         let strikeVerdict: "SOLID" | "WEAK" | "CHOPPY" | null = null;
         let strikeVerdictReason = "";
