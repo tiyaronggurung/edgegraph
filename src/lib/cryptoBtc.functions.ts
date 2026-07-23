@@ -1196,8 +1196,10 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
 
         const rawEdgePts = (p - yesPrice) * 100;
         // Side always follows current calibrated model prob (no freeze-side).
-        const side: "YES" | "NO" = p >= 0.5 ? "YES" : "NO";
-        const edgePts = side === "YES" ? rawEdgePts : -rawEdgePts;
+        // eslint-disable-next-line prefer-const
+        let side: "YES" | "NO" = p >= 0.5 ? "YES" : "NO";
+        // eslint-disable-next-line prefer-const
+        let edgePts = side === "YES" ? rawEdgePts : -rawEdgePts;
         const edgeAbs = Math.abs(edgePts);
         const kelly = quarterKelly(p, yesPrice);
 
