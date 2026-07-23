@@ -183,6 +183,7 @@ function TaChart({
   visible: Record<string, boolean>;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const priceH = 300;
   const rsiH = 70;
   const macdH = 70;
