@@ -511,6 +511,7 @@ function TaChart({
 
   const onScroll = () => setViewportTick(v => (v + 1) & 0xffff);
 
+  return (
     <div className="relative mt-2">
       {/* Zoom controls — overlay top-right */}
       <div className="absolute right-2 top-2 z-10 flex items-center gap-1 bg-black/60 border border-white/10 rounded px-1 py-0.5 backdrop-blur">
