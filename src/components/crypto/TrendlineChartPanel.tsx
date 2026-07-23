@@ -486,7 +486,31 @@ function TaChart({
   const upper = c.trend.upper;
   const lower = c.trend.lower;
 
-  return (
+  // Fibonacci grid — computed from candles currently visible in the viewport.
+  // Recomputes whenever the user scrolls / zooms / new candles arrive.
+  const fibList = useMemo(() => {
+    if (!fibOn) return [];
+    const el = scrollRef.current;
+    let startIdx = 0;
+    let endIdx = nCandles - 1;
+    if (el && el.clientWidth > 0) {
+      startIdx = Math.max(0, Math.floor((el.scrollLeft - PAD_L) / CANDLE_W));
+      endIdx = Math.min(nCandles - 1, Math.ceil((el.scrollLeft + el.clientWidth - PAD_L) / CANDLE_W));
+    }
+    if (endIdx <= startIdx) return [];
+    let hi = -Infinity, lo = Infinity;
+    for (let i = startIdx; i <= endIdx; i++) {
+      const cd = c.candles[i];
+      if (cd.h > hi) hi = cd.h;
+      if (cd.l < lo) lo = cd.l;
+    }
+    if (!isFinite(hi) || !isFinite(lo) || hi <= lo) return [];
+    return fibLevels(hi, lo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fibOn, viewportTick, nCandles, CANDLE_W, tf]);
+
+  const onScroll = () => setViewportTick(v => (v + 1) & 0xffff);
+
     <div className="relative mt-2">
       {/* Zoom controls — overlay top-right */}
       <div className="absolute right-2 top-2 z-10 flex items-center gap-1 bg-black/60 border border-white/10 rounded px-1 py-0.5 backdrop-blur">
