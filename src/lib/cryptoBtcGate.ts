@@ -96,7 +96,14 @@ export interface GateInput {
   // baseline to 41% after 2 straight losses; 3+ streaks stay depressed.
   // Optional so unit tests and old call sites still work.
   lossStreak?: number;
+  // Chase Veto (2026-07-23 backtest, 14d n=409): when pick_side matches BOTH
+  // of the last two settled outcomes, high-conf (≥0.90) WR collapses to 50%
+  // (vs 64.6% for FADE, 54.4% otherwise). Momentum-chasing after 2 same-side
+  // settles is the leak — require ≥0.93 model_prob to fire in that bucket.
+  prevOutcome1?: "YES" | "NO";
+  prevOutcome2?: "YES" | "NO";
 }
+
 
 
 
@@ -125,8 +132,12 @@ export const STREAK_HARD_LOSSES = 3;   // force SKIP one window
 export const STREAK_SOFT_CONF   = 0.93;
 export const STREAK_SOFT_EDGE   = 5.0;
 
+// Chase Veto: model_prob floor when pick == prev1_outcome == prev2_outcome.
+export const CHASE_MIN_PROB = 0.93;
+
+
 export function evaluateGate(input: GateInput): GateResult {
-  const { side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap, sideConf, liveFlipped, spot, strike, lossStreak } = input;
+  const { side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap, sideConf, liveFlipped, spot, strike, lossStreak, prevOutcome1, prevOutcome2 } = input;
   const pinRiskFloor = pinRiskFloorSigmas(secondsToClose);
   const currentlyWinning = gap.needsDirection === "hold";
 
@@ -157,6 +168,17 @@ export function evaluateGate(input: GateInput): GateResult {
       };
     }
   }
+  // Chase Veto — pick == prev1 outcome == prev2 outcome. 14d backtest (n=409):
+  // high-conf 50% WR, vs 64.6% FADE / 54.4% other. Require ≥0.93 to fire.
+  if (prevOutcome1 && prevOutcome2 && prevOutcome1 === side && prevOutcome2 === side) {
+    if (sideConf === undefined || sideConf < CHASE_MIN_PROB) {
+      return {
+        gateAction: "PASS",
+        gateReason: `chase_veto — ${side} matches last 2 outcomes, need conf ≥${(CHASE_MIN_PROB*100).toFixed(0)}% (have ${sideConf !== undefined ? (sideConf*100).toFixed(0)+"%" : "n/a"})`,
+      };
+    }
+  }
+
   // Near-strike deadband — kills the 17% `near_strike_flip` autopsy bucket.
   if (spot !== undefined && strike !== undefined && strike > 0 && secondsToClose < NEAR_STRIKE_DEADBAND_SECS) {
     const distPct = Math.abs(spot - strike) / strike * 100;

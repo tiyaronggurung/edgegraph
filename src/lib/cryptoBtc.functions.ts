@@ -963,24 +963,28 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
     // Losing-Streak Circuit Breaker: count consecutive most-recent settled
     // losses across all BTC tickers. 48h data shows WR drops 50%→41% after
     // 2 straight losses; the streak feeds the gate to brake at 2 and skip at 3.
-    const lossStreak: number = await (async () => {
+    const { lossStreak, prevOutcome1, prevOutcome2 } = await (async () => {
       try {
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data } = await supabaseAdmin
           .from("btc_model_predictions")
-          .select("was_correct,close_time")
+          .select("was_correct,outcome,close_time")
           .not("was_correct", "is", null)
+          .not("outcome", "is", null)
           .order("close_time", { ascending: false })
           .limit(10);
-        if (!data) return 0;
+        if (!data) return { lossStreak: 0, prevOutcome1: undefined, prevOutcome2: undefined };
         let n = 0;
         for (const row of data) {
           if (row.was_correct === false) n++;
           else break;
         }
-        return n;
-      } catch { return 0; }
+        const o1 = data[0]?.outcome === "YES" || data[0]?.outcome === "NO" ? data[0].outcome as "YES" | "NO" : undefined;
+        const o2 = data[1]?.outcome === "YES" || data[1]?.outcome === "NO" ? data[1].outcome as "YES" | "NO" : undefined;
+        return { lossStreak: n, prevOutcome1: o1, prevOutcome2: o2 };
+      } catch { return { lossStreak: 0, prevOutcome1: undefined, prevOutcome2: undefined }; }
     })();
+
 
 
 
@@ -1210,8 +1214,9 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         const sideConf = side === "YES" ? p : 1 - p;
         const { gateAction, gateReason } = evaluateGate({
           side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap: gapAnalysis,
-          sideConf, spot, strike, lossStreak,
+          sideConf, spot, strike, lossStreak, prevOutcome1, prevOutcome2,
         });
+
 
 
         // liveSide == side now (freeze-side guard removed).
