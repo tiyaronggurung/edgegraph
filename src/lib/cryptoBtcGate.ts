@@ -136,6 +136,27 @@ export function evaluateGate(input: GateInput): GateResult {
   if (yesPrice <= 0.02 || yesPrice >= 0.98) {
     return { gateAction: "PASS", gateReason: "price pinned (≤2¢ or ≥98¢) — no room for edge" };
   }
+  // Losing-Streak Circuit Breaker.
+  if (lossStreak !== undefined && lossStreak >= STREAK_HARD_LOSSES) {
+    return {
+      gateAction: "PASS",
+      gateReason: `cooldown_streak — ${lossStreak} straight losses, pausing one window`,
+    };
+  }
+  if (lossStreak !== undefined && lossStreak >= STREAK_SOFT_LOSSES) {
+    if (sideConf !== undefined && sideConf < STREAK_SOFT_CONF) {
+      return {
+        gateAction: "PASS",
+        gateReason: `streak_brake — ${lossStreak}L, need conf ≥${(STREAK_SOFT_CONF*100).toFixed(0)}% (have ${(sideConf*100).toFixed(0)}%)`,
+      };
+    }
+    if (edgeAbs < STREAK_SOFT_EDGE) {
+      return {
+        gateAction: "PASS",
+        gateReason: `streak_brake — ${lossStreak}L, need edge ≥${STREAK_SOFT_EDGE.toFixed(1)}pts (have ${edgeAbs.toFixed(1)}pts)`,
+      };
+    }
+  }
   // Near-strike deadband — kills the 17% `near_strike_flip` autopsy bucket.
   if (spot !== undefined && strike !== undefined && strike > 0 && secondsToClose < NEAR_STRIKE_DEADBAND_SECS) {
     const distPct = Math.abs(spot - strike) / strike * 100;
