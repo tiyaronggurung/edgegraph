@@ -172,6 +172,9 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         physics_prob: input.physicsProb ?? null,
         independent_prob: input.independentProb ?? null,
         jump_features: (input.jumpFeatures ?? null) as never,
+        ...(input.studyLockedSide ? { study_locked_side: input.studyLockedSide } : {}),
+
+
 
         ...(flipped ? {
           flip_count: Number(existing.flip_count ?? 0) + 1,
