@@ -297,6 +297,27 @@ function MarketRow({
         <div className={`text-[10px] text-right font-mono ${m.gapAnalysis.momentumAlignsWithSide ? "text-emerald-400/80" : "text-amber-400/80"}`} title="Gap analysis: $ spot must traverse for locked side to win, in σ of remaining-window vol, plus momentum sign.">
           gap {m.gapAnalysis.gapUsd >= 0 ? "+" : ""}${Math.round(m.gapAnalysis.gapUsd)} ({m.gapAnalysis.gapInSigmas.toFixed(2)}σ to flip) · mom {m.gapAnalysis.momentumSign > 0 ? "↑" : m.gapAnalysis.momentumSign < 0 ? "↓" : "—"} {m.gapAnalysis.momentumAlignsWithSide ? "with" : "vs"} {m.side}
         </div>
+        {m.studyFindings && m.studyFindings.length > 0 && (
+          <div className={`mt-1 w-full text-[10px] font-mono text-left rounded border p-1.5 ${
+            m.studying
+              ? "bg-amber-500/5 border-amber-500/30 text-amber-200/90"
+              : m.strikeVerdict === "SOLID"
+              ? "bg-emerald-500/5 border-emerald-500/30 text-emerald-200/80"
+              : m.strikeVerdict === "CHOPPY"
+              ? "bg-red-500/5 border-red-500/30 text-red-200/80"
+              : "bg-muted/20 border-border text-muted-foreground"
+          }`}>
+            <div className="uppercase tracking-wider text-[9px] opacity-70 mb-0.5">
+              {m.studying ? `⏳ Studying strike · ${m.studyingSecondsLeft}s left` : `📊 Strike Study · ${m.strikeVerdict ?? ""}`}
+            </div>
+            {m.studyFindings.map((f, i) => (
+              <div key={i} className="leading-tight">• {f}</div>
+            ))}
+            {!m.studying && m.strikeVerdictReason && (
+              <div className="mt-1 pt-1 border-t border-current/20 opacity-90">→ {m.strikeVerdictReason}</div>
+            )}
+          </div>
+        )}
       </div>
 
 
