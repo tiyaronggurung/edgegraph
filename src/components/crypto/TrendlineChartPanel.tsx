@@ -329,9 +329,9 @@ function TaChart({
     for (const v of vwapSeries) if (v != null) extras.push(v);
     for (const v of bbUpper) if (v != null) extras.push(v);
     for (const v of bbLower) if (v != null) extras.push(v);
-    if (data.strike != null) extras.push(data.strike);
-    if (data.upperAtNow != null) extras.push(data.upperAtNow);
-    if (data.lowerAtNow != null) extras.push(data.lowerAtNow);
+    if (data?.strike != null) extras.push(data.strike);
+    if (data?.upperAtNow != null) extras.push(data.upperAtNow);
+    if (data?.lowerAtNow != null) extras.push(data.lowerAtNow);
     let pMin = Math.min(...lows, ...extras);
     let pMax = Math.max(...highs, ...extras);
     const pad = (pMax - pMin) * 0.04;
@@ -341,7 +341,7 @@ function TaChart({
       candles, e9, e21, e55, e145, e169, vwapSeries, bbUpper, bbLower,
       rsiSeries, macdHist, trend, spikeFlags, pMin, pMax,
     };
-  }, [data]);
+  }, [candlesProp, data]);
 
   // Snap to the right only when the candle count changes (new data),
   // NOT on zoom or every render.
