@@ -82,6 +82,10 @@ export interface BtcMarket {
   calibActive: boolean;
   edgePts: number;
   side: "YES" | "NO";
+  // Original raw model pick (p >= 0.5), frozen at first snapshot in DB.
+  modelSidePreStudy: "YES" | "NO";
+  // Post-Study lock (final side chosen at T+420s). null before study lock.
+  studyLockedSide: "YES" | "NO" | null;
   edgeAbs: number;
   kellyFraction: number;     // quarter-Kelly bankroll fraction (display only)
   secondsToClose: number;
