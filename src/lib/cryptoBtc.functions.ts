@@ -148,6 +148,13 @@ export interface BtcMarket {
   // Reported alongside the legacy `gateAction`/`gateReason` so callers can
   // enforce the same universal gate. Nullable if config lookup failed.
   entryGate: BtcEntryGateDecision | null;
+  // ── Strike Study warm-up (first 150s of every 15m window) ────────────────
+  // During warm-up the model OBSERVES only — no bet fires, UI shows STUDYING.
+  // After warm-up a strike verdict is emitted from the full signal stack.
+  studying: boolean;                       // true = first 150s of window
+  studyingSecondsLeft: number;             // seconds remaining in warm-up (0 once done)
+  strikeVerdict: "SOLID" | "WEAK" | "CHOPPY" | null; // null while studying
+  strikeVerdictReason: string;             // human-readable justification
 }
 
 
