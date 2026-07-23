@@ -406,7 +406,39 @@ function TaChart({
   const lower = c.trend.lower;
 
   return (
-    <div ref={scrollRef} className="mt-2 overflow-x-auto overflow-y-hidden border border-white/5 rounded bg-black/30">
+    <div className="relative mt-2">
+      {/* Zoom controls — overlay top-right */}
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-1 bg-black/60 border border-white/10 rounded px-1 py-0.5 backdrop-blur">
+        <button
+          onClick={() => zoomBy(1 / 1.25)}
+          className="w-6 h-6 text-white/70 hover:text-white text-sm leading-none"
+          title="Zoom out"
+        >−</button>
+        <span className="text-[9px] text-white/40 font-mono tabular-nums w-8 text-center">
+          {(candleW / DEFAULT_CW).toFixed(2)}×
+        </span>
+        <button
+          onClick={() => zoomBy(1.25)}
+          className="w-6 h-6 text-white/70 hover:text-white text-sm leading-none"
+          title="Zoom in"
+        >+</button>
+        <button
+          onClick={resetZoom}
+          className="px-1.5 h-6 text-[10px] text-white/60 hover:text-white font-mono"
+          title="Reset zoom & scroll to now"
+        >reset</button>
+      </div>
+      <div
+        ref={scrollRef}
+        className="overflow-x-auto overflow-y-hidden border border-white/5 rounded bg-black/30 select-none"
+        style={{ cursor: "grab" }}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={endDrag}
+        onMouseLeave={endDrag}
+        onClickCapture={onClickCapture}
+        onWheel={onWheel}
+      >
       <svg
         width={innerW}
         height={priceH + rsiH + macdH + 24}
