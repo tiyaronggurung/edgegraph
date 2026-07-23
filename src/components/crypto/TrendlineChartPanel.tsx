@@ -3,15 +3,18 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Zap } from "lucide-react";
 import { evalTrendlineShadow, type TrendlineSnapshot } from "@/lib/trendlineShadow.functions";
+import { getBtcCandles, TF_LIST, type CandleTf } from "@/lib/btcCandles.functions";
 import { detectSpike, detectTrendlines, type TCandle } from "@/lib/ta/trendlines";
 import { emaSeries, rsi, macd, bollinger, sessionVwap } from "@/lib/ta/taEngine";
+import { fibLevels, FIB_COLORS } from "@/lib/ta/fib";
 import type { Candle } from "@/lib/ta/chartSignals";
 
-// Full-fidelity TA chart: 300× 1m candles (~5 hrs), horizontally scrollable,
-// with the same indicator stack our TA v2 engine actually consumes:
-//   EMA 9 / 21 / 55 / 145 / 169, session VWAP, Bollinger bands (20,2),
-//   plus RSI(14) and MACD(12/26/9) as sub-panels below price.
-// Strike line + trendlines + spike dots kept from the shadow layer.
+// Full-fidelity TA chart with multi-timeframe support:
+//   1m / 5m / 15m / 1h / 1d / 1w — sourced from public.btc_candles cache
+//   (topped up live from Coinbase when the cache is stale).
+// Indicators: EMA 9/21/55/145/169, session VWAP, Bollinger, plus RSI + MACD.
+// Overlays: strike line, spike dots, trendlines, and Fibonacci retracements
+// computed from whatever candles are currently in the viewport.
 
 const SERIES: Array<{
   key: "ema9" | "ema21" | "ema55" | "ema145" | "ema169" | "vwap" | "bbUpper" | "bbLower";
@@ -30,10 +33,23 @@ const SERIES: Array<{
   { key: "bbLower",  label: "BB Lower",color: "rgba(148, 163, 184, 0.85)", dash: "3 3", defaultOn: false },
 ];
 
+const TF_LABEL: Record<CandleTf, string> = {
+  "1m": "1m", "5m": "5m", "15m": "15m", "1h": "1H", "1d": "1D", "1w": "1W",
+};
+// Refetch cadence per tf — never more often than the bucket itself.
+const TF_REFETCH_MS: Record<CandleTf, number> = {
+  "1m": 15_000, "5m": 60_000, "15m": 120_000, "1h": 5 * 60_000, "1d": 30 * 60_000, "1w": 60 * 60_000,
+};
+
 export function TrendlineChartPanel() {
   const [open, setOpen] = useState(true);
+  const [tf, setTf] = useState<CandleTf>("1m");
+  const [fibOn, setFibOn] = useState(true);
   const evalFn = useServerFn(evalTrendlineShadow);
-  const { data, isFetching, refetch } = useQuery<TrendlineSnapshot>({
+  const candlesFn = useServerFn(getBtcCandles);
+
+  // Strike / wedge / spike metadata — only meaningful on 1m; keep the existing shadow query.
+  const { data: shadow, isFetching: shadowFetching, refetch: refetchShadow } = useQuery<TrendlineSnapshot>({
     queryKey: ["trendline-shadow"],
     queryFn: () => evalFn(),
     refetchInterval: 30_000,
@@ -43,6 +59,24 @@ export function TrendlineChartPanel() {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
+
+  // Candles per-tf. keepPreviousData → switching tf keeps old chart visible
+  // until new candles arrive, so the chart never blanks out.
+  const { data: candlesData, isFetching: candlesFetching } = useQuery({
+    queryKey: ["btc-candles", tf],
+    queryFn: () => candlesFn({ data: { tf, limit: tf === "1m" ? 500 : 300 } }),
+    refetchInterval: TF_REFETCH_MS[tf],
+    staleTime: TF_REFETCH_MS[tf] - 2_000,
+    gcTime: 30 * 60_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+
+  const candles = candlesData?.candles ?? shadow?.candles ?? [];
+  const isFetching = candlesFetching || shadowFetching;
+  const refetch = () => { refetchShadow(); };
+
 
   const [visible, setVisible] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(SERIES.map(s => [s.key, s.defaultOn]))
@@ -56,20 +90,20 @@ export function TrendlineChartPanel() {
       >
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] uppercase tracking-wider text-white/60">
-            BTC 1m · TA v2 · Trendlines
+            BTC {TF_LABEL[tf]} · TA v2 · Trendlines
           </span>
-          {data?.isWedge && (
+          {tf === "1m" && shadow?.isWedge && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
-              WEDGE · {data.wedgeBias?.toUpperCase()}
+              WEDGE · {shadow.wedgeBias?.toUpperCase()}
             </span>
           )}
-          {data?.spikeDetected && (
+          {tf === "1m" && shadow?.spikeDetected && (
             <span className={`text-[10px] px-1.5 py-0.5 rounded border flex items-center gap-1 ${
-              data.spikeDirection === "up"
+              shadow.spikeDirection === "up"
                 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
                 : "bg-rose-500/20 text-rose-300 border-rose-500/40"
             }`}>
-              <Zap className="h-3 w-3" /> SPIKE {data.spikeDirection?.toUpperCase()} · {data.spikeBreakPct.toFixed(2)}%
+              <Zap className="h-3 w-3" /> SPIKE {shadow.spikeDirection?.toUpperCase()} · {shadow.spikeBreakPct.toFixed(2)}%
             </span>
           )}
         </div>
@@ -86,44 +120,80 @@ export function TrendlineChartPanel() {
 
       {open && (
         <>
-          <Legend visible={visible} setVisible={setVisible} strike={data?.strike ?? null} />
-          <TaChart data={data} visible={visible} />
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+            <span className="text-[10px] text-white/40 mr-1">TF:</span>
+            {TF_LIST.map(t => (
+              <button
+                key={t}
+                onClick={() => setTf(t)}
+                className={`px-2 py-0.5 rounded text-[10px] font-mono border transition ${
+                  tf === t
+                    ? "bg-white/10 border-white/40 text-white"
+                    : "bg-transparent border-white/10 text-white/50 hover:text-white/80 hover:border-white/20"
+                }`}
+              >
+                {TF_LABEL[t]}
+              </button>
+            ))}
+            <span className="mx-1 h-3 w-px bg-white/10" />
+            <button
+              onClick={() => setFibOn(v => !v)}
+              className={`px-2 py-0.5 rounded text-[10px] font-mono border transition ${
+                fibOn
+                  ? "bg-yellow-400/10 border-yellow-400/40 text-yellow-200"
+                  : "bg-transparent border-white/10 text-white/40 hover:text-white/70"
+              }`}
+              title="Fibonacci retracements over the visible viewport"
+            >
+              Fib {fibOn ? "on" : "off"}
+            </button>
+            {candlesData?.source && (
+              <span className="ml-auto text-[9px] text-white/30 font-mono">
+                src: {candlesData.source} · {candles.length}
+              </span>
+            )}
+          </div>
+
+          <Legend visible={visible} setVisible={setVisible} strike={shadow?.strike ?? null} />
+          <TaChart candles={candles} shadow={shadow ?? null} tf={tf} visible={visible} fibOn={fibOn} />
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
-            <Stat label="Spot"          value={data?.spot != null ? `$${data.spot.toFixed(0)}` : "—"} />
-            <Stat label="Strike"        value={data?.strike != null ? `$${data.strike.toFixed(0)}` : "—"} />
+            <Stat label="Spot"          value={shadow?.spot != null ? `$${shadow.spot.toFixed(0)}` : "—"} />
+            <Stat label="Strike"        value={shadow?.strike != null ? `$${shadow.strike.toFixed(0)}` : "—"} />
             <Stat
               label="Δ Strike"
               value={
-                data?.spot != null && data?.strike != null
-                  ? `${(data.spot - data.strike) >= 0 ? "+" : ""}$${(data.spot - data.strike).toFixed(2)} ${data.spot >= data.strike ? "above" : "below"}`
+                shadow?.spot != null && shadow?.strike != null
+                  ? `${(shadow.spot - shadow.strike) >= 0 ? "+" : ""}$${(shadow.spot - shadow.strike).toFixed(2)} ${shadow.spot >= shadow.strike ? "above" : "below"}`
                   : "—"
               }
               icon={
-                data?.spot != null && data?.strike != null ? (
-                  data.spot >= data.strike
+                shadow?.spot != null && shadow?.strike != null ? (
+                  shadow.spot >= shadow.strike
                     ? <TrendingUp className="h-3 w-3 text-emerald-400" />
                     : <TrendingDown className="h-3 w-3 text-rose-400" />
                 ) : undefined
               }
             />
-            <Stat label="Upper line"    value={data?.upperAtNow != null ? `$${data.upperAtNow.toFixed(0)}` : "—"} />
-            <Stat label="Lower line"    value={data?.lowerAtNow != null ? `$${data.lowerAtNow.toFixed(0)}` : "—"} />
-            <Stat label="→ Upper"       value={data?.distToUpperPct != null ? `${data.distToUpperPct.toFixed(3)}%` : "—"}
+            <Stat label="Upper line"    value={shadow?.upperAtNow != null ? `$${shadow.upperAtNow.toFixed(0)}` : "—"} />
+            <Stat label="Lower line"    value={shadow?.lowerAtNow != null ? `$${shadow.lowerAtNow.toFixed(0)}` : "—"} />
+            <Stat label="→ Upper"       value={shadow?.distToUpperPct != null ? `${shadow.distToUpperPct.toFixed(3)}%` : "—"}
                   icon={<TrendingUp className="h-3 w-3 text-emerald-400" />} />
-            <Stat label="→ Lower"       value={data?.distToLowerPct != null ? `${data.distToLowerPct.toFixed(3)}%` : "—"}
+            <Stat label="→ Lower"       value={shadow?.distToLowerPct != null ? `${shadow.distToLowerPct.toFixed(3)}%` : "—"}
                   icon={<TrendingDown className="h-3 w-3 text-rose-400" />} />
-            <Stat label="Channel width" value={data?.channelWidthPct != null ? `${data.channelWidthPct.toFixed(2)}%` : "—"} />
-            <Stat label="Swings used"   value={data ? String(data.swingsUsed) : "—"} />
+            <Stat label="Channel width" value={shadow?.channelWidthPct != null ? `${shadow.channelWidthPct.toFixed(2)}%` : "—"} />
+            <Stat label="Swings used"   value={shadow ? String(shadow.swingsUsed) : "—"} />
           </div>
 
           <p className="text-[10px] text-white/40 mt-2">
-            Scroll horizontally to see the full 300-minute window · toggle series in the legend · sub-panels show RSI(14) and MACD(12/26/9). Shadow mode — no trading impact until WR ≥65% over 3–5 days.
+            Drag to pan · wheel to zoom · switch TF above · Fib is drawn from the highest high / lowest low currently visible.
+            Shadow mode — no trading impact until WR ≥65% over 3–5 days.
           </p>
         </>
       )}
     </div>
   );
+
 }
 
 function Legend({
@@ -181,14 +251,25 @@ const MAX_CW = 32;
 const DEFAULT_CW = 6;
 
 function TaChart({
-  data, visible,
+  candles: candlesProp, shadow, tf, visible, fibOn,
 }: {
-  data: TrendlineSnapshot | undefined;
+  candles: TCandle[];
+  shadow: TrendlineSnapshot | null;
+  tf: CandleTf;
   visible: Record<string, boolean>;
+  fibOn: boolean;
 }) {
+  // Alias so the rest of the component (which references `data.strike` etc.)
+  // keeps compiling. `data` here represents the shadow-analysis snapshot only
+  // (strike / wedge / spike / etc.); actual candles come from `candlesProp`.
+  const data = shadow;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [candleW, setCandleW] = useState<number>(DEFAULT_CW);
+  // Bumped on every scroll — triggers Fib recompute for the new viewport.
+  const [viewportTick, setViewportTick] = useState(0);
+  // Force scroll snap when TF changes (new dataset).
+  useEffect(() => { setSelectedIdx(null); }, [tf]);
   const priceH = 300;
   const rsiH = 70;
   const macdH = 70;
@@ -197,8 +278,8 @@ function TaChart({
   const FUTURE_SLOTS = 30; // empty room to the right of the last candle for upcoming candles
 
   const computed = useMemo(() => {
-    if (!data || data.candles.length === 0) return null;
-    const candles = data.candles;
+    if (candlesProp.length === 0) return null;
+    const candles = candlesProp;
     const closes = candles.map(c => c.c);
     const cAsCandle: Candle[] = candles.map(c => ({
       t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: c.v ?? 1,
@@ -250,9 +331,9 @@ function TaChart({
     for (const v of vwapSeries) if (v != null) extras.push(v);
     for (const v of bbUpper) if (v != null) extras.push(v);
     for (const v of bbLower) if (v != null) extras.push(v);
-    if (data.strike != null) extras.push(data.strike);
-    if (data.upperAtNow != null) extras.push(data.upperAtNow);
-    if (data.lowerAtNow != null) extras.push(data.lowerAtNow);
+    if (data?.strike != null) extras.push(data.strike);
+    if (data?.upperAtNow != null) extras.push(data.upperAtNow);
+    if (data?.lowerAtNow != null) extras.push(data.lowerAtNow);
     let pMin = Math.min(...lows, ...extras);
     let pMax = Math.max(...highs, ...extras);
     const pad = (pMax - pMin) * 0.04;
@@ -262,7 +343,7 @@ function TaChart({
       candles, e9, e21, e55, e145, e169, vwapSeries, bbUpper, bbLower,
       rsiSeries, macdHist, trend, spikeFlags, pMin, pMax,
     };
-  }, [data]);
+  }, [candlesProp, data]);
 
   // Snap to the right only when the candle count changes (new data),
   // NOT on zoom or every render.
@@ -401,9 +482,34 @@ function TaChart({
   // Trendlines rendered across full width.
   const t0 = c.candles[0].t;
   const tN = c.candles[nCandles - 1].t;
-  const iAtT = (t: number) => (nCandles - 1) * ((t - t0) / (tN - t0 || 1));
+  // (iAtT helper removed — trendlines rendered via slope/intercept directly)
   const upper = c.trend.upper;
   const lower = c.trend.lower;
+
+  // Fibonacci grid — computed from candles currently visible in the viewport.
+  // Recomputes whenever the user scrolls / zooms / new candles arrive.
+  const fibList = useMemo(() => {
+    if (!fibOn) return [];
+    const el = scrollRef.current;
+    let startIdx = 0;
+    let endIdx = nCandles - 1;
+    if (el && el.clientWidth > 0) {
+      startIdx = Math.max(0, Math.floor((el.scrollLeft - PAD_L) / CANDLE_W));
+      endIdx = Math.min(nCandles - 1, Math.ceil((el.scrollLeft + el.clientWidth - PAD_L) / CANDLE_W));
+    }
+    if (endIdx <= startIdx) return [];
+    let hi = -Infinity, lo = Infinity;
+    for (let i = startIdx; i <= endIdx; i++) {
+      const cd = c.candles[i];
+      if (cd.h > hi) hi = cd.h;
+      if (cd.l < lo) lo = cd.l;
+    }
+    if (!isFinite(hi) || !isFinite(lo) || hi <= lo) return [];
+    return fibLevels(hi, lo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fibOn, viewportTick, nCandles, CANDLE_W, tf]);
+
+  const onScroll = () => setViewportTick(v => (v + 1) & 0xffff);
 
   return (
     <div className="relative mt-2">
@@ -438,6 +544,7 @@ function TaChart({
         onMouseLeave={endDrag}
         onClickCapture={onClickCapture}
         onWheel={onWheel}
+        onScroll={onScroll}
       >
       <svg
         width={innerW}
@@ -446,6 +553,29 @@ function TaChart({
       >
         {/* ── Price panel ── */}
         <g>
+          {/* Fibonacci retracement grid — from currently visible viewport */}
+          {fibList.map((lvl, i) => {
+            if (lvl.price < c.pMin || lvl.price > c.pMax) return null;
+            const y = yPrice(lvl.price);
+            const stroke = FIB_COLORS[lvl.label] ?? "rgba(148, 163, 184, 0.5)";
+            return (
+              <g key={`fib-${i}`}>
+                <line
+                  x1={PAD_L} y1={y} x2={innerW - PAD_R} y2={y}
+                  stroke={stroke} strokeWidth={1}
+                  strokeDasharray={lvl.kind === "ext" ? "6 6" : "3 4"}
+                  opacity={lvl.ratio === 0.5 || lvl.ratio === 0.618 ? 0.95 : 0.7}
+                />
+                <text
+                  x={PAD_L + 4} y={y - 2}
+                  fill={stroke} fontSize={9} fontFamily="monospace"
+                >
+                  {lvl.label} · ${lvl.price.toFixed(lvl.price > 10_000 ? 0 : 2)}
+                </text>
+              </g>
+            );
+          })}
+
           {/* future/empty zone shading (right of the current candle) */}
           <rect
             x={lastCandleX} y={PAD_T}

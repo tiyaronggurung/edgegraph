@@ -1772,6 +1772,42 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_candles: {
+        Row: {
+          bucket_start: string
+          c: number
+          h: number
+          l: number
+          o: number
+          source: string | null
+          tf: string
+          updated_at: string
+          v: number | null
+        }
+        Insert: {
+          bucket_start: string
+          c: number
+          h: number
+          l: number
+          o: number
+          source?: string | null
+          tf: string
+          updated_at?: string
+          v?: number | null
+        }
+        Update: {
+          bucket_start?: string
+          c?: number
+          h?: number
+          l?: number
+          o?: number
+          source?: string | null
+          tf?: string
+          updated_at?: string
+          v?: number | null
+        }
+        Relationships: []
+      }
       btc_gate_config: {
         Row: {
           btc_entry_gate_enabled: boolean
@@ -4406,6 +4442,7 @@ export type Database = {
         }
         Returns: number
       }
+      prune_btc_candles: { Args: never; Returns: undefined }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
