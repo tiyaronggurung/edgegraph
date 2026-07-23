@@ -30,7 +30,7 @@ export interface TrendlineSnapshot {
   error: string | null;
 }
 
-async function fetchBinance1m(limit = 90): Promise<TCandle[]> {
+async function fetchBinance1m(limit = 300): Promise<TCandle[]> {
   const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=${limit}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`binance ${res.status}`);
@@ -43,9 +43,11 @@ async function fetchBinance1m(limit = 90): Promise<TCandle[]> {
       h: parseFloat(r[2]),
       l: parseFloat(r[3]),
       c: parseFloat(r[4]),
+      v: parseFloat(r[5]),
     };
   });
 }
+
 
 export const evalTrendlineShadow = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -62,7 +64,7 @@ export const evalTrendlineShadow = createServerFn({ method: "GET" })
 
     let candles: TCandle[];
     try {
-      candles = await fetchBinance1m(90);
+      candles = await fetchBinance1m(300);
     } catch (e) {
       return { ...empty, error: (e as Error).message };
     }
