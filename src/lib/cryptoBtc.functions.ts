@@ -1255,6 +1255,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         // Side always follows current calibrated model prob (no freeze-side).
         // eslint-disable-next-line prefer-const
         let side: "YES" | "NO" = p >= 0.5 ? "YES" : "NO";
+        // Frozen at first snapshot in DB — never overwritten by Study/Fight.
+        const modelSidePreStudy: "YES" | "NO" = side;
         // eslint-disable-next-line prefer-const
         let edgePts = side === "YES" ? rawEdgePts : -rawEdgePts;
         const edgeAbs = Math.abs(edgePts);
