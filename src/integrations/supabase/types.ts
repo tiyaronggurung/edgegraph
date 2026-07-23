@@ -2869,6 +2869,93 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_trendline_shadow: {
+        Row: {
+          channel_width_pct: number | null
+          created_at: string
+          dist_to_lower_pct: number | null
+          dist_to_upper_pct: number | null
+          evaluated_at: string
+          id: string
+          is_wedge: boolean
+          lower_intercept: number | null
+          lower_price_now: number | null
+          lower_slope: number | null
+          outcome: string | null
+          outcome_settled_at: string | null
+          seconds_to_close: number | null
+          spike_body_ratio: number | null
+          spike_break_pct: number | null
+          spike_detected: boolean
+          spike_direction: string | null
+          spot: number
+          strike: number | null
+          swings_used: number | null
+          ticker: string
+          upper_intercept: number | null
+          upper_price_now: number | null
+          upper_slope: number | null
+          user_id: string
+          wedge_bias: string | null
+        }
+        Insert: {
+          channel_width_pct?: number | null
+          created_at?: string
+          dist_to_lower_pct?: number | null
+          dist_to_upper_pct?: number | null
+          evaluated_at?: string
+          id?: string
+          is_wedge?: boolean
+          lower_intercept?: number | null
+          lower_price_now?: number | null
+          lower_slope?: number | null
+          outcome?: string | null
+          outcome_settled_at?: string | null
+          seconds_to_close?: number | null
+          spike_body_ratio?: number | null
+          spike_break_pct?: number | null
+          spike_detected?: boolean
+          spike_direction?: string | null
+          spot: number
+          strike?: number | null
+          swings_used?: number | null
+          ticker: string
+          upper_intercept?: number | null
+          upper_price_now?: number | null
+          upper_slope?: number | null
+          user_id: string
+          wedge_bias?: string | null
+        }
+        Update: {
+          channel_width_pct?: number | null
+          created_at?: string
+          dist_to_lower_pct?: number | null
+          dist_to_upper_pct?: number | null
+          evaluated_at?: string
+          id?: string
+          is_wedge?: boolean
+          lower_intercept?: number | null
+          lower_price_now?: number | null
+          lower_slope?: number | null
+          outcome?: string | null
+          outcome_settled_at?: string | null
+          seconds_to_close?: number | null
+          spike_body_ratio?: number | null
+          spike_break_pct?: number | null
+          spike_detected?: boolean
+          spike_direction?: string | null
+          spot?: number
+          strike?: number | null
+          swings_used?: number | null
+          ticker?: string
+          upper_intercept?: number | null
+          upper_price_now?: number | null
+          upper_slope?: number | null
+          user_id?: string
+          wedge_bias?: string | null
+        }
+        Relationships: []
+      }
       crypto_gate_shadow_sim: {
         Row: {
           created_at: string
