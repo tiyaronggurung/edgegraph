@@ -185,6 +185,13 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
   } catch (e) {
     console.warn("snapshotPrediction failed:", e);
   }
+  // Shadow EV log — fire-and-forget, never blocks the snapshot write.
+  void (async () => {
+    try {
+      const { logEvDecision } = await import("./evDecisionLog.server");
+      await logEvDecision(input);
+    } catch { /* swallowed inside logEvDecision */ }
+  })();
 }
 
 // Read the locked sides for a batch of tickers (one round-trip).
