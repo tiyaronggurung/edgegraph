@@ -176,6 +176,10 @@ function Stat({ label, value, icon }: { label: string; value: string; icon?: Rea
 }
 
 // ── The chart ─────────────────────────────────────────────────────────────
+const MIN_CW = 2;
+const MAX_CW = 32;
+const DEFAULT_CW = 6;
+
 function TaChart({
   data, visible,
 }: {
@@ -184,11 +188,12 @@ function TaChart({
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [candleW, setCandleW] = useState<number>(DEFAULT_CW);
   const priceH = 300;
   const rsiH = 70;
   const macdH = 70;
   const PAD_L = 52, PAD_R = 72, PAD_T = 10, PAD_B = 6;
-  const CANDLE_W = 6; // px per candle in the scrollable area
+  const CANDLE_W = candleW;
   const FUTURE_SLOTS = 30; // empty room to the right of the last candle for upcoming candles
 
   const computed = useMemo(() => {
@@ -199,19 +204,16 @@ function TaChart({
       t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: c.v ?? 1,
     }));
 
-    // Indicators — same math the server engine uses.
     const e9   = emaSeries(closes, 9);
     const e21  = emaSeries(closes, 21);
     const e55  = closes.length >= 60  ? emaSeries(closes, 55)  : null;
     const e145 = closes.length >= 150 ? emaSeries(closes, 145) : null;
     const e169 = closes.length >= 170 ? emaSeries(closes, 169) : null;
 
-    // Rolling session VWAP series (recompute at each i using taEngine.sessionVwap).
     const vwapSeries: (number | null)[] = candles.map((_, i) =>
       i < 1 ? null : sessionVwap(cAsCandle.slice(0, i + 1))
     );
 
-    // Rolling Bollinger series (upper/lower) — 20-period on closes.
     const bbUpper: (number | null)[] = [];
     const bbLower: (number | null)[] = [];
     for (let i = 0; i < closes.length; i++) {
@@ -221,7 +223,6 @@ function TaChart({
       bbLower.push(bb ? bb.lower : null);
     }
 
-    // Trendlines and per-candle spike flags (visual only).
     const trend = detectTrendlines(candles);
     const spikeFlags: boolean[] = candles.map((_, i) => {
       if (i < 21) return false;
@@ -231,12 +232,10 @@ function TaChart({
       return s.detected;
     });
 
-    // RSI + MACD series for sub-panels.
     const rsiSeries: (number | null)[] = closes.map((_, i) =>
       i < 14 ? null : rsi(closes.slice(0, i + 1), 14)
     );
 
-    // MACD histogram (need >=35 closes to start).
     const macdHist: (number | null)[] = [];
     for (let i = 0; i < closes.length; i++) {
       if (i < 35) { macdHist.push(null); continue; }
@@ -244,7 +243,6 @@ function TaChart({
       macdHist.push(m ? m.hist : null);
     }
 
-    // Price axis: include EMAs, VWAP, BB and strike so nothing clips.
     const highs = candles.map(c => c.h);
     const lows  = candles.map(c => c.l);
     const extras: number[] = [];
@@ -266,12 +264,100 @@ function TaChart({
     };
   }, [data]);
 
-  // On first load / refresh, snap the scroll container to the right.
+  // Snap to the right only when the candle count changes (new data),
+  // NOT on zoom or every render.
+  const prevCountRef = useRef(0);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollLeft = el.scrollWidth;
+    const n = computed?.candles.length ?? 0;
+    if (n !== prevCountRef.current) {
+      el.scrollLeft = el.scrollWidth;
+      prevCountRef.current = n;
+    }
   }, [computed]);
+
+  // ── Interactions: drag-to-pan + wheel-to-zoom (anchored under cursor) ──
+  const dragRef = useRef<{ startX: number; startLeft: number; moved: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    dragRef.current = { startX: e.clientX, startLeft: el.scrollLeft, moved: false };
+    el.style.cursor = "grabbing";
+  };
+  const onMouseMove = (e: React.MouseEvent) => {
+    const el = scrollRef.current;
+    const d = dragRef.current;
+    if (!el || !d) return;
+    const dx = e.clientX - d.startX;
+    if (Math.abs(dx) > 3) {
+      d.moved = true;
+      el.scrollLeft = d.startLeft - dx;
+    }
+  };
+  const endDrag = () => {
+    const el = scrollRef.current;
+    if (el) el.style.cursor = "grab";
+    if (dragRef.current?.moved) suppressClickRef.current = true;
+    dragRef.current = null;
+  };
+  const onClickCapture = (e: React.MouseEvent) => {
+    if (suppressClickRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+      suppressClickRef.current = false;
+    }
+  };
+  const onWheel = (e: React.WheelEvent) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Horizontal-only pan when Shift held or trackpad horizontal delta present
+    if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      el.scrollLeft += e.deltaX || e.deltaY;
+      e.preventDefault();
+      return;
+    }
+    // Vertical wheel = zoom, anchored under the mouse
+    e.preventDefault();
+    const rect = el.getBoundingClientRect();
+    const mouseInContainer = e.clientX - rect.left;
+    const mouseInContent = mouseInContainer + el.scrollLeft;
+    const anchorIdx = (mouseInContent - PAD_L) / candleW;
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    const nw = Math.max(MIN_CW, Math.min(MAX_CW, candleW * factor));
+    if (nw === candleW) return;
+    setCandleW(nw);
+    // Adjust scrollLeft next frame so the anchor stays under the cursor.
+    requestAnimationFrame(() => {
+      if (!scrollRef.current) return;
+      const newContentX = PAD_L + anchorIdx * nw;
+      scrollRef.current.scrollLeft = newContentX - mouseInContainer;
+    });
+  };
+
+  const zoomBy = (factor: number) => {
+    const el = scrollRef.current;
+    const nw = Math.max(MIN_CW, Math.min(MAX_CW, candleW * factor));
+    if (nw === candleW) return;
+    // Anchor to the right edge (where the current candle is).
+    const rightAnchorIdx = el
+      ? ((el.scrollLeft + el.clientWidth) - PAD_L) / candleW
+      : 0;
+    setCandleW(nw);
+    requestAnimationFrame(() => {
+      if (!scrollRef.current) return;
+      const newContentX = PAD_L + rightAnchorIdx * nw;
+      scrollRef.current.scrollLeft = newContentX - scrollRef.current.clientWidth;
+    });
+  };
+  const resetZoom = () => {
+    setCandleW(DEFAULT_CW);
+    requestAnimationFrame(() => {
+      if (scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    });
+  };
 
   if (!computed) {
     return <div className="h-[320px] mt-2 flex items-center justify-center text-xs text-white/40">Loading chart…</div>;
@@ -320,7 +406,39 @@ function TaChart({
   const lower = c.trend.lower;
 
   return (
-    <div ref={scrollRef} className="mt-2 overflow-x-auto overflow-y-hidden border border-white/5 rounded bg-black/30">
+    <div className="relative mt-2">
+      {/* Zoom controls — overlay top-right */}
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-1 bg-black/60 border border-white/10 rounded px-1 py-0.5 backdrop-blur">
+        <button
+          onClick={() => zoomBy(1 / 1.25)}
+          className="w-6 h-6 text-white/70 hover:text-white text-sm leading-none"
+          title="Zoom out"
+        >−</button>
+        <span className="text-[9px] text-white/40 font-mono tabular-nums w-8 text-center">
+          {(candleW / DEFAULT_CW).toFixed(2)}×
+        </span>
+        <button
+          onClick={() => zoomBy(1.25)}
+          className="w-6 h-6 text-white/70 hover:text-white text-sm leading-none"
+          title="Zoom in"
+        >+</button>
+        <button
+          onClick={resetZoom}
+          className="px-1.5 h-6 text-[10px] text-white/60 hover:text-white font-mono"
+          title="Reset zoom & scroll to now"
+        >reset</button>
+      </div>
+      <div
+        ref={scrollRef}
+        className="overflow-x-auto overflow-y-hidden border border-white/5 rounded bg-black/30 select-none"
+        style={{ cursor: "grab" }}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={endDrag}
+        onMouseLeave={endDrag}
+        onClickCapture={onClickCapture}
+        onWheel={onWheel}
+      >
       <svg
         width={innerW}
         height={priceH + rsiH + macdH + 24}
@@ -616,6 +734,7 @@ function TaChart({
           })}
         </g>
       </svg>
+      </div>
     </div>
   );
 }
