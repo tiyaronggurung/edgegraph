@@ -141,8 +141,9 @@ function buildStudyReason(r: {
   const L: string[] = [];
   const pickLabel = dirLabel(r.side);
   L.push(isStudying ? `Study Pick pending — locks at T+420s.` : `Study Pick: ${pickLabel}`);
-  const mp = r.modelSidePreStudy ?? r.side;
-  if (mp !== r.side) L.push(`Overrode Model Pick (${dirLabel(mp)}) — Study won the Fight Window.`);
+  const mp = r.modelSidePreStudy ?? null;
+  if (!mp) L.push(`Model Pick pending — no lock during opening noise; locks around T+360s.`);
+  else if (mp !== r.side) L.push(`Overrode Model Pick (${dirLabel(mp)}) — Study won the Fight Window.`);
   else L.push(`Agrees with Model Pick (${dirLabel(mp)}).`);
   if (r.studyLockedSide) L.push(`Study locked side: ${dirLabel(r.studyLockedSide)}.`);
 
@@ -1256,7 +1257,7 @@ function ModelAccuracyPanel() {
                       <th className="text-left p-2">Closed</th>
                       <th className="text-left p-2">Ticker</th>
                       <th className="text-left p-2" title="Study Pick — locked side after the 420s Strike Study. On Study/Model disagreement the side leans to Study. This is now the pick compared to settlement.">Study Pick</th>
-                      <th className="text-left p-2" title="Model Pick — the original raw model pick (p ≥ 50%) frozen at the first snapshot. Never overwritten by Study/Fight. This is the classic model pick shown for a long time.">Model Pick</th>
+                      <th className="text-left p-2" title="Model Pick — raw model side frozen only after opening noise, around T+360s. Never overwritten by Study/Fight after lock.">Model Pick</th>
                       <th className="text-left p-2" title="Raw model direction (live): P(YES) ≥ 50%? Updates with the current tick — no longer the win/loss comparator.">Raw model</th>
                       {/* Live column hidden (kept in data model) */}
                       <th className="text-right p-2">Strike</th>
@@ -1312,13 +1313,17 @@ function ModelAccuracyPanel() {
                         </td>
                         <td className="p-2">
                           {(() => {
-                            const mp = (r as { modelSidePreStudy?: "YES" | "NO" | null }).modelSidePreStudy ?? r.side;
+                            const mp = (r as { modelSidePreStudy?: "YES" | "NO" | null }).modelSidePreStudy ?? null;
                             const mpCorrect: boolean | null = r.wasCorrect == null
                               ? null
-                              : (r.side === mp ? r.wasCorrect : !r.wasCorrect);
+                              : mp == null ? null : (r.side === mp ? r.wasCorrect : !r.wasCorrect);
                             return (
                               <>
-                                <span className={mp === "YES" ? "text-emerald-400" : "text-red-400"} title="Model Pick — original raw model side frozen at first snapshot; never overridden by Study">{dirLabel(mp)}</span>
+                                {mp ? (
+                                  <span className={mp === "YES" ? "text-emerald-400" : "text-red-400"} title="Model Pick — raw model side frozen after opening noise; never overridden by Study">{dirLabel(mp)}</span>
+                                ) : (
+                                  <span className="text-muted-foreground text-[10px]" title="Opening-noise guard active · Model Pick locks around T+360s">—</span>
+                                )}
                                 {mpCorrect === true && <span className="ml-1 text-[10px] text-emerald-400">✓</span>}
                                 {mpCorrect === false && <span className="ml-1 text-[10px] text-red-400">✗</span>}
                               </>
