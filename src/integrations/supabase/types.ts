@@ -3425,6 +3425,99 @@ export type Database = {
         }
         Relationships: []
       }
+      ev_decision_log: {
+        Row: {
+          actual_outcome: string | null
+          close_time: string
+          created_at: string
+          edge_prob: number
+          edge_pts: number
+          ev_per_contract: number
+          ev_per_stake_10: number
+          event_ticker: string | null
+          fee_est: number
+          id: number
+          kalshi_no_price: number
+          kalshi_yes_price: number
+          market_implied_prob: number
+          model_prob: number
+          model_side: string
+          model_side_prob: number
+          realized_pnl_10: number | null
+          regime_tag: string | null
+          seconds_to_close: number
+          selected_side_ask: number
+          settled_at: string | null
+          snapshot_bucket: string
+          snapshot_ts: string
+          spot_at_snapshot: number | null
+          strike: number | null
+          ticker: string
+          was_correct: boolean | null
+          would_fire: boolean
+        }
+        Insert: {
+          actual_outcome?: string | null
+          close_time: string
+          created_at?: string
+          edge_prob: number
+          edge_pts: number
+          ev_per_contract: number
+          ev_per_stake_10: number
+          event_ticker?: string | null
+          fee_est: number
+          id?: number
+          kalshi_no_price: number
+          kalshi_yes_price: number
+          market_implied_prob: number
+          model_prob: number
+          model_side: string
+          model_side_prob: number
+          realized_pnl_10?: number | null
+          regime_tag?: string | null
+          seconds_to_close: number
+          selected_side_ask: number
+          settled_at?: string | null
+          snapshot_bucket: string
+          snapshot_ts?: string
+          spot_at_snapshot?: number | null
+          strike?: number | null
+          ticker: string
+          was_correct?: boolean | null
+          would_fire: boolean
+        }
+        Update: {
+          actual_outcome?: string | null
+          close_time?: string
+          created_at?: string
+          edge_prob?: number
+          edge_pts?: number
+          ev_per_contract?: number
+          ev_per_stake_10?: number
+          event_ticker?: string | null
+          fee_est?: number
+          id?: number
+          kalshi_no_price?: number
+          kalshi_yes_price?: number
+          market_implied_prob?: number
+          model_prob?: number
+          model_side?: string
+          model_side_prob?: number
+          realized_pnl_10?: number | null
+          regime_tag?: string | null
+          seconds_to_close?: number
+          selected_side_ask?: number
+          settled_at?: string | null
+          snapshot_bucket?: string
+          snapshot_ts?: string
+          spot_at_snapshot?: number | null
+          strike?: number | null
+          ticker?: string
+          was_correct?: boolean | null
+          would_fire?: boolean
+        }
+        Relationships: []
+      }
       graph_snapshots: {
         Row: {
           analysis_id: string
