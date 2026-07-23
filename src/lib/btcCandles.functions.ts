@@ -71,10 +71,7 @@ export const getBtcCandles = createServerFn({ method: "GET" })
     const stale = cacheCandles.length < 5 || ageMs > TF_SECONDS[tf] * 2000;
 
     if (!stale) return { tf, candles: cacheCandles, source: "cache" };
-    if (tf === "1w") {
-      // Weekly comes from cache only (built by ingest); no live fallback.
-      return { tf, candles: cacheCandles, source: "cache" };
-    }
+
 
     try {
       const live = await fetchCoinbaseLive(tf, limit);
