@@ -1292,17 +1292,18 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           }
         }
 
-        // ── STRIKE STUDY ENGINE (first 150s of every 15m window) ─────────
+        // ── STRIKE STUDY ENGINE (first 420s = minute 0–7 of every 15m window) ─
         // Live-analyze all TA tools *relative to this window's strike*:
         //   • Trendline break events (spot vs upper/lower over last 3 x 1m)
         //   • S/R proximity (nearest support & resistance vs strike)
-        //   • Strike-cross count in the last 150s (chop signal)
-        //   • Spot-side stability (% of last-3-candle closes above vs below strike)
+        //   • Strike-cross count in the last 7m (chop signal)
+        //   • Spot-side stability (% of last-7m closes above vs below strike)
         //   • Structure bias (HH/HL vs LH/LL) + VWAP position vs strike
         //   • Chart verdict + TA v2 alignment with the selected side
-        // During warm-up we OBSERVE only (no bet). At t≥150s we emit a rich
+        // During warm-up we OBSERVE only (no bet). At t≥420s we emit a rich
         // SOLID / WEAK / CHOPPY verdict from all findings above.
-        const WARMUP_SECONDS = 150;
+        // Backtest: min 5–7 candle-side follow-through hits 86.7–93.3%.
+        const WARMUP_SECONDS = 420;
         const windowElapsedSec = Math.max(0, Math.round((now - openMs) / 1000));
         const studying = windowElapsedSec < WARMUP_SECONDS;
         const studyingSecondsLeft = studying ? Math.max(0, WARMUP_SECONDS - windowElapsedSec) : 0;
