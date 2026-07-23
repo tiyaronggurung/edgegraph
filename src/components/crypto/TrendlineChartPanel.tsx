@@ -75,20 +75,45 @@ export function TrendlineChartPanel() {
 
   // Candles per-tf. keepPreviousData → switching tf keeps old chart visible
   // until new candles arrive, so the chart never blanks out.
-  const { data: candlesData, isFetching: candlesFetching } = useQuery({
+  const { data: candlesData, isFetching: candlesFetching, refetch: refetchCandles } = useQuery({
     queryKey: ["btc-candles", tf],
     queryFn: () => candlesFn({ data: { tf, limit: tf === "1m" ? 500 : 300 } }),
     refetchInterval: TF_REFETCH_MS[tf],
-    staleTime: TF_REFETCH_MS[tf] - 2_000,
+    staleTime: TF_REFETCH_MS[tf] - 1_000,
     gcTime: 30 * 60_000,
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
 
-  const candles = candlesData?.candles ?? shadow?.candles ?? [];
+  // Live-splice: extend the currently-forming last candle with the freshest
+  // spot we have (Kalshi implied @ 5s > shadow composite @ 30s) so the bar
+  // visibly ticks up/down between server refetches. Only when the live tick
+  // still falls inside the last bar's bucket — never invent a new bar.
+  const rawCandles = candlesData?.candles ?? shadow?.candles ?? [];
+  const liveSpot = kalshi?.impliedSpot ?? shadow?.spot ?? null;
+  const candles = useMemo<TCandle[]>(() => {
+    if (!rawCandles.length || liveSpot == null) return rawCandles;
+    const bucketMs =
+      tf === "1m" ? 60_000 :
+      tf === "5m" ? 300_000 :
+      tf === "15m" ? 900_000 :
+      tf === "1h" ? 3_600_000 :
+      86_400_000;
+    const last = rawCandles[rawCandles.length - 1];
+    const now = Date.now();
+    if (now - last.t >= bucketMs) return rawCandles; // bar closed — wait for next fetch
+    const patched: TCandle = {
+      ...last,
+      c: liveSpot,
+      h: Math.max(last.h, liveSpot),
+      l: Math.min(last.l, liveSpot),
+    };
+    return [...rawCandles.slice(0, -1), patched];
+  }, [rawCandles, liveSpot, tf]);
+
   const isFetching = candlesFetching || shadowFetching;
-  const refetch = () => { refetchShadow(); };
+  const refetch = () => { refetchShadow(); refetchCandles(); };
 
 
   const [visible, setVisible] = useState<Record<string, boolean>>(() =>
