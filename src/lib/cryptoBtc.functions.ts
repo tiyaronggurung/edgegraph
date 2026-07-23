@@ -1542,30 +1542,32 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           }
 
           if (!studyModelDisagree) {
-
-            strikeVerdict = "CHOPPY";
-            strikeVerdictReason = heavyChop
-              ? `${study.crossCount} strike-cross${study.crossCount === 1 ? "" : "es"} + ${study.straddleCount} straddle candle${study.straddleCount === 1 ? "" : "s"} during study → chop regime`
-              : `chop history + near strike (σ ${sigDist.toFixed(2)}) + no directional break`;
-          } else if (score <= -2) {
-            strikeVerdict = "CHOPPY";
-            strikeVerdictReason = `study score ${score} — signals oppose ${side}`;
-          } else if (study.nearStrike && noConsensus) {
-            strikeVerdict = "CHOPPY";
-            strikeVerdictReason = `near strike (σ ${sigDist.toFixed(2)}) with no chart/TA/distance confirmation`;
-          } else if (score >= 4) {
-            strikeVerdict = "SOLID";
-            const highlights: string[] = [];
-            if (strikeBreakForUs)  highlights.push(`trendline break for ${side}`);
-            if (sideStableForUs)   highlights.push(`spot held ${study.stableSide} strike`);
-            if (study.safeDist)    highlights.push(`σ ${sigDist.toFixed(2)}`);
-            if (study.chartAligns) highlights.push(`chart ${(cvConf * 100).toFixed(0)}%`);
-            if (study.taAligns)    highlights.push(`TA ${study.taScoreVal.toFixed(0)}`);
-            strikeVerdictReason = `${side} confirmed (score ${score}): ${highlights.join(" + ")}`;
-          } else {
-            strikeVerdict = "WEAK";
-            strikeVerdictReason = `${side} with mixed evidence (score ${score}, σ ${sigDist.toFixed(2)}, chart ${cvDir} ${(cvConf * 100).toFixed(0)}%, TA ${study.taScoreVal.toFixed(0)})`;
+            if (choppyRegime && !strikeBreakForUs) {
+              strikeVerdict = "CHOPPY";
+              strikeVerdictReason = heavyChop
+                ? `${study.crossCount} strike-cross${study.crossCount === 1 ? "" : "es"} + ${study.straddleCount} straddle candle${study.straddleCount === 1 ? "" : "s"} during study → chop regime`
+                : `chop history + near strike (σ ${sigDist.toFixed(2)}) + no directional break`;
+            } else if (score <= -2) {
+              strikeVerdict = "CHOPPY";
+              strikeVerdictReason = `study score ${score} — signals oppose ${side}`;
+            } else if (study.nearStrike && noConsensus) {
+              strikeVerdict = "CHOPPY";
+              strikeVerdictReason = `near strike (σ ${sigDist.toFixed(2)}) with no chart/TA/distance confirmation`;
+            } else if (score >= 4) {
+              strikeVerdict = "SOLID";
+              const highlights: string[] = [];
+              if (strikeBreakForUs)  highlights.push(`trendline break for ${side}`);
+              if (sideStableForUs)   highlights.push(`spot held ${study.stableSide} strike`);
+              if (study.safeDist)    highlights.push(`σ ${sigDist.toFixed(2)}`);
+              if (study.chartAligns) highlights.push(`chart ${(cvConf * 100).toFixed(0)}%`);
+              if (study.taAligns)    highlights.push(`TA ${study.taScoreVal.toFixed(0)}`);
+              strikeVerdictReason = `${side} confirmed (score ${score}): ${highlights.join(" + ")} · P_study ${(pStudy*100).toFixed(0)}% / P_model ${(pModelForModelDir*100).toFixed(0)}%`;
+            } else {
+              strikeVerdict = "WEAK";
+              strikeVerdictReason = `${side} with mixed evidence (score ${score}, σ ${sigDist.toFixed(2)}, chart ${cvDir} ${(cvConf * 100).toFixed(0)}%, TA ${study.taScoreVal.toFixed(0)}) · P_study ${(pStudy*100).toFixed(0)}% / P_model ${(pModelForModelDir*100).toFixed(0)}%`;
+            }
           }
+
 
           if (strikeVerdict === "CHOPPY") {
             entryGate = {
