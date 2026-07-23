@@ -363,6 +363,12 @@ export async function runBigFlipForUser(
     fill_price_cents: filledCents,
   });
 
+  if (shadowId) {
+    try {
+      await supabase.from("big_flip_lead_shadow").update({ live_fired: true }).eq("id", shadowId);
+    } catch { /* shadow-only; ignore */ }
+  }
+
   return {
     ok: true, ticker, toSide: cheapSide,
     prevYes: yesAsk, newYes: yesAsk, yesDelta: 0,
