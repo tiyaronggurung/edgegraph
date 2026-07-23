@@ -8,8 +8,9 @@
 //   - src/components/crypto/TrendlineChartPanel.tsx (visual overlay)
 
 export interface TCandle {
-  t: number; o: number; h: number; l: number; c: number;
+  t: number; o: number; h: number; l: number; c: number; v?: number;
 }
+
 
 export interface Line {
   slope: number;      // price units per millisecond
