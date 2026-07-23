@@ -35,6 +35,60 @@ const CONSECUTIVE_LOSS_CAP = 3;
 const CONSECUTIVE_HALT_HOURS = 4;
 const STAKE_CENTS = 1000;         // $10 flat
 
+// ---------------------------------------------------------------------------
+// BRR-LEAD SHADOW GATE (shadow mode — no live effect)
+// ---------------------------------------------------------------------------
+// Our composite spot leads Kalshi's BRR (60s VWAP) by ~15–30s. We log every
+// candidate that reaches model-agreement (Gate 3 passed) with:
+//   brr_proxy    = rolling 60s VWAP of our composite spot ticks
+//   lead_delta   = spot - brr_proxy  (positive => spot leading UP)
+//   gate_decision = boost | confirm | veto | neutral
+// Data lands in `big_flip_lead_shadow` for A/B comparison vs live outcomes.
+const LEAD_BOOST_ABS_USD = 25;   // |delta| >= 25 & agrees => boost
+const LEAD_VETO_ABS_USD = 15;    // |delta| >= 15 & opposes => veto
+const BRR_WINDOW_SEC = 60;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function computeBrrLead(supabase: any, cheapSide: "YES" | "NO", spotNow: number) {
+  const sinceIso = new Date(Date.now() - BRR_WINDOW_SEC * 1000).toISOString();
+  const { data } = await supabase
+    .from("btc_spot_ticks")
+    .select("spot,volume,observed_at")
+    .gte("observed_at", sinceIso)
+    .order("observed_at", { ascending: false })
+    .limit(500);
+  const rows = (data ?? []) as Array<{ spot: number; volume: number | null }>;
+  if (rows.length === 0) {
+    return { brrProxy: null as number | null, sampleCount: 0, leadDelta: null as number | null, decision: "neutral" as const, reason: "no ticks in 60s window" };
+  }
+  let vwapNum = 0, vwapDen = 0, meanSum = 0;
+  for (const r of rows) {
+    const s = Number(r.spot);
+    const v = Math.max(0, Number(r.volume ?? 0));
+    if (v > 0) { vwapNum += s * v; vwapDen += v; }
+    meanSum += s;
+  }
+  const brrProxy = vwapDen > 0 ? vwapNum / vwapDen : meanSum / rows.length;
+  const leadDelta = spotNow - brrProxy;
+  const agrees = (cheapSide === "YES" && leadDelta > 0) || (cheapSide === "NO" && leadDelta < 0);
+  const abs = Math.abs(leadDelta);
+  let decision: "boost" | "confirm" | "veto" | "neutral";
+  let reason: string;
+  if (agrees && abs >= LEAD_BOOST_ABS_USD) { decision = "boost"; reason = `agree $${abs.toFixed(2)} >= boost $${LEAD_BOOST_ABS_USD}`; }
+  else if (!agrees && abs >= LEAD_VETO_ABS_USD) { decision = "veto"; reason = `oppose $${abs.toFixed(2)} >= veto $${LEAD_VETO_ABS_USD}`; }
+  else if (agrees) { decision = "confirm"; reason = `agree $${abs.toFixed(2)}`; }
+  else { decision = "neutral"; reason = `oppose $${abs.toFixed(2)} < veto $${LEAD_VETO_ABS_USD}`; }
+  return { brrProxy, sampleCount: rows.length, leadDelta, decision, reason };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function insertLeadShadow(supabase: any, row: Record<string, unknown>): Promise<string | null> {
+  try {
+    const { data } = await supabase.from("big_flip_lead_shadow").insert(row).select("id").maybeSingle();
+    return (data?.id as string) ?? null;
+  } catch { return null; }
+}
+
 export interface CheapFlipSignal {
   ok: boolean;
   ticker: string | null;
