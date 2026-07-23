@@ -96,7 +96,14 @@ export interface GateInput {
   // baseline to 41% after 2 straight losses; 3+ streaks stay depressed.
   // Optional so unit tests and old call sites still work.
   lossStreak?: number;
+  // Chase Veto (2026-07-23 backtest, 14d n=409): when pick_side matches BOTH
+  // of the last two settled outcomes, high-conf (≥0.90) WR collapses to 50%
+  // (vs 64.6% for FADE, 54.4% otherwise). Momentum-chasing after 2 same-side
+  // settles is the leak — require ≥0.93 model_prob to fire in that bucket.
+  prevOutcome1?: "YES" | "NO";
+  prevOutcome2?: "YES" | "NO";
 }
+
 
 
 
