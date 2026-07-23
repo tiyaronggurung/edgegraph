@@ -452,6 +452,10 @@ function TaChart({
             const up = aboveStrike;
             const fill = up ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)";
             const dashStroke = up ? "rgba(34,197,94,0.6)" : "rgba(239,68,68,0.7)";
+            const diff = data?.strike != null ? last.c - data.strike : null;
+            const diffText = diff != null
+              ? `${diff >= 0 ? "+" : ""}$${diff.toFixed(2)} ${diff >= 0 ? "above" : "below"} strike`
+              : "";
             return (
               <>
                 <line
@@ -472,6 +476,22 @@ function TaChart({
                 >
                   ${last.c.toFixed(2)}
                 </text>
+                {/* amount above/below strike tag floating just left of the price pill */}
+                {diffText && (
+                  <>
+                    <rect
+                      x={innerW - PAD_R - 118} y={yy - 8} width={114} height={16} rx={3}
+                      fill="rgba(0,0,0,0.65)" stroke={dashStroke} strokeWidth={1}
+                    />
+                    <text
+                      x={innerW - PAD_R - 8} y={yy + 3} textAnchor="end"
+                      fill={up ? "rgb(134, 239, 172)" : "rgb(252, 165, 165)"}
+                      fontSize={10} fontFamily="monospace" fontWeight={600}
+                    >
+                      {diffText}
+                    </text>
+                  </>
+                )}
               </>
             );
           })()}
