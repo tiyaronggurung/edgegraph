@@ -37,9 +37,11 @@ const SERIES: Array<{
 const TF_LABEL: Record<CandleTf, string> = {
   "1m": "1m", "5m": "5m", "15m": "15m", "1h": "1H", "1d": "1D",
 };
-// Refetch cadence per tf — never more often than the bucket itself.
+// Refetch cadence per tf — for 1m we poll aggressively so the forming bar
+// moves; between server refetches we still splice live spot into the last
+// candle every render so the chart is never visibly frozen.
 const TF_REFETCH_MS: Record<CandleTf, number> = {
-  "1m": 15_000, "5m": 60_000, "15m": 120_000, "1h": 5 * 60_000, "1d": 30 * 60_000,
+  "1m": 5_000, "5m": 30_000, "15m": 60_000, "1h": 5 * 60_000, "1d": 30 * 60_000,
 };
 
 export function TrendlineChartPanel() {
@@ -73,20 +75,45 @@ export function TrendlineChartPanel() {
 
   // Candles per-tf. keepPreviousData → switching tf keeps old chart visible
   // until new candles arrive, so the chart never blanks out.
-  const { data: candlesData, isFetching: candlesFetching } = useQuery({
+  const { data: candlesData, isFetching: candlesFetching, refetch: refetchCandles } = useQuery({
     queryKey: ["btc-candles", tf],
     queryFn: () => candlesFn({ data: { tf, limit: tf === "1m" ? 500 : 300 } }),
     refetchInterval: TF_REFETCH_MS[tf],
-    staleTime: TF_REFETCH_MS[tf] - 2_000,
+    staleTime: TF_REFETCH_MS[tf] - 1_000,
     gcTime: 30 * 60_000,
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
 
-  const candles = candlesData?.candles ?? shadow?.candles ?? [];
+  // Live-splice: extend the currently-forming last candle with the freshest
+  // spot we have (Kalshi implied @ 5s > shadow composite @ 30s) so the bar
+  // visibly ticks up/down between server refetches. Only when the live tick
+  // still falls inside the last bar's bucket — never invent a new bar.
+  const rawCandles = candlesData?.candles ?? shadow?.candles ?? [];
+  const liveSpot = kalshi?.impliedSpot ?? shadow?.spot ?? null;
+  const candles = useMemo<TCandle[]>(() => {
+    if (!rawCandles.length || liveSpot == null) return rawCandles;
+    const bucketMs =
+      tf === "1m" ? 60_000 :
+      tf === "5m" ? 300_000 :
+      tf === "15m" ? 900_000 :
+      tf === "1h" ? 3_600_000 :
+      86_400_000;
+    const last = rawCandles[rawCandles.length - 1];
+    const now = Date.now();
+    if (now - last.t >= bucketMs) return rawCandles; // bar closed — wait for next fetch
+    const patched: TCandle = {
+      ...last,
+      c: liveSpot,
+      h: Math.max(last.h, liveSpot),
+      l: Math.min(last.l, liveSpot),
+    };
+    return [...rawCandles.slice(0, -1), patched];
+  }, [rawCandles, liveSpot, tf]);
+
   const isFetching = candlesFetching || shadowFetching;
-  const refetch = () => { refetchShadow(); };
+  const refetch = () => { refetchShadow(); refetchCandles(); };
 
 
   const [visible, setVisible] = useState<Record<string, boolean>>(() =>
