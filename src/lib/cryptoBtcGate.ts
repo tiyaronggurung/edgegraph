@@ -91,6 +91,9 @@ export interface GateInput {
   // kills the 17% `near_strike_flip` autopsy bucket (last-minute chop).
   spot?: number;
   strike?: number;
+}
+
+
 
 
 export interface GateResult {
