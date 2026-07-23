@@ -155,6 +155,7 @@ export interface BtcMarket {
   studyingSecondsLeft: number;             // seconds remaining in warm-up (0 once done)
   strikeVerdict: "SOLID" | "WEAK" | "CHOPPY" | null; // null while studying
   strikeVerdictReason: string;             // human-readable justification
+  studyFindings: string[];                 // per-signal notes from the strike-study engine
 }
 
 
