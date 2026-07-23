@@ -1064,8 +1064,9 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         const sideConf = side === "YES" ? p : 1 - p;
         const { gateAction, gateReason } = evaluateGate({
           side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap: gapAnalysis,
-          sideConf,
+          sideConf, spot, strike,
         });
+
 
         // liveSide == side now (freeze-side guard removed).
         const rawDir: "YES" | "NO" = side;
