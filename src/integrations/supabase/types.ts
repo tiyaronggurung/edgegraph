@@ -3428,6 +3428,7 @@ export type Database = {
       ev_decision_log: {
         Row: {
           actual_outcome: string | null
+          calibration_bucket: string | null
           close_time: string
           created_at: string
           edge_prob: number
@@ -3440,24 +3441,36 @@ export type Database = {
           kalshi_no_price: number
           kalshi_yes_price: number
           market_implied_prob: number
+          min_conf_threshold: number | null
+          min_edge_threshold: number | null
+          min_ev_threshold: number | null
           model_prob: number
           model_side: string
           model_side_prob: number
+          passes_conf: boolean | null
+          passes_edge: boolean | null
+          passes_ev: boolean | null
+          passes_price_ceiling: boolean | null
+          price_ceiling: number | null
           realized_pnl_10: number | null
           regime_tag: string | null
           seconds_to_close: number
           selected_side_ask: number
           settled_at: string | null
+          side_confidence: number | null
           snapshot_bucket: string
           snapshot_ts: string
           spot_at_snapshot: number | null
           strike: number | null
+          target_offset_seconds: number | null
           ticker: string
           was_correct: boolean | null
           would_fire: boolean
+          would_fire_gated: boolean | null
         }
         Insert: {
           actual_outcome?: string | null
+          calibration_bucket?: string | null
           close_time: string
           created_at?: string
           edge_prob: number
@@ -3470,24 +3483,36 @@ export type Database = {
           kalshi_no_price: number
           kalshi_yes_price: number
           market_implied_prob: number
+          min_conf_threshold?: number | null
+          min_edge_threshold?: number | null
+          min_ev_threshold?: number | null
           model_prob: number
           model_side: string
           model_side_prob: number
+          passes_conf?: boolean | null
+          passes_edge?: boolean | null
+          passes_ev?: boolean | null
+          passes_price_ceiling?: boolean | null
+          price_ceiling?: number | null
           realized_pnl_10?: number | null
           regime_tag?: string | null
           seconds_to_close: number
           selected_side_ask: number
           settled_at?: string | null
+          side_confidence?: number | null
           snapshot_bucket: string
           snapshot_ts?: string
           spot_at_snapshot?: number | null
           strike?: number | null
+          target_offset_seconds?: number | null
           ticker: string
           was_correct?: boolean | null
           would_fire: boolean
+          would_fire_gated?: boolean | null
         }
         Update: {
           actual_outcome?: string | null
+          calibration_bucket?: string | null
           close_time?: string
           created_at?: string
           edge_prob?: number
@@ -3500,21 +3525,32 @@ export type Database = {
           kalshi_no_price?: number
           kalshi_yes_price?: number
           market_implied_prob?: number
+          min_conf_threshold?: number | null
+          min_edge_threshold?: number | null
+          min_ev_threshold?: number | null
           model_prob?: number
           model_side?: string
           model_side_prob?: number
+          passes_conf?: boolean | null
+          passes_edge?: boolean | null
+          passes_ev?: boolean | null
+          passes_price_ceiling?: boolean | null
+          price_ceiling?: number | null
           realized_pnl_10?: number | null
           regime_tag?: string | null
           seconds_to_close?: number
           selected_side_ask?: number
           settled_at?: string | null
+          side_confidence?: number | null
           snapshot_bucket?: string
           snapshot_ts?: string
           spot_at_snapshot?: number | null
           strike?: number | null
+          target_offset_seconds?: number | null
           ticker?: string
           was_correct?: boolean | null
           would_fire?: boolean
+          would_fire_gated?: boolean | null
         }
         Relationships: []
       }
