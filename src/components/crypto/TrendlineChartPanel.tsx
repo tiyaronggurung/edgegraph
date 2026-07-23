@@ -515,7 +515,60 @@ function TaChart({
               </>
             );
           })()}
+
+          {/* selected candle: vertical guide + OHLC tooltip */}
+          {selectedIdx != null && selectedIdx >= 0 && selectedIdx < nCandles && (() => {
+            const cd = c.candles[selectedIdx];
+            const prev = c.candles[selectedIdx - 1] ?? cd;
+            const cx = xFor(selectedIdx);
+            const change = cd.c - prev.c;
+            const changePct = prev.c ? (change / prev.c) * 100 : 0;
+            const up = change >= 0;
+            const boxW = 168, boxH = 118;
+            // flip tooltip to the left if it would overflow the right edge
+            const rightEdge = innerW - PAD_R;
+            const flip = cx + boxW + 10 > rightEdge;
+            const bx = flip ? cx - boxW - 10 : cx + 10;
+            const by = PAD_T + 8;
+            const time = new Date(cd.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            const date = new Date(cd.t).toLocaleDateString([], { month: "short", day: "numeric" });
+            const rows: Array<[string, string, string?]> = [
+              ["O", `$${cd.o.toFixed(2)}`],
+              ["H", `$${cd.h.toFixed(2)}`, "rgb(74, 222, 128)"],
+              ["L", `$${cd.l.toFixed(2)}`, "rgb(248, 113, 113)"],
+              ["C", `$${cd.c.toFixed(2)}`, up ? "rgb(74, 222, 128)" : "rgb(248, 113, 113)"],
+              ["Δ", `${change >= 0 ? "+" : ""}$${change.toFixed(2)} (${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%)`, up ? "rgb(134, 239, 172)" : "rgb(252, 165, 165)"],
+              ["Vol", cd.v != null ? cd.v.toFixed(3) : "—"],
+            ];
+            return (
+              <g style={{ pointerEvents: "none" }}>
+                <line x1={cx} y1={PAD_T} x2={cx} y2={priceH - PAD_B}
+                  stroke="rgba(255,255,255,0.35)" strokeWidth={1} strokeDasharray="2 3" />
+                <rect x={bx} y={by} width={boxW} height={boxH} rx={4}
+                  fill="rgba(10,10,12,0.94)" stroke="rgba(255,255,255,0.25)" strokeWidth={1} />
+                <text x={bx + 8} y={by + 14} fill="rgba(255,255,255,0.55)"
+                  fontSize={10} fontFamily="monospace">{date} · {time} UTC</text>
+                {rows.map(([k, v, col], i) => (
+                  <g key={k}>
+                    <text x={bx + 8} y={by + 32 + i * 14}
+                      fill="rgba(255,255,255,0.55)" fontSize={11} fontFamily="monospace">{k}</text>
+                    <text x={bx + boxW - 8} y={by + 32 + i * 14} textAnchor="end"
+                      fill={col ?? "white"} fontSize={11} fontFamily="monospace" fontWeight={600}>{v}</text>
+                  </g>
+                ))}
+                {/* close button */}
+                <g style={{ pointerEvents: "all", cursor: "pointer" }}
+                   onClick={(e) => { e.stopPropagation(); setSelectedIdx(null); }}>
+                  <rect x={bx + boxW - 18} y={by + 2} width={16} height={14} rx={2}
+                    fill="rgba(255,255,255,0.08)" />
+                  <text x={bx + boxW - 10} y={by + 13} textAnchor="middle"
+                    fill="rgba(255,255,255,0.7)" fontSize={10} fontFamily="monospace">×</text>
+                </g>
+              </g>
+            );
+          })()}
         </g>
+
 
         {/* ── RSI panel ── */}
         <g transform={`translate(0, ${priceH + 12})`}>
