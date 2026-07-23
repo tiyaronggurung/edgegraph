@@ -1018,6 +1018,18 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         const cal = applyCalib ? applyCalib(p, secondsToClose, calibState) : { p, deltaPts: 0, bucket: "ge600", active: false };
         p = cal.p;
 
+        // (f2) TA v2 soft blend into model_prob (LIVE ±15pt, re-enabled 2026-07-23).
+        // Previous ±25pt blend broke calibration; ±15pt cap is deliberately gentler.
+        // Only shifts prob toward TA direction; side may still flip when |shift| > |p-0.5|.
+        let taBlendPts = 0;
+        if (taScoreRes && Number.isFinite(taScoreRes.score)) {
+          const clamped = Math.max(-100, Math.min(100, taScoreRes.score));
+          const shift = (clamped / 100) * 0.15; // ±0.15 max
+          const pBefore = p;
+          p = Math.max(0.01, Math.min(0.99, p + shift));
+          taBlendPts = (p - pBefore) * 100;
+        }
+
         // ── FREEZE-SIDE GUARD REMOVED (2026-07-22 rollback) ──
         // The lockedSide-first behavior kept the model stuck on the first
         // snapshot's pick even when live probability drifted across 50%.
@@ -1029,11 +1041,7 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         // than Kalshi (we read spot+time live; their book lags).
         if (yesPrice > 0 && yesPrice < 1) p = blendNearExpiry(p, yesPrice, minsRemaining, tentativeSide);
 
-        // ── TA-IN-PROBABILITY BLEND REMOVED (2026-07-22 rollback) ──
-        // Blending ta_score_v2 into model_prob (±25pt shift) broke calibration:
-        // the 70–85% confidence bucket collapsed from ~60% WR to ~25% WR after
-        // it went live. TA is now consumed as a VETO only (see entry gate
-        // post-processing below). Fields are still populated for display.
+
 
 
         const rawEdgePts = (p - yesPrice) * 100;
