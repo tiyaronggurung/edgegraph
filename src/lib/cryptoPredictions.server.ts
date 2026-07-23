@@ -94,9 +94,16 @@ async function priceAt(unixSec: number): Promise<number | null> {
 
 export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
   try {
+    // Do not freeze the displayed "Model Pick" from the first seconds after
+    // open. That was the UP-bias leak: a tiny opening spot>strike delta got
+    // locked for the whole 15m window. Freeze it only once the 6-minute fight
+    // window starts; until then the UI can show it as pending/blank.
+    const shouldLockModelSide = input.secondsToClose <= 540;
+    const modelSideForWrite = shouldLockModelSide ? (input.modelSidePreStudy ?? input.side) : null;
+
     const { data: existing } = await supabaseAdmin
       .from("btc_model_predictions")
-      .select("id, snapshot_seconds_to_close, outcome, side, live_side, flip_count")
+      .select("id, snapshot_seconds_to_close, outcome, side, live_side, flip_count, model_side_pre_study")
       .eq("ticker", input.ticker)
       .maybeSingle();
 
@@ -139,7 +146,7 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         physics_prob: input.physicsProb ?? null,
         independent_prob: input.independentProb ?? null,
         jump_features: (input.jumpFeatures ?? null) as never,
-        model_side_pre_study: input.modelSidePreStudy ?? input.side,
+        model_side_pre_study: modelSideForWrite,
         study_locked_side: input.studyLockedSide ?? null,
       });
 
@@ -181,6 +188,7 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         physics_prob: input.physicsProb ?? null,
         independent_prob: input.independentProb ?? null,
         jump_features: (input.jumpFeatures ?? null) as never,
+        ...(modelSideForWrite && !existing.model_side_pre_study ? { model_side_pre_study: modelSideForWrite } : {}),
         ...(input.studyLockedSide ? { study_locked_side: input.studyLockedSide } : {}),
 
 
@@ -337,12 +345,20 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
     .limit(500);
 
   const all = rows ?? [];
+  const displaySideOf = (r: { side: unknown; study_locked_side?: unknown }): "YES" | "NO" => {
+    const studySide = r.study_locked_side === "YES" || r.study_locked_side === "NO" ? r.study_locked_side : null;
+    return (studySide ?? r.side) as "YES" | "NO";
+  };
+  const displayWasCorrect = (r: { outcome: unknown; side: unknown; study_locked_side?: unknown }): boolean | null => {
+    if (r.outcome !== "YES" && r.outcome !== "NO") return null;
+    return r.outcome === displaySideOf(r);
+  };
   const settledAll = all.filter(r => r.outcome);
-  const correctAll = settledAll.filter(r => r.was_correct).length;
+  const correctAll = settledAll.filter(r => displayWasCorrect(r)).length;
   const in24 = settledAll.filter(r => (r.close_time as string) >= since24h);
-  const correct24 = in24.filter(r => r.was_correct).length;
+  const correct24 = in24.filter(r => displayWasCorrect(r)).length;
   const in12 = settledAll.filter(r => (r.close_time as string) >= since12h);
-  const correct12 = in12.filter(r => r.was_correct).length;
+  const correct12 = in12.filter(r => displayWasCorrect(r)).length;
 
   return {
     total: all.length,
@@ -368,13 +384,13 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
     },
     recent: all.map(r => ({
       ticker: r.ticker as string,
-      side: r.side as "YES" | "NO",
+      side: displaySideOf(r),
       strike: Number(r.strike),
       modelProb: Number(r.model_prob),
       marketYesPrice: Number(r.market_yes_price),
       edgePts: Number(r.edge_pts),
       outcome: (r.outcome as "YES" | "NO" | null) ?? null,
-      wasCorrect: (r.was_correct as boolean | null) ?? null,
+      wasCorrect: displayWasCorrect(r),
       settlePrice: r.settle_price != null ? Number(r.settle_price) : null,
       closeTime: r.close_time as string,
       settledAt: (r.settled_at as string | null) ?? null,
@@ -393,7 +409,7 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
       taVwapRejUp: Boolean(r.ta_vwap_rej_up),
       taVwapRejDown: Boolean(r.ta_vwap_rej_down),
       taEngineVersion: (r.ta_engine_version as string | null) ?? null,
-      modelSidePreStudy: ((r as { model_side_pre_study?: string | null }).model_side_pre_study as "YES" | "NO" | null) ?? (r.side as "YES" | "NO" | null) ?? null,
+      modelSidePreStudy: ((r as { model_side_pre_study?: string | null }).model_side_pre_study as "YES" | "NO" | null) ?? null,
       studyLockedSide: ((r as { study_locked_side?: string | null }).study_locked_side as "YES" | "NO" | null) ?? null,
     })),
   };
