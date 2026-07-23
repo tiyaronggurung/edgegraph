@@ -19,7 +19,7 @@ import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
 import { MultiTfShadowPanel } from "@/components/MultiTfShadowPanel";
-import { TrendlineChartPanel } from "@/components/crypto/TrendlineChartPanel";
+const TrendlineChartPanel = lazy(() => import("@/components/crypto/TrendlineChartPanel").then(m => ({ default: m.TrendlineChartPanel })));
 import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
 import { NextStakeBanner } from "@/components/crypto/NextStakeBanner";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
