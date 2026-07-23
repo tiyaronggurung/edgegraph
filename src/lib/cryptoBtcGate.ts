@@ -137,7 +137,7 @@ export const CHASE_MIN_PROB = 0.93;
 
 
 export function evaluateGate(input: GateInput): GateResult {
-  const { side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap, sideConf, liveFlipped, spot, strike, lossStreak } = input;
+  const { side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap, sideConf, liveFlipped, spot, strike, lossStreak, prevOutcome1, prevOutcome2 } = input;
   const pinRiskFloor = pinRiskFloorSigmas(secondsToClose);
   const currentlyWinning = gap.needsDirection === "hold";
 
