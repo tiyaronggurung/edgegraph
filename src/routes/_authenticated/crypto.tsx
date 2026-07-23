@@ -1237,6 +1237,21 @@ function ModelAccuracyPanel() {
                           )}
                         </td>
                         <td className="p-2">
+                          {(() => {
+                            const mp = (r as { modelSidePreStudy?: "YES" | "NO" | null }).modelSidePreStudy ?? r.side;
+                            const mpCorrect: boolean | null = r.wasCorrect == null
+                              ? null
+                              : (r.side === mp ? r.wasCorrect : !r.wasCorrect);
+                            return (
+                              <>
+                                <span className={mp === "YES" ? "text-emerald-400" : "text-red-400"} title="Model Pick — original raw model side frozen at first snapshot; never overridden by Study">{dirLabel(mp)}</span>
+                                {mpCorrect === true && <span className="ml-1 text-[10px] text-emerald-400">✓</span>}
+                                {mpCorrect === false && <span className="ml-1 text-[10px] text-red-400">✗</span>}
+                              </>
+                            );
+                          })()}
+                        </td>
+                        <td className="p-2">
                           {isStudying ? (
                             <span className="text-muted-foreground text-[10px]">—</span>
                           ) : (
