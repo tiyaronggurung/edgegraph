@@ -24,6 +24,7 @@ export const Route = createFileRoute("/api/public/hooks/market-context-tick")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         // Anon-key gate (matches other cron routes).
         const authHeader = request.headers.get("authorization") ?? request.headers.get("apikey");
         if (!authHeader) {

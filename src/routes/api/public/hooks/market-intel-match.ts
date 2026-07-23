@@ -6,7 +6,8 @@ import { verifyCronRequest } from "@/lib/cronAuth";
 export const Route = createFileRoute("/api/public/hooks/market-intel-match")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const graceMinutes = 5;

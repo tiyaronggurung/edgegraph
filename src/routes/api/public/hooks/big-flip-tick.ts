@@ -10,7 +10,8 @@ import { verifyCronRequest } from "@/lib/cronAuth";
 export const Route = createFileRoute("/api/public/hooks/big-flip-tick")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const t0 = Date.now();
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { runBigFlipForUser } = await import("@/lib/bigFlipDetector.functions");

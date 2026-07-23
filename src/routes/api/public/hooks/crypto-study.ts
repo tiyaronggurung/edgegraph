@@ -333,6 +333,7 @@ export const Route = createFileRoute("/api/public/hooks/crypto-study")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const apikey = request.headers.get("apikey") ?? "";
         const expected = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
         if (!apikey || apikey !== expected) {

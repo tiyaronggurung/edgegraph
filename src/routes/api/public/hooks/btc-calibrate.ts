@@ -37,7 +37,8 @@ function sigDistFrom(row: {
 export const Route = createFileRoute("/api/public/hooks/btc-calibrate")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const { data: rows, error } = await supabaseAdmin

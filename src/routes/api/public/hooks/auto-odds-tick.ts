@@ -45,7 +45,8 @@ function isKalshiMaintenanceWindow(d: Date = new Date()): boolean {
 export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         if (isKalshiMaintenanceWindow()) {
           return Response.json({ ok: true, skipped: "kalshi_maintenance" });
         }

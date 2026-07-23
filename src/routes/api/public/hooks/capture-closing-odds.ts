@@ -98,7 +98,8 @@ function fairProbsForEvent(ev: OddsEvent): { home: number; away: number } | null
 export const Route = createFileRoute("/api/public/hooks/capture-closing-odds")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const apiKey = process.env.ODDS_API_KEY;
         if (!apiKey) {
           return Response.json({ ok: false, error: "ODDS_API_KEY missing" }, { status: 500 });
