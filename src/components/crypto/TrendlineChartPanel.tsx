@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Zap } from "lucide-react";
 import { evalTrendlineShadow, type TrendlineSnapshot } from "@/lib/trendlineShadow.functions";
+import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
 import { getBtcCandles, TF_LIST, type CandleTf } from "@/lib/btcCandles.functions";
 import { detectSpike, detectTrendlines, type TCandle } from "@/lib/ta/trendlines";
 import { emaSeries, rsi, macd, bollinger, sessionVwap } from "@/lib/ta/taEngine";
@@ -47,6 +48,16 @@ export function TrendlineChartPanel() {
   const [fibOn, setFibOn] = useState(true);
   const evalFn = useServerFn(evalTrendlineShadow);
   const candlesFn = useServerFn(getBtcCandles);
+  const kalshiFn = useServerFn(getKalshiImpliedSpot);
+
+  const { data: kalshi } = useQuery({
+    queryKey: ["kalshi-implied-spot"],
+    queryFn: () => kalshiFn(),
+    refetchInterval: 5_000,
+    staleTime: 4_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+  });
 
   // Strike / wedge / spike metadata — only meaningful on 1m; keep the existing shadow query.
   const { data: shadow, isFetching: shadowFetching, refetch: refetchShadow } = useQuery<TrendlineSnapshot>({
@@ -92,6 +103,39 @@ export function TrendlineChartPanel() {
           <span className="text-[11px] uppercase tracking-wider text-white/60">
             BTC {TF_LABEL[tf]} · TA v2 · Trendlines
           </span>
+          {(() => {
+            const ours = shadow?.spot ?? null;
+            const k = kalshi?.impliedSpot ?? null;
+            const diff = ours != null && k != null ? ours - k : null;
+            const diffCls =
+              diff == null ? "text-white/40" :
+              Math.abs(diff) < 5 ? "text-white/50" :
+              diff > 0 ? "text-emerald-300" : "text-rose-300";
+            return (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded border border-cyan-500/40 bg-cyan-500/10 text-cyan-200 font-mono flex items-center gap-1.5"
+                title={
+                  kalshi?.ok
+                    ? `Kalshi ${kalshi.ticker} · YES mid ${((kalshi.yesMid ?? 0) * 100).toFixed(1)}¢ · strike $${kalshi.strike?.toFixed(0)} · ${kalshi.secondsToClose}s to close · implied spot inverted from YES prob via Φ⁻¹`
+                    : `Kalshi implied spot unavailable${kalshi?.error ? ` — ${kalshi.error}` : ""}`
+                }
+              >
+                <span className="text-white/50">Kalshi</span>
+                <span className="tabular-nums">
+                  {k != null ? `$${k.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+                </span>
+                <span className="text-white/40">vs ours</span>
+                <span className="tabular-nums">
+                  {ours != null ? `$${ours.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+                </span>
+                {diff != null && (
+                  <span className={`tabular-nums ${diffCls}`}>
+                    {diff >= 0 ? "+" : ""}${diff.toFixed(1)}
+                  </span>
+                )}
+              </span>
+            );
+          })()}
           {tf === "1m" && shadow?.isWedge && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
               WEDGE · {shadow.wedgeBias?.toUpperCase()}
