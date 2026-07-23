@@ -36,8 +36,8 @@ export function TrendlineChartPanel() {
   const { data, isFetching, refetch } = useQuery<TrendlineSnapshot>({
     queryKey: ["trendline-shadow"],
     queryFn: () => evalFn(),
-    refetchInterval: 60_000,
-    staleTime: 30_000,
+    refetchInterval: 10_000,
+    staleTime: 5_000,
   });
 
   const [visible, setVisible] = useState<Record<string, boolean>>(() =>
