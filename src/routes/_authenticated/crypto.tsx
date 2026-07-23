@@ -19,7 +19,7 @@ import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
 import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
 import { MultiTfShadowPanel } from "@/components/MultiTfShadowPanel";
-import { TrendlineChartPanel } from "@/components/crypto/TrendlineChartPanel";
+const TrendlineChartPanel = lazy(() => import("@/components/crypto/TrendlineChartPanel").then(m => ({ default: m.TrendlineChartPanel })));
 import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
 import { NextStakeBanner } from "@/components/crypto/NextStakeBanner";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
@@ -3947,8 +3947,20 @@ function CryptoPage() {
       {/* Multi-TF shadow (pure logging, no live impact) */}
       <MultiTfShadowPanel />
 
-      {/* Trendline + spike detector (shadow only) */}
-      <TrendlineChartPanel />
+      {/* Trendline + spike detector (shadow only) — lazy-mounted to speed up initial page load */}
+      <LazyOnVisible minHeight={520} rootMargin="200px" fallback={
+        <div className="border border-border rounded-lg bg-card p-6" style={{ minHeight: 520 }}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="h-4 w-48 bg-muted animate-pulse rounded" />
+            <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+          </div>
+          <div className="h-[420px] w-full bg-muted/40 animate-pulse rounded flex items-center justify-center text-xs text-muted-foreground">
+            Loading BTC trendline chart…
+          </div>
+        </div>
+      }>
+        <TrendlineChartPanel />
+      </LazyOnVisible>
 
 
 
