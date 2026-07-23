@@ -91,6 +91,11 @@ export interface GateInput {
   // kills the 17% `near_strike_flip` autopsy bucket (last-minute chop).
   spot?: number;
   strike?: number;
+  // Count of consecutive settled losses immediately preceding this snapshot,
+  // fed by the snapshot loop. 48h data (n=178) shows WR drops from 50%
+  // baseline to 41% after 2 straight losses; 3+ streaks stay depressed.
+  // Optional so unit tests and old call sites still work.
+  lossStreak?: number;
 }
 
 
