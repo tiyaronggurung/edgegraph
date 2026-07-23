@@ -4259,6 +4259,45 @@ export type Database = {
       }
     }
     Views: {
+      btc_ta_reblend_shadow: {
+        Row: {
+          close_time: string | null
+          model_prob: number | null
+          outcome: string | null
+          shadow_model_prob: number | null
+          shadow_side_conf: number | null
+          side: string | null
+          snapshot_seconds_to_close: number | null
+          ta_score: number | null
+          ticker: string | null
+          was_correct: boolean | null
+        }
+        Insert: {
+          close_time?: string | null
+          model_prob?: number | null
+          outcome?: string | null
+          shadow_model_prob?: never
+          shadow_side_conf?: never
+          side?: string | null
+          snapshot_seconds_to_close?: number | null
+          ta_score?: number | null
+          ticker?: string | null
+          was_correct?: boolean | null
+        }
+        Update: {
+          close_time?: string | null
+          model_prob?: number | null
+          outcome?: string | null
+          shadow_model_prob?: never
+          shadow_side_conf?: never
+          side?: string | null
+          snapshot_seconds_to_close?: number | null
+          ta_score?: number | null
+          ticker?: string | null
+          was_correct?: boolean | null
+        }
+        Relationships: []
+      }
       v_market_intel_alerts: {
         Row: {
           alert_cadence_high: boolean | null

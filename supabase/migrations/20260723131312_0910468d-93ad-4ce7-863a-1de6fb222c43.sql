@@ -1,0 +1,1 @@
+ALTER VIEW public.btc_ta_reblend_shadow SET (security_invoker = true);
