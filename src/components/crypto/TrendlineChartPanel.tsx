@@ -195,7 +195,75 @@ function TaChart({
   const PAD_L = 52, PAD_R = 72, PAD_T = 10, PAD_B = 6;
   const CANDLE_W = candleW;
   const FUTURE_SLOTS = 30; // empty room to the right of the last candle for upcoming candles
-...
+
+  const computed = useMemo(() => {
+    if (!data || data.candles.length === 0) return null;
+    const candles = data.candles;
+    const closes = candles.map(c => c.c);
+    const cAsCandle: Candle[] = candles.map(c => ({
+      t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: c.v ?? 1,
+    }));
+
+    const e9   = emaSeries(closes, 9);
+    const e21  = emaSeries(closes, 21);
+    const e55  = closes.length >= 60  ? emaSeries(closes, 55)  : null;
+    const e145 = closes.length >= 150 ? emaSeries(closes, 145) : null;
+    const e169 = closes.length >= 170 ? emaSeries(closes, 169) : null;
+
+    const vwapSeries: (number | null)[] = candles.map((_, i) =>
+      i < 1 ? null : sessionVwap(cAsCandle.slice(0, i + 1))
+    );
+
+    const bbUpper: (number | null)[] = [];
+    const bbLower: (number | null)[] = [];
+    for (let i = 0; i < closes.length; i++) {
+      if (i < 19) { bbUpper.push(null); bbLower.push(null); continue; }
+      const bb = bollinger(closes.slice(0, i + 1), 20, 2);
+      bbUpper.push(bb ? bb.upper : null);
+      bbLower.push(bb ? bb.lower : null);
+    }
+
+    const trend = detectTrendlines(candles);
+    const spikeFlags: boolean[] = candles.map((_, i) => {
+      if (i < 21) return false;
+      const slice = candles.slice(0, i + 1);
+      const t2 = detectTrendlines(slice);
+      const s = detectSpike(slice, t2);
+      return s.detected;
+    });
+
+    const rsiSeries: (number | null)[] = closes.map((_, i) =>
+      i < 14 ? null : rsi(closes.slice(0, i + 1), 14)
+    );
+
+    const macdHist: (number | null)[] = [];
+    for (let i = 0; i < closes.length; i++) {
+      if (i < 35) { macdHist.push(null); continue; }
+      const m = macd(closes.slice(0, i + 1));
+      macdHist.push(m ? m.hist : null);
+    }
+
+    const highs = candles.map(c => c.h);
+    const lows  = candles.map(c => c.l);
+    const extras: number[] = [];
+    for (const arr of [e9, e21, e55 ?? [], e145 ?? [], e169 ?? []]) extras.push(...arr);
+    for (const v of vwapSeries) if (v != null) extras.push(v);
+    for (const v of bbUpper) if (v != null) extras.push(v);
+    for (const v of bbLower) if (v != null) extras.push(v);
+    if (data.strike != null) extras.push(data.strike);
+    if (data.upperAtNow != null) extras.push(data.upperAtNow);
+    if (data.lowerAtNow != null) extras.push(data.lowerAtNow);
+    let pMin = Math.min(...lows, ...extras);
+    let pMax = Math.max(...highs, ...extras);
+    const pad = (pMax - pMin) * 0.04;
+    pMin -= pad; pMax += pad;
+
+    return {
+      candles, e9, e21, e55, e145, e169, vwapSeries, bbUpper, bbLower,
+      rsiSeries, macdHist, trend, spikeFlags, pMin, pMax,
+    };
+  }, [data]);
+
   // Snap to the right only when the candle count changes (new data),
   // NOT on zoom or every render.
   const prevCountRef = useRef(0);
