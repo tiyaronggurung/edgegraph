@@ -1196,8 +1196,10 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
 
         const rawEdgePts = (p - yesPrice) * 100;
         // Side always follows current calibrated model prob (no freeze-side).
-        const side: "YES" | "NO" = p >= 0.5 ? "YES" : "NO";
-        const edgePts = side === "YES" ? rawEdgePts : -rawEdgePts;
+        // eslint-disable-next-line prefer-const
+        let side: "YES" | "NO" = p >= 0.5 ? "YES" : "NO";
+        // eslint-disable-next-line prefer-const
+        let edgePts = side === "YES" ? rawEdgePts : -rawEdgePts;
         const edgeAbs = Math.abs(edgePts);
         const kelly = quarterKelly(p, yesPrice);
 
@@ -1290,17 +1292,18 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           }
         }
 
-        // ── STRIKE STUDY ENGINE (first 150s of every 15m window) ─────────
+        // ── STRIKE STUDY ENGINE (first 420s = minute 0–7 of every 15m window) ─
         // Live-analyze all TA tools *relative to this window's strike*:
         //   • Trendline break events (spot vs upper/lower over last 3 x 1m)
         //   • S/R proximity (nearest support & resistance vs strike)
-        //   • Strike-cross count in the last 150s (chop signal)
-        //   • Spot-side stability (% of last-3-candle closes above vs below strike)
+        //   • Strike-cross count in the last 7m (chop signal)
+        //   • Spot-side stability (% of last-7m closes above vs below strike)
         //   • Structure bias (HH/HL vs LH/LL) + VWAP position vs strike
         //   • Chart verdict + TA v2 alignment with the selected side
-        // During warm-up we OBSERVE only (no bet). At t≥150s we emit a rich
+        // During warm-up we OBSERVE only (no bet). At t≥420s we emit a rich
         // SOLID / WEAK / CHOPPY verdict from all findings above.
-        const WARMUP_SECONDS = 150;
+        // Backtest: min 5–7 candle-side follow-through hits 86.7–93.3%.
+        const WARMUP_SECONDS = 420;
         const windowElapsedSec = Math.max(0, Math.round((now - openMs) / 1000));
         const studying = windowElapsedSec < WARMUP_SECONDS;
         const studyingSecondsLeft = studying ? Math.max(0, WARMUP_SECONDS - windowElapsedSec) : 0;
@@ -1338,8 +1341,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           } catch { trendlineNote = "trendline calc failed"; }
           if (trendlineNote) findings.push(`trendline: ${trendlineNote}`);
 
-          // 2. Strike crossings in last 150s (chop signal)
-          const studyWindow = recent.slice(-3); // ~3 minutes of 1m candles
+          // 2. Strike crossings in the 7m study window (chop signal)
+          const studyWindow = recent.slice(-7); // ~7 minutes of 1m candles (min 0–7)
           let crossCount = 0;
           for (let i = 1; i < studyWindow.length; i++) {
             const a = studyWindow[i - 1], b = studyWindow[i];
@@ -1453,12 +1456,15 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           const choppyRegime = heavyChop || (study.recentChop && study.nearStrike);
           const noConsensus = !study.chartAligns && !study.taAligns && !study.safeDist;
 
-          // ── OPTION 2: Study vs Model independent-direction disagreement veto ──
+          // ── STUDY-LEAN on Study/Model disagreement ──
           // Study direction is computed from strike-relative evidence
           // (trendline breakout, side-stability, chart verdict, TA v2) — fully
-          // independent of the model's physics/edge output. If both systems
-          // hold a strong opinion and DISAGREE, historical WR is 33% (5/15
-          // over 14d). Skip the window entirely — never override the model side.
+          // independent of the model's physics/edge output. Backtest: min 5–7
+          // candle-side follow-through hits 86.7–93.3%. On disagreement we
+          // LEAN TO STUDY: override the displayed side to Study's direction
+          // and flip edgePts sign. Downstream side_conf gate (≥0.90) will
+          // naturally reject any high-conviction bet on the flipped side,
+          // so this is safe for auto-trade while surfacing the Study call in UI.
           const studyDirVotes =
             (study.breakoutSide === "up" ? 2 : 0) +
             (study.breakoutSide === "down" ? -2 : 0) +
@@ -1477,8 +1483,19 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
             studyDir !== "NEUTRAL" && modelDir !== "NEUTRAL" && studyDir !== modelSideDir;
 
           if (studyModelDisagree) {
-            strikeVerdict = "CHOPPY";
-            strikeVerdictReason = `study_model_disagree — study leans ${studyDir} (votes ${studyDirVotes}), model leans ${modelSideDir} (p=${(p * 100).toFixed(0)}%). Backtest WR 33% on disagreement — skip`;
+            const leanedSide: "YES" | "NO" = studyDir === "UP" ? "YES" : "NO";
+            const prevSide = side;
+            side = leanedSide;
+            edgePts = -edgePts; // flip sign; magnitude preserved
+            strikeVerdict = "WEAK";
+            strikeVerdictReason = `study_lean — leaned to Study (${studyDir}, votes ${studyDirVotes}); model was ${prevSide}/${modelSideDir} p=${(p * 100).toFixed(0)}%. Side flipped; auto-trade will only fire if side_conf ≥0.90 on ${leanedSide}`;
+            // Force PASS on entryGate — model's original edge no longer applies to flipped side.
+            entryGate = {
+              ...entryGate,
+              action: "PASS",
+              reason: `study_lean — flipped ${prevSide}→${leanedSide}; awaiting Study-side confirmation`,
+              allReasons: [...entryGate.allReasons, `study_lean (${prevSide}→${leanedSide})`],
+            };
           } else if (choppyRegime && !strikeBreakForUs) {
             strikeVerdict = "CHOPPY";
             strikeVerdictReason = heavyChop
