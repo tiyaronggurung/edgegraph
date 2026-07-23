@@ -1453,7 +1453,33 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           const choppyRegime = heavyChop || (study.recentChop && study.nearStrike);
           const noConsensus = !study.chartAligns && !study.taAligns && !study.safeDist;
 
-          if (choppyRegime && !strikeBreakForUs) {
+          // ── OPTION 2: Study vs Model independent-direction disagreement veto ──
+          // Study direction is computed from strike-relative evidence
+          // (trendline breakout, side-stability, chart verdict, TA v2) — fully
+          // independent of the model's physics/edge output. If both systems
+          // hold a strong opinion and DISAGREE, historical WR is 33% (5/15
+          // over 14d). Skip the window entirely — never override the model side.
+          const studyDirVotes =
+            (study.breakoutSide === "up" ? 2 : 0) +
+            (study.breakoutSide === "down" ? -2 : 0) +
+            (study.sideStable && study.stableSide === "above" ? 2 : 0) +
+            (study.sideStable && study.stableSide === "below" ? -2 : 0) +
+            (cvDir === "YES" && cvConf >= 0.6 ? 1 : 0) +
+            (cvDir === "NO"  && cvConf >= 0.6 ? -1 : 0) +
+            (study.taScoreVal >= 25 ? 1 : 0) +
+            (study.taScoreVal <= -25 ? -1 : 0);
+          const studyDir: "UP" | "DOWN" | "NEUTRAL" =
+            studyDirVotes >= 2 ? "UP" : studyDirVotes <= -2 ? "DOWN" : "NEUTRAL";
+          const modelDir: "UP" | "DOWN" | "NEUTRAL" =
+            p >= 0.60 ? "UP" : p <= 0.40 ? "DOWN" : "NEUTRAL";
+          const modelSideDir: "UP" | "DOWN" = side === "YES" ? "UP" : "DOWN";
+          const studyModelDisagree =
+            studyDir !== "NEUTRAL" && modelDir !== "NEUTRAL" && studyDir !== modelSideDir;
+
+          if (studyModelDisagree) {
+            strikeVerdict = "CHOPPY";
+            strikeVerdictReason = `study_model_disagree — study leans ${studyDir} (votes ${studyDirVotes}), model leans ${modelSideDir} (p=${(p * 100).toFixed(0)}%). Backtest WR 33% on disagreement — skip`;
+          } else if (choppyRegime && !strikeBreakForUs) {
             strikeVerdict = "CHOPPY";
             strikeVerdictReason = heavyChop
               ? `${study.crossCount} strike-cross${study.crossCount === 1 ? "" : "es"} + ${study.straddleCount} straddle candle${study.straddleCount === 1 ? "" : "s"} during study → chop regime`
