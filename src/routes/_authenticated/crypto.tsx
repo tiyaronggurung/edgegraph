@@ -92,6 +92,15 @@ export const Route = createFileRoute("/_authenticated/crypto")({
     context.queryClient.prefetchQuery({ queryKey: ["crypto-trades"], queryFn: () => listMyCryptoTrades() }).catch(() => {});
     context.queryClient.prefetchQuery({ queryKey: ["btc-markets"], queryFn: () => getBtcMarkets() }).catch(() => {});
     context.queryClient.prefetchQuery({ queryKey: ["btc-pred-stats"], queryFn: () => getPredictionStats() }).catch(() => {});
+    // Prefetch the trendline/candle snapshot so the chart is warm before the
+    // lazy panel scrolls into view. 25s staleTime matches the panel's config.
+    import("@/lib/trendlineShadow.functions").then(({ evalTrendlineShadow }) =>
+      context.queryClient.prefetchQuery({
+        queryKey: ["trendline-shadow"],
+        queryFn: () => evalTrendlineShadow(),
+        staleTime: 25_000,
+      }).catch(() => {})
+    ).catch(() => {});
   },
   component: CryptoPage,
 });
