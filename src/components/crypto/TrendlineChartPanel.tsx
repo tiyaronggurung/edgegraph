@@ -311,12 +311,18 @@ function TaChart({
             <line key={i} x1={PAD_L} y1={t.y} x2={innerW - PAD_R} y2={t.y}
               stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
           ))}
-          {/* y-axis labels — sticky-ish: painted at left of scroll area */}
+          {/* y-axis labels — right side (primary, like TradingView) + faint left mirror */}
           {priceTicks.map((t, i) => (
-            <text key={`l${i}`} x={4} y={t.y + 3} fill="rgba(255,255,255,0.45)"
-              fontSize={10} fontFamily="monospace">
-              ${t.p.toFixed(0)}
-            </text>
+            <g key={`l${i}`}>
+              <text x={4} y={t.y + 3} fill="rgba(255,255,255,0.25)"
+                fontSize={10} fontFamily="monospace">
+                ${t.p.toFixed(0)}
+              </text>
+              <text x={innerW - PAD_R + 6} y={t.y + 3} fill="rgba(255,255,255,0.6)"
+                fontSize={10} fontFamily="monospace">
+                ${t.p.toFixed(2)}
+              </text>
+            </g>
           ))}
 
           {/* candles */}
