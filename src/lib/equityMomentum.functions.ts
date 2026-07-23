@@ -164,5 +164,6 @@ export async function computeEquitySignal(): Promise<EquitySignalResult> {
 }
 
 export const getEquitySignal = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .handler(async (): Promise<EquitySignalResult> => computeEquitySignal());
 
