@@ -267,6 +267,26 @@ export async function runBigFlipForUser(
     return { ...base, toSide: cheapSide, modelSideConf: modelProb, rejectReason: "KALSHI_LIVE_ENABLED not true" };
   }
 
+  // --- BRR-LEAD SHADOW (log every candidate that reached model agreement) --
+  const lead = await computeBrrLead(supabase, cheapSide, Number(tape.spot));
+  const shadowId = await insertLeadShadow(supabase, {
+    user_id: userId,
+    ticker,
+    cheap_side: cheapSide,
+    cheap_ask_cents: cheapAsk,
+    model_side: modelSide,
+    model_prob: modelProb,
+    spot: tape.spot,
+    strike: tape.strike,
+    seconds_to_close: stc,
+    brr_proxy: lead.brrProxy,
+    brr_sample_count: lead.sampleCount,
+    lead_delta: lead.leadDelta,
+    gate_decision: lead.decision,
+    gate_reason: lead.reason,
+    live_fired: false,
+  });
+
   // -----------------------------------------------------------------------
   // ALL GATES PASSED — fire LIVE Kalshi IOC $10 buy.
   // -----------------------------------------------------------------------
