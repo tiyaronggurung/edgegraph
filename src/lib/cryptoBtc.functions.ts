@@ -1341,8 +1341,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           } catch { trendlineNote = "trendline calc failed"; }
           if (trendlineNote) findings.push(`trendline: ${trendlineNote}`);
 
-          // 2. Strike crossings in last 150s (chop signal)
-          const studyWindow = recent.slice(-3); // ~3 minutes of 1m candles
+          // 2. Strike crossings in the 7m study window (chop signal)
+          const studyWindow = recent.slice(-7); // ~7 minutes of 1m candles (min 0–7)
           let crossCount = 0;
           for (let i = 1; i < studyWindow.length; i++) {
             const a = studyWindow[i - 1], b = studyWindow[i];
