@@ -1848,6 +1848,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               physicsProb: m.physicsProb,
               independentProb: m.independentProb,
               jumpFeatures: jumpByTicker.get(m.ticker),
+              modelSidePreStudy: m.modelSidePreStudy,
+              studyLockedSide: m.studyLockedSide,
             })),
         );
 
