@@ -1460,15 +1460,15 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           const choppyRegime = heavyChop || (study.recentChop && study.nearStrike);
           const noConsensus = !study.chartAligns && !study.taAligns && !study.safeDist;
 
-          // ── STUDY-LEAN on Study/Model disagreement ──
-          // Study direction is computed from strike-relative evidence
-          // (trendline breakout, side-stability, chart verdict, TA v2) — fully
-          // independent of the model's physics/edge output. Backtest: min 5–7
-          // candle-side follow-through hits 86.7–93.3%. On disagreement we
-          // LEAN TO STUDY: override the displayed side to Study's direction
-          // and flip edgePts sign. Downstream side_conf gate (≥0.90) will
-          // naturally reject any high-conviction bet on the flipped side,
-          // so this is safe for auto-trade while surfacing the Study call in UI.
+          // ── FIGHT WINDOW: P_study (past) vs P_model (future) ──
+          // Fight begins at min 6:00 (T+360s) and locks at min 7:00 (T+420s).
+          // Instead of always overriding on disagreement, compare the actual
+          // probability each side has of being right:
+          //   P_study = weighted score of what already HAPPENED in min 0–7
+          //             (side stability, strike-touch, TA & chart alignment)
+          //   P_model = current model_prob mapped to the study direction
+          //             (represents what's still YET to happen in ~8 min left)
+          // Whichever probability is higher wins the lock. Both < 0.55 → CHOPPY.
           const studyDirVotes =
             (study.breakoutSide === "up" ? 2 : 0) +
             (study.breakoutSide === "down" ? -2 : 0) +
@@ -1483,24 +1483,66 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           const modelDir: "UP" | "DOWN" | "NEUTRAL" =
             p >= 0.60 ? "UP" : p <= 0.40 ? "DOWN" : "NEUTRAL";
           const modelSideDir: "UP" | "DOWN" = side === "YES" ? "UP" : "DOWN";
+
+          // Score P_study for the studyDir side (0–1). Only computed when
+          // studyDir has a direction; NEUTRAL means Study abstains.
+          const scoreForDir = (dir: "UP" | "DOWN"): number => {
+            const N = Math.max(1, study.studyLen);
+            const stab = dir === "UP" ? study.aboveCount / N : study.belowCount / N;
+            const noStraddle = 1 - Math.min(1, study.straddleCount / N);
+            const taAlign = dir === "UP"
+              ? Math.max(0, Math.min(1, study.taScoreVal / 100))
+              : Math.max(0, Math.min(1, -study.taScoreVal / 100));
+            const chartAlign =
+              (dir === "UP" && cvDir === "YES") || (dir === "DOWN" && cvDir === "NO")
+                ? cvConf : 0;
+            const breakBonus =
+              (dir === "UP" && study.breakoutSide === "up") ||
+              (dir === "DOWN" && study.breakoutSide === "down")
+                ? 0.10 : 0;
+            const raw = 0.35 * stab + 0.25 * noStraddle + 0.20 * taAlign + 0.20 * chartAlign + breakBonus;
+            return Math.max(0, Math.min(1, raw));
+          };
+
+          const pStudy = studyDir === "NEUTRAL" ? 0 : scoreForDir(studyDir);
+          // Map current model_prob onto studyDir's side for apples-to-apples
+          const pModelForStudyDir = studyDir === "UP" ? p : studyDir === "DOWN" ? (1 - p) : 0;
+          // Also compute P_model for its own direction (used when Study abstains)
+          const pModelForModelDir = modelSideDir === "UP" ? p : (1 - p);
+
+          const inFightWindow = windowElapsedSec >= 360 && windowElapsedSec <= 405;
           const studyModelDisagree =
             studyDir !== "NEUTRAL" && modelDir !== "NEUTRAL" && studyDir !== modelSideDir;
 
+          // FIGHT: only resolve when Study has an opinion AND disagrees.
           if (studyModelDisagree) {
-            const leanedSide: "YES" | "NO" = studyDir === "UP" ? "YES" : "NO";
-            const prevSide = side;
-            side = leanedSide;
-            edgePts = -edgePts; // flip sign; magnitude preserved
-            strikeVerdict = "WEAK";
-            strikeVerdictReason = `study_lean — leaned to Study (${studyDir}, votes ${studyDirVotes}); model was ${prevSide}/${modelSideDir} p=${(p * 100).toFixed(0)}%. Side flipped; auto-trade will only fire if side_conf ≥0.90 on ${leanedSide}`;
-            // Force PASS on entryGate — model's original edge no longer applies to flipped side.
-            entryGate = {
-              ...entryGate,
-              action: "PASS",
-              reason: `study_lean — flipped ${prevSide}→${leanedSide}; awaiting Study-side confirmation`,
-              allReasons: [...entryGate.allReasons, `study_lean (${prevSide}→${leanedSide})`],
-            };
-          } else if (choppyRegime && !strikeBreakForUs) {
+            const bothWeak = pStudy < 0.55 && pModelForStudyDir < 0.55;
+            if (bothWeak) {
+              strikeVerdict = "CHOPPY";
+              strikeVerdictReason = `fight_window — both weak (P_study ${(pStudy*100).toFixed(0)}% vs P_model ${(pModelForStudyDir*100).toFixed(0)}% for ${studyDir}); no confident side`;
+            } else if (pStudy >= pModelForStudyDir) {
+              // Study wins the fight → lean to Study
+              const leanedSide: "YES" | "NO" = studyDir === "UP" ? "YES" : "NO";
+              const prevSide = side;
+              side = leanedSide;
+              edgePts = -edgePts;
+              strikeVerdict = "WEAK";
+              strikeVerdictReason = `fight_won_by_study — P_study ${(pStudy*100).toFixed(0)}% > P_model ${(pModelForStudyDir*100).toFixed(0)}% for ${studyDir}; flipped ${prevSide}→${leanedSide}. Fight ${inFightWindow ? "LIVE" : "locked"} at ${windowElapsedSec}s`;
+              entryGate = {
+                ...entryGate,
+                action: "PASS",
+                reason: `fight_won_by_study — flipped ${prevSide}→${leanedSide}; awaiting side_conf ≥0.90 on ${leanedSide}`,
+                allReasons: [...entryGate.allReasons, `fight_won_by_study (P_s ${(pStudy*100).toFixed(0)}% vs P_m ${(pModelForStudyDir*100).toFixed(0)}%)`],
+              };
+            } else {
+              // Model wins the fight → keep model side, but note the contest
+              strikeVerdict = "WEAK";
+              strikeVerdictReason = `fight_won_by_model — P_model ${(pModelForStudyDir*100).toFixed(0)}% > P_study ${(pStudy*100).toFixed(0)}% for ${studyDir}; kept ${side}/${modelSideDir} (model p=${(pModelForModelDir*100).toFixed(0)}%). Fight ${inFightWindow ? "LIVE" : "locked"} at ${windowElapsedSec}s`;
+            }
+          }
+
+          if (!studyModelDisagree) {
+
             strikeVerdict = "CHOPPY";
             strikeVerdictReason = heavyChop
               ? `${study.crossCount} strike-cross${study.crossCount === 1 ? "" : "es"} + ${study.straddleCount} straddle candle${study.straddleCount === 1 ? "" : "s"} during study → chop regime`
