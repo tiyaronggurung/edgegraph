@@ -486,7 +486,7 @@ function TaChart({
   const upper = c.trend.upper;
   const lower = c.trend.lower;
 
-  const fibList = useFibList(computed, scrollRef, fibOn, viewportTick, tf, CANDLE_W, PAD_L);
+  const fibList = fibListMemo;
 
 
   const onScroll = () => setViewportTick(v => (v + 1) & 0xffff);
