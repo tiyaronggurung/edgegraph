@@ -48,6 +48,31 @@ async function fetchBinance1m(limit = 300): Promise<TCandle[]> {
   });
 }
 
+// Coinbase Exchange fallback — Binance blocks Cloudflare Worker egress with 403.
+// Coinbase returns rows as [time, low, high, open, close, volume], NEWEST first.
+async function fetchCoinbase1m(limit = 300): Promise<TCandle[]> {
+  const end = Math.floor(Date.now() / 1000);
+  const start = end - limit * 60;
+  const url = `https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=60&start=${new Date(start * 1000).toISOString()}&end=${new Date(end * 1000).toISOString()}`;
+  const res = await fetch(url, { headers: { "User-Agent": "bettinggraph/1.0" } });
+  if (!res.ok) throw new Error(`coinbase ${res.status}`);
+  const raw = (await res.json()) as [number, number, number, number, number, number][];
+  return raw
+    .map((r) => ({ t: r[0] * 1000, o: r[3], h: r[2], l: r[1], c: r[4], v: r[5] }))
+    .sort((a, b) => a.t - b.t);
+}
+
+async function fetch1mCandles(limit = 300): Promise<{ candles: TCandle[]; source: string }> {
+  try {
+    const c = await fetchBinance1m(limit);
+    if (c.length) return { candles: c, source: "binance" };
+    throw new Error("binance empty");
+  } catch (e1) {
+    const c = await fetchCoinbase1m(limit);
+    return { candles: c, source: `coinbase (binance: ${(e1 as Error).message})` };
+  }
+}
+
 
 export const evalTrendlineShadow = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -64,7 +89,8 @@ export const evalTrendlineShadow = createServerFn({ method: "GET" })
 
     let candles: TCandle[];
     try {
-      candles = await fetchBinance1m(300);
+      const r = await fetch1mCandles(300);
+      candles = r.candles;
     } catch (e) {
       return { ...empty, error: (e as Error).message };
     }
