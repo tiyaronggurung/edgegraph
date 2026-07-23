@@ -372,47 +372,70 @@ function TaChart({
             />
           )}
 
-          {/* strike line — bold, labeled at both ends */}
+          {/* strike line — bold, labeled on BOTH ends with target price pill on right */}
           {data?.strike != null && data.strike >= c.pMin && data.strike <= c.pMax && (
             <>
               <line
                 x1={PAD_L} y1={yPrice(data.strike)}
                 x2={innerW - PAD_R} y2={yPrice(data.strike)}
-                stroke="rgb(56, 189, 248)" strokeWidth={1.5} strokeDasharray="6 4" opacity={0.9}
+                stroke="rgb(255,255,255)" strokeWidth={1.4} strokeDasharray="6 4" opacity={0.85}
               />
+              {/* left pill: STRIKE label */}
               <rect
                 x={PAD_L + 4} y={yPrice(data.strike) - 10}
-                width={92} height={16} rx={3}
-                fill="rgba(2, 132, 199, 0.85)"
+                width={110} height={16} rx={3}
+                fill="rgba(2, 132, 199, 0.9)"
               />
               <text
                 x={PAD_L + 10} y={yPrice(data.strike) + 2}
-                fill="white" fontSize={11} fontFamily="monospace" fontWeight={600}
+                fill="white" fontSize={11} fontFamily="monospace" fontWeight={700}
               >
-                STRIKE ${data.strike.toFixed(0)}
+                ${data.strike.toFixed(2)} target
+              </text>
+              {/* right pill: matching y-axis tag */}
+              <rect
+                x={innerW - PAD_R + 2} y={yPrice(data.strike) - 9}
+                width={PAD_R - 4} height={18} rx={3}
+                fill="rgba(2, 132, 199, 0.95)" stroke="rgba(255,255,255,0.4)"
+              />
+              <text
+                x={innerW - 6} y={yPrice(data.strike) + 3} textAnchor="end"
+                fill="white" fontSize={11} fontFamily="monospace" fontWeight={700}
+              >
+                ${data.strike.toFixed(2)}
               </text>
             </>
           )}
 
-          {/* current price marker on the right edge */}
+          {/* current price marker on the right edge — colored by direction vs strike */}
           {(() => {
             const last = c.candles[nCandles - 1];
+            const prev = c.candles[nCandles - 2] ?? last;
             const yy = yPrice(last.c);
+            // Green if above strike (or rising), red if below strike (or falling)
+            const aboveStrike = data?.strike != null ? last.c >= data.strike : last.c >= prev.c;
+            const up = aboveStrike;
+            const fill = up ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)";
+            const dashStroke = up ? "rgba(34,197,94,0.6)" : "rgba(239,68,68,0.7)";
             return (
               <>
                 <line
                   x1={PAD_L} y1={yy} x2={innerW - PAD_R} y2={yy}
-                  stroke="rgba(255,255,255,0.35)" strokeWidth={1} strokeDasharray="2 3"
+                  stroke={dashStroke} strokeWidth={1.2} strokeDasharray="4 4"
                 />
+                {/* pulse dot at last candle */}
+                <circle cx={xFor(nCandles - 1)} cy={yy} r={5} fill={fill} opacity={0.35} />
+                <circle cx={xFor(nCandles - 1)} cy={yy} r={3} fill={fill} />
+                {/* right-axis price pill */}
                 <rect
-                  x={innerW - PAD_R - 72} y={yy - 9} width={68} height={16} rx={3}
-                  fill="rgba(0,0,0,0.7)" stroke="rgba(255,255,255,0.35)"
+                  x={innerW - PAD_R + 2} y={yy - 9} width={PAD_R - 4} height={18} rx={3}
+                  fill={fill} stroke="rgba(0,0,0,0.4)"
                 />
                 <text
-                  x={innerW - PAD_R - 6} y={yy + 3} textAnchor="end"
-                  fill="white" fontSize={11} fontFamily="monospace"
+                  x={innerW - 6} y={yy + 3} textAnchor="end"
+                  fill="white" fontSize={11} fontFamily="monospace" fontWeight={700}
                 >
-                  ${last.c.toFixed(0)}
+                  ${last.c.toFixed(2)}
                 </text>
               </>
             );
