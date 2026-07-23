@@ -106,8 +106,14 @@ export interface GateResult {
 // thresholds mix in the low-conviction band that history says loses.
 export const MIN_SIDE_CONF = 0.90;
 
+// Near-strike deadband: when |spot − strike| / strike is under this and less
+// than NEAR_STRIKE_DEADBAND_SECS remain, we skip. Loss autopsy showed 17% of
+// losses cluster here as pure last-minute chop that no side-signal can rescue.
+export const NEAR_STRIKE_DEADBAND_PCT = 0.03; // percent, i.e. 0.03%
+export const NEAR_STRIKE_DEADBAND_SECS = 60;
+
 export function evaluateGate(input: GateInput): GateResult {
-  const { side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap, sideConf, liveFlipped } = input;
+  const { side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap, sideConf, liveFlipped, spot, strike } = input;
   const pinRiskFloor = pinRiskFloorSigmas(secondsToClose);
   const currentlyWinning = gap.needsDirection === "hold";
 
@@ -117,6 +123,17 @@ export function evaluateGate(input: GateInput): GateResult {
   if (yesPrice <= 0.02 || yesPrice >= 0.98) {
     return { gateAction: "PASS", gateReason: "price pinned (≤2¢ or ≥98¢) — no room for edge" };
   }
+  // Near-strike deadband — kills the 17% `near_strike_flip` autopsy bucket.
+  if (spot !== undefined && strike !== undefined && strike > 0 && secondsToClose < NEAR_STRIKE_DEADBAND_SECS) {
+    const distPct = Math.abs(spot - strike) / strike * 100;
+    if (distPct < NEAR_STRIKE_DEADBAND_PCT) {
+      return {
+        gateAction: "PASS",
+        gateReason: `near-strike deadband — spot ${distPct.toFixed(3)}% from strike with ${secondsToClose}s left (chop zone)`,
+      };
+    }
+  }
+
   // Side-confidence gate: blocks the "locked-side diverged from model"
   // bucket (~9% historical hit rate). Skipped when caller omits sideConf.
   if (sideConf !== undefined && sideConf < MIN_SIDE_CONF) {
