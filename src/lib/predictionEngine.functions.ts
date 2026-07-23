@@ -212,6 +212,7 @@ function applyEnsemble(
 }
 
 export const predictMatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }): Promise<{ prediction: MatchPrediction | null; error: string | null }> => {
     try {
