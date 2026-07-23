@@ -3,6 +3,7 @@
 // Provider-agnostic by design; swap providers without touching this file's contract.
 
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { getProvider } from "@/lib/providers";
 import type {
