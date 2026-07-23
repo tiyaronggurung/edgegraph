@@ -1030,6 +1030,23 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           taBlendPts = (p - pBefore) * 100;
         }
 
+        // (f3) Chart Verdict blend — trendlines + S/R + structure (LIVE ±10pt, 2026-07-23).
+        // Smaller cap than TA v2 to avoid double-counting overlapping signals.
+        // shift = direction_sign * confidence * 0.10
+        let chartBlendPts = 0;
+        if (chartVerdict?.combined) {
+          const dir = chartVerdict.combined.direction; // "YES" | "NO" | "neutral"
+          const conf = Math.max(0, Math.min(1, chartVerdict.combined.confidence ?? 0));
+          const sign = dir === "YES" ? 1 : dir === "NO" ? -1 : 0;
+          if (sign !== 0 && conf > 0) {
+            const shift = sign * conf * 0.10; // ±0.10 max
+            const pBefore = p;
+            p = Math.max(0.01, Math.min(0.99, p + shift));
+            chartBlendPts = (p - pBefore) * 100;
+          }
+        }
+
+
         // ── FREEZE-SIDE GUARD REMOVED (2026-07-22 rollback) ──
         // The lockedSide-first behavior kept the model stuck on the first
         // snapshot's pick even when live probability drifted across 50%.
