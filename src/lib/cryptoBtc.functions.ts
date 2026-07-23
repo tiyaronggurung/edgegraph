@@ -1578,6 +1578,7 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           studyingSecondsLeft,
           strikeVerdict,
           strikeVerdictReason,
+          studyFindings,
         });
 
       }
