@@ -34,11 +34,11 @@ const SERIES: Array<{
 ];
 
 const TF_LABEL: Record<CandleTf, string> = {
-  "1m": "1m", "5m": "5m", "15m": "15m", "1h": "1H", "1d": "1D", "1w": "1W",
+  "1m": "1m", "5m": "5m", "15m": "15m", "1h": "1H", "1d": "1D",
 };
 // Refetch cadence per tf — never more often than the bucket itself.
 const TF_REFETCH_MS: Record<CandleTf, number> = {
-  "1m": 15_000, "5m": 60_000, "15m": 120_000, "1h": 5 * 60_000, "1d": 30 * 60_000, "1w": 60 * 60_000,
+  "1m": 15_000, "5m": 60_000, "15m": 120_000, "1h": 5 * 60_000, "1d": 30 * 60_000,
 };
 
 export function TrendlineChartPanel() {

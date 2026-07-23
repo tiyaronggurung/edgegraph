@@ -7,11 +7,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import type { TCandle } from "@/lib/ta/trendlines";
 
-export const TF_LIST = ["1m", "5m", "15m", "1h", "1d", "1w"] as const;
+export const TF_LIST = ["1m", "5m", "15m", "1h", "1d"] as const;
 export type CandleTf = typeof TF_LIST[number];
 
 const TF_SECONDS: Record<CandleTf, number> = {
-  "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86_400, "1w": 604_800,
+  "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86_400,
 };
 const CB_GRANULARITY: Partial<Record<CandleTf, number>> = {
   "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86_400,
@@ -28,7 +28,7 @@ export interface CandlesResult {
   source: "cache" | "cache+live" | "live";
 }
 
-async function fetchCoinbaseLive(tf: Exclude<CandleTf, "1w">, limit: number): Promise<TCandle[]> {
+async function fetchCoinbaseLive(tf: CandleTf, limit: number): Promise<TCandle[]> {
   const g = CB_GRANULARITY[tf]!;
   const end = Math.floor(Date.now() / 1000);
   const start = end - Math.min(300, limit) * g;
@@ -71,10 +71,7 @@ export const getBtcCandles = createServerFn({ method: "GET" })
     const stale = cacheCandles.length < 5 || ageMs > TF_SECONDS[tf] * 2000;
 
     if (!stale) return { tf, candles: cacheCandles, source: "cache" };
-    if (tf === "1w") {
-      // Weekly comes from cache only (built by ingest); no live fallback.
-      return { tf, candles: cacheCandles, source: "cache" };
-    }
+
 
     try {
       const live = await fetchCoinbaseLive(tf, limit);
