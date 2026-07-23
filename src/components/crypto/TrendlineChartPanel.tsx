@@ -88,6 +88,21 @@ export function TrendlineChartPanel() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
             <Stat label="Spot"          value={data?.spot != null ? `$${data.spot.toFixed(0)}` : "—"} />
             <Stat label="Strike"        value={data?.strike != null ? `$${data.strike.toFixed(0)}` : "—"} />
+            <Stat
+              label="Δ Strike"
+              value={
+                data?.spot != null && data?.strike != null
+                  ? `${(data.spot - data.strike) >= 0 ? "+" : ""}$${(data.spot - data.strike).toFixed(2)} ${data.spot >= data.strike ? "above" : "below"}`
+                  : "—"
+              }
+              icon={
+                data?.spot != null && data?.strike != null ? (
+                  data.spot >= data.strike
+                    ? <TrendingUp className="h-3 w-3 text-emerald-400" />
+                    : <TrendingDown className="h-3 w-3 text-rose-400" />
+                ) : undefined
+              }
+            />
             <Stat label="Upper line"    value={data?.upperAtNow != null ? `$${data.upperAtNow.toFixed(0)}` : "—"} />
             <Stat label="Lower line"    value={data?.lowerAtNow != null ? `$${data.lowerAtNow.toFixed(0)}` : "—"} />
             <Stat label="→ Upper"       value={data?.distToUpperPct != null ? `${data.distToUpperPct.toFixed(3)}%` : "—"}
@@ -437,6 +452,10 @@ function TaChart({
             const up = aboveStrike;
             const fill = up ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)";
             const dashStroke = up ? "rgba(34,197,94,0.6)" : "rgba(239,68,68,0.7)";
+            const diff = data?.strike != null ? last.c - data.strike : null;
+            const diffText = diff != null
+              ? `${diff >= 0 ? "+" : ""}$${diff.toFixed(2)} ${diff >= 0 ? "above" : "below"} strike`
+              : "";
             return (
               <>
                 <line
@@ -457,6 +476,22 @@ function TaChart({
                 >
                   ${last.c.toFixed(2)}
                 </text>
+                {/* amount above/below strike tag floating just left of the price pill */}
+                {diffText && (
+                  <>
+                    <rect
+                      x={innerW - PAD_R - 118} y={yy - 8} width={114} height={16} rx={3}
+                      fill="rgba(0,0,0,0.65)" stroke={dashStroke} strokeWidth={1}
+                    />
+                    <text
+                      x={innerW - PAD_R - 8} y={yy + 3} textAnchor="end"
+                      fill={up ? "rgb(134, 239, 172)" : "rgb(252, 165, 165)"}
+                      fontSize={10} fontFamily="monospace" fontWeight={600}
+                    >
+                      {diffText}
+                    </text>
+                  </>
+                )}
               </>
             );
           })()}
