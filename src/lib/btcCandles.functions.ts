@@ -7,7 +7,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import type { TCandle } from "@/lib/ta/trendlines";
 
-export const TF_LIST = ["1m", "5m", "15m", "1h", "1d", "1w"] as const;
+export const TF_LIST = ["1m", "5m", "15m", "1h", "1d"] as const;
 export type CandleTf = typeof TF_LIST[number];
 
 const TF_SECONDS: Record<CandleTf, number> = {
