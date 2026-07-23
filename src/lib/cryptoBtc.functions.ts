@@ -222,27 +222,84 @@ async function kalshiFetch(path: string): Promise<any> {
   throw lastErr ?? new Error("Kalshi failed");
 }
 
-async function fetchBtcCandles(): Promise<BtcCandle[]> {
-  // Coinbase returns up to 300 candles per call. At granularity=60 that's 5h
-  // of 1m data — enough for EMA169 (170 bars), MACD (35 bars), and RSI/BB.
-  const res = await fetch(`${COINBASE}/products/BTC-USD/candles?granularity=60`, {
+async function fetchBinanceKlines(intervalMs: number, interval: string, limit: number): Promise<BtcCandle[]> {
+  const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`, {
     headers: { Accept: "application/json", "User-Agent": "edgegraph/1.0" },
   });
-  if (!res.ok) throw new Error(`Coinbase ${res.status}`);
-  const rows = (await res.json()) as number[][];
-  return rows.map(([t, l, h, o, c, v]) => ({ t, o, h, l, c, v })).sort((a, b) => a.t - b.t);
+  if (!res.ok) throw new Error(`Binance klines ${res.status}`);
+  const rows = (await res.json()) as any[][];
+  // [openTime, open, high, low, close, volume, closeTime, ...]
+  return rows.map(r => ({
+    t: Math.floor(Number(r[0]) / 1000),
+    o: Number(r[1]),
+    h: Number(r[2]),
+    l: Number(r[3]),
+    c: Number(r[4]),
+    v: Number(r[5]),
+  })).sort((a, b) => a.t - b.t);
+}
+
+// Merge two candle series into a composite (BRR-style): median close per aligned
+// bucket, max/min for h/l, average for o. Kalshi settles on the BRR composite,
+// not any single exchange — using Coinbase alone leaves a $20–$100 basis in
+// fast moves. If Binance fails we transparently fall back to Coinbase-only.
+function mergeCandles(a: BtcCandle[], b: BtcCandle[]): BtcCandle[] {
+  if (!b.length) return a;
+  if (!a.length) return b;
+  const byT = new Map<number, BtcCandle>();
+  for (const c of a) byT.set(c.t, c);
+  const out: BtcCandle[] = [];
+  for (const cA of a) {
+    const cB = byT.has(cA.t) ? b.find(x => x.t === cA.t) : undefined;
+    if (!cB) { out.push(cA); continue; }
+    out.push({
+      t: cA.t,
+      o: (cA.o + cB.o) / 2,
+      h: Math.max(cA.h, cB.h),
+      l: Math.min(cA.l, cB.l),
+      c: (cA.c + cB.c) / 2,
+      v: cA.v + cB.v,
+    });
+  }
+  return out.sort((x, y) => x.t - y.t);
+}
+
+async function fetchBtcCandles(): Promise<BtcCandle[]> {
+  const [cbRes, bnRes] = await Promise.allSettled([
+    (async () => {
+      const res = await fetch(`${COINBASE}/products/BTC-USD/candles?granularity=60`, {
+        headers: { Accept: "application/json", "User-Agent": "edgegraph/1.0" },
+      });
+      if (!res.ok) throw new Error(`Coinbase ${res.status}`);
+      const rows = (await res.json()) as number[][];
+      return rows.map(([t, l, h, o, c, v]) => ({ t, o, h, l, c, v })).sort((a, b) => a.t - b.t);
+    })(),
+    fetchBinanceKlines(60_000, "1m", 300),
+  ]);
+  const cb = cbRes.status === "fulfilled" ? cbRes.value : [];
+  const bn = bnRes.status === "fulfilled" ? bnRes.value : [];
+  if (!cb.length && !bn.length) throw new Error("Both Coinbase & Binance 1m candles failed");
+  return mergeCandles(cb, bn);
 }
 
 async function fetchBtcCandles5m(): Promise<BtcCandle[]> {
-  // True 5m candles from Coinbase (granularity=300 = 25h of history).
-  // We need ≥35 bars for MACD 5m, ≥20 for BB — this gives 300, plenty for both.
-  const res = await fetch(`${COINBASE}/products/BTC-USD/candles?granularity=300`, {
-    headers: { Accept: "application/json", "User-Agent": "edgegraph/1.0" },
-  });
-  if (!res.ok) throw new Error(`Coinbase 5m ${res.status}`);
-  const rows = (await res.json()) as number[][];
-  return rows.map(([t, l, h, o, c, v]) => ({ t, o, h, l, c, v })).sort((a, b) => a.t - b.t);
+  const [cbRes, bnRes] = await Promise.allSettled([
+    (async () => {
+      const res = await fetch(`${COINBASE}/products/BTC-USD/candles?granularity=300`, {
+        headers: { Accept: "application/json", "User-Agent": "edgegraph/1.0" },
+      });
+      if (!res.ok) throw new Error(`Coinbase 5m ${res.status}`);
+      const rows = (await res.json()) as number[][];
+      return rows.map(([t, l, h, o, c, v]) => ({ t, o, h, l, c, v })).sort((a, b) => a.t - b.t);
+    })(),
+    fetchBinanceKlines(300_000, "5m", 300),
+  ]);
+  const cb = cbRes.status === "fulfilled" ? cbRes.value : [];
+  const bn = bnRes.status === "fulfilled" ? bnRes.value : [];
+  if (!cb.length && !bn.length) throw new Error("Both Coinbase & Binance 5m candles failed");
+  return mergeCandles(cb, bn);
 }
+
 
 // BRTI-style consolidated spot: median of Coinbase, Binance, Kraken mids.
 // Closes the basis gap with Kalshi's settlement index.
