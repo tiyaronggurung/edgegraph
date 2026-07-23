@@ -1390,6 +1390,15 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           const momOk = gapAnalysis.momentumAlignsWithSide;
           findings.push(`momentum: ${gapAnalysis.momentumSign > 0 ? "↑" : gapAnalysis.momentumSign < 0 ? "↓" : "—"} ${momOk ? "with" : "vs"} ${side}`);
 
+          // Distance trajectory: early (min 2–4) vs late (min 5–7) avg |dist|
+          const distAt = (c: { c: number }) => Math.abs(c.c - strike);
+          const N = studyWindow.length;
+          const earlySlice = studyWindow.slice(Math.max(0, N - 5), Math.max(0, N - 2)); // ~min 2–4
+          const lateSlice  = studyWindow.slice(Math.max(0, N - 2));                     // ~min 5–7
+          const distEarly = earlySlice.length ? earlySlice.reduce((s,c)=>s+distAt(c),0)/earlySlice.length : 0;
+          const distLate  = lateSlice.length  ? lateSlice.reduce((s,c)=>s+distAt(c),0)/lateSlice.length  : 0;
+          const dominance = N > 0 ? Math.max(aboveCount, belowCount) / N : 0;
+
           return {
             findings,
             breakoutSide,
@@ -1410,7 +1419,11 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
             aboveCount,
             belowCount,
             studyLen: studyWindow.length,
+            dominance,
+            distEarly,
+            distLate,
           };
+
         })();
 
 
