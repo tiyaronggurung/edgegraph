@@ -10,6 +10,7 @@
 // the auto_odds_settings table (only pre-enabled users are touched).
 
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { runAutoTradeCore, sellOddsBetCore } from "@/lib/cryptoAutoTrade.functions";
 import { computeBtcMarkets } from "@/lib/cryptoBtc.functions";
 
@@ -44,7 +45,8 @@ function isKalshiMaintenanceWindow(d: Date = new Date()): boolean {
 export const Route = createFileRoute("/api/public/hooks/auto-odds-tick")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         if (isKalshiMaintenanceWindow()) {
           return Response.json({ ok: true, skipped: "kalshi_maintenance" });
         }

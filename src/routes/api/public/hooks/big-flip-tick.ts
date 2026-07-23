@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 
 // Server-side cron: runs the big-flip detector + live $10 auto-buy for every
 // user with Kalshi creds set and recent tape activity. Fires 24/7 regardless
@@ -9,7 +10,8 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/api/public/hooks/big-flip-tick")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const t0 = Date.now();
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { runBigFlipForUser } = await import("@/lib/bigFlipDetector.functions");

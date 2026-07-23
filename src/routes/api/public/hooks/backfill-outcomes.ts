@@ -4,6 +4,7 @@
 // Called daily via pg_cron.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { createClient } from "@supabase/supabase-js";
 import { getProvider } from "@/lib/providers";
 import type { LiveMatchSnapshot } from "@/lib/providers/liveProvider";
@@ -54,6 +55,7 @@ export const Route = createFileRoute("/api/public/hooks/backfill-outcomes")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
         const apikey = request.headers.get("apikey");
         if (!expected || apikey !== expected) {

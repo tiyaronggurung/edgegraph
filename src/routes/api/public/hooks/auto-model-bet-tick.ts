@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { evaluateBtcEntry } from "@/lib/btcEntryGate";
 import { getBtcGateConfig } from "@/lib/btcGateConfig.server";
 import { logBtcGateDecision } from "@/lib/btcGateLog.server";
@@ -12,7 +13,8 @@ import { logBtcGateDecision } from "@/lib/btcGateLog.server";
 export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const t0 = Date.now();
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { runAutoTradeCore } = await import("@/lib/cryptoAutoTrade.functions");

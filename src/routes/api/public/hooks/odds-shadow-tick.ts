@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { evaluateAtm, evaluateReentry, atmByTicker, type Row } from "@/lib/oddsShadowCore";
 
 // Public cron endpoint — pg_cron hits this so the shadow trader keeps
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/api/public/hooks/odds-shadow-tick")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const apikey = request.headers.get("apikey");
         const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
         if (!apikey || !expected || apikey !== expected) {

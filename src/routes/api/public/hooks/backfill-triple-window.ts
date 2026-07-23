@@ -3,6 +3,7 @@
 // client-side final flush in useTripleWindowTracker (which only runs while a
 // user has the crypto page open).
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { createClient } from "@supabase/supabase-js";
 import { fetchKalshiSettlement } from "@/lib/kalshiSettle";
 
@@ -10,6 +11,7 @@ export const Route = createFileRoute("/api/public/hooks/backfill-triple-window")
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
         const apikey = request.headers.get("apikey");
         if (!expected || apikey !== expected) {

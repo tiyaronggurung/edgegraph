@@ -4,6 +4,7 @@
 // market / theory prob, and a correction factor (actual_rate / avg_model_prob,
 // clamped to [0.5, 2.0]) so we can later multiply raw model prob by it.
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 
 function sigmaBucketOf(sigDist: number | null | undefined): string {
   const s = Number(sigDist);
@@ -36,7 +37,8 @@ function sigDistFrom(row: {
 export const Route = createFileRoute("/api/public/hooks/btc-calibrate")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const { data: rows, error } = await supabaseAdmin

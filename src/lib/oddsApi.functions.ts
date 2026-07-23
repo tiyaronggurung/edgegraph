@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 /**
@@ -45,6 +46,7 @@ function teamsMatch(apiName: string, target: string): boolean {
 }
 
 export const getNoVigFairLine = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => InputSchema.parse(input))
   .handler(async ({ data }) => {
     const apiKey = process.env.ODDS_API_KEY;

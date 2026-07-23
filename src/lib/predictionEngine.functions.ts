@@ -3,6 +3,7 @@
 // Provider-agnostic by design; swap providers without touching this file's contract.
 
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { getProvider } from "@/lib/providers";
 import type {
@@ -211,6 +212,7 @@ function applyEnsemble(
 }
 
 export const predictMatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }): Promise<{ prediction: MatchPrediction | null; error: string | null }> => {
     try {
@@ -262,7 +264,9 @@ export const predictMatch = createServerFn({ method: "POST" })
   });
 
 // Lightweight list of live fixtures (no per-match stats round-trips).
-export const listLiveFixtures = createServerFn({ method: "GET" }).handler(async () => {
+export const listLiveFixtures = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
   try {
     const matches = await provider.fetchLive();
     return {

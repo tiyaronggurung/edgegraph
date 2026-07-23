@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 const InputSchema = z.object({
@@ -109,6 +110,7 @@ function buildPrompt(d: DeepAnalyzeInput): string {
 }
 
 export const deepAnalyze = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => InputSchema.parse(d))
   .handler(async ({ data }): Promise<{ result: DeepAnalyzeResult | null; error: string | null }> => {
     const key = process.env.LOVABLE_API_KEY;

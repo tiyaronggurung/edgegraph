@@ -3,12 +3,14 @@
 // windows whose close time has passed.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { runMultiTfShadow } from "@/lib/multiTfShadow.functions";
 
 export const Route = createFileRoute("/api/public/hooks/multi-tf-shadow")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const key = request.headers.get("apikey");
         if (!key || key !== process.env.SUPABASE_PUBLISHABLE_KEY) {
           return new Response("unauthorized", { status: 401 });

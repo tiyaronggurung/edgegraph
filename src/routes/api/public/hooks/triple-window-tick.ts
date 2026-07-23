@@ -10,6 +10,7 @@
 //   browser has never been on the page for a given window, that row stays
 //   uncreated until the client seeds it (same behavior as before).
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { createClient } from "@supabase/supabase-js";
 import { getPolymarketBtcUpDown } from "@/lib/polymarketOdds";
 
@@ -35,6 +36,7 @@ export const Route = createFileRoute("/api/public/hooks/triple-window-tick")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
         const apikey = request.headers.get("apikey");
         if (!expected || apikey !== expected) {

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { planStake, applySettlement, resetSession, isNewUtcDay, type RecoveryState } from "@/lib/martingaleRecovery";
 
 // Public cron endpoint — Martingale Recovery auto trader.
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/api/public/hooks/martingale-tick")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const apikey = request.headers.get("apikey");
         const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
         if (!apikey || !expected || apikey !== expected) {

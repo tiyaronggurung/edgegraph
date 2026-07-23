@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 // Simple in-process cache to respect API-Football rate limits.
@@ -77,7 +78,9 @@ async function apiFootball<T = unknown>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-export const getLiveSoccerFixtures = createServerFn({ method: "GET" }).handler(
+export const getLiveSoccerFixtures = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(
   async (): Promise<{ matches: LiveMatchStats[]; error: string | null }> => {
     try {
       if (liveCache && Date.now() - liveCache.ts < CACHE_TTL_MS) {
@@ -106,6 +109,7 @@ export const getLiveSoccerFixtures = createServerFn({ method: "GET" }).handler(
 );
 
 export const getMatchStats = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ fixtureId: z.number().int().positive() }).parse(d))
   .handler(async ({ data }): Promise<{ stats: MatchStats | null; error: string | null }> => {
     try {

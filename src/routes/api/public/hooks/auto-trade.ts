@@ -5,6 +5,7 @@
 // up to a lifetime cap of 5 orders, then only settles. No auth header needed
 // (this prefix bypasses published-site auth — we still validate apikey).
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
 import { evaluateBtcEntry } from "@/lib/btcEntryGate";
 import { getBtcGateConfig } from "@/lib/btcGateConfig.server";
@@ -44,6 +45,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-trade")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const apikey = request.headers.get("apikey") ?? "";
         const expected = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
         if (!apikey || apikey !== expected) {

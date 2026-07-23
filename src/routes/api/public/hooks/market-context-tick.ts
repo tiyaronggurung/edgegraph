@@ -8,6 +8,7 @@
 // Shadow-only. Nothing here reads or blocks trading logic.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronRequest } from "@/lib/cronAuth";
 import { writeMarketContext, type CheckpointType } from "@/lib/marketContext/computeAndWrite.server";
 
 function checkpointForSecondsToClose(s: number): CheckpointType | null {
@@ -23,6 +24,7 @@ export const Route = createFileRoute("/api/public/hooks/market-context-tick")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         // Anon-key gate (matches other cron routes).
         const authHeader = request.headers.get("authorization") ?? request.headers.get("apikey");
         if (!authHeader) {
