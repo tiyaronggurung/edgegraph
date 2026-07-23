@@ -308,7 +308,25 @@ function TaChart({
       >
         {/* ── Price panel ── */}
         <g>
-          {/* horizontal grid */}
+          {/* future/empty zone shading (right of the current candle) */}
+          <rect
+            x={lastCandleX} y={PAD_T}
+            width={Math.max(0, innerW - PAD_R - lastCandleX)}
+            height={priceH - PAD_T}
+            fill="rgba(255,255,255,0.015)"
+          />
+          {/* "now" vertical divider between last candle and upcoming space */}
+          <line
+            x1={lastCandleX} y1={PAD_T} x2={lastCandleX} y2={priceH - PAD_B}
+            stroke="rgba(255,255,255,0.18)" strokeWidth={1} strokeDasharray="2 3"
+          />
+          <text
+            x={lastCandleX + 4} y={PAD_T + 10}
+            fill="rgba(255,255,255,0.4)" fontSize={9} fontFamily="monospace"
+          >
+            now →
+          </text>
+          {/* horizontal grid — extends into the future zone so it feels continuous */}
           {priceTicks.map((t, i) => (
             <line key={i} x1={PAD_L} y1={t.y} x2={innerW - PAD_R} y2={t.y}
               stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
