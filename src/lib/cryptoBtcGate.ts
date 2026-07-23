@@ -91,6 +91,11 @@ export interface GateInput {
   // kills the 17% `near_strike_flip` autopsy bucket (last-minute chop).
   spot?: number;
   strike?: number;
+  // Count of consecutive settled losses immediately preceding this snapshot,
+  // fed by the snapshot loop. 48h data (n=178) shows WR drops from 50%
+  // baseline to 41% after 2 straight losses; 3+ streaks stay depressed.
+  // Optional so unit tests and old call sites still work.
+  lossStreak?: number;
 }
 
 
@@ -112,8 +117,16 @@ export const MIN_SIDE_CONF = 0.90;
 export const NEAR_STRIKE_DEADBAND_PCT = 0.03; // percent, i.e. 0.03%
 export const NEAR_STRIKE_DEADBAND_SECS = 60;
 
+// Losing-Streak Circuit Breaker (2026-07-23).
+// 48h data: baseline WR 50%, after 2L 41%, after 3L 46%. Losses cluster.
+// Soft brake at ≥2 losses (tighter conf + edge floors); hard skip at ≥3.
+export const STREAK_SOFT_LOSSES = 2;   // require conf ≥0.93 + edge ≥5
+export const STREAK_HARD_LOSSES = 3;   // force SKIP one window
+export const STREAK_SOFT_CONF   = 0.93;
+export const STREAK_SOFT_EDGE   = 5.0;
+
 export function evaluateGate(input: GateInput): GateResult {
-  const { side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap, sideConf, liveFlipped, spot, strike } = input;
+  const { side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap, sideConf, liveFlipped, spot, strike, lossStreak } = input;
   const pinRiskFloor = pinRiskFloorSigmas(secondsToClose);
   const currentlyWinning = gap.needsDirection === "hold";
 
@@ -122,6 +135,27 @@ export function evaluateGate(input: GateInput): GateResult {
   }
   if (yesPrice <= 0.02 || yesPrice >= 0.98) {
     return { gateAction: "PASS", gateReason: "price pinned (≤2¢ or ≥98¢) — no room for edge" };
+  }
+  // Losing-Streak Circuit Breaker.
+  if (lossStreak !== undefined && lossStreak >= STREAK_HARD_LOSSES) {
+    return {
+      gateAction: "PASS",
+      gateReason: `cooldown_streak — ${lossStreak} straight losses, pausing one window`,
+    };
+  }
+  if (lossStreak !== undefined && lossStreak >= STREAK_SOFT_LOSSES) {
+    if (sideConf !== undefined && sideConf < STREAK_SOFT_CONF) {
+      return {
+        gateAction: "PASS",
+        gateReason: `streak_brake — ${lossStreak}L, need conf ≥${(STREAK_SOFT_CONF*100).toFixed(0)}% (have ${(sideConf*100).toFixed(0)}%)`,
+      };
+    }
+    if (edgeAbs < STREAK_SOFT_EDGE) {
+      return {
+        gateAction: "PASS",
+        gateReason: `streak_brake — ${lossStreak}L, need edge ≥${STREAK_SOFT_EDGE.toFixed(1)}pts (have ${edgeAbs.toFixed(1)}pts)`,
+      };
+    }
   }
   // Near-strike deadband — kills the 17% `near_strike_flip` autopsy bucket.
   if (spot !== undefined && strike !== undefined && strike > 0 && secondsToClose < NEAR_STRIKE_DEADBAND_SECS) {

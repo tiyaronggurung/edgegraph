@@ -960,6 +960,30 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
     // Fetch shared BTC gate config once per snapshot — cached 30s in memory.
     const btcGateCfg = await getBtcGateConfig();
 
+    // Losing-Streak Circuit Breaker: count consecutive most-recent settled
+    // losses across all BTC tickers. 48h data shows WR drops 50%→41% after
+    // 2 straight losses; the streak feeds the gate to brake at 2 and skip at 3.
+    const lossStreak: number = await (async () => {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data } = await supabaseAdmin
+          .from("btc_model_predictions")
+          .select("was_correct,close_time")
+          .not("was_correct", "is", null)
+          .order("close_time", { ascending: false })
+          .limit(10);
+        if (!data) return 0;
+        let n = 0;
+        for (const row of data) {
+          if (row.was_correct === false) n++;
+          else break;
+        }
+        return n;
+      } catch { return 0; }
+    })();
+
+
+
 
     for (const e of events) {
       for (const m of e.markets ?? []) {
@@ -1122,7 +1146,7 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         const sideConf = side === "YES" ? p : 1 - p;
         const { gateAction, gateReason } = evaluateGate({
           side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap: gapAnalysis,
-          sideConf, spot, strike,
+          sideConf, spot, strike, lossStreak,
         });
 
 
