@@ -64,7 +64,7 @@ export const evalTrendlineShadow = createServerFn({ method: "GET" })
 
     let candles: TCandle[];
     try {
-      candles = await fetchBinance1m(90);
+      candles = await fetchBinance1m(300);
     } catch (e) {
       return { ...empty, error: (e as Error).message };
     }
