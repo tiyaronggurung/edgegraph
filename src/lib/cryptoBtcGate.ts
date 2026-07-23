@@ -132,6 +132,10 @@ export const STREAK_HARD_LOSSES = 3;   // force SKIP one window
 export const STREAK_SOFT_CONF   = 0.93;
 export const STREAK_SOFT_EDGE   = 5.0;
 
+// Chase Veto: model_prob floor when pick == prev1_outcome == prev2_outcome.
+export const CHASE_MIN_PROB = 0.93;
+
+
 export function evaluateGate(input: GateInput): GateResult {
   const { side, secondsToClose, yesPrice, sigDist, edgeAbs, requiredEdgePts, kelly, gap, sideConf, liveFlipped, spot, strike, lossStreak } = input;
   const pinRiskFloor = pinRiskFloorSigmas(secondsToClose);
