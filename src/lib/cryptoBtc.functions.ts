@@ -1043,7 +1043,11 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         const cal = applyCalib ? applyCalib(p, secondsToClose, calibState) : { p, deltaPts: 0, bucket: "ge600", active: false };
         p = cal.p;
 
+        // Snapshot pre-blend prob for mean-reversion sanity clamp below.
+        const pPreBlend = p;
+
         // (f2) TA v2 soft blend into model_prob (LIVE ±15pt, re-enabled 2026-07-23).
+
         // Previous ±25pt blend broke calibration; ±15pt cap is deliberately gentler.
         // Only shifts prob toward TA direction; side may still flip when |shift| > |p-0.5|.
         let taBlendPts = 0;
