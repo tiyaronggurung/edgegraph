@@ -38,7 +38,7 @@ export const Route = createFileRoute("/api/public/hooks/btc-calibrate")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const __cronAuth = verifyCronRequest(request); if (__cronAuth) return __cronAuth;
+        const __cronAuth = await verifyCronRequest(request); if (__cronAuth) return __cronAuth;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const { data: rows, error } = await supabaseAdmin
