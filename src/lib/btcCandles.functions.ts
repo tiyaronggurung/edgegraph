@@ -11,7 +11,7 @@ export const TF_LIST = ["1m", "5m", "15m", "1h", "1d"] as const;
 export type CandleTf = typeof TF_LIST[number];
 
 const TF_SECONDS: Record<CandleTf, number> = {
-  "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86_400, "1w": 604_800,
+  "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86_400,
 };
 const CB_GRANULARITY: Partial<Record<CandleTf, number>> = {
   "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86_400,
