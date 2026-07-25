@@ -158,7 +158,7 @@ export function TrendlineChartPanel() {
             BTC {TF_LABEL[tf]} · TA v2 · Trendlines
           </span>
           {(() => {
-            const ours = composite?.spot ?? shadow?.spot ?? null;
+            const ours = displaySpot;
             const k = kalshi?.impliedSpot ?? null;
             const diff = ours != null && k != null ? ours - k : null;
             const diffCls =
@@ -170,7 +170,7 @@ export function TrendlineChartPanel() {
                 className="text-[10px] px-1.5 py-0.5 rounded border border-cyan-500/40 bg-cyan-500/10 text-cyan-200 font-mono flex items-center gap-1.5"
                 title={
                   kalshi?.ok
-                    ? `Kalshi ${kalshi.ticker} · YES mid ${((kalshi.yesMid ?? 0) * 100).toFixed(1)}¢ · strike $${kalshi.strike?.toFixed(0)} · ${kalshi.secondsToClose}s to close · implied spot inverted from YES prob via Φ⁻¹`
+                    ? `Kalshi ${kalshi.ticker} · YES mid ${((kalshi.yesMid ?? 0) * 100).toFixed(1)}¢ · strike $${kalshi.strike?.toFixed(0)} · ${kalshi.secondsToClose}s to close · implied spot inverted from YES prob via Φ⁻¹ · live ${live.sources ? `${live.sources}v` : "off"}`
                     : `Kalshi implied spot unavailable${kalshi?.error ? ` — ${kalshi.error}` : ""}`
                 }
               >
@@ -180,16 +180,18 @@ export function TrendlineChartPanel() {
                 </span>
                 <span className="text-white/40">vs ours</span>
                 <span className="tabular-nums">
-                  {ours != null ? `$${ours.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+                  {ours != null ? `$${ours.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "—"}
                 </span>
                 {diff != null && (
                   <span className={`tabular-nums ${diffCls}`}>
                     {diff >= 0 ? "+" : ""}${diff.toFixed(1)}
                   </span>
                 )}
+                <span className={`ml-1 h-1.5 w-1.5 rounded-full ${live.connected ? "bg-emerald-400 animate-pulse" : "bg-white/20"}`} />
               </span>
             );
           })()}
+
           {tf === "1m" && shadow?.isWedge && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
               WEDGE · {shadow.wedgeBias?.toUpperCase()}
