@@ -9,7 +9,9 @@ import { getBtcCandles, TF_LIST, type CandleTf } from "@/lib/btcCandles.function
 import { detectSpike, detectTrendlines, type TCandle } from "@/lib/ta/trendlines";
 import { emaSeries, rsi, macd, bollinger, sessionVwap } from "@/lib/ta/taEngine";
 import { fibLevels, FIB_COLORS } from "@/lib/ta/fib";
+import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import type { Candle } from "@/lib/ta/chartSignals";
+
 
 // Full-fidelity TA chart with multi-timeframe support:
 //   1m / 5m / 15m / 1h / 1d / 1w — sourced from public.btc_candles cache
