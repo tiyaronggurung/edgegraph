@@ -56,8 +56,12 @@ export function TrendlineChartPanel() {
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
   const compositeFn = useServerFn(getCompositeSpot);
 
-  // Composite BTC spot (Coinbase + Binance + Kraken median) — polled every
-  // 1s so the forming candle ticks in near-realtime.
+  // Live composite BTC spot from Binance+Coinbase WebSockets (~50–200ms/tick).
+  // This is the fastest source and drives the price marker + delta pill.
+  const live = useLiveCompositeSpot();
+
+  // Server-side composite (median of Coinbase+Binance+Kraken) — polled every
+  // 1s. Used only as a fallback when WS hasn't connected yet.
   const { data: composite } = useQuery({
     queryKey: ["composite-spot"],
     queryFn: () => compositeFn(),
@@ -67,6 +71,7 @@ export function TrendlineChartPanel() {
     refetchOnWindowFocus: false,
     refetchIntervalInBackground: false,
   });
+
 
   const { data: kalshi } = useQuery({
     queryKey: ["kalshi-implied-spot"],
