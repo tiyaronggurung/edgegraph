@@ -112,10 +112,14 @@ export function TrendlineChartPanel() {
   // visibly ticks up/down between server refetches. Only when the live tick
   // still falls inside the last bar's bucket — never invent a new bar.
   const rawCandles = candlesData?.candles ?? shadow?.candles ?? [];
-  const liveSpot = live.spot ?? composite?.spot ?? kalshi?.impliedSpot ?? shadow?.spot ?? null;
+  // Splice source ticks slowly (server composite @1s) so indicator memos
+  // don't recompute on every WS tick.
+  const spliceSpot = composite?.spot ?? kalshi?.impliedSpot ?? shadow?.spot ?? null;
+  // Display source is the WS live tick (~50–200ms). Falls back to slower feeds.
+  const displaySpot = live.spot ?? spliceSpot;
 
   const candles = useMemo<TCandle[]>(() => {
-    if (!rawCandles.length || liveSpot == null) return rawCandles;
+    if (!rawCandles.length || spliceSpot == null) return rawCandles;
     const bucketMs =
       tf === "1m" ? 60_000 :
       tf === "5m" ? 300_000 :
@@ -127,12 +131,13 @@ export function TrendlineChartPanel() {
     if (now - last.t >= bucketMs) return rawCandles; // bar closed — wait for next fetch
     const patched: TCandle = {
       ...last,
-      c: liveSpot,
-      h: Math.max(last.h, liveSpot),
-      l: Math.min(last.l, liveSpot),
+      c: spliceSpot,
+      h: Math.max(last.h, spliceSpot),
+      l: Math.min(last.l, spliceSpot),
     };
     return [...rawCandles.slice(0, -1), patched];
-  }, [rawCandles, liveSpot, tf]);
+  }, [rawCandles, spliceSpot, tf]);
+
 
   const isFetching = candlesFetching || shadowFetching;
   const refetch = () => { refetchShadow(); refetchCandles(); };
