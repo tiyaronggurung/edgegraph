@@ -9,7 +9,9 @@ import { getBtcCandles, TF_LIST, type CandleTf } from "@/lib/btcCandles.function
 import { detectSpike, detectTrendlines, type TCandle } from "@/lib/ta/trendlines";
 import { emaSeries, rsi, macd, bollinger, sessionVwap } from "@/lib/ta/taEngine";
 import { fibLevels, FIB_COLORS } from "@/lib/ta/fib";
+import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import type { Candle } from "@/lib/ta/chartSignals";
+
 
 // Full-fidelity TA chart with multi-timeframe support:
 //   1m / 5m / 15m / 1h / 1d / 1w — sourced from public.btc_candles cache
@@ -54,8 +56,12 @@ export function TrendlineChartPanel() {
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
   const compositeFn = useServerFn(getCompositeSpot);
 
-  // Composite BTC spot (Coinbase + Binance + Kraken median) — polled every
-  // 1s so the forming candle ticks in near-realtime.
+  // Live composite BTC spot from Binance+Coinbase WebSockets (~50–200ms/tick).
+  // This is the fastest source and drives the price marker + delta pill.
+  const live = useLiveCompositeSpot();
+
+  // Server-side composite (median of Coinbase+Binance+Kraken) — polled every
+  // 1s. Used only as a fallback when WS hasn't connected yet.
   const { data: composite } = useQuery({
     queryKey: ["composite-spot"],
     queryFn: () => compositeFn(),
@@ -65,6 +71,7 @@ export function TrendlineChartPanel() {
     refetchOnWindowFocus: false,
     refetchIntervalInBackground: false,
   });
+
 
   const { data: kalshi } = useQuery({
     queryKey: ["kalshi-implied-spot"],
@@ -105,9 +112,14 @@ export function TrendlineChartPanel() {
   // visibly ticks up/down between server refetches. Only when the live tick
   // still falls inside the last bar's bucket — never invent a new bar.
   const rawCandles = candlesData?.candles ?? shadow?.candles ?? [];
-  const liveSpot = composite?.spot ?? kalshi?.impliedSpot ?? shadow?.spot ?? null;
+  // Splice source ticks slowly (server composite @1s) so indicator memos
+  // don't recompute on every WS tick.
+  const spliceSpot = composite?.spot ?? kalshi?.impliedSpot ?? shadow?.spot ?? null;
+  // Display source is the WS live tick (~50–200ms). Falls back to slower feeds.
+  const displaySpot = live.spot ?? spliceSpot;
+
   const candles = useMemo<TCandle[]>(() => {
-    if (!rawCandles.length || liveSpot == null) return rawCandles;
+    if (!rawCandles.length || spliceSpot == null) return rawCandles;
     const bucketMs =
       tf === "1m" ? 60_000 :
       tf === "5m" ? 300_000 :
@@ -119,12 +131,13 @@ export function TrendlineChartPanel() {
     if (now - last.t >= bucketMs) return rawCandles; // bar closed — wait for next fetch
     const patched: TCandle = {
       ...last,
-      c: liveSpot,
-      h: Math.max(last.h, liveSpot),
-      l: Math.min(last.l, liveSpot),
+      c: spliceSpot,
+      h: Math.max(last.h, spliceSpot),
+      l: Math.min(last.l, spliceSpot),
     };
     return [...rawCandles.slice(0, -1), patched];
-  }, [rawCandles, liveSpot, tf]);
+  }, [rawCandles, spliceSpot, tf]);
+
 
   const isFetching = candlesFetching || shadowFetching;
   const refetch = () => { refetchShadow(); refetchCandles(); };
@@ -145,7 +158,7 @@ export function TrendlineChartPanel() {
             BTC {TF_LABEL[tf]} · TA v2 · Trendlines
           </span>
           {(() => {
-            const ours = composite?.spot ?? shadow?.spot ?? null;
+            const ours = displaySpot;
             const k = kalshi?.impliedSpot ?? null;
             const diff = ours != null && k != null ? ours - k : null;
             const diffCls =
@@ -157,7 +170,7 @@ export function TrendlineChartPanel() {
                 className="text-[10px] px-1.5 py-0.5 rounded border border-cyan-500/40 bg-cyan-500/10 text-cyan-200 font-mono flex items-center gap-1.5"
                 title={
                   kalshi?.ok
-                    ? `Kalshi ${kalshi.ticker} · YES mid ${((kalshi.yesMid ?? 0) * 100).toFixed(1)}¢ · strike $${kalshi.strike?.toFixed(0)} · ${kalshi.secondsToClose}s to close · implied spot inverted from YES prob via Φ⁻¹`
+                    ? `Kalshi ${kalshi.ticker} · YES mid ${((kalshi.yesMid ?? 0) * 100).toFixed(1)}¢ · strike $${kalshi.strike?.toFixed(0)} · ${kalshi.secondsToClose}s to close · implied spot inverted from YES prob via Φ⁻¹ · live ${live.sources ? `${live.sources}v` : "off"}`
                     : `Kalshi implied spot unavailable${kalshi?.error ? ` — ${kalshi.error}` : ""}`
                 }
               >
@@ -167,16 +180,18 @@ export function TrendlineChartPanel() {
                 </span>
                 <span className="text-white/40">vs ours</span>
                 <span className="tabular-nums">
-                  {ours != null ? `$${ours.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+                  {ours != null ? `$${ours.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "—"}
                 </span>
                 {diff != null && (
                   <span className={`tabular-nums ${diffCls}`}>
                     {diff >= 0 ? "+" : ""}${diff.toFixed(1)}
                   </span>
                 )}
+                <span className={`ml-1 h-1.5 w-1.5 rounded-full ${live.connected ? "bg-emerald-400 animate-pulse" : "bg-white/20"}`} />
               </span>
             );
           })()}
+
           {tf === "1m" && shadow?.isWedge && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
               WEDGE · {shadow.wedgeBias?.toUpperCase()}
@@ -240,21 +255,52 @@ export function TrendlineChartPanel() {
           </div>
 
           <Legend visible={visible} setVisible={setVisible} strike={shadow?.strike ?? null} />
-          <TaChart candles={candles} shadow={shadow ?? null} tf={tf} visible={visible} fibOn={fibOn} />
+          <div className="relative">
+            {/* Sticky live-price overlay — always visible, never hidden by scroll */}
+            {displaySpot != null && (() => {
+              const strike = shadow?.strike ?? null;
+              const diff = strike != null ? displaySpot - strike : null;
+              const up = diff != null ? diff >= 0 : true;
+              const border = diff == null
+                ? "border-white/20"
+                : up ? "border-emerald-500/60" : "border-rose-500/60";
+              const priceCls = diff == null
+                ? "text-white"
+                : up ? "text-emerald-300" : "text-rose-300";
+              return (
+                <div
+                  className={`pointer-events-none absolute top-2 left-2 z-20 flex items-center gap-2 px-2 py-1 rounded border ${border} bg-black/75 backdrop-blur font-mono text-[11px] shadow-lg`}
+                  aria-label="Live BTC composite spot"
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${live.connected ? "bg-emerald-400 animate-pulse" : "bg-white/30"}`} />
+                  <span className={`tabular-nums ${priceCls}`}>
+                    ${displaySpot.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  {diff != null && (
+                    <span className={`tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}>
+                      {up ? "+" : ""}${diff.toFixed(2)} {up ? "above" : "below"} strike
+                    </span>
+                  )}
+                  <span className="text-white/30">· {live.sources || 0}v</span>
+                </div>
+              );
+            })()}
+            <TaChart candles={candles} shadow={shadow ?? null} tf={tf} visible={visible} fibOn={fibOn} liveSpot={displaySpot} />
+          </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
-            <Stat label="Spot"          value={shadow?.spot != null ? `$${shadow.spot.toFixed(0)}` : "—"} />
-            <Stat label="Strike"        value={shadow?.strike != null ? `$${shadow.strike.toFixed(0)}` : "—"} />
+            <Stat label="Spot (live)"   value={displaySpot != null ? `$${displaySpot.toFixed(2)}` : "—"} />
+            <Stat label="Strike"        value={shadow?.strike != null ? `$${shadow.strike.toFixed(2)}` : "—"} />
             <Stat
               label="Δ Strike"
               value={
-                shadow?.spot != null && shadow?.strike != null
-                  ? `${(shadow.spot - shadow.strike) >= 0 ? "+" : ""}$${(shadow.spot - shadow.strike).toFixed(2)} ${shadow.spot >= shadow.strike ? "above" : "below"}`
+                displaySpot != null && shadow?.strike != null
+                  ? `${(displaySpot - shadow.strike) >= 0 ? "+" : ""}$${(displaySpot - shadow.strike).toFixed(2)} ${displaySpot >= shadow.strike ? "above" : "below"}`
                   : "—"
               }
               icon={
-                shadow?.spot != null && shadow?.strike != null ? (
-                  shadow.spot >= shadow.strike
+                displaySpot != null && shadow?.strike != null ? (
+                  displaySpot >= shadow.strike
                     ? <TrendingUp className="h-3 w-3 text-emerald-400" />
                     : <TrendingDown className="h-3 w-3 text-rose-400" />
                 ) : undefined
@@ -269,6 +315,7 @@ export function TrendlineChartPanel() {
             <Stat label="Channel width" value={shadow?.channelWidthPct != null ? `${shadow.channelWidthPct.toFixed(2)}%` : "—"} />
             <Stat label="Swings used"   value={shadow ? String(shadow.swingsUsed) : "—"} />
           </div>
+
 
           <p className="text-[10px] text-white/40 mt-2">
             Drag to pan · wheel to zoom · switch TF above · Fib is drawn from the highest high / lowest low currently visible.
@@ -336,14 +383,16 @@ const MAX_CW = 32;
 const DEFAULT_CW = 6;
 
 function TaChart({
-  candles: candlesProp, shadow, tf, visible, fibOn,
+  candles: candlesProp, shadow, tf, visible, fibOn, liveSpot,
 }: {
   candles: TCandle[];
   shadow: TrendlineSnapshot | null;
   tf: CandleTf;
   visible: Record<string, boolean>;
   fibOn: boolean;
+  liveSpot: number | null;
 }) {
+
   // Alias so the rest of the component (which references `data.strike` etc.)
   // keeps compiling. `data` here represents the shadow-analysis snapshot only
   // (strike / wedge / spike / etc.); actual candles come from `candlesProp`.
@@ -804,16 +853,33 @@ function TaChart({
           {(() => {
             const last = c.candles[nCandles - 1];
             const prev = c.candles[nCandles - 2] ?? last;
-            const yy = yPrice(last.c);
-            // Green if above strike (or rising), red if below strike (or falling)
-            const aboveStrike = data?.strike != null ? last.c >= data.strike : last.c >= prev.c;
+            // Prefer the WS live tick over the (possibly seconds-stale) last candle close.
+            const nowPrice = liveSpot != null && Number.isFinite(liveSpot) ? liveSpot : last.c;
+            // Clamp Y so the marker stays visible when the live price briefly
+            // exits the current price range (rare during a fast spike).
+            const clampedY = Math.max(PAD_T, Math.min(priceH - PAD_B, yPrice(nowPrice)));
+            const yy = clampedY;
+            const aboveStrike = data?.strike != null ? nowPrice >= data.strike : nowPrice >= prev.c;
             const up = aboveStrike;
             const fill = up ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)";
             const dashStroke = up ? "rgba(34,197,94,0.6)" : "rgba(239,68,68,0.7)";
-            const diff = data?.strike != null ? last.c - data.strike : null;
+            const diff = data?.strike != null ? nowPrice - data.strike : null;
             const diffText = diff != null
               ? `${diff >= 0 ? "+" : ""}$${diff.toFixed(2)} ${diff >= 0 ? "above" : "below"} strike`
               : "";
+            // Anchor the delta pill just to the left of the pulse dot so it
+            // stays visible next to the running candle instead of floating far
+            // off-screen against the y-axis. Falls back to the right edge if
+            // the pulse dot is too close to the left padding.
+            const dotX = xFor(nCandles - 1);
+            const pillW = 132;
+            const pillH = 16;
+            const pillGap = 12;
+            const preferLeft = dotX - pillGap - pillW >= PAD_L + 4;
+            const pillX = preferLeft
+              ? dotX - pillGap - pillW
+              : Math.min(innerW - PAD_R - pillW - 4, dotX + pillGap);
+            const pillTextX = pillX + pillW - 6;
             return (
               <>
                 <line
@@ -821,8 +887,11 @@ function TaChart({
                   stroke={dashStroke} strokeWidth={1.2} strokeDasharray="4 4"
                 />
                 {/* pulse dot at last candle */}
-                <circle cx={xFor(nCandles - 1)} cy={yy} r={5} fill={fill} opacity={0.35} />
-                <circle cx={xFor(nCandles - 1)} cy={yy} r={3} fill={fill} />
+                <circle cx={dotX} cy={yy} r={6} fill={fill} opacity={0.28}>
+                  <animate attributeName="r" values="4;9;4" dur="1.2s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.45;0.05;0.45" dur="1.2s" repeatCount="indefinite" />
+                </circle>
+                <circle cx={dotX} cy={yy} r={3.2} fill={fill} />
                 {/* right-axis price pill */}
                 <rect
                   x={innerW - PAD_R + 2} y={yy - 9} width={PAD_R - 4} height={18} rx={3}
@@ -832,17 +901,17 @@ function TaChart({
                   x={innerW - 6} y={yy + 3} textAnchor="end"
                   fill="white" fontSize={11} fontFamily="monospace" fontWeight={700}
                 >
-                  ${last.c.toFixed(2)}
+                  ${nowPrice.toFixed(2)}
                 </text>
-                {/* amount above/below strike tag floating just left of the price pill */}
+                {/* delta-from-strike pill anchored to the pulse dot */}
                 {diffText && (
                   <>
                     <rect
-                      x={innerW - PAD_R - 118} y={yy - 8} width={114} height={16} rx={3}
-                      fill="rgba(0,0,0,0.65)" stroke={dashStroke} strokeWidth={1}
+                      x={pillX} y={yy - pillH / 2} width={pillW} height={pillH} rx={3}
+                      fill="rgba(0,0,0,0.8)" stroke={dashStroke} strokeWidth={1}
                     />
                     <text
-                      x={innerW - PAD_R - 8} y={yy + 3} textAnchor="end"
+                      x={pillTextX} y={yy + 3} textAnchor="end"
                       fill={up ? "rgb(134, 239, 172)" : "rgb(252, 165, 165)"}
                       fontSize={10} fontFamily="monospace" fontWeight={600}
                     >
@@ -853,6 +922,7 @@ function TaChart({
               </>
             );
           })()}
+
 
           {/* selected candle: vertical guide + OHLC tooltip */}
           {selectedIdx != null && selectedIdx >= 0 && selectedIdx < nCandles && (() => {
