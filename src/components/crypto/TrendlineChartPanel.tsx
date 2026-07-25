@@ -853,16 +853,33 @@ function TaChart({
           {(() => {
             const last = c.candles[nCandles - 1];
             const prev = c.candles[nCandles - 2] ?? last;
-            const yy = yPrice(last.c);
-            // Green if above strike (or rising), red if below strike (or falling)
-            const aboveStrike = data?.strike != null ? last.c >= data.strike : last.c >= prev.c;
+            // Prefer the WS live tick over the (possibly seconds-stale) last candle close.
+            const nowPrice = liveSpot != null && Number.isFinite(liveSpot) ? liveSpot : last.c;
+            // Clamp Y so the marker stays visible when the live price briefly
+            // exits the current price range (rare during a fast spike).
+            const clampedY = Math.max(PAD_T, Math.min(priceH - PAD_B, yPrice(nowPrice)));
+            const yy = clampedY;
+            const aboveStrike = data?.strike != null ? nowPrice >= data.strike : nowPrice >= prev.c;
             const up = aboveStrike;
             const fill = up ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)";
             const dashStroke = up ? "rgba(34,197,94,0.6)" : "rgba(239,68,68,0.7)";
-            const diff = data?.strike != null ? last.c - data.strike : null;
+            const diff = data?.strike != null ? nowPrice - data.strike : null;
             const diffText = diff != null
               ? `${diff >= 0 ? "+" : ""}$${diff.toFixed(2)} ${diff >= 0 ? "above" : "below"} strike`
               : "";
+            // Anchor the delta pill just to the left of the pulse dot so it
+            // stays visible next to the running candle instead of floating far
+            // off-screen against the y-axis. Falls back to the right edge if
+            // the pulse dot is too close to the left padding.
+            const dotX = xFor(nCandles - 1);
+            const pillW = 132;
+            const pillH = 16;
+            const pillGap = 12;
+            const preferLeft = dotX - pillGap - pillW >= PAD_L + 4;
+            const pillX = preferLeft
+              ? dotX - pillGap - pillW
+              : Math.min(innerW - PAD_R - pillW - 4, dotX + pillGap);
+            const pillTextX = pillX + pillW - 6;
             return (
               <>
                 <line
@@ -870,8 +887,11 @@ function TaChart({
                   stroke={dashStroke} strokeWidth={1.2} strokeDasharray="4 4"
                 />
                 {/* pulse dot at last candle */}
-                <circle cx={xFor(nCandles - 1)} cy={yy} r={5} fill={fill} opacity={0.35} />
-                <circle cx={xFor(nCandles - 1)} cy={yy} r={3} fill={fill} />
+                <circle cx={dotX} cy={yy} r={6} fill={fill} opacity={0.28}>
+                  <animate attributeName="r" values="4;9;4" dur="1.2s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.45;0.05;0.45" dur="1.2s" repeatCount="indefinite" />
+                </circle>
+                <circle cx={dotX} cy={yy} r={3.2} fill={fill} />
                 {/* right-axis price pill */}
                 <rect
                   x={innerW - PAD_R + 2} y={yy - 9} width={PAD_R - 4} height={18} rx={3}
@@ -881,17 +901,17 @@ function TaChart({
                   x={innerW - 6} y={yy + 3} textAnchor="end"
                   fill="white" fontSize={11} fontFamily="monospace" fontWeight={700}
                 >
-                  ${last.c.toFixed(2)}
+                  ${nowPrice.toFixed(2)}
                 </text>
-                {/* amount above/below strike tag floating just left of the price pill */}
+                {/* delta-from-strike pill anchored to the pulse dot */}
                 {diffText && (
                   <>
                     <rect
-                      x={innerW - PAD_R - 118} y={yy - 8} width={114} height={16} rx={3}
-                      fill="rgba(0,0,0,0.65)" stroke={dashStroke} strokeWidth={1}
+                      x={pillX} y={yy - pillH / 2} width={pillW} height={pillH} rx={3}
+                      fill="rgba(0,0,0,0.8)" stroke={dashStroke} strokeWidth={1}
                     />
                     <text
-                      x={innerW - PAD_R - 8} y={yy + 3} textAnchor="end"
+                      x={pillTextX} y={yy + 3} textAnchor="end"
                       fill={up ? "rgb(134, 239, 172)" : "rgb(252, 165, 165)"}
                       fontSize={10} fontFamily="monospace" fontWeight={600}
                     >
@@ -902,6 +922,7 @@ function TaChart({
               </>
             );
           })()}
+
 
           {/* selected candle: vertical guide + OHLC tooltip */}
           {selectedIdx != null && selectedIdx >= 0 && selectedIdx < nCandles && (() => {
