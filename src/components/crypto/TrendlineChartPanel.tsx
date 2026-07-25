@@ -255,21 +255,52 @@ export function TrendlineChartPanel() {
           </div>
 
           <Legend visible={visible} setVisible={setVisible} strike={shadow?.strike ?? null} />
-          <TaChart candles={candles} shadow={shadow ?? null} tf={tf} visible={visible} fibOn={fibOn} />
+          <div className="relative">
+            {/* Sticky live-price overlay — always visible, never hidden by scroll */}
+            {displaySpot != null && (() => {
+              const strike = shadow?.strike ?? null;
+              const diff = strike != null ? displaySpot - strike : null;
+              const up = diff != null ? diff >= 0 : true;
+              const border = diff == null
+                ? "border-white/20"
+                : up ? "border-emerald-500/60" : "border-rose-500/60";
+              const priceCls = diff == null
+                ? "text-white"
+                : up ? "text-emerald-300" : "text-rose-300";
+              return (
+                <div
+                  className={`pointer-events-none absolute top-2 left-2 z-20 flex items-center gap-2 px-2 py-1 rounded border ${border} bg-black/75 backdrop-blur font-mono text-[11px] shadow-lg`}
+                  aria-label="Live BTC composite spot"
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${live.connected ? "bg-emerald-400 animate-pulse" : "bg-white/30"}`} />
+                  <span className={`tabular-nums ${priceCls}`}>
+                    ${displaySpot.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  {diff != null && (
+                    <span className={`tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}>
+                      {up ? "+" : ""}${diff.toFixed(2)} {up ? "above" : "below"} strike
+                    </span>
+                  )}
+                  <span className="text-white/30">· {live.sources || 0}v</span>
+                </div>
+              );
+            })()}
+            <TaChart candles={candles} shadow={shadow ?? null} tf={tf} visible={visible} fibOn={fibOn} liveSpot={displaySpot} />
+          </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
-            <Stat label="Spot"          value={shadow?.spot != null ? `$${shadow.spot.toFixed(0)}` : "—"} />
-            <Stat label="Strike"        value={shadow?.strike != null ? `$${shadow.strike.toFixed(0)}` : "—"} />
+            <Stat label="Spot (live)"   value={displaySpot != null ? `$${displaySpot.toFixed(2)}` : "—"} />
+            <Stat label="Strike"        value={shadow?.strike != null ? `$${shadow.strike.toFixed(2)}` : "—"} />
             <Stat
               label="Δ Strike"
               value={
-                shadow?.spot != null && shadow?.strike != null
-                  ? `${(shadow.spot - shadow.strike) >= 0 ? "+" : ""}$${(shadow.spot - shadow.strike).toFixed(2)} ${shadow.spot >= shadow.strike ? "above" : "below"}`
+                displaySpot != null && shadow?.strike != null
+                  ? `${(displaySpot - shadow.strike) >= 0 ? "+" : ""}$${(displaySpot - shadow.strike).toFixed(2)} ${displaySpot >= shadow.strike ? "above" : "below"}`
                   : "—"
               }
               icon={
-                shadow?.spot != null && shadow?.strike != null ? (
-                  shadow.spot >= shadow.strike
+                displaySpot != null && shadow?.strike != null ? (
+                  displaySpot >= shadow.strike
                     ? <TrendingUp className="h-3 w-3 text-emerald-400" />
                     : <TrendingDown className="h-3 w-3 text-rose-400" />
                 ) : undefined
@@ -284,6 +315,7 @@ export function TrendlineChartPanel() {
             <Stat label="Channel width" value={shadow?.channelWidthPct != null ? `${shadow.channelWidthPct.toFixed(2)}%` : "—"} />
             <Stat label="Swings used"   value={shadow ? String(shadow.swingsUsed) : "—"} />
           </div>
+
 
           <p className="text-[10px] text-white/40 mt-2">
             Drag to pan · wheel to zoom · switch TF above · Fib is drawn from the highest high / lowest low currently visible.
