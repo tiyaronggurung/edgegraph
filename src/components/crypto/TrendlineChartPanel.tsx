@@ -112,7 +112,8 @@ export function TrendlineChartPanel() {
   // visibly ticks up/down between server refetches. Only when the live tick
   // still falls inside the last bar's bucket — never invent a new bar.
   const rawCandles = candlesData?.candles ?? shadow?.candles ?? [];
-  const liveSpot = composite?.spot ?? kalshi?.impliedSpot ?? shadow?.spot ?? null;
+  const liveSpot = live.spot ?? composite?.spot ?? kalshi?.impliedSpot ?? shadow?.spot ?? null;
+
   const candles = useMemo<TCandle[]>(() => {
     if (!rawCandles.length || liveSpot == null) return rawCandles;
     const bucketMs =
