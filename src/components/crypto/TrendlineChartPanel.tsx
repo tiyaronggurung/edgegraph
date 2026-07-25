@@ -383,14 +383,16 @@ const MAX_CW = 32;
 const DEFAULT_CW = 6;
 
 function TaChart({
-  candles: candlesProp, shadow, tf, visible, fibOn,
+  candles: candlesProp, shadow, tf, visible, fibOn, liveSpot,
 }: {
   candles: TCandle[];
   shadow: TrendlineSnapshot | null;
   tf: CandleTf;
   visible: Record<string, boolean>;
   fibOn: boolean;
+  liveSpot: number | null;
 }) {
+
   // Alias so the rest of the component (which references `data.strike` etc.)
   // keeps compiling. `data` here represents the shadow-analysis snapshot only
   // (strike / wedge / spike / etc.); actual candles come from `candlesProp`.
