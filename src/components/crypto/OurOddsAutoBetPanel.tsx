@@ -24,6 +24,11 @@ const STAKE_USD = 10;
 const TRIGGER_PROB = 2 / 3;
 // Don't fire in the pin-zone final seconds — slippage.
 const MIN_SECS_TO_CLOSE = 15;
+// Warmup: only fire after the new 15-min window has been open ≥3 min.
+// Kalshi windows are 900s → require secondsToClose ≤ 720.
+const WINDOW_LEN_SECS = 900;
+const WARMUP_SECS = 180;
+const MAX_SECS_TO_CLOSE = WINDOW_LEN_SECS - WARMUP_SECS;
 
 export function OurOddsAutoBetPanel() {
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
@@ -140,6 +145,11 @@ export function OurOddsAutoBetPanel() {
     if (!enabled || firing) return;
     if (!ticker || !strike || secondsToClose == null) return;
     if (secondsToClose < MIN_SECS_TO_CLOSE) return;
+    if (secondsToClose > MAX_SECS_TO_CLOSE) {
+      const wait = secondsToClose - MAX_SECS_TO_CLOSE;
+      setLastSkip(`warmup — ${wait}s until window has been open ${WARMUP_SECS}s`);
+      return;
+    }
     if (!quote || pUp == null || pDown == null) return;
 
     let side: "YES" | "NO" | null = null;
