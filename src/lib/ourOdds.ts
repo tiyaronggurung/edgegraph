@@ -228,6 +228,14 @@ export interface OurQuote {
   timeDecayFrac: number; // 0 at open → 1 at close (for UI decay bar)
   midPivotTiltPct: number; // signed fraction actually applied
   pillGateTiltPct: number; // signed fraction from strike-vs-pills gate
+  recommendation: BetRecommendation; // UI-facing UP/DOWN/WAIT call w/ reason
+}
+
+export interface BetRecommendation {
+  side: "UP" | "DOWN" | "WAIT";
+  strength: "strong" | "lean" | "wait";
+  confidencePct: number; // 0..100 = chosen-side prob (WAIT → mid or 50)
+  reason: string;        // one-liner shown in the UI tooltip/pill
 }
 
 
