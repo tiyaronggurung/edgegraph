@@ -1181,7 +1181,11 @@ function TaChart({
                   const upFav = (ourMidProb ?? 0.5) >= 0.5;
                   const oPW = 70, oPH = 14, oGap = 8, oVGap = 6;
                   const rightLimit = innerW - PAD_R - 4;
-                  const oX = Math.min(dotX + oGap, rightLimit - oPW);
+                  // sit to the right of the stacked SELL/MID/BUY pills (max width 92)
+                  const stackMaxW = 92, stackGutter = 8;
+                  const stackRight = Math.min(innerW - PAD_R - stackMaxW - 2, lastCandleX + stackGutter) + stackMaxW;
+                  const oX = Math.min(Math.max(dotX + oGap, stackRight + oGap), rightLimit - oPW);
+
                   // vertical: stack around the price line, but clamp inside plot area
                   let upY = yy - oVGap - oPH;
                   let dnY = yy + oVGap;
