@@ -1101,32 +1101,34 @@ function TaChart({
                 >
                   ${nowPrice.toFixed(2)}
                 </text>
-                {/* delta-from-strike pill — anchored to the strike line, not the price */}
+                {/* delta-from-strike pill — pinned to top-center of the plot area */}
                 {diffText && (
                   <>
-                    {/* thin connector from the strike line to the pill */}
-                    <line
-                      x1={pillX + pillW / 2}
-                      y1={strikeY ?? yy}
-                      x2={pillX + pillW / 2}
-                      y2={pillCenterY + (priceBelowStrike ? pillH / 2 : -pillH / 2)}
-                      stroke={dashStroke} strokeWidth={1} strokeDasharray="2 2" opacity={0.6}
-                    />
+                    {/* thin connector from the strike line down to the pinned pill */}
+                    {strikeY != null && (
+                      <line
+                        x1={pillX + pillW / 2}
+                        y1={pillCenterY + pillH / 2}
+                        x2={pillX + pillW / 2}
+                        y2={strikeY}
+                        stroke={dashStroke} strokeWidth={1} strokeDasharray="2 2" opacity={0.45}
+                      />
+                    )}
                     <rect
                       data-testid="pill-delta"
                       x={pillX} y={pillCenterY - pillH / 2} width={pillW} height={pillH} rx={3}
-                      fill="rgba(0,0,0,0.85)" stroke={dashStroke} strokeWidth={1}
+                      fill="rgba(0,0,0,0.9)" stroke={dashStroke} strokeWidth={1}
                     />
-
                     <text
-                      x={pillTextX} y={pillCenterY + 3} textAnchor="end"
+                      x={pillTextX} y={pillCenterY + 4} textAnchor="middle"
                       fill={up ? "rgb(134, 239, 172)" : "rgb(252, 165, 165)"}
-                      fontSize={10} fontFamily="monospace" fontWeight={600}
+                      fontSize={11} fontFamily="monospace" fontWeight={700}
                     >
                       {diffText}
                     </text>
                   </>
                 )}
+
 
 
                 {/* UP / DOWN odds pills — anchored to the right of the pulse dot */}
