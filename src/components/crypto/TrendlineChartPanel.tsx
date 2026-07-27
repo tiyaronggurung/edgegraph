@@ -251,7 +251,7 @@ export function TrendlineChartPanel() {
       const settle = lastSpotRef.current;
       if (settle != null && Number.isFinite(settle)) {
         const won = recoLock.side === "UP" ? settle > recoLock.strike : settle < recoLock.strike;
-        setRecoHistory(h => [...h, { side: recoLock.side, won, strike: recoLock.strike, settleSpot: settle }].slice(-10));
+        setRecoHistory(h => [...h, { side: recoLock.side, won, strike: recoLock.strike, settleSpot: settle }]);
       }
       setRecoLock(null);
       return;
