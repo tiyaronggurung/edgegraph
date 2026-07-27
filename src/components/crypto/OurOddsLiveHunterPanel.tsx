@@ -14,7 +14,7 @@ import { getCompositeSpot } from "@/lib/compositeSpot.functions";
 import { evalTrendlineShadow } from "@/lib/trendlineShadow.functions";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useOurQuote } from "@/hooks/useOurQuote";
-import { fireOurOddsLiveBet } from "@/lib/ourOddsLiveHunter.functions";
+import { fireOurOddsLiveBet, autoTakeProfitOurOddsLive } from "@/lib/ourOddsLiveHunter.functions";
 
 const LS_ENABLED = "crypto.ourOddsLiveHunter";
 const STAKE_USD = 10;
