@@ -145,6 +145,11 @@ export function OurOddsAutoBetPanel() {
     if (!enabled || firing) return;
     if (!ticker || !strike || secondsToClose == null) return;
     if (secondsToClose < MIN_SECS_TO_CLOSE) return;
+    if (secondsToClose > MAX_SECS_TO_CLOSE) {
+      const wait = secondsToClose - MAX_SECS_TO_CLOSE;
+      setLastSkip(`warmup — ${wait}s until window has been open ${WARMUP_SECS}s`);
+      return;
+    }
     if (!quote || pUp == null || pDown == null) return;
 
     let side: "YES" | "NO" | null = null;
