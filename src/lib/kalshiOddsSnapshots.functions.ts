@@ -96,46 +96,41 @@ export const listRecentWindowStats = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }): Promise<{ windows: OddsWindowStats[] }> => {
     const limit = data.limit ?? 12;
-    const { data: rows, error } = await context.supabase
-      .rpc("btc_odds_snapshots_window_stats", { p_limit: limit });
-    if (error) {
-      // Fallback: aggregate in JS from last ~2 hours
-      const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-      const { data: raw, error: e2 } = await context.supabase
-        .from("btc_kalshi_odds_snapshots")
-        .select("ticker,strike,snapped_at,kalshi_yes_mid,our_mid,delta_up")
-        .gte("snapped_at", since)
-        .order("snapped_at", { ascending: true });
-      if (e2) throw new Error(e2.message);
-      const by = new Map<string, OddsSnapshotRow[]>();
-      for (const r of (raw ?? []) as any[]) {
-        const arr = by.get(r.ticker) ?? [];
-        arr.push(r);
-        by.set(r.ticker, arr);
-      }
-      const windows: OddsWindowStats[] = [];
-      for (const [ticker, arr] of by.entries()) {
-        const deltas = arr.map(r => r.delta_up).filter((v: any): v is number => typeof v === "number");
-        const sum = deltas.reduce((s, v) => s + v, 0);
-        const abs = deltas.reduce((s, v) => s + Math.abs(v), 0);
-        windows.push({
-          ticker,
-          strike: Number(arr[0].strike ?? 0),
-          samples: arr.length,
-          first_at: arr[0].snapped_at as unknown as string,
-          last_at: arr[arr.length - 1].snapped_at as unknown as string,
-          avg_delta_up: deltas.length ? sum / deltas.length : null,
-          abs_avg_delta_up: deltas.length ? abs / deltas.length : null,
-          max_delta_up: deltas.length ? Math.max(...deltas) : null,
-          min_delta_up: deltas.length ? Math.min(...deltas) : null,
-          our_up_start: (arr[0] as any).our_mid ?? null,
-          our_up_end: (arr[arr.length - 1] as any).our_mid ?? null,
-          kalshi_up_start: (arr[0] as any).kalshi_yes_mid ?? null,
-          kalshi_up_end: (arr[arr.length - 1] as any).kalshi_yes_mid ?? null,
-        });
-      }
-      windows.sort((a, b) => (a.last_at < b.last_at ? 1 : -1));
-      return { windows: windows.slice(0, limit) };
+    const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const { data: raw, error } = await context.supabase
+      .from("btc_kalshi_odds_snapshots")
+      .select("ticker,strike,snapped_at,kalshi_yes_mid,our_mid,delta_up")
+      .gte("snapped_at", since)
+      .order("snapped_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    const by = new Map<string, any[]>();
+    for (const r of (raw ?? []) as any[]) {
+      const arr = by.get(r.ticker) ?? [];
+      arr.push(r);
+      by.set(r.ticker, arr);
     }
-    return { windows: (rows ?? []) as OddsWindowStats[] };
+    const windows: OddsWindowStats[] = [];
+    for (const [ticker, arr] of by.entries()) {
+      const deltas = arr.map(r => r.delta_up).filter((v: any): v is number => typeof v === "number");
+      const sum = deltas.reduce((s, v) => s + v, 0);
+      const abs = deltas.reduce((s, v) => s + Math.abs(v), 0);
+      windows.push({
+        ticker,
+        strike: Number(arr[0].strike ?? 0),
+        samples: arr.length,
+        first_at: arr[0].snapped_at,
+        last_at: arr[arr.length - 1].snapped_at,
+        avg_delta_up: deltas.length ? sum / deltas.length : null,
+        abs_avg_delta_up: deltas.length ? abs / deltas.length : null,
+        max_delta_up: deltas.length ? Math.max(...deltas) : null,
+        min_delta_up: deltas.length ? Math.min(...deltas) : null,
+        our_up_start: arr[0].our_mid ?? null,
+        our_up_end: arr[arr.length - 1].our_mid ?? null,
+        kalshi_up_start: arr[0].kalshi_yes_mid ?? null,
+        kalshi_up_end: arr[arr.length - 1].kalshi_yes_mid ?? null,
+      });
+    }
+    windows.sort((a, b) => (a.last_at < b.last_at ? 1 : -1));
+    return { windows: windows.slice(0, limit) };
   });
+
