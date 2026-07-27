@@ -252,6 +252,25 @@ export function TrendlineChartPanel() {
             );
           })()}
 
+          {(() => {
+            // 1m closes for realized vol — prefer live 1m candles, fall back to shadow (also 1m).
+            const closes1m: number[] =
+              tf === "1m"
+                ? (rawCandles as TCandle[]).map(c => c.c)
+                : ((shadow?.candles ?? []) as TCandle[]).map(c => c.c);
+            return (
+              <OurOddsPill
+                spot={displaySpot ?? null}
+                strike={kalshi?.strike ?? null}
+                secondsToClose={kalshiRemainingSec}
+                closes1m={closes1m}
+                kalshiUpProb={kalshi?.yesMid ?? null}
+              />
+            );
+          })()}
+
+
+
           {tf === "1m" && shadow?.isWedge && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
               WEDGE · {shadow.wedgeBias?.toUpperCase()}
