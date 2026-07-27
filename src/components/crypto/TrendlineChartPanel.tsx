@@ -218,7 +218,26 @@ export function TrendlineChartPanel() {
             );
           })()}
 
-          {tf === "1m" && shadow?.isWedge && (
+          {kalshiRemainingSec != null && (() => {
+            const s = kalshiRemainingSec;
+            const urgent = s <= 30;
+            const soon = s <= 120;
+            const cls = urgent
+              ? "border-rose-500/60 bg-rose-500/15 text-rose-200 animate-pulse"
+              : soon
+                ? "border-amber-500/50 bg-amber-500/15 text-amber-200"
+                : "border-cyan-500/40 bg-cyan-500/10 text-cyan-200";
+            return (
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded border font-mono flex items-center gap-1 ${cls}`}
+                title={`Kalshi ${kalshi?.ticker ?? ""} closes in ${s}s`}
+              >
+                <span className="text-white/50">CLOSES</span>
+                <span className="tabular-nums font-bold">{fmtMMSS(s)}</span>
+              </span>
+            );
+          })()}
+
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
               WEDGE · {shadow.wedgeBias?.toUpperCase()}
             </span>
