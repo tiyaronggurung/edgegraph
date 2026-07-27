@@ -12,6 +12,8 @@ import { fibLevels, FIB_COLORS } from "@/lib/ta/fib";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { OurOddsPill } from "@/components/crypto/OurOddsPill";
 import { computeOurQuote, realizedVolFromCloses, toAmericanOdds } from "@/lib/ourOdds";
+import { useKalshiOddsRecorder } from "@/hooks/useKalshiOddsRecorder";
+
 import type { Candle } from "@/lib/ta/chartSignals";
 
 
@@ -58,6 +60,11 @@ export function TrendlineChartPanel() {
   const candlesFn = useServerFn(getBtcCandles);
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
   const compositeFn = useServerFn(getCompositeSpot);
+
+  // Records 1 snapshot/sec of Kalshi odds + our odds into btc_kalshi_odds_snapshots.
+  useKalshiOddsRecorder([]);
+
+
 
   // Live composite BTC spot from Binance+Coinbase WebSockets (~50–200ms/tick).
   // This is the fastest source and drives the price marker + delta pill.
