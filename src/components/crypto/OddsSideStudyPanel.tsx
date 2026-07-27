@@ -44,19 +44,36 @@ export function OddsSideStudyPanel() {
         <span className="text-[10px] text-white/50">last 12h · {rows.length} windows</span>
       </div>
 
-      {/* Live confidence call — no artificial lock; pure real-time read. */}
+      {/* Live confidence call — locks side once conviction first crosses 88%. */}
       {live && (() => {
-        const p = live.our_mid;
-        const sideProb = p == null ? null : Math.max(p, 1 - p);
-        const sideDir: "UP" | "DOWN" | null = p == null ? null : p >= 0.5 ? "UP" : "DOWN";
+        const LOCK_THRESHOLD = 0.88;
         const SKIP_THRESHOLD = 0.55;
+        const p = live.our_mid;
+        const liveProb = p == null ? null : Math.max(p, 1 - p);
+        const liveDir: "UP" | "DOWN" | null = p == null ? null : p >= 0.5 ? "UP" : "DOWN";
+        const tickerKey = live.ticker ?? "";
+
+        // Reset lock when ticker rolls to a new window.
+        if (lockRef.current && lockRef.current.ticker !== tickerKey) {
+          lockRef.current = null;
+        }
+        // Arm lock the first time conviction crosses the threshold this window.
+        if (!lockRef.current && tickerKey && liveProb != null && liveDir && liveProb >= LOCK_THRESHOLD) {
+          lockRef.current = { ticker: tickerKey, side: liveDir, prob: liveProb };
+        }
+
+        const locked = lockRef.current && lockRef.current.ticker === tickerKey ? lockRef.current : null;
+        const displaySide = locked ? locked.side : liveDir;
+        const displayProb = locked ? locked.prob : liveProb;
+        const isSkip = !locked && (displayProb == null || displayProb < SKIP_THRESHOLD);
+
         const call =
-          sideProb == null ? "—"
-          : sideProb < SKIP_THRESHOLD ? "SKIP"
-          : `${sideDir} ${(sideProb * 100).toFixed(0)}%`;
+          displayProb == null ? "—"
+          : isSkip ? "SKIP"
+          : `${displaySide} ${(displayProb * 100).toFixed(0)}%${locked ? " 🔒" : ""}`;
         const callClass =
-          sideProb == null || sideProb < SKIP_THRESHOLD ? "text-amber-300"
-          : sideDir === "UP" ? "text-emerald-300" : "text-rose-300";
+          isSkip || displayProb == null ? "text-amber-300"
+          : displaySide === "UP" ? "text-emerald-300" : "text-rose-300";
         return (
           <div className="mt-3 flex items-center gap-3 p-2 rounded border border-white/10 bg-black/40">
             <div className={`text-lg font-bold font-mono ${callClass}`}>{call}</div>
@@ -66,7 +83,11 @@ export function OddsSideStudyPanel() {
                 {live.strike != null ? <span className="text-white/40"> · ${live.strike.toFixed(0)}</span> : null}
                 {live.seconds_to_close != null ? <span className="text-white/40"> · {live.seconds_to_close}s left</span> : null}
               </div>
-              <div className="text-white/50">{live.reason}</div>
+              <div className="text-white/50">
+                {locked
+                  ? `Locked ${locked.side} at ${(locked.prob * 100).toFixed(0)}% — held for rest of window`
+                  : live.reason}
+              </div>
             </div>
             <div className="text-[10px] font-mono text-right text-white/60">
               <div>Ours {pct(live.our_mid, 0)}</div>
@@ -76,6 +97,7 @@ export function OddsSideStudyPanel() {
           </div>
         );
       })()}
+
 
 
       {/* Summary */}
