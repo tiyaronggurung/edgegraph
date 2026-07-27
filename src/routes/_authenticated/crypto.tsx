@@ -62,6 +62,7 @@ const EvReportPanel = lazy(() => import("@/components/crypto/EvReportPanel").the
 const OddsComparisonPanel = lazy(() => import("@/components/crypto/OddsComparisonPanel").then(m => ({ default: m.OddsComparisonPanel })));
 const OddsSideStudyPanel = lazy(() => import("@/components/crypto/OddsSideStudyPanel").then(m => ({ default: m.OddsSideStudyPanel })));
 const LockThresholdStudyPanel = lazy(() => import("@/components/crypto/OddsSideStudyPanel").then(m => ({ default: m.LockThresholdStudyPanel })));
+const TrendlineBreakStudyPanel = lazy(() => import("@/components/crypto/TrendlineBreakStudyPanel").then(m => ({ default: m.TrendlineBreakStudyPanel })));
 
 const TrendlinePatternReportPanel = lazy(() => import("@/components/crypto/TrendlinePatternReportPanel").then(m => ({ default: m.TrendlinePatternReportPanel })));
 const JumpBacktestPanel = lazy(() => import("@/components/crypto/JumpBacktestPanel").then(m => ({ default: m.JumpBacktestPanel })));
@@ -4014,6 +4015,7 @@ function CryptoPage() {
 
       <LazyOnVisible><OddsSideStudyPanel /></LazyOnVisible>
       <LazyOnVisible><LockThresholdStudyPanel /></LazyOnVisible>
+      <LazyOnVisible><TrendlineBreakStudyPanel /></LazyOnVisible>
       <LazyOnVisible><OddsComparisonPanel /></LazyOnVisible>
 
 
