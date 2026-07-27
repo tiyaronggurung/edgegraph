@@ -1030,10 +1030,12 @@ function TaChart({
               </text>
               {/* right pill: matching y-axis tag */}
               <rect
+                data-testid="pill-strike-target"
                 x={innerW - PAD_R + 2} y={yPrice(data.strike) - 9}
                 width={PAD_R - 4} height={18} rx={3}
                 fill="rgba(2, 132, 199, 0.95)" stroke="rgba(255,255,255,0.4)"
               />
+
               <text
                 x={innerW - 6} y={yPrice(data.strike) + 3} textAnchor="end"
                 fill="white" fontSize={11} fontFamily="monospace" fontWeight={700}
