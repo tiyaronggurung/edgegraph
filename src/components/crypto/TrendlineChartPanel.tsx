@@ -1063,52 +1063,19 @@ function TaChart({
             const diffText = diff != null
               ? `${diff >= 0 ? "+" : ""}$${diff.toFixed(2)} ${diff >= 0 ? "above" : "below"} strike`
               : "";
-              // Anchor the delta pill to the STRIKE line (not the price line)
-              // so it never crowds the UP/DN pulse pills that sit at the price.
+              // Pin the delta pill to the TOP of the plot area so it never
+              // overlaps the UP/DN BUY/SELL pills that sit next to the price.
               const dotX = xFor(nCandles - 1);
-              const pillW = 132;
-              const pillH = 16;
-              const pillGap = 10;
-              // Reserve the horizontal strip the UP/DN pills occupy (right of the
-              // dot, up against the right axis). We must keep the delta pill fully
-              // LEFT of this strip so it can never sit on top of BUY/SELL prices.
-              const oPW_reserve = 70;
-              const upDnLeft = Math.min(dotX + 8, innerW - PAD_R - 4 - oPW_reserve);
-              // Prefer placing the delta pill just LEFT of the dot, but never
-              // let its right edge cross into the UP/DN reservation strip.
-              const maxRight = upDnLeft - pillGap;               // right edge budget
-              const preferRight = dotX - pillGap;
-              const pillRight = Math.min(preferRight, maxRight);
-              const pillX = Math.max(PAD_L + 4, pillRight - pillW);
-              const pillTextX = pillX + pillW - 6;
-              // Vertical: sit just OUTSIDE the strike line on the side the price
-              // sits (below strike → pill above strike line; above strike → below).
-              // Falls back to price-line if strike is off-chart.
+              const pillW = 148;
+              const pillH = 18;
+              // Center horizontally in the plot area (between left pad and right axis).
+              const plotLeft = PAD_L + 4;
+              const plotRight = innerW - PAD_R - 4;
+              const pillX = Math.max(plotLeft, Math.min(plotRight - pillW, (plotLeft + plotRight) / 2 - pillW / 2));
+              const pillTextX = pillX + pillW / 2;
+              const pillCenterY = PAD_T + pillH / 2 + 2;
               const strikeY = data?.strike != null ? yPrice(data.strike) : null;
-              const priceBelowStrike = diff != null && diff < 0;
-              const anchorY = strikeY ?? yy;
-              const rawCenter = strikeY != null
-                ? (priceBelowStrike ? anchorY - 14 : anchorY + 14)
-                : anchorY - 14;
-              let pillCenterY = Math.min(
-                priceH - PAD_B - pillH / 2 - 2,
-                Math.max(PAD_T + pillH / 2 + 2, rawCenter),
-              );
-              // Extra guard: if the delta pill's horizontal band overlaps the
-              // UP/DN strip (can happen at tight widths after clamping), push
-              // it vertically away from the price line so it can't stack on
-              // top of the BUY/SELL pills that sit ±(6..20)px around yy.
-              const horizOverlapsUpDn = (pillX + pillW) > upDnLeft;
-              if (horizOverlapsUpDn) {
-                const bandTop = yy - 24;
-                const bandBot = yy + 24;
-                if (pillCenterY > bandTop && pillCenterY < bandBot) {
-                  // push to whichever side has more room, clamped to plot area.
-                  const roomAbove = bandTop - (PAD_T + pillH / 2 + 2);
-                  const roomBelow = (priceH - PAD_B - pillH / 2 - 2) - bandBot;
-                  pillCenterY = roomAbove >= roomBelow ? bandTop : bandBot;
-                }
-              }
+
 
             return (
               <>
@@ -1134,32 +1101,34 @@ function TaChart({
                 >
                   ${nowPrice.toFixed(2)}
                 </text>
-                {/* delta-from-strike pill — anchored to the strike line, not the price */}
+                {/* delta-from-strike pill — pinned to top-center of the plot area */}
                 {diffText && (
                   <>
-                    {/* thin connector from the strike line to the pill */}
-                    <line
-                      x1={pillX + pillW / 2}
-                      y1={strikeY ?? yy}
-                      x2={pillX + pillW / 2}
-                      y2={pillCenterY + (priceBelowStrike ? pillH / 2 : -pillH / 2)}
-                      stroke={dashStroke} strokeWidth={1} strokeDasharray="2 2" opacity={0.6}
-                    />
+                    {/* thin connector from the strike line down to the pinned pill */}
+                    {strikeY != null && (
+                      <line
+                        x1={pillX + pillW / 2}
+                        y1={pillCenterY + pillH / 2}
+                        x2={pillX + pillW / 2}
+                        y2={strikeY}
+                        stroke={dashStroke} strokeWidth={1} strokeDasharray="2 2" opacity={0.45}
+                      />
+                    )}
                     <rect
                       data-testid="pill-delta"
                       x={pillX} y={pillCenterY - pillH / 2} width={pillW} height={pillH} rx={3}
-                      fill="rgba(0,0,0,0.85)" stroke={dashStroke} strokeWidth={1}
+                      fill="rgba(0,0,0,0.9)" stroke={dashStroke} strokeWidth={1}
                     />
-
                     <text
-                      x={pillTextX} y={pillCenterY + 3} textAnchor="end"
+                      x={pillTextX} y={pillCenterY + 4} textAnchor="middle"
                       fill={up ? "rgb(134, 239, 172)" : "rgb(252, 165, 165)"}
-                      fontSize={10} fontFamily="monospace" fontWeight={600}
+                      fontSize={11} fontFamily="monospace" fontWeight={700}
                     >
                       {diffText}
                     </text>
                   </>
                 )}
+
 
 
                 {/* UP / DOWN odds pills — anchored to the right of the pulse dot */}
