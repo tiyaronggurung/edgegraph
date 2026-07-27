@@ -2075,6 +2075,69 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_kalshi_odds_snapshots: {
+        Row: {
+          created_at: string
+          delta_up: number | null
+          id: number
+          kalshi_implied_spot: number | null
+          kalshi_yes_ask: number | null
+          kalshi_yes_bid: number | null
+          kalshi_yes_mid: number | null
+          our_down_ask: number | null
+          our_mid: number | null
+          our_sigma: number | null
+          our_tilt: number | null
+          our_up_ask: number | null
+          seconds_to_close: number | null
+          snap_bucket_sec: number
+          snapped_at: string
+          spot_composite: number | null
+          strike: number
+          ticker: string
+        }
+        Insert: {
+          created_at?: string
+          delta_up?: number | null
+          id?: number
+          kalshi_implied_spot?: number | null
+          kalshi_yes_ask?: number | null
+          kalshi_yes_bid?: number | null
+          kalshi_yes_mid?: number | null
+          our_down_ask?: number | null
+          our_mid?: number | null
+          our_sigma?: number | null
+          our_tilt?: number | null
+          our_up_ask?: number | null
+          seconds_to_close?: number | null
+          snap_bucket_sec: number
+          snapped_at?: string
+          spot_composite?: number | null
+          strike: number
+          ticker: string
+        }
+        Update: {
+          created_at?: string
+          delta_up?: number | null
+          id?: number
+          kalshi_implied_spot?: number | null
+          kalshi_yes_ask?: number | null
+          kalshi_yes_bid?: number | null
+          kalshi_yes_mid?: number | null
+          our_down_ask?: number | null
+          our_mid?: number | null
+          our_sigma?: number | null
+          our_tilt?: number | null
+          our_up_ask?: number | null
+          seconds_to_close?: number | null
+          snap_bucket_sec?: number
+          snapped_at?: string
+          spot_composite?: number | null
+          strike?: number
+          ticker?: string
+        }
+        Relationships: []
+      }
       btc_market_context: {
         Row: {
           adx_15m: number | null
