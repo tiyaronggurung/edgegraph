@@ -1117,10 +1117,10 @@ function TaChart({
                 )}
 
                 {/* UP / DOWN odds pills — anchored to the right of the pulse dot */}
-                {ourUpProb != null && (() => {
-                  const upStr = toAmericanOdds(ourUpProb);
-                  const dnStr = toAmericanOdds(1 - ourUpProb);
-                  const upFav = ourUpProb >= 0.5;
+                {ourUpAskProb != null && ourDownAskProb != null && (() => {
+                  const upStr = toAmericanOdds(ourUpAskProb);
+                  const dnStr = toAmericanOdds(ourDownAskProb);
+                  const upFav = (ourMidProb ?? 0.5) >= 0.5;
                   const oPW = 70, oPH = 14, oGap = 8, oVGap = 6;
                   const rightLimit = innerW - PAD_R - 4;
                   const oX = Math.min(dotX + oGap, rightLimit - oPW);
