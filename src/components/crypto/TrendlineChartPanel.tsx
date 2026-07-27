@@ -486,7 +486,6 @@ export function TrendlineChartPanel() {
                 </div>
               );
             })()}
-            })()}
             <TaChart
               candles={candles}
               shadow={shadow ?? null}
