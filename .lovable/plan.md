@@ -1,72 +1,59 @@
-## Paper Trading System — $100 bankroll, $10 flat, separate section
+# Our-Odds Pill (UP / DOWN) — beat Kalshi on latency
 
-### Scope
-- Give every user a $100 paper balance
-- All 3 buttons (Model Bet, PRED Bet, Green Hours Bet) already forced to paper mode → deduct $10 per fire
-- Settlement credits back: win = $10 × (100/fill_price_cents), loss = $0
-- Stop firing when balance ≤ $0 ("paper_bankrupt" skip); admin/manual reset only
-- New route `/crypto/paper` with balance, stats, and full fill log
-- Do NOT touch: real-money paths, live Kalshi code, existing auto_trade_orders schema, PRED gates, Model/Green Hours gates
+A compact pill in the TrendlineChartPanel header that shows our own live UP/DOWN probability for the current 15m window, in the same visual style as the Kalshi Buy/Sell box in the reference screenshot. Purely presentational — no changes to Model Pick, Study Pick, Cheap Flip Hunter, or any auto-trade path.
 
-### Database (1 migration)
-1. `paper_balances` table
-   - `user_id uuid PK` → auth.users
-   - `balance_cents int NOT NULL DEFAULT 10000` (=$100)
-   - `starting_cents int NOT NULL DEFAULT 10000`
-   - `bankrupt_at timestamptz NULL`
-   - `updated_at timestamptz`
-   - RLS: user reads own; service_role writes
-   - GRANTs per convention
+## What the user sees
 
-2. `paper_fills` table (dedicated log — decoupled from auto_trade_orders so live-money history stays clean)
-   - `id uuid PK`
-   - `user_id uuid` → auth.users
-   - `ticker text`, `close_time timestamptz`
-   - `button text` ('model' | 'pred' | 'green_hours')
-   - `side text` ('YES'|'NO'), `contracts int`, `fill_price_cents int`
-   - `stake_cents int NOT NULL DEFAULT 1000` ($10)
-   - `entry_snapshot jsonb` (edge, prob, sideConf, sigmaDist, etc.)
-   - `status text` ('open'|'won'|'lost')
-   - `payout_cents int NULL`, `pnl_cents int NULL`
-   - `settled_at timestamptz NULL`
-   - RLS: user reads own; service_role writes
+Small dark pill, right next to the existing `Kalshi $X vs ours $Y` and countdown badges:
 
-3. `handle_new_user()` trigger update → seed `paper_balances` on signup (existing users seeded via one-time insert)
+```text
+[  UP  -184   |   DOWN  +142  ]   Δ vs Kalshi: UP +3.1%
+```
 
-### Server functions (new file `src/lib/paperTrading.functions.ts`)
-- `getPaperBalance()` — returns balance + bankruptcy state
-- `getPaperFills({ limit })` — user's fill log
-- `getPaperStats()` — WR, P/L, streaks per button
-- `recordPaperFire({ ticker, closeTime, button, side, fillPriceCents, snapshot })` — deducts $10, inserts open fill, throws if bankrupt
-- `resetPaperBalance()` — admin/self reset to $100
-- Settlement worker: extend existing settlement cron (or add new) to resolve open `paper_fills` and credit `paper_balances`
+- Left half highlighted green when UP is our favorite; right half highlighted red when DOWN is.
+- American-odds style number (matches the screenshot: `-191 / +158`) computed from our probability.
+- Small "Δ vs Kalshi" chip: how much our UP prob differs from Kalshi's UP mid. Green when our edge is positive, muted when within ±1%.
+- Updates on the same 1s cadence as the live composite price (no flicker — same rAF pattern already in use for the countdown).
 
-### UI
-1. `/crypto/paper` route
-   - Balance card ("$X / $100 · +$Y net") with Reset button
-   - Bankruptcy banner if balance ≤ 0
-   - Stats per button (WR, fires, P/L)
-   - Full fill log table: time · ticker · button · side · contracts · fill · payout · P/L · status
+## How our probability is computed (fast, no model changes)
 
-2. On `/crypto` page:
-   - Small "Paper: $X.XX" pill next to Kalshi cash section (link to /crypto/paper)
-   - Fire hooks in ModelBet / PredBet / GreenHours panels call `recordPaperFire` before the paper `auto_trade_orders` insert; on bankrupt → toast + skip
+A lightweight closed-form estimate that uses only signals we already fetch client-side, so it can update every second and stays faster than Kalshi:
 
-### Stake enforcement
-- All 3 paper buttons: hardcode `stake_dollars = 10` regardless of current logic
-- Contracts = floor(1000 / fill_price_cents), min 1
+1. Take live composite spot `S` (already streaming at 50ms via `useLiveCompositeSpot`).
+2. Take strike `K` and `secondsToClose T` from the existing Kalshi query.
+3. Take short-horizon realized vol `sigma` from the 1m candles we already load for the trendline chart (log-returns over the last ~30 minutes, annualized only for consistency).
+4. Compute Black-Scholes-style up probability under a driftless GBM:
+   `P_up = Phi( ln(S/K) / (sigma * sqrt(T/YEAR)) )`
+   Clamp `T` to a small floor (e.g. 5s) to avoid blowups in the last seconds.
+5. Convert to American odds for display:
+   - favorite (`p >= 0.5`): `-round(100 * p / (1 - p))`
+   - underdog: `+round(100 * (1 - p) / p)`
 
-### Out of scope (untouched)
-- Real Kalshi order path (KALSHI_LIVE_ENABLED)
-- Auto-trade background crons that still fire live (auto-model-bet-tick, auto-odds-tick)
-- Existing `auto_trade_orders` rows / analytics cards
-- PRED gates, sweet-spot gate, kill-switch, green-hour whitelist
-- pred_locks
+This is intentionally simple — the goal is a fast, always-on odds readout, not a new model. The heavy model logic (Study, Fight window, TA v2, trendlines) stays exactly where it is.
 
-### Deliverable order
-1. Migration (paper_balances + paper_fills + trigger) — awaits your approval
-2. Server functions + settlement hook
-3. `/crypto/paper` route
-4. Header pill + wire the 3 paper buttons to `recordPaperFire`
+## Files touched (frontend only)
 
-Approve and I'll ship the migration first.
+- `src/lib/ourOdds.ts` (new, pure functions):
+  - `computeUpProbability({ spot, strike, secondsToClose, sigmaAnnualized })`
+  - `toAmericanOdds(prob)`
+  - `realizedVolFromCloses(closes: number[])`
+- `src/components/crypto/OurOddsPill.tsx` (new):
+  - Reads `useLiveCompositeSpot`, existing `kalshi` query result, and the 1m candle array already computed in `TrendlineChartPanel`.
+  - Renders the pill + `Δ vs Kalshi` chip. Uses design tokens (no hardcoded colors).
+- `src/components/crypto/TrendlineChartPanel.tsx`:
+  - Mount `<OurOddsPill />` in the header row next to the Kalshi badge / countdown.
+  - Pass the 1m closes down as a prop (they are already fetched here).
+
+No DB changes. No server functions. No changes to `cryptoBtc.functions.ts`, `bigFlipDetector.functions.ts`, or any auto-trade code.
+
+## Out of scope (explicitly not touched)
+
+- Model Pick / Study Pick / Fight window logic
+- Cheap Flip Hunter, PRED, Green Hours paper trading
+- Auto-trade gates and settlement pipelines
+- Any migration or shadow logging (can be added later if you want to backtest our-odds vs Kalshi)
+
+## Follow-ups you may want after seeing it live
+
+- Shadow-log `(t, our_p_up, kalshi_p_up, settled_side)` to measure whether our odds lead Kalshi's — I will not build this until you ask.
+- Add a small sparkline of our UP prob over the last 60s.
