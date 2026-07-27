@@ -212,7 +212,10 @@ export interface QuoteInput extends UpProbInput {
   momentumTiltPct?: number; // signed fraction, e.g. +0.015 = +1.5¢ UP lean
   midPivotTiltPct?: number; // legacy — no longer used as tilt; kept for shape
   midPrice?: number | null; // trendline MID (SELL+BUY)/2 — the anchor
+  buyPrice?: number | null; // upper trendline pill (resistance)
+  sellPrice?: number | null;// lower trendline pill (support)
 }
+
 
 
 export interface OurQuote {
