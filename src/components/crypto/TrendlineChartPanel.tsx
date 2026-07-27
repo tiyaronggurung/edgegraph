@@ -10,7 +10,9 @@ import { detectSpike, detectTrendlines, type TCandle } from "@/lib/ta/trendlines
 import { emaSeries, rsi, macd, bollinger, sessionVwap } from "@/lib/ta/taEngine";
 import { fibLevels, FIB_COLORS } from "@/lib/ta/fib";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
+import { OurOddsPill } from "@/components/crypto/OurOddsPill";
 import type { Candle } from "@/lib/ta/chartSignals";
+
 
 
 // Full-fidelity TA chart with multi-timeframe support:
@@ -249,6 +251,25 @@ export function TrendlineChartPanel() {
               </span>
             );
           })()}
+
+          {(() => {
+            // 1m closes for realized vol — prefer live 1m candles, fall back to shadow (also 1m).
+            const closes1m: number[] =
+              tf === "1m"
+                ? (rawCandles as TCandle[]).map(c => c.c)
+                : ((shadow?.candles ?? []) as TCandle[]).map(c => c.c);
+            return (
+              <OurOddsPill
+                spot={displaySpot ?? null}
+                strike={kalshi?.strike ?? null}
+                secondsToClose={kalshiRemainingSec}
+                closes1m={closes1m}
+                kalshiUpProb={kalshi?.yesMid ?? null}
+              />
+            );
+          })()}
+
+
 
           {tf === "1m" && shadow?.isWedge && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
