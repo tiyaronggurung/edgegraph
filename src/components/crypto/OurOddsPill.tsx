@@ -1,70 +1,19 @@
-import { useEffect, useMemo, useRef } from "react";
-import {
-  computeOurQuote,
-  ewmaVolFromTape,
-  momentumTilt,
-  realizedVolFromCloses,
-  toAmericanOdds,
-  type TapeSample,
-} from "@/lib/ourOdds";
+import type { computeOurQuote } from "@/lib/ourOdds";
+import { toAmericanOdds } from "@/lib/ourOdds";
 
 interface Props {
-  /** Live composite spot (BTC USD), smoothed. */
-  spot: number | null | undefined;
-  /** Strike for the current Kalshi 15m window. */
-  strike: number | null | undefined;
-  /** Seconds remaining until close (Kalshi-anchored, ticks locally). */
-  secondsToClose: number | null | undefined;
-  /** 1m closes we already fetched for the chart. Fallback for σ when tape is cold. */
-  closes1m: number[];
+  /** Precomputed quote from useOurQuote — shared with the chart pulse pills. */
+  quote: ReturnType<typeof computeOurQuote> | null;
   /** Kalshi implied UP probability (0..1), for the Δ chip. */
   kalshiUpProb?: number | null;
 }
 
-const TAPE_MAX = 240;         // ~4min at 1/s
-const TAPE_MIN_DT_MS = 250;   // don't record more than 4 samples/sec
-
 /**
- * Kalshi-style UP/DOWN odds pill computed from our own faster feed.
- *
- * - σ from EWMA of our live tape (λ=0.94), fallback to 1m closes.
- * - mid = Φ(ln(S/K) / (σ√T))  + tiny momentum tilt from last 60s drift.
- * - Adds synthetic bid/ask half-spread → UP¢ + DOWN¢ > 100, never equal.
- *
- * Presentational only.
+ * Kalshi-style UP/DOWN odds pill. Presentational only — the quote is
+ * computed upstream via useOurQuote so this pill and the chart pulse-dot
+ * pills always show the same numbers.
  */
-export function OurOddsPill({ spot, strike, secondsToClose, closes1m, kalshiUpProb }: Props) {
-  // Rolling tape of {t,p} for EWMA σ + momentum.
-  const tapeRef = useRef<TapeSample[]>([]);
-  useEffect(() => {
-    if (spot == null || !Number.isFinite(spot) || !(spot > 0)) return;
-    const now = Date.now();
-    const tape = tapeRef.current;
-    const last = tape[tape.length - 1];
-    if (last && now - last.t < TAPE_MIN_DT_MS) return;
-    tape.push({ t: now, p: spot });
-    if (tape.length > TAPE_MAX) tape.splice(0, tape.length - TAPE_MAX);
-  }, [spot]);
-
-  const quote = useMemo(() => {
-    if (spot == null || strike == null || secondsToClose == null) return null;
-    const tape = tapeRef.current;
-    const sigma =
-      ewmaVolFromTape(tape) ??
-      realizedVolFromCloses(closes1m.slice(-30));
-    if (sigma == null) return null;
-    const tilt = momentumTilt(tape);
-    return computeOurQuote({
-      spot,
-      strike,
-      secondsToClose,
-      sigmaAnnualized: sigma,
-      momentumTiltPct: tilt,
-    });
-    // Recompute on every spot tick — that's the whole point (faster than Kalshi).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spot, strike, secondsToClose, closes1m]);
-
+export function OurOddsPill({ quote, kalshiUpProb }: Props) {
   if (!quote) {
     return (
       <span
