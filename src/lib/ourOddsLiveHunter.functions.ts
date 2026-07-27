@@ -254,3 +254,156 @@ export const fireOurOddsLiveBet = createServerFn({ method: "POST" })
       fillPriceCents: filledCents,
     };
   });
+
+
+// ============================================================================
+// AUTO TAKE-PROFIT — +40% on stake (sell at Kalshi bid when ≥ entry × 1.40)
+// ----------------------------------------------------------------------------
+// Polled by OurOddsLiveHunterPanel every few seconds while the toggle is ON.
+// For each open (status='submitted') our_odds_live_hunter trade owned by
+// the caller, fetches the current Kalshi market, computes the mark for the
+// owning side, and fires an IOC sell if mark ≥ ceil(entry × 1.4).
+// Safe idempotent: skips anything already closed/settled/errored. Never
+// touches manual trades, cheap-flip fills, or any other source.
+// ============================================================================
+
+const KALSHI_BASE_TP = "https://api.elections.kalshi.com/trade-api/v2";
+const TP_MULTIPLIER = 1.4;
+
+export interface AutoTpResult {
+  scanned: number;
+  fired: number;
+  results: Array<{
+    tradeId: string;
+    ticker: string;
+    side: "YES" | "NO";
+    entryCents: number;
+    targetCents: number;
+    markCents: number;
+    fired: boolean;
+    reason?: string;
+    exitCents?: number;
+    realizedPnl?: number;
+  }>;
+}
+
+export const autoTakeProfitOurOddsLive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<AutoTpResult> => {
+    const supabase = context.supabase;
+    const userId = context.userId;
+
+    const { data: rows } = await supabase
+      .from("crypto_trades")
+      .select("id,ticker,side,contracts,stake_usd,raw,close_time,inputs_snapshot")
+      .eq("user_id", userId)
+      .eq("status", "submitted")
+      .eq("inputs_snapshot->>source", "our_odds_live_hunter")
+      .order("created_at", { ascending: true })
+      .limit(20);
+
+    const trades = (rows ?? []) as Array<{
+      id: string; ticker: string; side: "YES" | "NO";
+      contracts: number; stake_usd: number; raw: any; close_time: string | null;
+    }>;
+
+    if (trades.length === 0) return { scanned: 0, fired: 0, results: [] };
+
+    const { signKalshi } = await import("./cryptoTrades.functions");
+    const results: AutoTpResult["results"] = [];
+    let fired = 0;
+
+    for (const t of trades) {
+      if (!t.contracts || t.contracts <= 0) continue;
+      const entryCents = Math.round((Number(t.stake_usd) / Number(t.contracts)) * 100);
+      const targetCents = Math.min(99, Math.ceil(entryCents * TP_MULTIPLIER));
+
+      // Skip trades already close to settlement (< 20s) — pin-zone risk
+      if (t.close_time) {
+        const stc = Math.floor((Date.parse(t.close_time) - Date.now()) / 1000);
+        if (stc < 20) {
+          results.push({ tradeId: t.id, ticker: t.ticker, side: t.side, entryCents, targetCents, markCents: 0, fired: false, reason: "pin-zone" });
+          continue;
+        }
+      }
+
+      // Fetch current market
+      let yesBid = 0, yesAsk = 0;
+      try {
+        const mPath = `/markets/${encodeURIComponent(t.ticker)}`;
+        const h = await signKalshi("GET", mPath, userId);
+        const mr = await fetch(`${KALSHI_BASE_TP}${mPath}`, { headers: { ...h, Accept: "application/json" } });
+        const mj: any = await mr.json().catch(() => ({}));
+        const m = mj?.market ?? mj;
+        yesBid = Number(m?.yes_bid ?? 0);
+        yesAsk = Number(m?.yes_ask ?? 0);
+      } catch (e: any) {
+        results.push({ tradeId: t.id, ticker: t.ticker, side: t.side, entryCents, targetCents, markCents: 0, fired: false, reason: `market fetch: ${e?.message ?? "err"}` });
+        continue;
+      }
+
+      // Mark = current best exit price for the side we own
+      // YES holder sells @ yesBid; NO holder sells @ (100 - yesAsk)
+      const markCents = t.side === "YES" ? yesBid : (100 - yesAsk);
+
+      if (markCents < targetCents) {
+        results.push({ tradeId: t.id, ticker: t.ticker, side: t.side, entryCents, targetCents, markCents, fired: false, reason: "below target" });
+        continue;
+      }
+
+      // Fire IOC sell at targetCents (limit → we take mark or better)
+      const path = "/portfolio/events/orders";
+      let sellHeaders: Record<string, string>;
+      try {
+        sellHeaders = await signKalshi("POST", path, userId);
+      } catch (e: any) {
+        results.push({ tradeId: t.id, ticker: t.ticker, side: t.side, entryCents, targetCents, markCents, fired: false, reason: `sign: ${e?.message ?? "err"}` });
+        continue;
+      }
+      const limitCents = targetCents;
+      const priceDollars = (t.side === "YES" ? limitCents : 100 - limitCents) / 100;
+      const body = {
+        ticker: t.ticker,
+        action: "sell",
+        side: t.side === "YES" ? "ask" : "bid",
+        type: "limit",
+        count: String(t.contracts),
+        price: priceDollars.toFixed(4),
+        time_in_force: "immediate_or_cancel",
+        self_trade_prevention_type: "taker_at_cross",
+        client_order_id: `tp40-${t.id}`,
+      };
+      const res = await fetch(`${KALSHI_BASE_TP}${path}`, {
+        method: "POST",
+        headers: { ...sellHeaders, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json: any = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        results.push({ tradeId: t.id, ticker: t.ticker, side: t.side, entryCents, targetCents, markCents, fired: false, reason: `kalshi ${res.status}: ${json?.error?.message ?? json?.message ?? ""}` });
+        continue;
+      }
+      const fillCount = Number(json?.order?.fill_count ?? json?.fill_count ?? 0) || 0;
+      if (fillCount <= 0) {
+        results.push({ tradeId: t.id, ticker: t.ticker, side: t.side, entryCents, targetCents, markCents, fired: false, reason: "0-fill" });
+        continue;
+      }
+      const avgFillDollars = Number(json?.order?.average_fill_price ?? json?.average_fill_price ?? 0) || 0;
+      const exitCents = avgFillDollars > 0
+        ? (t.side === "YES" ? Math.round(avgFillDollars * 100) : Math.round(100 - avgFillDollars * 100))
+        : limitCents;
+      const realizedPnl = ((exitCents - entryCents) / 100) * Number(t.contracts);
+      const closeOrderId = json?.order_id ?? json?.order?.order_id ?? null;
+      const prevRaw = (t.raw as any) ?? {};
+      await supabase.from("crypto_trades").update({
+        status: "closed",
+        pnl_usd: realizedPnl,
+        raw: { ...prevRaw, close: { at: new Date().toISOString(), source: "auto_tp_40pct", exit_cents: exitCents, entry_cents: entryCents, kalshi_order_id: closeOrderId, response: json } },
+      }).eq("id", t.id);
+
+      fired += 1;
+      results.push({ tradeId: t.id, ticker: t.ticker, side: t.side, entryCents, targetCents, markCents, fired: true, exitCents, realizedPnl });
+    }
+
+    return { scanned: trades.length, fired, results };
+  });
