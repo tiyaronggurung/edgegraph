@@ -462,27 +462,6 @@ export function TrendlineChartPanel() {
                     )}
                     <span className="text-white/30">· {live.sources || 0}v</span>
                   </div>
-                  {recoHistory.length > 0 && (() => {
-                    const wins = recoHistory.filter(o => o.won).length;
-                    const wr = (wins / recoHistory.length) * 100;
-                    return (
-                      <div
-                        className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/70 border border-white/10 backdrop-blur font-mono text-[9px] text-white/60"
-                        title={recoHistory.map((o, i) => `#${i + 1} ${o.side} ${o.won ? "WIN" : "LOSS"} @ $${o.strike}`).join(" · ")}
-                      >
-                        <span className="text-white/40">W/L</span>
-                        {recoHistory.map((o, i) => (
-                          <span
-                            key={i}
-                            className={`h-1.5 w-1.5 rounded-full ${o.won ? "bg-emerald-400" : "bg-rose-400"}`}
-                          />
-                        ))}
-                        <span className="ml-0.5 text-white/50 tabular-nums">
-                          {wins}/{recoHistory.length} · {wr.toFixed(0)}%
-                        </span>
-                      </div>
-                    );
-                  })()}
                 </div>
               );
             })()}
