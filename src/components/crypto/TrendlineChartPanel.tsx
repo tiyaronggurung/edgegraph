@@ -381,6 +381,15 @@ export function TrendlineChartPanel() {
               const priceCls = diff == null
                 ? "text-white"
                 : up ? "text-emerald-300" : "text-rose-300";
+              const rec = ourQuote?.recommendation ?? null;
+              const recCls = rec == null || rec.side === "WAIT"
+                ? "border-white/30 bg-white/10 text-white/70"
+                : rec.side === "UP"
+                  ? (rec.strength === "strong" ? "border-emerald-400 bg-emerald-500/25 text-emerald-100" : "border-emerald-400/60 bg-emerald-500/10 text-emerald-200")
+                  : (rec.strength === "strong" ? "border-rose-400 bg-rose-500/25 text-rose-100" : "border-rose-400/60 bg-rose-500/10 text-rose-200");
+              const recLabel = rec == null
+                ? "…"
+                : rec.side === "WAIT" ? "WAIT" : `BET ${rec.side}`;
               return (
                 <div
                   className={`pointer-events-none absolute top-2 left-2 z-20 flex items-center gap-2 px-2 py-1 rounded border ${border} bg-black/75 backdrop-blur font-mono text-[11px] shadow-lg`}
@@ -393,6 +402,19 @@ export function TrendlineChartPanel() {
                   {diff != null && (
                     <span className={`tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}>
                       {up ? "+" : ""}${diff.toFixed(2)} {up ? "above" : "below"} strike
+                    </span>
+                  )}
+                  {rec && (
+                    <span
+                      className={`ml-1 px-1.5 py-[1px] rounded border text-[10px] font-bold tracking-wider ${recCls}`}
+                      title={rec.reason}
+                    >
+                      {recLabel}
+                      {rec.side !== "WAIT" && (
+                        <span className="ml-1 opacity-80 font-mono font-normal">
+                          {rec.confidencePct.toFixed(0)}%
+                        </span>
+                      )}
                     </span>
                   )}
                   <span className="text-white/30">· {live.sources || 0}v</span>
