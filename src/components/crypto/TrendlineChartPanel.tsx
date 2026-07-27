@@ -11,7 +11,7 @@ import { emaSeries, rsi, macd, bollinger, sessionVwap } from "@/lib/ta/taEngine"
 import { fibLevels, FIB_COLORS } from "@/lib/ta/fib";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { OurOddsPill } from "@/components/crypto/OurOddsPill";
-import { computeUpProbability, realizedVolFromCloses, toAmericanOdds } from "@/lib/ourOdds";
+import { computeOurQuote, realizedVolFromCloses, toAmericanOdds } from "@/lib/ourOdds";
 import type { Candle } from "@/lib/ta/chartSignals";
 
 
@@ -371,9 +371,9 @@ export function TrendlineChartPanel() {
                   ? (rawCandles as TCandle[]).map(c => c.c)
                   : ((shadow?.candles ?? []) as TCandle[]).map(c => c.c);
               const sig = realizedVolFromCloses(closesForOdds.slice(-30));
-              const ourUpProb =
+              const quote =
                 displaySpot != null && kalshi?.strike != null && kalshiRemainingSec != null && sig != null
-                  ? computeUpProbability({
+                  ? computeOurQuote({
                       spot: displaySpot,
                       strike: kalshi.strike,
                       secondsToClose: kalshiRemainingSec,
@@ -388,7 +388,9 @@ export function TrendlineChartPanel() {
                   visible={visible}
                   fibOn={fibOn}
                   liveSpot={displaySpot}
-                  ourUpProb={ourUpProb}
+                  ourUpAskProb={quote?.pUpAsk ?? null}
+                  ourDownAskProb={quote?.pDownAsk ?? null}
+                  ourMidProb={quote?.mid ?? null}
                 />
               );
             })()}
@@ -489,7 +491,8 @@ const MAX_CW = 32;
 const DEFAULT_CW = 6;
 
 function TaChart({
-  candles: candlesProp, shadow, tf, visible, fibOn, liveSpot, ourUpProb,
+  candles: candlesProp, shadow, tf, visible, fibOn, liveSpot,
+  ourUpAskProb, ourDownAskProb, ourMidProb,
 }: {
   candles: TCandle[];
   shadow: TrendlineSnapshot | null;
@@ -497,7 +500,9 @@ function TaChart({
   visible: Record<string, boolean>;
   fibOn: boolean;
   liveSpot: number | null;
-  ourUpProb: number | null;
+  ourUpAskProb: number | null;
+  ourDownAskProb: number | null;
+  ourMidProb: number | null;
 }) {
 
   // Alias so the rest of the component (which references `data.strike` etc.)
@@ -1112,10 +1117,10 @@ function TaChart({
                 )}
 
                 {/* UP / DOWN odds pills — anchored to the right of the pulse dot */}
-                {ourUpProb != null && (() => {
-                  const upStr = toAmericanOdds(ourUpProb);
-                  const dnStr = toAmericanOdds(1 - ourUpProb);
-                  const upFav = ourUpProb >= 0.5;
+                {ourUpAskProb != null && ourDownAskProb != null && (() => {
+                  const upStr = toAmericanOdds(ourUpAskProb);
+                  const dnStr = toAmericanOdds(ourDownAskProb);
+                  const upFav = (ourMidProb ?? 0.5) >= 0.5;
                   const oPW = 70, oPH = 14, oGap = 8, oVGap = 6;
                   const rightLimit = innerW - PAD_R - 4;
                   const oX = Math.min(dotX + oGap, rightLimit - oPW);
