@@ -28,6 +28,8 @@ export function OddsSideStudyPanel() {
     refetchInterval: 10_000,
     staleTime: 8_000,
   });
+  const lockRef = useRef<{ ticker: string; side: "UP" | "DOWN"; prob: number } | null>(null);
+
 
   const rows: SideStudyRow[] = data?.rows ?? [];
   const summary: SideStudySummary | undefined = data?.summary;
