@@ -210,8 +210,10 @@ export function computeUpProbability(inp: UpProbInput): number | null {
 
 export interface QuoteInput extends UpProbInput {
   momentumTiltPct?: number; // signed fraction, e.g. +0.015 = +1.5¢ UP lean
-  midPivotTiltPct?: number; // signed fraction from trendline MID pivot
+  midPivotTiltPct?: number; // legacy — no longer used as tilt; kept for shape
+  midPrice?: number | null; // trendline MID (SELL+BUY)/2 — the anchor
 }
+
 
 export interface OurQuote {
   mid: number;         // fair-value P(UP) after tilt (0..1)
