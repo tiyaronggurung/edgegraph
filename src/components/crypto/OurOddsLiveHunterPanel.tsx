@@ -259,8 +259,9 @@ export function OurOddsLiveHunterPanel() {
           </span>
           <div className="flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">
             {firing && <Loader2 className="h-3 w-3 animate-spin" />}
-            {lastFired && <span className="text-amber-200">last: {lastFired}</span>}
-            {!lastFired && lastSkip && <span className="opacity-60">wait: {lastSkip}</span>}
+            {lastFired && <span className="text-amber-200">buy: {lastFired}</span>}
+            {lastTp && <span className="text-emerald-300">TP: {lastTp}</span>}
+            {!lastFired && !lastTp && lastSkip && <span className="opacity-60">wait: {lastSkip}</span>}
           </div>
         </div>
       </div>
