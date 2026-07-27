@@ -12,6 +12,7 @@ import { fibLevels, FIB_COLORS } from "@/lib/ta/fib";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { OurOddsPill } from "@/components/crypto/OurOddsPill";
 import { computeOurQuote, realizedVolFromCloses, toAmericanOdds } from "@/lib/ourOdds";
+import { useOurQuote } from "@/hooks/useOurQuote";
 import { useKalshiOddsRecorder } from "@/hooks/useKalshiOddsRecorder";
 
 import type { Candle } from "@/lib/ta/chartSignals";
@@ -209,6 +210,20 @@ export function TrendlineChartPanel() {
     Object.fromEntries(SERIES.map(s => [s.key, s.defaultOn]))
   );
 
+  // Single source of truth for OUR UP/DOWN quote — shared by the top OURS
+  // pill and the pulse-dot pills on the chart so they always match.
+  const closes1mForOdds = useMemo<number[]>(() => (
+    tf === "1m"
+      ? (rawCandles as TCandle[]).map(c => c.c)
+      : ((shadow?.candles ?? []) as TCandle[]).map(c => c.c)
+  ), [tf, rawCandles, shadow?.candles]);
+  const ourQuote = useOurQuote({
+    spot: displaySpot,
+    strike: kalshi?.strike ?? null,
+    secondsToClose: kalshiRemainingSec,
+    closes1m: closes1mForOdds,
+  });
+
   return (
     <div className="border border-white/10 rounded-lg bg-black/40 p-3">
       <div
@@ -274,22 +289,11 @@ export function TrendlineChartPanel() {
             );
           })()}
 
-          {(() => {
-            // 1m closes for realized vol — prefer live 1m candles, fall back to shadow (also 1m).
-            const closes1m: number[] =
-              tf === "1m"
-                ? (rawCandles as TCandle[]).map(c => c.c)
-                : ((shadow?.candles ?? []) as TCandle[]).map(c => c.c);
-            return (
-              <OurOddsPill
-                spot={displaySpot ?? null}
-                strike={kalshi?.strike ?? null}
-                secondsToClose={kalshiRemainingSec}
-                closes1m={closes1m}
-                kalshiUpProb={kalshi?.yesMid ?? null}
-              />
-            );
-          })()}
+          <OurOddsPill
+            quote={ourQuote}
+            kalshiUpProb={kalshi?.yesMid ?? null}
+          />
+
 
 
 
@@ -386,39 +390,18 @@ export function TrendlineChartPanel() {
                 </div>
               );
             })()}
-            {(() => {
-              const closesForOdds: number[] =
-                tf === "1m"
-                  ? (rawCandles as TCandle[]).map(c => c.c)
-                  : ((shadow?.candles ?? []) as TCandle[]).map(c => c.c);
-              const sig = realizedVolFromCloses(closesForOdds.slice(-30));
-              const fresh =
-                displaySpot != null && kalshi?.strike != null && kalshiRemainingSec != null && sig != null
-                  ? computeOurQuote({
-                      spot: displaySpot,
-                      strike: kalshi.strike,
-                      secondsToClose: kalshiRemainingSec,
-                      sigmaAnnualized: sig,
-                    })
-                  : null;
-              // Retain last-good quote so the pulse-dot UP/DN pills don't blink
-              // when sig/candles/kalshi momentarily go null between frames.
-              if (fresh) lastQuoteRef.current = fresh;
-              const quote = fresh ?? lastQuoteRef.current;
-              return (
-                <TaChart
-                  candles={candles}
-                  shadow={shadow ?? null}
-                  tf={tf}
-                  visible={visible}
-                  fibOn={fibOn}
-                  liveSpot={displaySpot}
-                  ourUpAskProb={quote?.pUpAsk ?? null}
-                  ourDownAskProb={quote?.pDownAsk ?? null}
-                  ourMidProb={quote?.mid ?? null}
-                />
-              );
-            })()}
+            <TaChart
+              candles={candles}
+              shadow={shadow ?? null}
+              tf={tf}
+              visible={visible}
+              fibOn={fibOn}
+              liveSpot={displaySpot}
+              ourUpAskProb={ourQuote?.pUpAsk ?? null}
+              ourDownAskProb={ourQuote?.pDownAsk ?? null}
+              ourMidProb={ourQuote?.mid ?? null}
+            />
+
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
