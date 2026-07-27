@@ -12,6 +12,7 @@ import { fibLevels, FIB_COLORS } from "@/lib/ta/fib";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { OurOddsPill } from "@/components/crypto/OurOddsPill";
 import { computeOurQuote, realizedVolFromCloses, toAmericanOdds } from "@/lib/ourOdds";
+import { useOurQuote } from "@/hooks/useOurQuote";
 import { useKalshiOddsRecorder } from "@/hooks/useKalshiOddsRecorder";
 
 import type { Candle } from "@/lib/ta/chartSignals";
