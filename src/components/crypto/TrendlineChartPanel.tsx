@@ -1061,23 +1061,31 @@ function TaChart({
             const diffText = diff != null
               ? `${diff >= 0 ? "+" : ""}$${diff.toFixed(2)} ${diff >= 0 ? "above" : "below"} strike`
               : "";
-            // Anchor the delta pill just above the price line so it never
-            // sits on top of the pulse dot or the right-axis price tag.
+            // Anchor the delta pill to the STRIKE line (not the price line)
+            // so it never crowds the UP/DN pulse pills that sit at the price.
             const dotX = xFor(nCandles - 1);
             const pillW = 132;
             const pillH = 16;
             const pillGap = 10;
-            // horizontal: prefer left of the dot; fall back to right of the dot,
-            // clamped so it never overlaps the right-axis price pill.
-            const rightAxisLeft = innerW - PAD_R; // where the axis price tag starts
+            const rightAxisLeft = innerW - PAD_R;
             const preferLeft = dotX - pillGap - pillW >= PAD_L + 4;
             const pillX = preferLeft
               ? dotX - pillGap - pillW
               : Math.min(rightAxisLeft - pillW - 6, dotX + pillGap);
             const pillTextX = pillX + pillW - 6;
-            // vertical: lift the pill above the dashed price line so it doesn't
-            // overlap the pulse dot or the axis pill visually.
-            const pillCenterY = Math.max(PAD_T + pillH / 2 + 2, yy - 14);
+            // Vertical: sit just OUTSIDE the strike line on the side the price
+            // sits (below strike → pill above strike line; above strike → below).
+            // Falls back to price-line if strike is off-chart.
+            const strikeY = data?.strike != null ? yPrice(data.strike) : null;
+            const priceBelowStrike = diff != null && diff < 0;
+            const anchorY = strikeY ?? yy;
+            const rawCenter = strikeY != null
+              ? (priceBelowStrike ? anchorY - 14 : anchorY + 14)
+              : anchorY - 14;
+            const pillCenterY = Math.min(
+              priceH - PAD_B - pillH / 2 - 2,
+              Math.max(PAD_T + pillH / 2 + 2, rawCenter),
+            );
             return (
               <>
                 <line
@@ -1101,13 +1109,15 @@ function TaChart({
                 >
                   ${nowPrice.toFixed(2)}
                 </text>
-                {/* delta-from-strike pill — lifted above the price line */}
+                {/* delta-from-strike pill — anchored to the strike line, not the price */}
                 {diffText && (
                   <>
-                    {/* thin connector from the price line to the pill */}
+                    {/* thin connector from the strike line to the pill */}
                     <line
-                      x1={pillX + pillW / 2} y1={yy}
-                      x2={pillX + pillW / 2} y2={pillCenterY + pillH / 2}
+                      x1={pillX + pillW / 2}
+                      y1={strikeY ?? yy}
+                      x2={pillX + pillW / 2}
+                      y2={pillCenterY + (priceBelowStrike ? pillH / 2 : -pillH / 2)}
                       stroke={dashStroke} strokeWidth={1} strokeDasharray="2 2" opacity={0.6}
                     />
                     <rect
@@ -1123,6 +1133,7 @@ function TaChart({
                     </text>
                   </>
                 )}
+
 
                 {/* UP / DOWN odds pills — anchored to the right of the pulse dot */}
                 {ourUpAskProb != null && ourDownAskProb != null && (() => {
