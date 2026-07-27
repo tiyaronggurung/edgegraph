@@ -96,16 +96,20 @@ export function TrendlineChartPanel() {
       kalshiAnchorRef.current = { ticker: kalshi.ticker, secs: kalshi.secondsToClose, at: Date.now() };
     }
   }
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [kalshiRemainingSec, setKalshiRemainingSec] = useState<number | null>(null);
   useEffect(() => {
-    const id = setInterval(() => setNowMs(Date.now()), 500);
-    return () => clearInterval(id);
+    let raf = 0;
+    const tick = () => {
+      const a = kalshiAnchorRef.current;
+      if (a) {
+        const next = Math.max(0, a.secs - Math.floor((Date.now() - a.at) / 1000));
+        setKalshiRemainingSec((prev) => (prev === next ? prev : next));
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, []);
-  const kalshiRemainingSec = (() => {
-    const a = kalshiAnchorRef.current;
-    if (!a) return null;
-    return Math.max(0, a.secs - Math.round((nowMs - a.at) / 1000));
-  })();
   const fmtMMSS = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   // Strike / wedge / spike metadata — only meaningful on 1m; keep the existing shadow query.
