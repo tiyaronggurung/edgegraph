@@ -43,14 +43,19 @@ export function OurOddsPill({ quote, kalshiUpProb }: Props) {
     : "bg-white/5 text-white/60 border-white/10";
 
   const overround = (quote.upCents + quote.downCents) - 100;
+  const pillTiltCents = (quote.pillGateTiltPct ?? 0) * 100;
   const title =
     `Our ask-side odds (Kalshi-style GBM + spread):\n` +
     `  MID P(UP) = ${(quote.mid * 100).toFixed(1)}%\n` +
     `  UP  ask   = ${quote.upCents.toFixed(1)}¢  →  ${upOdds}\n` +
     `  DOWN ask  = ${quote.downCents.toFixed(1)}¢  →  ${downOdds}\n` +
     `  Half-spread = ${(quote.halfSpread * 100).toFixed(2)}¢  ·  Overround = ${overround.toFixed(1)}¢\n` +
+    (Math.abs(pillTiltCents) > 0.01
+      ? `  Pill-gate tilt = ${pillTiltCents >= 0 ? "+" : ""}${pillTiltCents.toFixed(2)}¢ (strike vs BUY/MID/SELL, last 5m)\n`
+      : "") +
     (kalshiUpProb != null ? `Kalshi P(UP) = ${(kalshiUpProb * 100).toFixed(1)}%  ·  Δ = ${((delta ?? 0) * 100).toFixed(2)}%\n` : "") +
     `σ from live tape (EWMA λ=0.94); tilt from last-60s drift.\nRecomputed every tick.`;
+
 
   return (
     <span

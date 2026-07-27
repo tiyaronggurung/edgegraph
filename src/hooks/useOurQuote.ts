@@ -16,8 +16,10 @@ export function useOurQuote(params: {
   secondsToClose: number | null | undefined;
   closes1m: number[];
   midPrice?: number | null | undefined;
+  buyPrice?: number | null | undefined;
+  sellPrice?: number | null | undefined;
 }) {
-  const { spot, strike, secondsToClose, closes1m, midPrice } = params;
+  const { spot, strike, secondsToClose, closes1m, midPrice, buyPrice, sellPrice } = params;
 
   const tapeRef = useRef<TapeSample[]>([]);
   const lastGoodRef = useRef<ReturnType<typeof computeOurQuote> | null>(null);
@@ -57,12 +59,15 @@ export function useOurQuote(params: {
       sigmaAnnualized: sigma,
       momentumTiltPct: tilt,
       midPrice: midPrice ?? null,
+      buyPrice: buyPrice ?? null,
+      sellPrice: sellPrice ?? null,
     });
 
     if (q) lastGoodRef.current = q;
     return q ?? lastGoodRef.current;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spot, strike, secondsToClose, closes1m, midPrice]);
+  }, [spot, strike, secondsToClose, closes1m, midPrice, buyPrice, sellPrice]);
 }
+
 
 

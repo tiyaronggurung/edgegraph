@@ -227,7 +227,10 @@ export function TrendlineChartPanel() {
     secondsToClose: kalshiRemainingSec,
     closes1m: closes1mForOdds,
     midPrice: midPriceNow,
+    buyPrice: shadow?.upperAtNow ?? null,
+    sellPrice: shadow?.lowerAtNow ?? null,
   });
+
 
 
   return (
