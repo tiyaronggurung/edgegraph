@@ -29,6 +29,10 @@ export function OddsSideStudyPanel() {
     staleTime: 8_000,
   });
   const lockRef = useRef<{ ticker: string; side: "UP" | "DOWN"; prob: number } | null>(null);
+  // Rolling buffer of recent p_up samples for the current ticker.
+  // Feeds EWMA (recency-weighted mean) + dwell-ratio (% of ticks favoring a side).
+  // Buffer resets when the ticker rolls to a new 15m window.
+  const bufRef = useRef<{ ticker: string; samples: { t: number; pUp: number }[] }>({ ticker: "", samples: [] });
 
 
   const rows: SideStudyRow[] = data?.rows ?? [];
