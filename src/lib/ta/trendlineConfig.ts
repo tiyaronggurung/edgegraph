@@ -4,7 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type TrendlineConfig = {
-  booster_mode: "follow" | "fade" | "off";
+  booster_mode: "follow" | "fade" | "hybrid" | "off";
   quality_gates_enabled: boolean;
   min_channel_width_pct: number;
   min_swings: number;
