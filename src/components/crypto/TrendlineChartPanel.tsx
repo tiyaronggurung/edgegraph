@@ -798,21 +798,95 @@ function TaChart({
           {visible.bbUpper && line(c.bbUpper, "rgba(148, 163, 184, 0.85)", "3 3", 0.9)}
           {visible.bbLower && line(c.bbLower, "rgba(148, 163, 184, 0.85)", "3 3", 0.9)}
 
-          {/* trendlines */}
-          {upper && (
-            <line
-              x1={xFor(0)} y1={yPrice(upper.slope * t0 + upper.intercept)}
-              x2={xFor(nCandles - 1)} y2={yPrice(upper.slope * tN + upper.intercept)}
-              stroke="rgb(251, 191, 36)" strokeWidth={1.5} strokeDasharray="4 3" opacity={0.85}
-            />
-          )}
-          {lower && (
-            <line
-              x1={xFor(0)} y1={yPrice(lower.slope * t0 + lower.intercept)}
-              x2={xFor(nCandles - 1)} y2={yPrice(lower.slope * tN + lower.intercept)}
-              stroke="rgb(251, 191, 36)" strokeWidth={1.5} strokeDasharray="4 3" opacity={0.85}
-            />
-          )}
+          {/* trendlines with BUY (lower) / SELL (upper) price pills */}
+          {upper && (() => {
+            const yStart = yPrice(upper.slope * t0 + upper.intercept);
+            const yEnd = yPrice(upper.slope * tN + upper.intercept);
+            const priceEnd = upper.slope * tN + upper.intercept;
+            const pillY = Math.max(PAD_T + 10, Math.min(priceH - PAD_B - 10, yEnd));
+            return (
+              <g>
+                <line
+                  x1={xFor(0)} y1={yStart}
+                  x2={xFor(nCandles - 1)} y2={yEnd}
+                  stroke="rgb(239, 68, 68)" strokeWidth={1.5} strokeDasharray="4 3" opacity={0.9}
+                />
+                <rect
+                  x={xFor(nCandles - 1) - 78} y={pillY - 9}
+                  width={72} height={16} rx={3}
+                  fill="rgba(239, 68, 68, 0.92)"
+                />
+                <text
+                  x={xFor(nCandles - 1) - 42} y={pillY + 3} textAnchor="middle"
+                  fill="white" fontSize={10} fontFamily="monospace" fontWeight={700}
+                >
+                  SELL ${priceEnd.toFixed(0)}
+                </text>
+              </g>
+            );
+          })()}
+          {lower && (() => {
+            const yStart = yPrice(lower.slope * t0 + lower.intercept);
+            const yEnd = yPrice(lower.slope * tN + lower.intercept);
+            const priceEnd = lower.slope * tN + lower.intercept;
+            const pillY = Math.max(PAD_T + 10, Math.min(priceH - PAD_B - 10, yEnd));
+            return (
+              <g>
+                <line
+                  x1={xFor(0)} y1={yStart}
+                  x2={xFor(nCandles - 1)} y2={yEnd}
+                  stroke="rgb(34, 197, 94)" strokeWidth={1.5} strokeDasharray="4 3" opacity={0.9}
+                />
+                <rect
+                  x={xFor(nCandles - 1) - 78} y={pillY - 9}
+                  width={72} height={16} rx={3}
+                  fill="rgba(34, 197, 94, 0.92)"
+                />
+                <text
+                  x={xFor(nCandles - 1) - 42} y={pillY + 3} textAnchor="middle"
+                  fill="white" fontSize={10} fontFamily="monospace" fontWeight={700}
+                >
+                  BUY ${priceEnd.toFixed(0)}
+                </text>
+              </g>
+            );
+          })()}
+
+          {/* BUY/SELL touch markers: candles whose wick tags a trendline */}
+          {c.candles.map((cd, i) => {
+            const tol = (c.pMax - c.pMin) * 0.005; // ~0.5% of visible range
+            const upperP = upper ? upper.slope * cd.t + upper.intercept : null;
+            const lowerP = lower ? lower.slope * cd.t + lower.intercept : null;
+            const sellTouch = upperP != null && cd.h >= upperP - tol && cd.h <= upperP + tol * 2;
+            const buyTouch = lowerP != null && cd.l <= lowerP + tol && cd.l >= lowerP - tol * 2;
+            if (!sellTouch && !buyTouch) return null;
+            const cx = xFor(i);
+            return (
+              <g key={`tt-${i}`} pointerEvents="none">
+                {sellTouch && upperP != null && (
+                  <>
+                    <polygon
+                      points={`${cx - 4},${yPrice(upperP) - 8} ${cx + 4},${yPrice(upperP) - 8} ${cx},${yPrice(upperP) - 2}`}
+                      fill="rgb(239, 68, 68)" stroke="rgba(0,0,0,0.6)" strokeWidth={0.5}
+                    />
+                    <text x={cx} y={yPrice(upperP) - 10} textAnchor="middle"
+                      fill="rgb(239, 68, 68)" fontSize={8} fontWeight={700}>S</text>
+                  </>
+                )}
+                {buyTouch && lowerP != null && (
+                  <>
+                    <polygon
+                      points={`${cx - 4},${yPrice(lowerP) + 8} ${cx + 4},${yPrice(lowerP) + 8} ${cx},${yPrice(lowerP) + 2}`}
+                      fill="rgb(34, 197, 94)" stroke="rgba(0,0,0,0.6)" strokeWidth={0.5}
+                    />
+                    <text x={cx} y={yPrice(lowerP) + 18} textAnchor="middle"
+                      fill="rgb(34, 197, 94)" fontSize={8} fontWeight={700}>B</text>
+                  </>
+                )}
+              </g>
+            );
+          })}
+
 
           {/* strike line — bold, labeled on BOTH ends with target price pill on right */}
           {data?.strike != null && data.strike >= c.pMin && data.strike <= c.pMax && (
