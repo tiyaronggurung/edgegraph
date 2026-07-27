@@ -17,13 +17,15 @@ export const getTrendlineBreakStudy = createServerFn({ method: "GET" })
     z.object({ days: z.number().int().min(1).max(60).default(14) }).parse(d ?? {}),
   )
   .handler(async ({ data, context }): Promise<{ days: number; rows: TrendlineBreakRow[] }> => {
-    const { data: rows, error } = await context.supabase.rpc("trendline_break_study", {
-      _days: data.days,
-    });
+    const { data: rows, error } = await (context.supabase.rpc as any)(
+      "trendline_break_study",
+      { _days: data.days },
+    );
     if (error) throw new Error(error.message);
+    const arr: any[] = Array.isArray(rows) ? rows : [];
     return {
       days: data.days,
-      rows: (rows ?? []).map((r: any) => ({
+      rows: arr.map((r) => ({
         bucket: r.bucket,
         n: Number(r.n ?? 0),
         pct_up: r.pct_up == null ? null : Number(r.pct_up),
