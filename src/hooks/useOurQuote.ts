@@ -3,9 +3,9 @@ import {
   computeOurQuote,
   effectiveVol,
   momentumTilt,
-  midPivotTilt,
   type TapeSample,
 } from "@/lib/ourOdds";
+
 
 const TAPE_MAX = 900;         // ~5 min of ticks at ~300ms cadence
 const TAPE_MIN_DT_MS = 250;
