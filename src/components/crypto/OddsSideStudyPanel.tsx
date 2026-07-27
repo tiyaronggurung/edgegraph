@@ -29,6 +29,10 @@ export function OddsSideStudyPanel() {
     staleTime: 8_000,
   });
   const lockRef = useRef<{ ticker: string; side: "UP" | "DOWN"; prob: number } | null>(null);
+  // Rolling buffer of recent p_up samples for the current ticker.
+  // Feeds EWMA (recency-weighted mean) + dwell-ratio (% of ticks favoring a side).
+  // Buffer resets when the ticker rolls to a new 15m window.
+  const bufRef = useRef<{ ticker: string; samples: { t: number; pUp: number }[] }>({ ticker: "", samples: [] });
 
 
   const rows: SideStudyRow[] = data?.rows ?? [];
@@ -44,20 +48,77 @@ export function OddsSideStudyPanel() {
         <span className="text-[10px] text-white/50">last 12h · {rows.length} windows</span>
       </div>
 
-      {/* Live confidence call — locks side once conviction first crosses 88%. */}
+      {/* Live confidence call — path-aware blend of EWMA + dwell-ratio.
+          Locks side once blended conviction first crosses 88%. */}
       {live && (() => {
         const LOCK_THRESHOLD = 0.88;
         const SKIP_THRESHOLD = 0.55;
-        const p = live.our_mid;
-        const liveProb = p == null ? null : Math.max(p, 1 - p);
-        const liveDir: "UP" | "DOWN" | null = p == null ? null : p >= 0.5 ? "UP" : "DOWN";
-        const tickerKey = live.ticker ?? "";
+        const DWELL_SIDE_THRESHOLD = 0.55; // a tick "favors" a side if p_side ≥ 0.55
+        const EWMA_HALFLIFE_SEC = 60;      // 60s halflife → recent ticks dominate
+        const DWELL_WINDOW_SEC = 300;      // dwell over last 5 min
+        const BUF_MAX_SEC = 900;           // keep at most one full 15m window
+        const BLEND_W_EWMA = 0.5;
+        const BLEND_W_DWELL = 0.5;
 
-        // Reset lock when ticker rolls to a new window.
-        if (lockRef.current && lockRef.current.ticker !== tickerKey) {
+        const p = live.our_mid;
+        const tickerKey = live.ticker ?? "";
+        const nowMs = Date.now();
+
+        // Reset buffer + lock when ticker rolls.
+        if (bufRef.current.ticker !== tickerKey) {
+          bufRef.current = { ticker: tickerKey, samples: [] };
           lockRef.current = null;
         }
-        // Arm lock the first time conviction crosses the threshold this window.
+        // Append this tick's p_up.
+        if (tickerKey && p != null && Number.isFinite(p)) {
+          bufRef.current.samples.push({ t: nowMs, pUp: p });
+          const cutoff = nowMs - BUF_MAX_SEC * 1000;
+          bufRef.current.samples = bufRef.current.samples.filter(s => s.t >= cutoff);
+        }
+        const samples = bufRef.current.samples;
+
+        // #2 EWMA of p_up (recency-weighted).
+        let ewmaUp: number | null = null;
+        if (samples.length > 0) {
+          const lambda = Math.log(2) / EWMA_HALFLIFE_SEC;
+          let num = 0, den = 0;
+          for (const s of samples) {
+            const ageSec = (nowMs - s.t) / 1000;
+            const w = Math.exp(-lambda * ageSec);
+            num += w * s.pUp;
+            den += w;
+          }
+          ewmaUp = den > 0 ? num / den : null;
+        }
+
+        // #3 Dwell-ratio: fraction of last DWELL_WINDOW_SEC where p_up ≥ 0.55 vs ≤ 0.45.
+        const dwellCutoff = nowMs - DWELL_WINDOW_SEC * 1000;
+        const recent = samples.filter(s => s.t >= dwellCutoff);
+        let dwellUp: number | null = null;
+        if (recent.length >= 3) {
+          const upTicks = recent.filter(s => s.pUp >= DWELL_SIDE_THRESHOLD).length;
+          const downTicks = recent.filter(s => s.pUp <= 1 - DWELL_SIDE_THRESHOLD).length;
+          const decided = upTicks + downTicks;
+          // If most ticks are near 50/50, dwell stays near 0.5 (correctly indecisive).
+          dwellUp = decided > 0
+            ? (upTicks + 0.5 * (recent.length - decided)) / recent.length
+            : 0.5;
+        }
+
+        // Blend: EWMA if only that's ready, else weighted blend.
+        let blendedUp: number | null = null;
+        if (ewmaUp != null && dwellUp != null) {
+          blendedUp = BLEND_W_EWMA * ewmaUp + BLEND_W_DWELL * dwellUp;
+        } else if (ewmaUp != null) {
+          blendedUp = ewmaUp;
+        } else if (p != null) {
+          blendedUp = p; // cold-start fallback: instantaneous
+        }
+
+        const liveProb = blendedUp == null ? null : Math.max(blendedUp, 1 - blendedUp);
+        const liveDir: "UP" | "DOWN" | null = blendedUp == null ? null : blendedUp >= 0.5 ? "UP" : "DOWN";
+
+        // Arm lock the first time blended conviction crosses the threshold this window.
         if (!lockRef.current && tickerKey && liveProb != null && liveDir && liveProb >= LOCK_THRESHOLD) {
           lockRef.current = { ticker: tickerKey, side: liveDir, prob: liveProb };
         }
@@ -74,6 +135,11 @@ export function OddsSideStudyPanel() {
         const callClass =
           isSkip || displayProb == null ? "text-amber-300"
           : displaySide === "UP" ? "text-emerald-300" : "text-rose-300";
+
+        // Show component breakdown so we can see EWMA vs dwell divergence.
+        const ewmaTxt = ewmaUp == null ? "—" : `${(Math.max(ewmaUp, 1 - ewmaUp) * 100).toFixed(0)}% ${ewmaUp >= 0.5 ? "U" : "D"}`;
+        const dwellTxt = dwellUp == null ? "—" : `${(Math.max(dwellUp, 1 - dwellUp) * 100).toFixed(0)}% ${dwellUp >= 0.5 ? "U" : "D"}`;
+
         return (
           <div className="mt-3 flex items-center gap-3 p-2 rounded border border-white/10 bg-black/40">
             <div className={`text-lg font-bold font-mono ${callClass}`}>{call}</div>
@@ -86,13 +152,13 @@ export function OddsSideStudyPanel() {
               <div className="text-white/50">
                 {locked
                   ? `Locked ${locked.side} at ${(locked.prob * 100).toFixed(0)}% — held for rest of window`
-                  : live.reason}
+                  : `EWMA(60s) ${ewmaTxt} · dwell(5m) ${dwellTxt} · ${samples.length} ticks`}
               </div>
             </div>
             <div className="text-[10px] font-mono text-right text-white/60">
               <div>Ours {pct(live.our_mid, 0)}</div>
               <div>Kalshi {pct(live.kalshi_mid, 0)}</div>
-              <div className="text-white/40">conv {live.confidence != null ? (live.confidence * 100).toFixed(0) + "%" : "—"}</div>
+              <div className="text-white/40">inst {live.confidence != null ? (live.confidence * 100).toFixed(0) + "%" : "—"}</div>
             </div>
           </div>
         );
