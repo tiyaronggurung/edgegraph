@@ -4785,6 +4785,15 @@ export type Database = {
         }[]
       }
       run_loss_autopsy: { Args: never; Returns: number }
+      trendline_break_study: {
+        Args: { _days?: number }
+        Returns: {
+          avg_dist_pct: number
+          bucket: string
+          n: number
+          pct_up: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
