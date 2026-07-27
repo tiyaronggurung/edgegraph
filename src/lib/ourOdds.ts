@@ -297,7 +297,18 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
 
   // Momentum lean survives the blend — small but real edge over Kalshi.
   const momTilt = inp.momentumTiltPct ?? 0;
-  let mid = Math.min(0.99, Math.max(0.01, anchorMid + momTilt));
+  // Pill-gate tilt: when strike sits above BOTH pills (BUY+MID) by ≥$5,
+  // shadow-study says settlement leans DOWN 65-92% depending on time-left.
+  // Symmetric on the low side. Only kicks in at T ≤ 300s.
+  const pillTilt = pillGateTilt({
+    spot,
+    strike,
+    midPrice: midPrice ?? null,
+    buyPrice: inp.buyPrice ?? null,
+    sellPrice: inp.sellPrice ?? null,
+    secondsToClose: inp.secondsToClose,
+  });
+  let mid = Math.min(0.99, Math.max(0.01, anchorMid + momTilt + pillTilt));
 
   const hs = halfSpread(inp.secondsToClose);
   let pUpAsk = Math.min(0.995, Math.max(0.005, mid + hs));
@@ -321,8 +332,55 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
     downCents: pDownAsk * 100,
     timeDecayFrac,
     midPivotTiltPct: effectivePivot,
+    pillGateTiltPct: pillTilt,
   };
 }
+
+/**
+ * Pill-gate tilt (signed fraction, capped ±8¢). Encodes the study-confirmed
+ * rule: when the Kalshi strike sits above BOTH the trendline BUY pill and
+ * the MID pill (by ≥$5), settlement is heavily biased DOWN in the last 5m.
+ * Symmetric for strike below both SELL and MID. Off outside T ≤ 300s.
+ *
+ * Historical WR (last 30d, gap ≥ $5, strike above both pills):
+ *   T 5-10m: 64.6% · T 2-5m: 68.9% · T 30s-2m: 92.0% · T <30s: 88.5%
+ */
+export function pillGateTilt(args: {
+  spot: number | null | undefined;
+  strike: number | null | undefined;
+  midPrice: number | null | undefined;
+  buyPrice: number | null | undefined;
+  sellPrice: number | null | undefined;
+  secondsToClose: number;
+}): number {
+  const { strike, midPrice, buyPrice, sellPrice, secondsToClose } = args;
+  const MIN_GAP = 5; // $
+  if (!(strike != null && strike > 0)) return 0;
+  if (!(midPrice != null && midPrice > 0)) return 0;
+  const T = Math.max(0, secondsToClose);
+  if (T > 300) return 0; // rule only reliable in last 5 min
+
+  // Time weight: 0 at T=300s → 1.0 at T=60s → holds through close.
+  let wT: number;
+  if (T >= 60) wT = 1 - (T - 60) / 240; // 300→0, 60→1
+  else         wT = 1;
+  wT = Math.max(0, Math.min(1, wT));
+
+  // Strike above BOTH BUY & MID by ≥$5 → DOWN lean.
+  if (buyPrice != null && buyPrice > 0
+      && strike >= buyPrice + MIN_GAP
+      && strike >= midPrice + MIN_GAP) {
+    return -0.08 * wT;
+  }
+  // Strike below BOTH SELL & MID by ≥$5 → UP lean.
+  if (sellPrice != null && sellPrice > 0
+      && strike <= sellPrice - MIN_GAP
+      && strike <= midPrice - MIN_GAP) {
+    return +0.08 * wT;
+  }
+  return 0;
+}
+
 
 
 
