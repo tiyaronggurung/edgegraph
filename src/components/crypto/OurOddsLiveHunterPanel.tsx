@@ -30,6 +30,7 @@ export function OurOddsLiveHunterPanel() {
   const compositeFn = useServerFn(getCompositeSpot);
   const evalFn = useServerFn(evalTrendlineShadow);
   const fireFn = useServerFn(fireOurOddsLiveBet);
+  const autoTpFn = useServerFn(autoTakeProfitOurOddsLive);
   const qc = useQueryClient();
 
   const [enabled, setEnabled] = useState<boolean>(() => {
