@@ -151,68 +151,89 @@ export function OddsSideStudyPanel() {
   );
 }
 
-const LOCK_THRESHOLD = 0.70; // once side prob hits this, lock the call for the rest of the window
-const SKIP_THRESHOLD = 0.55;
+// ---------- Threshold × Time-Remaining Study ----------
+export function LockThresholdStudyPanel() {
+  const fn = useServerFn(getLockThresholdStudy);
+  const { data } = useQuery({
+    queryKey: ["lock-threshold-study"],
+    queryFn: () => fn({ data: { hours: 168 } }),
+    refetchInterval: 60_000,
+    staleTime: 55_000,
+  });
 
-function LiveCall({ live }: { live: LiveHold }) {
-  // Persist the first side that crosses LOCK_THRESHOLD per ticker.
-  const lockRef = useRef<Map<string, { side: "UP" | "DOWN"; prob: number }>>(new Map());
-  const [, force] = useState(0);
+  const cells: LockCell[] = data?.cells ?? [];
+  const covered = data?.covered_windows ?? 0;
+  const BUCKETS = ["≥10m", "5-10m", "2-5m", "30s-2m", "<30s"];
+  const THRS = [0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90];
+  const get = (thr: number, b: string) => cells.find(c => c.threshold === thr && c.bucket === b);
 
-  useEffect(() => {
-    if (!live.ticker || live.our_mid == null) return;
-    const sideProb = Math.max(live.our_mid, 1 - live.our_mid);
-    const sideDir: "UP" | "DOWN" = live.our_mid >= 0.5 ? "UP" : "DOWN";
-    const existing = lockRef.current.get(live.ticker);
-    if (!existing && sideProb >= LOCK_THRESHOLD) {
-      lockRef.current.set(live.ticker, { side: sideDir, prob: sideProb });
-      // Prune to last 20 tickers to avoid unbounded growth.
-      if (lockRef.current.size > 20) {
-        const first = lockRef.current.keys().next().value;
-        if (first) lockRef.current.delete(first);
-      }
-      force(x => x + 1);
-    }
-  }, [live.ticker, live.our_mid]);
+  // Best cell: needs meaningful sample size.
+  const MIN_N = 10;
+  const best = cells
+    .filter(c => c.windows >= MIN_N && c.wr != null)
+    .sort((a, b) => (b.wr! - a.wr!) || (b.windows - a.windows))[0];
 
-  const p = live.our_mid;
-  const locked = live.ticker ? lockRef.current.get(live.ticker) : undefined;
-  const sideProb = p == null ? null : Math.max(p, 1 - p);
-  const sideDir: "UP" | "DOWN" | null = p == null ? null : p >= 0.5 ? "UP" : "DOWN";
-
-  const displaySide = locked?.side ?? sideDir;
-  const displayProb = locked?.prob ?? sideProb;
-  const isLocked = !!locked;
-  const skip = !isLocked && (sideProb == null || sideProb < SKIP_THRESHOLD);
-
-  const call =
-    displayProb == null ? "—"
-    : skip ? "SKIP"
-    : `${displaySide} ${(displayProb * 100).toFixed(0)}%${isLocked ? " 🔒" : ""}`;
-  const callClass =
-    skip || displayProb == null ? "text-amber-300"
-    : displaySide === "UP" ? "text-emerald-300" : "text-rose-300";
-
-  const reason = isLocked
-    ? `Locked at ${(locked!.prob * 100).toFixed(0)}% — holding for rest of window`
-    : live.reason;
+  const cellColor = (wr: number | null, n: number) => {
+    if (wr == null) return "text-white/25";
+    if (n < 3) return "text-white/40";
+    if (wr >= 0.80) return "text-emerald-300 font-bold";
+    if (wr >= 0.65) return "text-emerald-400";
+    if (wr >= 0.55) return "text-amber-300";
+    return "text-rose-300";
+  };
 
   return (
-    <div className="mt-3 flex items-center gap-3 p-2 rounded border border-white/10 bg-black/40">
-      <div className={`text-lg font-bold font-mono ${callClass}`}>{call}</div>
-      <div className="flex-1 text-[11px] font-mono text-white/70">
-        <div>
-          {live.ticker ? live.ticker.replace("KXBTC15M-", "") : "—"}
-          {live.strike != null ? <span className="text-white/40"> · ${live.strike.toFixed(0)}</span> : null}
-          {live.seconds_to_close != null ? <span className="text-white/40"> · {live.seconds_to_close}s left</span> : null}
-        </div>
-        <div className="text-white/50">{reason}</div>
+    <div className="border border-white/10 rounded-lg bg-black/40 p-3 mt-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] uppercase tracking-wider text-white/60">
+          Lock Threshold Study — WR by first-cross time
+        </span>
+        <span className="text-[10px] text-white/50">last 7d · {covered} settled windows w/ snapshots</span>
       </div>
-      <div className="text-[10px] font-mono text-right text-white/60">
-        <div>Ours {pct(live.our_mid, 0)}</div>
-        <div>Kalshi {pct(live.kalshi_mid, 0)}</div>
-        <div className="text-white/40">conv {live.confidence != null ? (live.confidence * 100).toFixed(0) + "%" : "—"}</div>
+
+      {best ? (
+        <div className="mt-2 text-[11px] font-mono text-emerald-300">
+          Best rule (n≥{MIN_N}): first cross ≥{(best.threshold * 100).toFixed(0)}% during {best.bucket} →
+          {" "}{(best.wr! * 100).toFixed(1)}% WR ({best.wins}/{best.windows})
+        </div>
+      ) : (
+        <div className="mt-2 text-[11px] font-mono text-white/40">
+          Not enough coverage yet — need at least {MIN_N} windows per cell before any rule is trustworthy.
+        </div>
+      )}
+
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full text-[10px] font-mono">
+          <thead className="text-white/50">
+            <tr>
+              <th className="text-left pr-2 py-1">Threshold</th>
+              {BUCKETS.map(b => <th key={b} className="text-right px-2">{b}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {THRS.map(thr => (
+              <tr key={thr} className="border-t border-white/5">
+                <td className="pr-2 py-1 text-white/80">≥ {(thr * 100).toFixed(0)}%</td>
+                {BUCKETS.map(b => {
+                  const c = get(thr, b);
+                  const wr = c?.wr ?? null;
+                  const n = c?.windows ?? 0;
+                  return (
+                    <td key={b} className={`text-right px-2 tabular-nums ${cellColor(wr, n)}`}>
+                      {wr == null ? "—" : `${(wr * 100).toFixed(0)}%`}
+                      <span className="text-white/30 ml-1">({n})</span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-2 text-[10px] text-white/40">
+        Cell = win-rate when side-conviction first crosses that threshold during that time window. Grey = &lt;3 samples.
       </div>
     </div>
   );
+}
 }
