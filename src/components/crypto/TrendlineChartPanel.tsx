@@ -918,59 +918,55 @@ function TaChart({
           {visible.bbUpper && line(c.bbUpper, "rgba(148, 163, 184, 0.85)", "3 3", 0.9)}
           {visible.bbLower && line(c.bbLower, "rgba(148, 163, 184, 0.85)", "3 3", 0.9)}
 
-          {/* trendlines with BUY (lower) / SELL (upper) price pills */}
-          {upper && (() => {
-            const yStart = yPrice(upper.slope * t0 + upper.intercept);
-            const yEnd = yPrice(upper.slope * tN + upper.intercept);
-            const priceEnd = upper.slope * tN + upper.intercept;
-            const pillY = Math.max(PAD_T + 10, Math.min(priceH - PAD_B - 10, yEnd));
+          {/* trendlines with SELL (upper) / BUY (lower) price pills — styled like UP/DN pills */}
+          {(() => {
+            const tPW = 70, tPH = 14;
+            const xRight = xFor(nCandles - 1);
+            const xLeft = Math.max(PAD_L + 2, xRight - tPW);
+            const renderPill = (
+              kind: "SELL" | "BUY",
+              yStart: number, yEnd: number, priceEnd: number,
+            ) => {
+              const isSell = kind === "SELL";
+              const color = isSell ? "rgb(239, 68, 68)" : "rgb(34, 197, 94)";
+              const fill  = isSell ? "rgba(239,68,68,0.85)" : "rgba(34,197,94,0.85)";
+              const stroke = isSell ? "rgba(239,68,68,0.95)" : "rgba(34,197,94,0.95)";
+              const py = Math.max(PAD_T + 2, Math.min(priceH - PAD_B - 2 - tPH, yEnd - tPH / 2));
+              return (
+                <g>
+                  <line
+                    x1={xFor(0)} y1={yStart}
+                    x2={xRight} y2={yEnd}
+                    stroke={color} strokeWidth={1.5} strokeDasharray="4 3" opacity={0.9}
+                  />
+                  <rect x={xLeft} y={py} width={tPW} height={tPH} rx={3}
+                    fill={fill} stroke={stroke} strokeWidth={1} />
+                  <text x={xLeft + 5} y={py + tPH - 3.5}
+                    fill="white" fontSize={10} fontFamily="monospace" fontWeight={700}>{kind}</text>
+                  <text x={xLeft + tPW - 5} y={py + tPH - 3.5} textAnchor="end"
+                    fill="white" fontSize={10} fontFamily="monospace" fontWeight={700}
+                    className="tabular-nums">${priceEnd.toFixed(0)}</text>
+                </g>
+              );
+            };
             return (
-              <g>
-                <line
-                  x1={xFor(0)} y1={yStart}
-                  x2={xFor(nCandles - 1)} y2={yEnd}
-                  stroke="rgb(239, 68, 68)" strokeWidth={1.5} strokeDasharray="4 3" opacity={0.9}
-                />
-                <rect
-                  x={xFor(nCandles - 1) - 78} y={pillY - 9}
-                  width={72} height={16} rx={3}
-                  fill="rgba(239, 68, 68, 0.92)"
-                />
-                <text
-                  x={xFor(nCandles - 1) - 42} y={pillY + 3} textAnchor="middle"
-                  fill="white" fontSize={10} fontFamily="monospace" fontWeight={700}
-                >
-                  SELL ${priceEnd.toFixed(0)}
-                </text>
-              </g>
+              <>
+                {upper && renderPill(
+                  "SELL",
+                  yPrice(upper.slope * t0 + upper.intercept),
+                  yPrice(upper.slope * tN + upper.intercept),
+                  upper.slope * tN + upper.intercept,
+                )}
+                {lower && renderPill(
+                  "BUY",
+                  yPrice(lower.slope * t0 + lower.intercept),
+                  yPrice(lower.slope * tN + lower.intercept),
+                  lower.slope * tN + lower.intercept,
+                )}
+              </>
             );
           })()}
-          {lower && (() => {
-            const yStart = yPrice(lower.slope * t0 + lower.intercept);
-            const yEnd = yPrice(lower.slope * tN + lower.intercept);
-            const priceEnd = lower.slope * tN + lower.intercept;
-            const pillY = Math.max(PAD_T + 10, Math.min(priceH - PAD_B - 10, yEnd));
-            return (
-              <g>
-                <line
-                  x1={xFor(0)} y1={yStart}
-                  x2={xFor(nCandles - 1)} y2={yEnd}
-                  stroke="rgb(34, 197, 94)" strokeWidth={1.5} strokeDasharray="4 3" opacity={0.9}
-                />
-                <rect
-                  x={xFor(nCandles - 1) - 78} y={pillY - 9}
-                  width={72} height={16} rx={3}
-                  fill="rgba(34, 197, 94, 0.92)"
-                />
-                <text
-                  x={xFor(nCandles - 1) - 42} y={pillY + 3} textAnchor="middle"
-                  fill="white" fontSize={10} fontFamily="monospace" fontWeight={700}
-                >
-                  BUY ${priceEnd.toFixed(0)}
-                </text>
-              </g>
-            );
-          })()}
+
 
           {/* BUY/SELL touch markers: candles whose wick tags a trendline */}
           {c.candles.map((cd, i) => {
