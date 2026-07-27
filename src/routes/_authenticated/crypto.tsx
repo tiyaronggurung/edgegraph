@@ -61,6 +61,7 @@ const ModelAblationPanel = lazy(() => import("@/components/crypto/ModelAblationP
 const EvReportPanel = lazy(() => import("@/components/crypto/EvReportPanel").then(m => ({ default: m.EvReportPanel })));
 const OddsComparisonPanel = lazy(() => import("@/components/crypto/OddsComparisonPanel").then(m => ({ default: m.OddsComparisonPanel })));
 const OddsSideStudyPanel = lazy(() => import("@/components/crypto/OddsSideStudyPanel").then(m => ({ default: m.OddsSideStudyPanel })));
+const LockThresholdStudyPanel = lazy(() => import("@/components/crypto/OddsSideStudyPanel").then(m => ({ default: m.LockThresholdStudyPanel })));
 
 const TrendlinePatternReportPanel = lazy(() => import("@/components/crypto/TrendlinePatternReportPanel").then(m => ({ default: m.TrendlinePatternReportPanel })));
 const JumpBacktestPanel = lazy(() => import("@/components/crypto/JumpBacktestPanel").then(m => ({ default: m.JumpBacktestPanel })));
