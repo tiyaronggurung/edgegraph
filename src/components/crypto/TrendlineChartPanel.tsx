@@ -1162,20 +1162,21 @@ function TaChart({
                   return (
                     <g style={{ pointerEvents: "none" }}>
                       <title>{`Our odds · UP ${upStr} · DOWN ${dnStr}`}</title>
-                      <rect x={oX} y={upY} width={oPW} height={oPH} rx={3}
+                      <rect data-testid="pill-up" x={oX} y={upY} width={oPW} height={oPH} rx={3}
                         fill={upFill} stroke={upStroke} strokeWidth={1} />
                       <text x={oX + 5} y={upY + oPH - 3.5}
                         fill={upTxt} fontSize={10} fontFamily="monospace" fontWeight={700}>UP</text>
                       <text x={oX + oPW - 5} y={upY + oPH - 3.5} textAnchor="end"
                         fill={upTxt} fontSize={10} fontFamily="monospace" fontWeight={700}
                         className="tabular-nums">{upStr}</text>
-                      <rect x={oX} y={dnY} width={oPW} height={oPH} rx={3}
+                      <rect data-testid="pill-down" x={oX} y={dnY} width={oPW} height={oPH} rx={3}
                         fill={dnFill} stroke={dnStroke} strokeWidth={1} />
                       <text x={oX + 5} y={dnY + oPH - 3.5}
                         fill={dnTxt} fontSize={10} fontFamily="monospace" fontWeight={700}>DN</text>
                       <text x={oX + oPW - 5} y={dnY + oPH - 3.5} textAnchor="end"
                         fill={dnTxt} fontSize={10} fontFamily="monospace" fontWeight={700}
                         className="tabular-nums">{dnStr}</text>
+
                     </g>
                   );
                 })()}
