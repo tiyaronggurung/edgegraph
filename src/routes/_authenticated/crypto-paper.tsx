@@ -14,6 +14,7 @@ import { KalshiOddsWidget } from "@/components/crypto/KalshiOddsWidget";
 import { ModelBetPanel, PredBetPanel, GreenHoursBetPanel, T5mBetPanel } from "@/routes/_authenticated/crypto";
 import { MultiTfShadowPanel } from "@/components/MultiTfShadowPanel";
 import { LossAutopsyPanel } from "@/components/crypto/LossAutopsyPanel";
+import { OurOddsAutoBetPanel } from "@/components/crypto/OurOddsAutoBetPanel";
 
 export const Route = createFileRoute("/_authenticated/crypto-paper")({
   head: () => ({
