@@ -4,7 +4,9 @@ import { defineConfig, devices } from "@playwright/test";
 // Run with: bun run test:visual
 export default defineConfig({
   testDir: ".",
+  testMatch: /.*\.visual\.ts$/,
   fullyParallel: false,
+
   reporter: [["list"]],
   timeout: 60_000,
   expect: { timeout: 10_000 },
