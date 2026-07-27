@@ -388,7 +388,7 @@ export function TrendlineChartPanel() {
                   ? (rawCandles as TCandle[]).map(c => c.c)
                   : ((shadow?.candles ?? []) as TCandle[]).map(c => c.c);
               const sig = realizedVolFromCloses(closesForOdds.slice(-30));
-              const quote =
+              const fresh =
                 displaySpot != null && kalshi?.strike != null && kalshiRemainingSec != null && sig != null
                   ? computeOurQuote({
                       spot: displaySpot,
@@ -397,6 +397,10 @@ export function TrendlineChartPanel() {
                       sigmaAnnualized: sig,
                     })
                   : null;
+              // Retain last-good quote so the pulse-dot UP/DN pills don't blink
+              // when sig/candles/kalshi momentarily go null between frames.
+              if (fresh) lastQuoteRef.current = fresh;
+              const quote = fresh ?? lastQuoteRef.current;
               return (
                 <TaChart
                   candles={candles}
