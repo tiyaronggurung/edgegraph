@@ -390,39 +390,18 @@ export function TrendlineChartPanel() {
                 </div>
               );
             })()}
-            {(() => {
-              const closesForOdds: number[] =
-                tf === "1m"
-                  ? (rawCandles as TCandle[]).map(c => c.c)
-                  : ((shadow?.candles ?? []) as TCandle[]).map(c => c.c);
-              const sig = realizedVolFromCloses(closesForOdds.slice(-30));
-              const fresh =
-                displaySpot != null && kalshi?.strike != null && kalshiRemainingSec != null && sig != null
-                  ? computeOurQuote({
-                      spot: displaySpot,
-                      strike: kalshi.strike,
-                      secondsToClose: kalshiRemainingSec,
-                      sigmaAnnualized: sig,
-                    })
-                  : null;
-              // Retain last-good quote so the pulse-dot UP/DN pills don't blink
-              // when sig/candles/kalshi momentarily go null between frames.
-              if (fresh) lastQuoteRef.current = fresh;
-              const quote = fresh ?? lastQuoteRef.current;
-              return (
-                <TaChart
-                  candles={candles}
-                  shadow={shadow ?? null}
-                  tf={tf}
-                  visible={visible}
-                  fibOn={fibOn}
-                  liveSpot={displaySpot}
-                  ourUpAskProb={quote?.pUpAsk ?? null}
-                  ourDownAskProb={quote?.pDownAsk ?? null}
-                  ourMidProb={quote?.mid ?? null}
-                />
-              );
-            })()}
+            <TaChart
+              candles={candles}
+              shadow={shadow ?? null}
+              tf={tf}
+              visible={visible}
+              fibOn={fibOn}
+              liveSpot={displaySpot}
+              ourUpAskProb={ourQuote?.pUpAsk ?? null}
+              ourDownAskProb={ourQuote?.pDownAsk ?? null}
+              ourMidProb={ourQuote?.mid ?? null}
+            />
+
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
