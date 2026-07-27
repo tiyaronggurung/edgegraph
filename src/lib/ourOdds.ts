@@ -1,15 +1,20 @@
 // Fast, closed-form odds for the current 15m BTC UP/DOWN market.
 // Presentational-only: does NOT feed the model, Study, or auto-trade paths.
 //
-// Modeled after how Kalshi actually prices BTC 15m:
-//   1. Underlying = composite BRTI-style spot (Coinbase+Binance median).
-//   2. Fair value = driftless GBM survival prob:
-//        mid = Φ( ln(S/K) / (σ · √T) )
-//      with σ = short-horizon realized vol.
-//   3. Quotes are shifted by a synthetic bid/ask spread + a small momentum
-//      tilt, so UP¢ + DOWN¢ > 100 (house edge / MM spread) and the two
-//      American odds are never equal. This mirrors Kalshi's order-book
-//      structure where YES ask + NO ask always exceed 100¢.
+// Kalshi's BTC 15m book is quoted off a BRTI-style composite spot with:
+//   - driftless GBM survival probability using realized vol,
+//   - a tight bid/ask that widens with time-to-close (uncertainty),
+//   - a small momentum lean that decays as T→0,
+//   - a fat-tail bump so ITM sides don't sit at 99¢ too early.
+//
+// We mirror all four but recompute on every tick so our quote leads the book
+// by a few hundred ms on fast moves.
+//
+//   mid = Φ( ln(S/K) / (σ_eff · √T) ) + tilt(T)
+//   σ_eff = blend( σ_short_ewma, σ_medium_ewma, closes_realized )
+//                 weighted toward the short leg as T→0
+//   spread = base + k · √T   (tightens near close)
+//   pUpAsk = clamp(mid + spread/2), pDownAsk = clamp(1-mid + spread/2)
 
 const SECONDS_PER_YEAR = 365 * 24 * 3600;
 
@@ -47,9 +52,9 @@ export function realizedVolFromCloses(closes: number[]): number | null {
 export interface TapeSample { t: number; p: number }
 
 /**
- * EWMA realized vol from a live tick tape (annualized).
- * λ=0.94 gives a ~2min half-life on 1s samples — reactive but stable.
- * Time-weighted so uneven sample spacing (WS jitter) doesn't bias σ.
+ * Time-weighted EWMA realized vol from a live tick tape (annualized).
+ * Custom lambda lets us build short + medium legs from the same tape.
+ * Default λ=0.94 → ~2min half-life on 1s samples.
  */
 export function ewmaVolFromTape(samples: TapeSample[], lambda = 0.94): number | null {
   if (!samples || samples.length < 10) return null;
@@ -72,13 +77,59 @@ export function ewmaVolFromTape(samples: TapeSample[], lambda = 0.94): number | 
 }
 
 /**
- * Short-horizon momentum tilt in probability units (fraction, e.g. 0.02 = +2¢).
- * Signed by direction of last-windowMs drift, magnitude = |z| of that drift
- * vs. the tape's realized 1s stdev, clamped to ±3¢. Kalshi MMs lean their
- * quotes similarly when the tape is trending; we compute it locally so our
- * odds react faster than their book.
+ * Blend a fast (30s half-life) and slow (2min half-life) EWMA leg from the
+ * same tape, weighting the fast leg more as time-to-close shrinks. Mirrors
+ * how Kalshi MMs react on the last minute — they trust the last few ticks
+ * far more than the average.
  */
-export function momentumTilt(samples: TapeSample[], windowMs = 60_000): number {
+export function effectiveVol(
+  tape: TapeSample[],
+  closes1m: number[],
+  secondsToClose: number,
+): number | null {
+  // λ per-sample; 1s cadence: λ=0.5^(1/halflife_s)
+  const lamFast = Math.pow(0.5, 1 / 30);   // ~30s halflife
+  const lamSlow = Math.pow(0.5, 1 / 120);  // ~2min halflife
+  const sigFast = ewmaVolFromTape(tape, lamFast);
+  const sigSlow = ewmaVolFromTape(tape, lamSlow);
+  const sigBar = realizedVolFromCloses(closes1m.slice(-30));
+
+  // Weight toward the fast leg as we approach close. wFast in [0.4, 0.85].
+  const T = Math.max(5, secondsToClose);
+  const frac = Math.max(0, Math.min(1, 1 - T / 900)); // 0 at open, 1 at close
+  const wFast = 0.4 + 0.45 * frac;
+
+  const legs: Array<[number, number]> = [];
+  if (sigFast != null) legs.push([wFast, sigFast]);
+  if (sigSlow != null) legs.push([1 - wFast, sigSlow]);
+  if (legs.length === 0 && sigBar != null) return sigBar;
+  if (legs.length === 0) return null;
+
+  const wSum = legs.reduce((s, [w]) => s + w, 0);
+  let blended = legs.reduce((s, [w, v]) => s + w * v, 0) / wSum;
+
+  // Fat-tail bump: if the closes-based leg is notably higher than tape,
+  // BTC just had a jump the EWMA underweights. Nudge σ up 10-20%.
+  if (sigBar != null && blended > 0) {
+    const ratio = sigBar / blended;
+    if (ratio > 1.3) blended *= Math.min(1.2, 1 + 0.15 * (ratio - 1.3));
+  }
+  // Floor: 0.15 annualized (~15% vol) so we never quote a degenerate σ≈0
+  // that snaps every side to 99/1 on a $2 move.
+  return Math.max(blended, 0.15);
+}
+
+/**
+ * Short-horizon momentum tilt in probability units (fraction). Signed by
+ * direction of last-windowMs drift, magnitude = |z| of that drift vs. the
+ * tape's realized 1s stdev, clamped to ±3¢. Scaled down in the last 30s
+ * where 1-tick noise dominates and Kalshi MMs pull their lean.
+ */
+export function momentumTilt(
+  samples: TapeSample[],
+  windowMs = 60_000,
+  secondsToClose?: number,
+): number {
   if (!samples || samples.length < 10) return 0;
   const now = samples[samples.length - 1].t;
   const cutoff = now - windowMs;
@@ -107,18 +158,32 @@ export function momentumTilt(samples: TapeSample[], windowMs = 60_000): number {
   const expected = sd * Math.sqrt(dtWindow);
   if (!(expected > 0)) return 0;
   const z = drift / expected;
-  const tilt = Math.max(-3, Math.min(3, z)) / 100; // ±3¢ cap → ±0.03
+  let tilt = Math.max(-3, Math.min(3, z)) / 100; // ±3¢ cap → ±0.03
+
+  // Decay tilt as we approach close: full lean in mid-window, ~30% at close.
+  if (secondsToClose != null) {
+    const tSec = Math.max(0, secondsToClose);
+    let decay = 1;
+    if (tSec < 30) decay = 0.3;                  // noise dominates
+    else if (tSec < 90) decay = 0.3 + 0.7 * ((tSec - 30) / 60);
+    tilt *= decay;
+  }
   return tilt;
 }
 
 /**
  * Synthetic half-spread (probability units). Wider with more time on the
- * clock (uncertainty), tighter near close. Guarantees UP¢ + DOWN¢ > 100
- * and asymmetric American odds.
+ * clock (uncertainty), tighter near close as MMs compete for the last flow.
+ * Guarantees UP¢ + DOWN¢ > 100 and asymmetric American odds.
  */
 export function halfSpread(secondsToClose: number): number {
-  const tMin = Math.max(0.1, secondsToClose / 60);
-  return Math.max(0.01, 0.005 * Math.sqrt(tMin)); // 1¢..~3.5¢ across a 15m window
+  const t = Math.max(0, secondsToClose);
+  // Base 0.6¢ + 0.45¢ * √minutes → ~0.6¢ at close, ~2.4¢ at open.
+  const tMin = t / 60;
+  const raw = 0.006 + 0.0045 * Math.sqrt(Math.max(tMin, 0.05));
+  // Final 20s: MMs pull further in, quote 0.4¢ half-spread.
+  if (t < 20) return Math.max(0.004, raw * 0.7);
+  return raw;
 }
 
 export interface UpProbInput {
@@ -132,7 +197,7 @@ export interface UpProbInput {
 export function computeUpProbability(inp: UpProbInput): number | null {
   const { spot, strike, sigmaAnnualized } = inp;
   if (!(spot > 0) || !(strike > 0) || !(sigmaAnnualized > 0)) return null;
-  const T = Math.max(inp.secondsToClose, 5) / SECONDS_PER_YEAR;
+  const T = Math.max(inp.secondsToClose, 3) / SECONDS_PER_YEAR;
   const denom = sigmaAnnualized * Math.sqrt(T);
   if (!(denom > 0)) return null;
   const z = Math.log(spot / strike) / denom;

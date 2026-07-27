@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import {
   computeOurQuote,
-  ewmaVolFromTape,
+  effectiveVol,
   momentumTilt,
-  realizedVolFromCloses,
   type TapeSample,
 } from "@/lib/ourOdds";
 
@@ -41,11 +40,9 @@ export function useOurQuote(params: {
       return lastGoodRef.current;
     }
     const tape = tapeRef.current;
-    const sigma =
-      ewmaVolFromTape(tape) ??
-      realizedVolFromCloses(closes1m.slice(-30));
+    const sigma = effectiveVol(tape, closes1m, secondsToClose);
     if (sigma == null) return lastGoodRef.current;
-    const tilt = momentumTilt(tape);
+    const tilt = momentumTilt(tape, 60_000, secondsToClose);
     const q = computeOurQuote({
       spot,
       strike,
