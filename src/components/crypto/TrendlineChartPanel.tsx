@@ -365,7 +365,33 @@ export function TrendlineChartPanel() {
                 </div>
               );
             })()}
-            <TaChart candles={candles} shadow={shadow ?? null} tf={tf} visible={visible} fibOn={fibOn} liveSpot={displaySpot} />
+            {(() => {
+              const closesForOdds: number[] =
+                tf === "1m"
+                  ? (rawCandles as TCandle[]).map(c => c.c)
+                  : ((shadow?.candles ?? []) as TCandle[]).map(c => c.c);
+              const sig = realizedVolFromCloses(closesForOdds.slice(-30));
+              const ourUpProb =
+                displaySpot != null && kalshi?.strike != null && kalshiRemainingSec != null && sig != null
+                  ? computeUpProbability({
+                      spot: displaySpot,
+                      strike: kalshi.strike,
+                      secondsToClose: kalshiRemainingSec,
+                      sigmaAnnualized: sig,
+                    })
+                  : null;
+              return (
+                <TaChart
+                  candles={candles}
+                  shadow={shadow ?? null}
+                  tf={tf}
+                  visible={visible}
+                  fibOn={fibOn}
+                  liveSpot={displaySpot}
+                  ourUpProb={ourUpProb}
+                />
+              );
+            })()}
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
