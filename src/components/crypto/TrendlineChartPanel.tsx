@@ -332,37 +332,6 @@ export function TrendlineChartPanel() {
             kalshiUpProb={kalshi?.yesMid ?? null}
           />
 
-          {/* Live BET recommendation chip — always visible in the header */}
-          {(() => {
-            const strike = shadow?.strike ?? null;
-            const rec = ourQuote?.recommendation ?? null;
-            const lockActive = recoLock != null && strike != null && recoLock.strike === strike;
-            const shownSide: "UP" | "DOWN" | "WAIT" = lockActive
-              ? recoLock!.side
-              : (rec?.side ?? "WAIT");
-            const shownConf = lockActive
-              ? Math.max(recoLock!.lockedConf, rec?.side === recoLock!.side ? rec.confidencePct : recoLock!.lockedConf)
-              : (rec?.confidencePct ?? 0);
-            const shownStrong = lockActive || rec?.strength === "strong";
-            if (shownSide === "WAIT" && !lockActive) return null;
-            const recCls = shownSide === "UP"
-              ? (shownStrong ? "border-emerald-400 bg-emerald-500/25 text-emerald-100" : "border-emerald-400/60 bg-emerald-500/10 text-emerald-200")
-              : (shownStrong ? "border-rose-400 bg-rose-500/25 text-rose-100" : "border-rose-400/60 bg-rose-500/10 text-rose-200");
-            const recTitle = lockActive
-              ? `🔒 Locked ${recoLock!.side} @ ${recoLock!.lockedConf.toFixed(0)}% — releases on next window. Live rec: ${rec?.reason ?? "…"}`
-              : (rec?.reason ?? "");
-            return (
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded border font-bold tracking-wider flex items-center gap-1 ${recCls}`}
-                title={recTitle}
-              >
-                {lockActive && <span>🔒</span>}
-                BET {shownSide}
-                <span className="opacity-80 font-mono font-normal">{shownConf.toFixed(0)}%</span>
-              </span>
-            );
-          })()}
-
           {tf === "1m" && shadow?.isWedge && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
               WEDGE · {shadow.wedgeBias?.toUpperCase()}
@@ -389,42 +358,74 @@ export function TrendlineChartPanel() {
         </div>
       </div>
 
-      {/* Session W/L ledger — always visible, never behind the collapse */}
-      {recoHistory.length > 0 && (
-        <div className="mt-2 flex flex-col gap-1.5 px-2 py-1.5 rounded border border-white/10 bg-black/60 backdrop-blur">
-          {(() => {
-            const wins = recoHistory.filter(o => o.won).length;
-            const losses = recoHistory.length - wins;
-            const wr = (wins / recoHistory.length) * 100;
-            return (
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-bold text-white/70 uppercase tracking-wider">Locked Side Summary</span>
-                <div className="flex items-center gap-2 text-[11px] font-mono">
-                  <span className="text-white/60">locks <span className="text-white/90 tabular-nums">{recoHistory.length}</span></span>
-                  <span className="text-white/30">·</span>
-                  <span className="text-emerald-300">wins <span className="tabular-nums">{wins}</span></span>
-                  <span className="text-white/30">·</span>
-                  <span className="text-rose-300">losses <span className="tabular-nums">{losses}</span></span>
-                  <span className="text-white/30">·</span>
-                  <span className="tabular-nums text-cyan-200">{wr.toFixed(0)}% WR</span>
+      {open && (
+        <>
+          {/* BET UP/DOWN lock + Session W/L ledger — inside the trendline section */}
+          <div className="mt-2 flex flex-col gap-1.5 px-2 py-1.5 rounded border border-white/10 bg-black/40">
+            {(() => {
+              const strike = shadow?.strike ?? null;
+              const rec = ourQuote?.recommendation ?? null;
+              const lockActive = recoLock != null && strike != null && recoLock.strike === strike;
+              const shownSide: "UP" | "DOWN" | "WAIT" = lockActive
+                ? recoLock!.side
+                : (rec?.side ?? "WAIT");
+              const shownConf = lockActive
+                ? Math.max(recoLock!.lockedConf, rec?.side === recoLock!.side ? rec.confidencePct : recoLock!.lockedConf)
+                : (rec?.confidencePct ?? 0);
+              const shownStrong = lockActive || rec?.strength === "strong";
+              const recCls = shownSide === "UP"
+                ? (shownStrong ? "border-emerald-400 bg-emerald-500/25 text-emerald-100" : "border-emerald-400/60 bg-emerald-500/10 text-emerald-200")
+                : shownSide === "DOWN"
+                  ? (shownStrong ? "border-rose-400 bg-rose-500/25 text-rose-100" : "border-rose-400/60 bg-rose-500/10 text-rose-200")
+                  : "border-white/20 bg-white/5 text-white/60";
+              const recTitle = lockActive
+                ? `🔒 Locked ${recoLock!.side} @ ${recoLock!.lockedConf.toFixed(0)}% — releases on next window. Live rec: ${rec?.reason ?? "…"}`
+                : (rec?.reason ?? "waiting for ≥75% conviction");
+              return (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded border font-bold tracking-wider flex items-center gap-1 ${recCls}`}
+                    title={recTitle}
+                  >
+                    {lockActive && <span>🔒</span>}
+                    BET {shownSide}
+                    <span className="opacity-80 font-mono font-normal">{shownConf.toFixed(0)}%</span>
+                  </span>
+                  {recoHistory.length > 0 && (() => {
+                    const wins = recoHistory.filter(o => o.won).length;
+                    const losses = recoHistory.length - wins;
+                    const wr = (wins / recoHistory.length) * 100;
+                    return (
+                      <div className="flex items-center gap-2 text-[11px] font-mono ml-auto">
+                        <span className="text-white/60">locks <span className="text-white/90 tabular-nums">{recoHistory.length}</span></span>
+                        <span className="text-white/30">·</span>
+                        <span className="text-emerald-300">W <span className="tabular-nums">{wins}</span></span>
+                        <span className="text-white/30">·</span>
+                        <span className="text-rose-300">L <span className="tabular-nums">{losses}</span></span>
+                        <span className="text-white/30">·</span>
+                        <span className="tabular-nums text-cyan-200">{wr.toFixed(0)}% WR</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })()}
+            {recoHistory.length > 0 && (
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider shrink-0">Trail</span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {recoHistory.map((o, i) => (
+                    <span
+                      key={i}
+                      className={`h-2.5 w-2.5 rounded-full ${o.won ? "bg-emerald-400" : "bg-rose-400"} ring-1 ring-white/10`}
+                      title={`#${i + 1} · ${o.side} ${o.won ? "WIN" : "LOSS"} · strike $${o.strike.toFixed(0)} · settle $${o.settleSpot.toFixed(2)}`}
+                    />
+                  ))}
                 </div>
               </div>
-            );
-          })()}
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider shrink-0">Trail</span>
-            <div className="flex items-center gap-1 flex-wrap">
-              {recoHistory.map((o, i) => (
-                <span
-                  key={i}
-                  className={`h-2.5 w-2.5 rounded-full ${o.won ? "bg-emerald-400" : "bg-rose-400"} ring-1 ring-white/10`}
-                  title={`#${i + 1} · ${o.side} ${o.won ? "WIN" : "LOSS"} · strike $${o.strike.toFixed(0)} · settle $${o.settleSpot.toFixed(2)}`}
-                />
-              ))}
-            </div>
+            )}
           </div>
-        </div>
-      )}
+
 
       {open && (
         <>
