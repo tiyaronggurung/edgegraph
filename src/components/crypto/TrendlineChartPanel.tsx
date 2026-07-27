@@ -918,87 +918,101 @@ function TaChart({
           {visible.bbUpper && line(c.bbUpper, "rgba(148, 163, 184, 0.85)", "3 3", 0.9)}
           {visible.bbLower && line(c.bbLower, "rgba(148, 163, 184, 0.85)", "3 3", 0.9)}
 
-          {/* trendlines with SELL (upper) / BUY (lower) price pills — styled like UP/DN pills */}
+          {/* trendlines + SELL/MID/BUY pills stacked to the right of the last candle */}
           {(() => {
-            const tPW = 70, tPH = 14;
+            const tPW = 78, tPH = 15;
+            const mPW = 92, mPH = 16;
             const xRight = xFor(nCandles - 1);
-            const xLeft = Math.max(PAD_L + 2, xRight - tPW);
-            const renderPill = (
+            // stack column just right of the last real candle, before strike-pill gutter
+            const gutter = 8;
+            const stackX = Math.min(innerW - PAD_R - Math.max(tPW, mPW) - 2, lastCandleX + gutter);
+
+            const sellPrice = upper ? upper.slope * tN + upper.intercept : null;
+            const buyPrice  = lower ? lower.slope * tN + lower.intercept : null;
+            const midPrice  = (sellPrice != null && buyPrice != null) ? (sellPrice + buyPrice) / 2 : null;
+
+            // Base stack anchor: MID price y (or last-candle close y if no mid).
+            const lastClose = c.candles[nCandles - 1].c;
+            const baseY = midPrice != null ? yPrice(midPrice) : yPrice(lastClose);
+            const spacing = 22; // vertical spacing between pills
+
+            // Clamp stack inside plot
+            const clampY = (y: number, h: number) =>
+              Math.max(PAD_T + 2, Math.min(priceH - PAD_B - 2 - h, y));
+
+            const sellY = clampY(baseY - spacing - tPH,  tPH);
+            const midY  = clampY(baseY - mPH / 2,        mPH);
+            const buyY  = clampY(baseY + spacing,        tPH);
+
+            const renderTrendPill = (
               kind: "SELL" | "BUY",
-              yStart: number, yEnd: number, priceEnd: number,
+              yStart: number, priceEnd: number, pillY: number,
             ) => {
               const isSell = kind === "SELL";
-              const color = isSell ? "rgb(239, 68, 68)" : "rgb(34, 197, 94)";
-              const fill  = isSell ? "rgba(239,68,68,0.85)" : "rgba(34,197,94,0.85)";
+              const color  = isSell ? "rgb(239, 68, 68)" : "rgb(34, 197, 94)";
+              const fill   = isSell ? "rgba(239,68,68,0.9)" : "rgba(34,197,94,0.9)";
               const stroke = isSell ? "rgba(239,68,68,0.95)" : "rgba(34,197,94,0.95)";
-              const py = Math.max(PAD_T + 2, Math.min(priceH - PAD_B - 2 - tPH, yEnd - tPH / 2));
+              const pillCenterY = pillY + tPH / 2;
               return (
                 <g>
                   <line
                     x1={xFor(0)} y1={yStart}
-                    x2={xRight} y2={yEnd}
-                    stroke={color} strokeWidth={1.5} strokeDasharray="4 3" opacity={0.9}
+                    x2={stackX} y2={pillCenterY}
+                    stroke={color} strokeWidth={1.5} strokeDasharray="4 3" opacity={0.85}
                   />
-                  <rect x={xLeft} y={py} width={tPW} height={tPH} rx={3}
+                  <rect x={stackX} y={pillY} width={tPW} height={tPH} rx={3}
                     fill={fill} stroke={stroke} strokeWidth={1} />
-                  <text x={xLeft + 5} y={py + tPH - 3.5}
+                  <text x={stackX + 5} y={pillY + tPH - 4}
                     fill="white" fontSize={10} fontFamily="monospace" fontWeight={700}>{kind}</text>
-                  <text x={xLeft + tPW - 5} y={py + tPH - 3.5} textAnchor="end"
+                  <text x={stackX + tPW - 5} y={pillY + tPH - 4} textAnchor="end"
                     fill="white" fontSize={10} fontFamily="monospace" fontWeight={700}
                     className="tabular-nums">${priceEnd.toFixed(0)}</text>
                 </g>
               );
             };
-            const midEnd = upper && lower
-              ? ((upper.slope * tN + upper.intercept) + (lower.slope * tN + lower.intercept)) / 2
-              : null;
-            const midStart = upper && lower
-              ? ((upper.slope * t0 + upper.intercept) + (lower.slope * t0 + lower.intercept)) / 2
-              : null;
+
             return (
               <>
-                {upper && renderPill(
+                {upper && renderTrendPill(
                   "SELL",
                   yPrice(upper.slope * t0 + upper.intercept),
-                  yPrice(upper.slope * tN + upper.intercept),
-                  upper.slope * tN + upper.intercept,
+                  sellPrice as number,
+                  sellY,
                 )}
-                {lower && renderPill(
+                {lower && renderTrendPill(
                   "BUY",
                   yPrice(lower.slope * t0 + lower.intercept),
-                  yPrice(lower.slope * tN + lower.intercept),
-                  lower.slope * tN + lower.intercept,
+                  buyPrice as number,
+                  buyY,
                 )}
-                {midEnd != null && midStart != null && (() => {
-                  const mPW = 92, mPH = 16;
-                  const yS = yPrice(midStart);
-                  const yE = yPrice(midEnd);
-                  const py = Math.max(PAD_T + 2, Math.min(priceH - PAD_B - 2 - mPH, yE - mPH - 4));
-                  const px = Math.max(PAD_L + 2, xRight - mPW);
+                {midPrice != null && (() => {
+                  const midStart = ((upper!.slope * t0 + upper!.intercept) + (lower!.slope * t0 + lower!.intercept)) / 2;
+                  const pillCenterY = midY + mPH / 2;
                   return (
                     <g data-testid="pill-midline-support">
                       <line
-                        x1={xFor(0)} y1={yS}
-                        x2={xRight} y2={yE}
+                        x1={xFor(0)} y1={yPrice(midStart)}
+                        x2={stackX} y2={pillCenterY}
                         stroke="rgb(250, 204, 21)" strokeWidth={1.5}
                         strokeDasharray="6 3" opacity={0.95}
                       />
-                      <rect x={px} y={py} width={mPW} height={mPH} rx={3}
+                      <rect x={stackX} y={midY} width={mPW} height={mPH} rx={3}
                         fill="rgba(250, 204, 21, 0.95)"
                         stroke="rgb(202, 138, 4)" strokeWidth={1} />
-                      <text x={px + 6} y={py + mPH - 4.5}
+                      <text x={stackX + 6} y={midY + mPH - 4.5}
                         fill="rgb(24, 24, 27)" fontSize={10} fontFamily="monospace" fontWeight={800}>
                         MID
                       </text>
-                      <text x={px + mPW - 5} y={py + mPH - 4.5} textAnchor="end"
+                      <text x={stackX + mPW - 5} y={midY + mPH - 4.5} textAnchor="end"
                         fill="rgb(24, 24, 27)" fontSize={10} fontFamily="monospace" fontWeight={800}
-                        className="tabular-nums">${midEnd.toFixed(0)}</text>
+                        className="tabular-nums">${midPrice.toFixed(0)}</text>
                     </g>
                   );
                 })()}
               </>
             );
           })()}
+
 
 
           {/* BUY/SELL touch markers: candles whose wick tags a trendline */}
