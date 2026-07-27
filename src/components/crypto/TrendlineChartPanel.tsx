@@ -371,9 +371,9 @@ export function TrendlineChartPanel() {
                   ? (rawCandles as TCandle[]).map(c => c.c)
                   : ((shadow?.candles ?? []) as TCandle[]).map(c => c.c);
               const sig = realizedVolFromCloses(closesForOdds.slice(-30));
-              const ourUpProb =
+              const quote =
                 displaySpot != null && kalshi?.strike != null && kalshiRemainingSec != null && sig != null
-                  ? computeUpProbability({
+                  ? computeOurQuote({
                       spot: displaySpot,
                       strike: kalshi.strike,
                       secondsToClose: kalshiRemainingSec,
@@ -388,7 +388,9 @@ export function TrendlineChartPanel() {
                   visible={visible}
                   fibOn={fibOn}
                   liveSpot={displaySpot}
-                  ourUpProb={ourUpProb}
+                  ourUpAskProb={quote?.pUpAsk ?? null}
+                  ourDownAskProb={quote?.pDownAsk ?? null}
+                  ourMidProb={quote?.mid ?? null}
                 />
               );
             })()}
