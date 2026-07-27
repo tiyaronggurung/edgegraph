@@ -60,6 +60,7 @@ const DailyPerformancePanel = lazy(() => import("@/components/crypto/DailyPerfor
 const ModelAblationPanel = lazy(() => import("@/components/crypto/ModelAblationPanel").then(m => ({ default: m.ModelAblationPanel })));
 const EvReportPanel = lazy(() => import("@/components/crypto/EvReportPanel").then(m => ({ default: m.EvReportPanel })));
 const OddsComparisonPanel = lazy(() => import("@/components/crypto/OddsComparisonPanel").then(m => ({ default: m.OddsComparisonPanel })));
+const OddsSideStudyPanel = lazy(() => import("@/components/crypto/OddsSideStudyPanel").then(m => ({ default: m.OddsSideStudyPanel })));
 
 const TrendlinePatternReportPanel = lazy(() => import("@/components/crypto/TrendlinePatternReportPanel").then(m => ({ default: m.TrendlinePatternReportPanel })));
 const JumpBacktestPanel = lazy(() => import("@/components/crypto/JumpBacktestPanel").then(m => ({ default: m.JumpBacktestPanel })));
