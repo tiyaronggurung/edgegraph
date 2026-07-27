@@ -4011,6 +4011,7 @@ function CryptoPage() {
         <TrendlineChartPanel />
       </LazyOnVisible>
 
+      <LazyOnVisible><OddsSideStudyPanel /></LazyOnVisible>
       <LazyOnVisible><OddsComparisonPanel /></LazyOnVisible>
 
 
