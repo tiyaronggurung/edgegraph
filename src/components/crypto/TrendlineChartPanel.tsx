@@ -82,6 +82,32 @@ export function TrendlineChartPanel() {
     refetchOnWindowFocus: false,
   });
 
+  // Smooth 1s countdown to Kalshi window close. Kalshi refetches every 5s;
+  // between refetches we interpolate locally so the timer never freezes.
+  const kalshiAnchorRef = useRef<{ ticker: string; secs: number; at: number } | null>(null);
+  if (kalshi?.ok && kalshi.ticker && typeof kalshi.secondsToClose === "number") {
+    const prev = kalshiAnchorRef.current;
+    // Re-anchor when the ticker rolls to a new window, or when the fresh
+    // server value is more than 1s off our interpolated value (drift guard).
+    const interp = prev
+      ? Math.max(0, prev.secs - Math.round((Date.now() - prev.at) / 1000))
+      : null;
+    if (!prev || prev.ticker !== kalshi.ticker || interp == null || Math.abs(interp - kalshi.secondsToClose) > 1) {
+      kalshiAnchorRef.current = { ticker: kalshi.ticker, secs: kalshi.secondsToClose, at: Date.now() };
+    }
+  }
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 500);
+    return () => clearInterval(id);
+  }, []);
+  const kalshiRemainingSec = (() => {
+    const a = kalshiAnchorRef.current;
+    if (!a) return null;
+    return Math.max(0, a.secs - Math.round((nowMs - a.at) / 1000));
+  })();
+  const fmtMMSS = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
   // Strike / wedge / spike metadata — only meaningful on 1m; keep the existing shadow query.
   const { data: shadow, isFetching: shadowFetching, refetch: refetchShadow } = useQuery<TrendlineSnapshot>({
     queryKey: ["trendline-shadow"],
