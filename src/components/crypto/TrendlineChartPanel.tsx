@@ -1030,10 +1030,12 @@ function TaChart({
               </text>
               {/* right pill: matching y-axis tag */}
               <rect
+                data-testid="pill-strike-target"
                 x={innerW - PAD_R + 2} y={yPrice(data.strike) - 9}
                 width={PAD_R - 4} height={18} rx={3}
                 fill="rgba(2, 132, 199, 0.95)" stroke="rgba(255,255,255,0.4)"
               />
+
               <text
                 x={innerW - 6} y={yPrice(data.strike) + 3} textAnchor="end"
                 fill="white" fontSize={11} fontFamily="monospace" fontWeight={700}
@@ -1100,6 +1102,7 @@ function TaChart({
                 <circle cx={dotX} cy={yy} r={3.2} fill={fill} />
                 {/* right-axis price pill */}
                 <rect
+                  data-testid="pill-price-now"
                   x={innerW - PAD_R + 2} y={yy - 9} width={PAD_R - 4} height={18} rx={3}
                   fill={fill} stroke="rgba(0,0,0,0.4)"
                 />
@@ -1121,9 +1124,11 @@ function TaChart({
                       stroke={dashStroke} strokeWidth={1} strokeDasharray="2 2" opacity={0.6}
                     />
                     <rect
+                      data-testid="pill-delta"
                       x={pillX} y={pillCenterY - pillH / 2} width={pillW} height={pillH} rx={3}
                       fill="rgba(0,0,0,0.85)" stroke={dashStroke} strokeWidth={1}
                     />
+
                     <text
                       x={pillTextX} y={pillCenterY + 3} textAnchor="end"
                       fill={up ? "rgb(134, 239, 172)" : "rgb(252, 165, 165)"}
@@ -1157,20 +1162,21 @@ function TaChart({
                   return (
                     <g style={{ pointerEvents: "none" }}>
                       <title>{`Our odds · UP ${upStr} · DOWN ${dnStr}`}</title>
-                      <rect x={oX} y={upY} width={oPW} height={oPH} rx={3}
+                      <rect data-testid="pill-up" x={oX} y={upY} width={oPW} height={oPH} rx={3}
                         fill={upFill} stroke={upStroke} strokeWidth={1} />
                       <text x={oX + 5} y={upY + oPH - 3.5}
                         fill={upTxt} fontSize={10} fontFamily="monospace" fontWeight={700}>UP</text>
                       <text x={oX + oPW - 5} y={upY + oPH - 3.5} textAnchor="end"
                         fill={upTxt} fontSize={10} fontFamily="monospace" fontWeight={700}
                         className="tabular-nums">{upStr}</text>
-                      <rect x={oX} y={dnY} width={oPW} height={oPH} rx={3}
+                      <rect data-testid="pill-down" x={oX} y={dnY} width={oPW} height={oPH} rx={3}
                         fill={dnFill} stroke={dnStroke} strokeWidth={1} />
                       <text x={oX + 5} y={dnY + oPH - 3.5}
                         fill={dnTxt} fontSize={10} fontFamily="monospace" fontWeight={700}>DN</text>
                       <text x={oX + oPW - 5} y={dnY + oPH - 3.5} textAnchor="end"
                         fill={dnTxt} fontSize={10} fontFamily="monospace" fontWeight={700}
                         className="tabular-nums">{dnStr}</text>
+
                     </g>
                   );
                 })()}
