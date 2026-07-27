@@ -208,6 +208,7 @@ export function computeUpProbability(inp: UpProbInput): number | null {
 
 export interface QuoteInput extends UpProbInput {
   momentumTiltPct?: number; // signed fraction, e.g. +0.015 = +1.5¢ UP lean
+  midPivotTiltPct?: number; // signed fraction from trendline MID pivot
 }
 
 export interface OurQuote {
@@ -217,6 +218,35 @@ export interface OurQuote {
   halfSpread: number;  // in probability units
   upCents: number;     // 0..100
   downCents: number;   // 0..100
+  timeDecayFrac: number; // 0 at open → 1 at close (for UI decay bar)
+  midPivotTiltPct: number; // signed fraction actually applied
+}
+
+/**
+ * Trendline MID pivot tilt (signed fraction, capped ±4¢).
+ * Side = sign(spot - midPrice). Magnitude scales with |spot-MID|/spot and
+ * a time-growing weight (weak at open, peaks in last ~3 min) — matches the
+ * `mid_support_study` edge curve where MID predicts settlement side best
+ * as T shrinks.
+ */
+export function midPivotTilt(
+  spot: number | null | undefined,
+  midPrice: number | null | undefined,
+  secondsToClose: number,
+): number {
+  if (!(spot != null && spot > 0) || !(midPrice != null && midPrice > 0)) return 0;
+  const dist = (spot - midPrice) / spot; // signed fraction of price
+  // Saturate distance: 0.05% strike-distance ≈ full-strength side signal.
+  const magFrac = Math.min(1, Math.abs(dist) / 0.0005);
+  // Time weight: 0.15 at open (>10min), rising to 1.0 in the last 60s.
+  const T = Math.max(0, secondsToClose);
+  let wT: number;
+  if (T >= 600)      wT = 0.15;
+  else if (T >= 300) wT = 0.15 + 0.35 * ((600 - T) / 300); // → 0.50
+  else if (T >= 60)  wT = 0.50 + 0.40 * ((300 - T) / 240); // → 0.90
+  else               wT = 0.90 + 0.10 * ((60 - T) / 60);   // → 1.00
+  const magCents = 4 * magFrac * wT;                       // ±4¢ cap
+  return Math.sign(dist) * (magCents / 100);
 }
 
 /**
@@ -226,19 +256,21 @@ export interface OurQuote {
 export function computeOurQuote(inp: QuoteInput): OurQuote | null {
   const rawMid = computeUpProbability(inp);
   if (rawMid == null) return null;
-  const tilt = inp.momentumTiltPct ?? 0;
-  const mid = Math.min(0.99, Math.max(0.01, rawMid + tilt));
+  const momTilt  = inp.momentumTiltPct ?? 0;
+  const pivTilt  = inp.midPivotTiltPct ?? 0;
+  const mid = Math.min(0.99, Math.max(0.01, rawMid + momTilt + pivTilt));
   const hs = halfSpread(inp.secondsToClose);
 
   let pUpAsk = Math.min(0.995, Math.max(0.005, mid + hs));
   let pDownAsk = Math.min(0.995, Math.max(0.005, (1 - mid) + hs));
 
-  // Guarantee never-equal: nudge the smaller side down by 0.1¢ if a clamp
-  // collision made them exactly equal.
   if (Math.abs(pUpAsk - pDownAsk) < 1e-4) {
     if (mid >= 0.5) pDownAsk = Math.max(0.005, pDownAsk - 0.001);
     else pUpAsk = Math.max(0.005, pUpAsk - 0.001);
   }
+
+  const T = Math.max(0, inp.secondsToClose);
+  const timeDecayFrac = Math.max(0, Math.min(1, 1 - T / 900));
 
   return {
     mid,
@@ -247,8 +279,11 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
     halfSpread: hs,
     upCents: pUpAsk * 100,
     downCents: pDownAsk * 100,
+    timeDecayFrac,
+    midPivotTiltPct: pivTilt,
   };
 }
+
 
 /** American odds string for a probability. "-184" / "+142". */
 export function toAmericanOdds(prob: number): string {
