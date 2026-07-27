@@ -3,6 +3,7 @@
 // / WAIT based on our conviction (with Kalshi agreement as a boost).
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useRef, useState } from "react";
 import { getOddsSideStudy, type SideStudyRow, type LiveHold, type SideStudySummary } from "@/lib/kalshiOddsSnapshots.functions";
 
 function pct(v: number | null | undefined, d = 0) {
