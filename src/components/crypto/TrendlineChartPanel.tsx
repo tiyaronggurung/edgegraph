@@ -510,6 +510,7 @@ const DEFAULT_CW = 6;
 function TaChart({
   candles: candlesProp, shadow, tf, visible, fibOn, liveSpot,
   ourUpAskProb, ourDownAskProb, ourMidProb,
+  timeDecayFrac, midPivotTiltPct,
 }: {
   candles: TCandle[];
   shadow: TrendlineSnapshot | null;
@@ -520,7 +521,10 @@ function TaChart({
   ourUpAskProb: number | null;
   ourDownAskProb: number | null;
   ourMidProb: number | null;
+  timeDecayFrac: number;
+  midPivotTiltPct: number;
 }) {
+
 
   // Alias so the rest of the component (which references `data.strike` etc.)
   // keeps compiling. `data` here represents the shadow-analysis snapshot only
