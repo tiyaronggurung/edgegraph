@@ -1111,6 +1111,46 @@ function TaChart({
                   </>
                 )}
 
+                {/* UP / DOWN odds pills — anchored to the right of the pulse dot */}
+                {ourUpProb != null && (() => {
+                  const upStr = toAmericanOdds(ourUpProb);
+                  const dnStr = toAmericanOdds(1 - ourUpProb);
+                  const upFav = ourUpProb >= 0.5;
+                  const oPW = 70, oPH = 14, oGap = 8, oVGap = 6;
+                  const rightLimit = innerW - PAD_R - 4;
+                  const oX = Math.min(dotX + oGap, rightLimit - oPW);
+                  // vertical: stack around the price line, but clamp inside plot area
+                  let upY = yy - oVGap - oPH;
+                  let dnY = yy + oVGap;
+                  if (upY < PAD_T + 2) upY = PAD_T + 2;
+                  if (dnY + oPH > priceH - PAD_B - 2) dnY = priceH - PAD_B - 2 - oPH;
+                  const upFill = upFav ? "rgba(16,185,129,0.85)" : "rgba(0,0,0,0.8)";
+                  const upStroke = upFav ? "rgba(16,185,129,0.9)" : "rgba(148,163,184,0.5)";
+                  const upTxt = upFav ? "white" : "rgb(134, 239, 172)";
+                  const dnFill = !upFav ? "rgba(239,68,68,0.85)" : "rgba(0,0,0,0.8)";
+                  const dnStroke = !upFav ? "rgba(239,68,68,0.9)" : "rgba(148,163,184,0.5)";
+                  const dnTxt = !upFav ? "white" : "rgb(252, 165, 165)";
+                  return (
+                    <g style={{ pointerEvents: "none" }}>
+                      <title>{`Our odds · UP ${upStr} · DOWN ${dnStr}`}</title>
+                      <rect x={oX} y={upY} width={oPW} height={oPH} rx={3}
+                        fill={upFill} stroke={upStroke} strokeWidth={1} />
+                      <text x={oX + 5} y={upY + oPH - 3.5}
+                        fill={upTxt} fontSize={10} fontFamily="monospace" fontWeight={700}>UP</text>
+                      <text x={oX + oPW - 5} y={upY + oPH - 3.5} textAnchor="end"
+                        fill={upTxt} fontSize={10} fontFamily="monospace" fontWeight={700}
+                        className="tabular-nums">{upStr}</text>
+                      <rect x={oX} y={dnY} width={oPW} height={oPH} rx={3}
+                        fill={dnFill} stroke={dnStroke} strokeWidth={1} />
+                      <text x={oX + 5} y={dnY + oPH - 3.5}
+                        fill={dnTxt} fontSize={10} fontFamily="monospace" fontWeight={700}>DN</text>
+                      <text x={oX + oPW - 5} y={dnY + oPH - 3.5} textAnchor="end"
+                        fill={dnTxt} fontSize={10} fontFamily="monospace" fontWeight={700}
+                        className="tabular-nums">{dnStr}</text>
+                    </g>
+                  );
+                })()}
+
               </>
             );
           })()}
