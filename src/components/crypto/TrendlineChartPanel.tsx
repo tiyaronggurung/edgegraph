@@ -406,8 +406,8 @@ export function TrendlineChartPanel() {
               ourUpAskProb={ourQuote?.pUpAsk ?? null}
               ourDownAskProb={ourQuote?.pDownAsk ?? null}
               ourMidProb={ourQuote?.mid ?? null}
-              timeDecayFrac={ourQuote?.timeDecayFrac ?? 0}
-              midPivotTiltPct={ourQuote?.midPivotTiltPct ?? 0}
+              timeDecayFrac={timeDecayFrac}
+              midPivotTiltPct={midPivotTiltPct}
 
             />
 
@@ -1232,7 +1232,7 @@ function TaChart({
                       {(() => {
                         const barY = upY + oPH + 1;
                         const barH = Math.max(1, dnY - barY - 1);
-                        const decay = ourQuote?.timeDecayFrac ?? 0;
+                        const decay = timeDecayFrac;
                         const fillW = Math.max(0, Math.min(oPW - 2, (oPW - 2) * decay));
                         return (
                           <g>
@@ -1242,7 +1242,7 @@ function TaChart({
                               fill="rgba(250,204,21,0.85)" />
                             {/* MID pivot marker: shows sign & strength of the tilt */}
                             {(() => {
-                              const piv = ourQuote?.midPivotTiltPct ?? 0;
+                              const piv = midPivotTiltPct;
                               if (Math.abs(piv) < 0.0005) return null;
                               const mag = Math.min(1, Math.abs(piv) / 0.04); // vs ±4¢ cap
                               const half = (oPW - 2) / 2;
