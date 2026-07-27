@@ -1,10 +1,9 @@
-// Per-window UP-vs-DOWN study: replays our per-second odds against the actual
-// winner and, for the currently active window, tells us to HOLD UP / HOLD DOWN
-// / WAIT based on our conviction (with Kalshi agreement as a boost).
+// Per-window UP-vs-DOWN study: live confidence call + historical grid of
+// (lock threshold × time-remaining when first crossed) → win rate, so we can
+// engineer the lock rule from data instead of guessing.
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useRef, useState } from "react";
-import { getOddsSideStudy, type SideStudyRow, type LiveHold, type SideStudySummary } from "@/lib/kalshiOddsSnapshots.functions";
+import { getOddsSideStudy, getLockThresholdStudy, type SideStudyRow, type LiveHold, type SideStudySummary, type LockCell } from "@/lib/kalshiOddsSnapshots.functions";
 
 function pct(v: number | null | undefined, d = 0) {
   if (v == null || !Number.isFinite(v)) return "—";
