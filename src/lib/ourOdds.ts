@@ -266,27 +266,29 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
   const denom = sigmaAnnualized * Math.sqrt(Tyr);
   if (!(denom > 0)) return null;
 
-  // Two anchors:
-  //   spotMid — Φ(ln(S/K)/σ√T): where we are now.
-  //   midMid  — Φ(ln(MID/K)/σ√T): where the trendline says we're going.
-  // Blend weight shifts from spot at open → MID at close (time decay).
-  const zSpot = Math.log(spot / strike) / denom;
-  const spotMid = Math.min(0.995, Math.max(0.005, phi(zSpot)));
-
+  // Three inputs → one anchor price:
+  //   strike  = target line
+  //   spot    = where BTC is right now
+  //   MID     = where the trendline (SELL+BUY)/2 says price is pivoting
+  // anchor_price = wMid*MID + (1-wMid)*spot, wMid grows with time decay.
+  // Odds = Φ( ln(anchor / strike) / (σ·√T) )
   const hasMid = midPrice != null && Number.isFinite(midPrice) && midPrice > 0;
-  let anchorMid = spotMid;
+  const t = Math.max(0, inp.secondsToClose);
+  let wMid = 0;
   if (hasMid) {
-    const zMid = Math.log((midPrice as number) / strike) / denom;
-    const midMid = Math.min(0.995, Math.max(0.005, phi(zMid)));
-    // wMid: 0.15 at open (>10min), 0.50 at 5min, 0.80 at 1min, 0.95 at close.
-    const t = Math.max(0, inp.secondsToClose);
-    let wMid: number;
     if (t >= 600)      wMid = 0.15;
     else if (t >= 300) wMid = 0.15 + 0.35 * ((600 - t) / 300);
     else if (t >= 60)  wMid = 0.50 + 0.30 * ((300 - t) / 240);
     else               wMid = 0.80 + 0.15 * ((60 - t) / 60);
-    anchorMid = wMid * midMid + (1 - wMid) * spotMid;
   }
+  const anchorPrice = hasMid
+    ? wMid * (midPrice as number) + (1 - wMid) * spot
+    : spot;
+
+  const zAnchor = Math.log(anchorPrice / strike) / denom;
+  const anchorMid = Math.min(0.995, Math.max(0.005, phi(zAnchor)));
+  const spotMid = Math.min(0.995, Math.max(0.005, phi(Math.log(spot / strike) / denom)));
+
 
   // Momentum lean survives the blend — small but real edge over Kalshi.
   const momTilt = inp.momentumTiltPct ?? 0;
