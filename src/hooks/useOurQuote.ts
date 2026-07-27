@@ -50,15 +50,15 @@ export function useOurQuote(params: {
     const sigma = effectiveVol(tape, closes1m, secondsToClose);
     if (sigma == null) return lastGoodRef.current;
     const tilt = momentumTilt(tape, 60_000, secondsToClose);
-    const pivTilt = midPivotTilt(spot, midPrice ?? null, secondsToClose);
     const q = computeOurQuote({
       spot,
       strike,
       secondsToClose,
       sigmaAnnualized: sigma,
       momentumTiltPct: tilt,
-      midPivotTiltPct: pivTilt,
+      midPrice: midPrice ?? null,
     });
+
     if (q) lastGoodRef.current = q;
     return q ?? lastGoodRef.current;
     // eslint-disable-next-line react-hooks/exhaustive-deps
