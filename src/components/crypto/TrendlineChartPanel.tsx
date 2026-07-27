@@ -427,8 +427,7 @@ export function TrendlineChartPanel() {
           </div>
 
 
-      {open && (
-        <>
+
           <div className="flex items-center gap-1.5 mt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
             <span className="text-[10px] text-white/40 mr-1">TF:</span>
             {TF_LIST.map(t => (
