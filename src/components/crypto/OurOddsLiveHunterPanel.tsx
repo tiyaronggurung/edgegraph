@@ -14,7 +14,7 @@ import { getCompositeSpot } from "@/lib/compositeSpot.functions";
 import { evalTrendlineShadow } from "@/lib/trendlineShadow.functions";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useOurQuote } from "@/hooks/useOurQuote";
-import { fireOurOddsLiveBet } from "@/lib/ourOddsLiveHunter.functions";
+import { fireOurOddsLiveBet, autoTakeProfitOurOddsLive } from "@/lib/ourOddsLiveHunter.functions";
 
 const LS_ENABLED = "crypto.ourOddsLiveHunter";
 const STAKE_USD = 10;
@@ -30,6 +30,7 @@ export function OurOddsLiveHunterPanel() {
   const compositeFn = useServerFn(getCompositeSpot);
   const evalFn = useServerFn(evalTrendlineShadow);
   const fireFn = useServerFn(fireOurOddsLiveBet);
+  const autoTpFn = useServerFn(autoTakeProfitOurOddsLive);
   const qc = useQueryClient();
 
   const [enabled, setEnabled] = useState<boolean>(() => {
@@ -39,6 +40,7 @@ export function OurOddsLiveHunterPanel() {
   const [firing, setFiring] = useState(false);
   const [lastFired, setLastFired] = useState<string | null>(null);
   const [lastSkip, setLastSkip] = useState<string | null>(null);
+  const [lastTp, setLastTp] = useState<string | null>(null);
   const firedKeysRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -195,6 +197,36 @@ export function OurOddsLiveHunterPanel() {
     }
   }, [ticker]);
 
+  // Auto-TP watcher: while enabled, poll every 4s and IOC-sell any open
+  // our_odds_live_hunter position when Kalshi mark ≥ entry × 1.4 (+40%).
+  const tpBusyRef = useRef(false);
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled || tpBusyRef.current) return;
+      tpBusyRef.current = true;
+      try {
+        const r = await autoTpFn({});
+        if (r && r.fired > 0) {
+          const winners = r.results.filter((x) => x.fired);
+          const label = winners.map((w) => `${w.ticker} ${w.side} +$${(w.realizedPnl ?? 0).toFixed(2)} @ ${w.exitCents}¢`).join(" · ");
+          setLastTp(label);
+          toast.success(`Auto-TP filled: ${label}`);
+          qc.invalidateQueries({ queryKey: ["cryptoTrades"] });
+        }
+      } catch {
+        /* swallow — retry next tick */
+      } finally {
+        tpBusyRef.current = false;
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 4_000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [enabled, autoTpFn, qc]);
+
+
   return (
     <div className="border border-amber-500/40 rounded-lg bg-amber-500/5 mt-2">
       <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
@@ -207,7 +239,7 @@ export function OurOddsLiveHunterPanel() {
             {enabled ? `Our-Odds LIVE Hunter ON · REAL $${STAKE_USD}` : `Our-Odds LIVE Hunter OFF · REAL $${STAKE_USD}`}
           </button>
           <span className="text-[11px] text-amber-200/70">
-            REAL MONEY · fires at Kalshi ask when our UP/DN odds hit −200 · ≤{MAX_ASK_CENTS}¢ · 1 shot/side · 3-min warmup
+            REAL MONEY · buys at −200 · auto-sells at +40% (entry × 1.4) · ≤{MAX_ASK_CENTS}¢ · 1 shot/side · 3-min warmup
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -227,8 +259,9 @@ export function OurOddsLiveHunterPanel() {
           </span>
           <div className="flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">
             {firing && <Loader2 className="h-3 w-3 animate-spin" />}
-            {lastFired && <span className="text-amber-200">last: {lastFired}</span>}
-            {!lastFired && lastSkip && <span className="opacity-60">wait: {lastSkip}</span>}
+            {lastFired && <span className="text-amber-200">buy: {lastFired}</span>}
+            {lastTp && <span className="text-emerald-300">TP: {lastTp}</span>}
+            {!lastFired && !lastTp && lastSkip && <span className="opacity-60">wait: {lastSkip}</span>}
           </div>
         </div>
       </div>
