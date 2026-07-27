@@ -332,8 +332,36 @@ export function TrendlineChartPanel() {
             kalshiUpProb={kalshi?.yesMid ?? null}
           />
 
-
-
+          {/* Live BET recommendation chip — always visible in the header */}
+          {(() => {
+            const strike = shadow?.strike ?? null;
+            const rec = ourQuote?.recommendation ?? null;
+            const lockActive = recoLock != null && strike != null && recoLock.strike === strike;
+            const shownSide: "UP" | "DOWN" | "WAIT" = lockActive
+              ? recoLock!.side
+              : (rec?.side ?? "WAIT");
+            const shownConf = lockActive
+              ? Math.max(recoLock!.lockedConf, rec?.side === recoLock!.side ? rec.confidencePct : recoLock!.lockedConf)
+              : (rec?.confidencePct ?? 0);
+            const shownStrong = lockActive || rec?.strength === "strong";
+            if (shownSide === "WAIT" && !lockActive) return null;
+            const recCls = shownSide === "UP"
+              ? (shownStrong ? "border-emerald-400 bg-emerald-500/25 text-emerald-100" : "border-emerald-400/60 bg-emerald-500/10 text-emerald-200")
+              : (shownStrong ? "border-rose-400 bg-rose-500/25 text-rose-100" : "border-rose-400/60 bg-rose-500/10 text-rose-200");
+            const recTitle = lockActive
+              ? `🔒 Locked ${recoLock!.side} @ ${recoLock!.lockedConf.toFixed(0)}% — releases on next window. Live rec: ${rec?.reason ?? "…"}`
+              : (rec?.reason ?? "");
+            return (
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded border font-bold tracking-wider flex items-center gap-1 ${recCls}`}
+                title={recTitle}
+              >
+                {lockActive && <span>🔒</span>}
+                BET {shownSide}
+                <span className="opacity-80 font-mono font-normal">{shownConf.toFixed(0)}%</span>
+              </span>
+            );
+          })()}
 
           {tf === "1m" && shadow?.isWedge && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
