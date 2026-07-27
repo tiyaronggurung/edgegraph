@@ -15,6 +15,7 @@ import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, autoExitLiveP
 import { recordOddsTape } from "@/lib/oddsTape.functions";
 import { getRecentOddsFlip } from "@/lib/oddsFlipAlert.functions";
 import { detectBigFlip } from "@/lib/bigFlipDetector.functions";
+import { OurOddsLiveHunterPanel } from "@/components/crypto/OurOddsLiveHunterPanel";
 import { diagnoseRecentMisses, studyMissesWithAI, getLatestStudy, setRecommendationFeedback, type StudyRecommendation } from "@/lib/cryptoMisses.functions";
 import { recomputeShadowSim, getShadowSimReport, type ShadowSimGateStat } from "@/lib/cryptoShadowSim.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
@@ -3392,6 +3393,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
           </p>
           <OddsFlipAlert />
           <BigFlipMonitor />
+          <OurOddsLiveHunterPanel />
 
           {skipReport.data && skipReport.data.totalSettled > 0 && (
             <div className="mt-1.5 rounded border border-border/60 bg-muted/10 px-2 py-1.5 text-[10px]">
