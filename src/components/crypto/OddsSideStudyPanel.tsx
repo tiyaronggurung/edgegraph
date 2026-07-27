@@ -42,37 +42,8 @@ export function OddsSideStudyPanel() {
       </div>
 
       {/* Live confidence call */}
-      {live && (() => {
-        const p = live.our_mid;
-        const sideProb = p == null ? null : Math.max(p, 1 - p);
-        const sideDir: "UP" | "DOWN" | null = p == null ? null : p >= 0.5 ? "UP" : "DOWN";
-        const SKIP_THRESHOLD = 0.55;
-        const call =
-          sideProb == null ? "—"
-          : sideProb < SKIP_THRESHOLD ? "SKIP"
-          : `${sideDir} ${(sideProb * 100).toFixed(0)}%`;
-        const callClass =
-          sideProb == null || sideProb < SKIP_THRESHOLD ? "text-amber-300"
-          : sideDir === "UP" ? "text-emerald-300" : "text-rose-300";
-        return (
-          <div className="mt-3 flex items-center gap-3 p-2 rounded border border-white/10 bg-black/40">
-            <div className={`text-lg font-bold font-mono ${callClass}`}>{call}</div>
-            <div className="flex-1 text-[11px] font-mono text-white/70">
-              <div>
-                {live.ticker ? live.ticker.replace("KXBTC15M-", "") : "—"}
-                {live.strike != null ? <span className="text-white/40"> · ${live.strike.toFixed(0)}</span> : null}
-                {live.seconds_to_close != null ? <span className="text-white/40"> · {live.seconds_to_close}s left</span> : null}
-              </div>
-              <div className="text-white/50">{live.reason}</div>
-            </div>
-            <div className="text-[10px] font-mono text-right text-white/60">
-              <div>Ours {pct(live.our_mid, 0)}</div>
-              <div>Kalshi {pct(live.kalshi_mid, 0)}</div>
-              <div className="text-white/40">conv {live.confidence != null ? (live.confidence * 100).toFixed(0) + "%" : "—"}</div>
-            </div>
-          </div>
-        );
-      })()}
+      {live && <LiveCall live={live} />}
+
 
       {/* Summary */}
       {summary && (
