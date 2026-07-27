@@ -949,6 +949,12 @@ function TaChart({
                 </g>
               );
             };
+            const midEnd = upper && lower
+              ? ((upper.slope * tN + upper.intercept) + (lower.slope * tN + lower.intercept)) / 2
+              : null;
+            const midStart = upper && lower
+              ? ((upper.slope * t0 + upper.intercept) + (lower.slope * t0 + lower.intercept)) / 2
+              : null;
             return (
               <>
                 {upper && renderPill(
@@ -963,6 +969,33 @@ function TaChart({
                   yPrice(lower.slope * tN + lower.intercept),
                   lower.slope * tN + lower.intercept,
                 )}
+                {midEnd != null && midStart != null && (() => {
+                  const mPW = 92, mPH = 16;
+                  const yS = yPrice(midStart);
+                  const yE = yPrice(midEnd);
+                  const py = Math.max(PAD_T + 2, Math.min(priceH - PAD_B - 2 - mPH, yE - mPH - 4));
+                  const px = Math.max(PAD_L + 2, xRight - mPW);
+                  return (
+                    <g data-testid="pill-midline-support">
+                      <line
+                        x1={xFor(0)} y1={yS}
+                        x2={xRight} y2={yE}
+                        stroke="rgb(250, 204, 21)" strokeWidth={1.5}
+                        strokeDasharray="6 3" opacity={0.95}
+                      />
+                      <rect x={px} y={py} width={mPW} height={mPH} rx={3}
+                        fill="rgba(250, 204, 21, 0.95)"
+                        stroke="rgb(202, 138, 4)" strokeWidth={1} />
+                      <text x={px + 6} y={py + mPH - 4.5}
+                        fill="rgb(24, 24, 27)" fontSize={10} fontFamily="monospace" fontWeight={800}>
+                        MID
+                      </text>
+                      <text x={px + mPW - 5} y={py + mPH - 4.5} textAnchor="end"
+                        fill="rgb(24, 24, 27)" fontSize={10} fontFamily="monospace" fontWeight={800}
+                        className="tabular-nums">${midEnd.toFixed(0)}</text>
+                    </g>
+                  );
+                })()}
               </>
             );
           })()}
