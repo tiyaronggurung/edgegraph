@@ -210,6 +210,20 @@ export function TrendlineChartPanel() {
     Object.fromEntries(SERIES.map(s => [s.key, s.defaultOn]))
   );
 
+  // Single source of truth for OUR UP/DOWN quote — shared by the top OURS
+  // pill and the pulse-dot pills on the chart so they always match.
+  const closes1mForOdds = useMemo<number[]>(() => (
+    tf === "1m"
+      ? (rawCandles as TCandle[]).map(c => c.c)
+      : ((shadow?.candles ?? []) as TCandle[]).map(c => c.c)
+  ), [tf, rawCandles, shadow?.candles]);
+  const ourQuote = useOurQuote({
+    spot: displaySpot,
+    strike: kalshi?.strike ?? null,
+    secondsToClose: kalshiRemainingSec,
+    closes1m: closes1mForOdds,
+  });
+
   return (
     <div className="border border-white/10 rounded-lg bg-black/40 p-3">
       <div
