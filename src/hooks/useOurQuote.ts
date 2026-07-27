@@ -7,14 +7,9 @@ import {
   type TapeSample,
 } from "@/lib/ourOdds";
 
-const TAPE_MAX = 240;
+const TAPE_MAX = 900;         // ~5 min of ticks at ~300ms cadence
 const TAPE_MIN_DT_MS = 250;
 
-/**
- * Single source of truth for "our" UP/DOWN odds quote.
- * Both the top OURS pill and the chart pulse-dot pills consume this so
- * they never disagree.
- */
 export function useOurQuote(params: {
   spot: number | null | undefined;
   strike: number | null | undefined;
@@ -25,6 +20,18 @@ export function useOurQuote(params: {
   const { spot, strike, secondsToClose, closes1m, midPrice } = params;
 
   const tapeRef = useRef<TapeSample[]>([]);
+  const lastGoodRef = useRef<ReturnType<typeof computeOurQuote> | null>(null);
+  const lastStrikeRef = useRef<number | null | undefined>(strike);
+
+  // Reset carry on new window (strike change): kills stale quote flash.
+  useEffect(() => {
+    if (lastStrikeRef.current !== strike) {
+      lastStrikeRef.current = strike;
+      lastGoodRef.current = null;
+      // keep tape — vol estimation benefits from continuity across windows
+    }
+  }, [strike]);
+
   useEffect(() => {
     if (spot == null || !Number.isFinite(spot) || !(spot > 0)) return;
     const now = Date.now();
@@ -34,8 +41,6 @@ export function useOurQuote(params: {
     tape.push({ t: now, p: spot });
     if (tape.length > TAPE_MAX) tape.splice(0, tape.length - TAPE_MAX);
   }, [spot]);
-
-  const lastGoodRef = useRef<ReturnType<typeof computeOurQuote> | null>(null);
 
   return useMemo(() => {
     if (spot == null || strike == null || secondsToClose == null) {
@@ -59,4 +64,5 @@ export function useOurQuote(params: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spot, strike, secondsToClose, closes1m, midPrice]);
 }
+
 
