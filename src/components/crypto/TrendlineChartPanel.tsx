@@ -61,6 +61,11 @@ export function TrendlineChartPanel() {
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
   const compositeFn = useServerFn(getCompositeSpot);
 
+  // Records 1 snapshot/sec of Kalshi odds + our odds into btc_kalshi_odds_snapshots.
+  useKalshiOddsRecorder([]);
+
+
+
   // Live composite BTC spot from Binance+Coinbase WebSockets (~50–200ms/tick).
   // This is the fastest source and drives the price marker + delta pill.
   const live = useLiveCompositeSpot();
