@@ -1102,6 +1102,7 @@ function TaChart({
                 <circle cx={dotX} cy={yy} r={3.2} fill={fill} />
                 {/* right-axis price pill */}
                 <rect
+                  data-testid="pill-price-now"
                   x={innerW - PAD_R + 2} y={yy - 9} width={PAD_R - 4} height={18} rx={3}
                   fill={fill} stroke="rgba(0,0,0,0.4)"
                 />
@@ -1123,9 +1124,11 @@ function TaChart({
                       stroke={dashStroke} strokeWidth={1} strokeDasharray="2 2" opacity={0.6}
                     />
                     <rect
+                      data-testid="pill-delta"
                       x={pillX} y={pillCenterY - pillH / 2} width={pillW} height={pillH} rx={3}
                       fill="rgba(0,0,0,0.85)" stroke={dashStroke} strokeWidth={1}
                     />
+
                     <text
                       x={pillTextX} y={pillCenterY + 3} textAnchor="end"
                       fill={up ? "rgb(134, 239, 172)" : "rgb(252, 165, 165)"}
