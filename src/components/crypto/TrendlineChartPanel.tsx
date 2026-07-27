@@ -238,6 +238,7 @@ export function TrendlineChartPanel() {
             );
           })()}
 
+          {tf === "1m" && shadow?.isWedge && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
               WEDGE · {shadow.wedgeBias?.toUpperCase()}
             </span>
