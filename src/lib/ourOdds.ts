@@ -160,15 +160,17 @@ export function momentumTilt(
   const z = drift / expected;
   let tilt = Math.max(-3, Math.min(3, z)) / 100; // ±3¢ cap → ±0.03
 
-  // Decay tilt as we approach close: full lean in mid-window, ~30% at close.
+  // Kalshi-style: keep lean alive near close instead of snapping to 50/50.
+  // Full lean in mid-window, ~70% at close (was 30% — that was the "reset").
   if (secondsToClose != null) {
     const tSec = Math.max(0, secondsToClose);
     let decay = 1;
-    if (tSec < 30) decay = 0.3;                  // noise dominates
-    else if (tSec < 90) decay = 0.3 + 0.7 * ((tSec - 30) / 60);
+    if (tSec < 30) decay = 0.7;
+    else if (tSec < 90) decay = 0.7 + 0.3 * ((tSec - 30) / 60);
     tilt *= decay;
   }
   return tilt;
+
 }
 
 /**
