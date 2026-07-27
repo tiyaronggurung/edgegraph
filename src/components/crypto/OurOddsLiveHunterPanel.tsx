@@ -197,6 +197,36 @@ export function OurOddsLiveHunterPanel() {
     }
   }, [ticker]);
 
+  // Auto-TP watcher: while enabled, poll every 4s and IOC-sell any open
+  // our_odds_live_hunter position when Kalshi mark ≥ entry × 1.4 (+40%).
+  const tpBusyRef = useRef(false);
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled || tpBusyRef.current) return;
+      tpBusyRef.current = true;
+      try {
+        const r = await autoTpFn({});
+        if (r && r.fired > 0) {
+          const winners = r.results.filter((x) => x.fired);
+          const label = winners.map((w) => `${w.ticker} ${w.side} +$${(w.realizedPnl ?? 0).toFixed(2)} @ ${w.exitCents}¢`).join(" · ");
+          setLastTp(label);
+          toast.success(`Auto-TP filled: ${label}`);
+          qc.invalidateQueries({ queryKey: ["cryptoTrades"] });
+        }
+      } catch {
+        /* swallow — retry next tick */
+      } finally {
+        tpBusyRef.current = false;
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 4_000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [enabled, autoTpFn, qc]);
+
+
   return (
     <div className="border border-amber-500/40 rounded-lg bg-amber-500/5 mt-2">
       <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
