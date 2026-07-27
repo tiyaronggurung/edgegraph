@@ -258,25 +258,39 @@ export function midPivotTilt(
  * summing to > 100¢. Never returns equal sides.
  */
 export function computeOurQuote(inp: QuoteInput): OurQuote | null {
-  const rawMid = computeUpProbability(inp);
-  if (rawMid == null) return null;
-  const momTilt  = inp.momentumTiltPct ?? 0;
-  const pivTilt  = inp.midPivotTiltPct ?? 0;
-  let mid = Math.min(0.99, Math.max(0.01, rawMid + momTilt + pivTilt));
+  const { spot, strike, sigmaAnnualized, midPrice } = inp;
+  if (!(spot > 0) || !(strike > 0) || !(sigmaAnnualized > 0)) return null;
 
-  // Pin-lock: when spot pins the strike in the final seconds, Φ collapses to
-  // ~0.5 and quotes flip to -119 coin-flip. Kalshi holds a directional lean
-  // in that regime (last known drift wins). Bias mid toward the side that
-  // momentum + MID pivot agree on when |S-K| is tiny and T is short.
-  const T = Math.max(0, inp.secondsToClose);
-  const distFrac = Math.abs((inp.spot - inp.strike) / inp.strike);
-  if (T < 25 && distFrac < 0.00008) { // ~$8 on $100k
-    const lean = momTilt + pivTilt; // signed
-    if (Math.abs(lean) > 0.002) {
-      const push = Math.sign(lean) * Math.min(0.12, Math.abs(lean) * 6);
-      mid = Math.min(0.97, Math.max(0.03, 0.5 + push));
-    }
+  const T = Math.max(inp.secondsToClose, 3);
+  const Tyr = T / SECONDS_PER_YEAR;
+  const denom = sigmaAnnualized * Math.sqrt(Tyr);
+  if (!(denom > 0)) return null;
+
+  // Two anchors:
+  //   spotMid — Φ(ln(S/K)/σ√T): where we are now.
+  //   midMid  — Φ(ln(MID/K)/σ√T): where the trendline says we're going.
+  // Blend weight shifts from spot at open → MID at close (time decay).
+  const zSpot = Math.log(spot / strike) / denom;
+  const spotMid = Math.min(0.995, Math.max(0.005, phi(zSpot)));
+
+  const hasMid = midPrice != null && Number.isFinite(midPrice) && midPrice > 0;
+  let anchorMid = spotMid;
+  if (hasMid) {
+    const zMid = Math.log((midPrice as number) / strike) / denom;
+    const midMid = Math.min(0.995, Math.max(0.005, phi(zMid)));
+    // wMid: 0.15 at open (>10min), 0.50 at 5min, 0.80 at 1min, 0.95 at close.
+    const t = Math.max(0, inp.secondsToClose);
+    let wMid: number;
+    if (t >= 600)      wMid = 0.15;
+    else if (t >= 300) wMid = 0.15 + 0.35 * ((600 - t) / 300);
+    else if (t >= 60)  wMid = 0.50 + 0.30 * ((300 - t) / 240);
+    else               wMid = 0.80 + 0.15 * ((60 - t) / 60);
+    anchorMid = wMid * midMid + (1 - wMid) * spotMid;
   }
+
+  // Momentum lean survives the blend — small but real edge over Kalshi.
+  const momTilt = inp.momentumTiltPct ?? 0;
+  let mid = Math.min(0.99, Math.max(0.01, anchorMid + momTilt));
 
   const hs = halfSpread(inp.secondsToClose);
   let pUpAsk = Math.min(0.995, Math.max(0.005, mid + hs));
@@ -287,7 +301,9 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
     else pUpAsk = Math.max(0.005, pUpAsk - 0.001);
   }
 
-  const timeDecayFrac = Math.max(0, Math.min(1, 1 - T / 900));
+  const timeDecayFrac = Math.max(0, Math.min(1, 1 - Math.max(0, inp.secondsToClose) / 900));
+  // Report the effective pivot influence for the UI decay bar.
+  const effectivePivot = hasMid ? (anchorMid - spotMid) : 0;
 
   return {
     mid,
@@ -297,9 +313,10 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
     upCents: pUpAsk * 100,
     downCents: pDownAsk * 100,
     timeDecayFrac,
-    midPivotTiltPct: pivTilt,
+    midPivotTiltPct: effectivePivot,
   };
 }
+
 
 
 
