@@ -40,6 +40,7 @@ export function OurOddsLiveHunterPanel() {
   const [firing, setFiring] = useState(false);
   const [lastFired, setLastFired] = useState<string | null>(null);
   const [lastSkip, setLastSkip] = useState<string | null>(null);
+  const [lastTp, setLastTp] = useState<string | null>(null);
   const firedKeysRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
