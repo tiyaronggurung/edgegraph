@@ -3,6 +3,7 @@ import {
   computeOurQuote,
   effectiveVol,
   momentumTilt,
+  midPivotTilt,
   type TapeSample,
 } from "@/lib/ourOdds";
 
@@ -19,8 +20,9 @@ export function useOurQuote(params: {
   strike: number | null | undefined;
   secondsToClose: number | null | undefined;
   closes1m: number[];
+  midPrice?: number | null | undefined;
 }) {
-  const { spot, strike, secondsToClose, closes1m } = params;
+  const { spot, strike, secondsToClose, closes1m, midPrice } = params;
 
   const tapeRef = useRef<TapeSample[]>([]);
   useEffect(() => {
@@ -43,15 +45,18 @@ export function useOurQuote(params: {
     const sigma = effectiveVol(tape, closes1m, secondsToClose);
     if (sigma == null) return lastGoodRef.current;
     const tilt = momentumTilt(tape, 60_000, secondsToClose);
+    const pivTilt = midPivotTilt(spot, midPrice ?? null, secondsToClose);
     const q = computeOurQuote({
       spot,
       strike,
       secondsToClose,
       sigmaAnnualized: sigma,
       momentumTiltPct: tilt,
+      midPivotTiltPct: pivTilt,
     });
     if (q) lastGoodRef.current = q;
     return q ?? lastGoodRef.current;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spot, strike, secondsToClose, closes1m]);
+  }, [spot, strike, secondsToClose, closes1m, midPrice]);
 }
+

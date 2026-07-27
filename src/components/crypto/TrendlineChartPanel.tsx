@@ -217,12 +217,18 @@ export function TrendlineChartPanel() {
       ? (rawCandles as TCandle[]).map(c => c.c)
       : ((shadow?.candles ?? []) as TCandle[]).map(c => c.c)
   ), [tf, rawCandles, shadow?.candles]);
+  const midPriceNow = useMemo<number | null>(() => {
+    const u = shadow?.upperAtNow, l = shadow?.lowerAtNow;
+    return (u != null && l != null && u > l) ? (u + l) / 2 : null;
+  }, [shadow?.upperAtNow, shadow?.lowerAtNow]);
   const ourQuote = useOurQuote({
     spot: displaySpot,
     strike: kalshi?.strike ?? null,
     secondsToClose: kalshiRemainingSec,
     closes1m: closes1mForOdds,
+    midPrice: midPriceNow,
   });
+
 
   return (
     <div className="border border-white/10 rounded-lg bg-black/40 p-3">
@@ -400,6 +406,9 @@ export function TrendlineChartPanel() {
               ourUpAskProb={ourQuote?.pUpAsk ?? null}
               ourDownAskProb={ourQuote?.pDownAsk ?? null}
               ourMidProb={ourQuote?.mid ?? null}
+              timeDecayFrac={timeDecayFrac}
+              midPivotTiltPct={midPivotTiltPct}
+
             />
 
           </div>
@@ -501,6 +510,7 @@ const DEFAULT_CW = 6;
 function TaChart({
   candles: candlesProp, shadow, tf, visible, fibOn, liveSpot,
   ourUpAskProb, ourDownAskProb, ourMidProb,
+  timeDecayFrac, midPivotTiltPct,
 }: {
   candles: TCandle[];
   shadow: TrendlineSnapshot | null;
@@ -511,7 +521,10 @@ function TaChart({
   ourUpAskProb: number | null;
   ourDownAskProb: number | null;
   ourMidProb: number | null;
+  timeDecayFrac: number;
+  midPivotTiltPct: number;
 }) {
+
 
   // Alias so the rest of the component (which references `data.strike` etc.)
   // keeps compiling. `data` here represents the shadow-analysis snapshot only
@@ -1215,9 +1228,38 @@ function TaChart({
                         fill={dnTxt} fontSize={10} fontFamily="monospace" fontWeight={700}
                         className="tabular-nums">{dnStr}</text>
 
+                      {/* time-decay bar between UP and DN pills — fills L→R as T→0 */}
+                      {(() => {
+                        const barY = upY + oPH + 1;
+                        const barH = Math.max(1, dnY - barY - 1);
+                        const decay = timeDecayFrac;
+                        const fillW = Math.max(0, Math.min(oPW - 2, (oPW - 2) * decay));
+                        return (
+                          <g>
+                            <rect x={oX + 1} y={barY} width={oPW - 2} height={barH}
+                              fill="rgba(255,255,255,0.08)" />
+                            <rect x={oX + 1} y={barY} width={fillW} height={barH}
+                              fill="rgba(250,204,21,0.85)" />
+                            {/* MID pivot marker: shows sign & strength of the tilt */}
+                            {(() => {
+                              const piv = midPivotTiltPct;
+                              if (Math.abs(piv) < 0.0005) return null;
+                              const mag = Math.min(1, Math.abs(piv) / 0.04); // vs ±4¢ cap
+                              const half = (oPW - 2) / 2;
+                              const cx0 = oX + 1 + half;
+                              const w = Math.max(2, half * mag);
+                              const x = piv >= 0 ? cx0 : cx0 - w;
+                              const fill = piv >= 0 ? "rgba(16,185,129,0.95)" : "rgba(239,68,68,0.95)";
+                              return <rect x={x} y={barY} width={w} height={barH} fill={fill} />;
+                            })()}
+                          </g>
+                        );
+                      })()}
                     </g>
                   );
                 })()}
+
+
 
               </>
             );
