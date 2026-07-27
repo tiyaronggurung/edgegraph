@@ -337,3 +337,132 @@ export const getOddsSideStudy = createServerFn({ method: "GET" })
     return { rows, summary, live };
   });
 
+// ---------------------------------------------------------------------------
+// Lock-Threshold Study — 2D grid: at what side-conviction threshold, first
+// crossed at what time-remaining, do we get the best win-rate? Pure replay
+// against btc_kalshi_odds_snapshots + btc_model_predictions.
+// ---------------------------------------------------------------------------
+
+export interface LockCell {
+  threshold: number;         // 0.60..0.90
+  bucket: string;            // "≥10m" | "5-10m" | "2-5m" | "30s-2m" | "<30s"
+  bucket_order: number;      // for sort
+  windows: number;
+  wins: number;
+  wr: number | null;         // wins/windows
+}
+
+export interface LockStudyResult {
+  cells: LockCell[];
+  covered_windows: number;
+  hours: number;
+}
+
+const THRESHOLDS = [0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90];
+
+function bucketOf(stc: number): { name: string; order: number } {
+  if (stc >= 600) return { name: "≥10m", order: 0 };
+  if (stc >= 300) return { name: "5-10m", order: 1 };
+  if (stc >= 120) return { name: "2-5m", order: 2 };
+  if (stc >= 30)  return { name: "30s-2m", order: 3 };
+  return { name: "<30s", order: 4 };
+}
+
+export const getLockThresholdStudy = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { hours?: number } | undefined) =>
+    z.object({ hours: z.number().int().min(1).max(168).optional() }).parse(d ?? {}),
+  )
+  .handler(async ({ data, context }): Promise<LockStudyResult> => {
+    const hours = data.hours ?? 168;
+    const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+
+    const { data: preds, error: predErr } = await context.supabase
+      .from("btc_model_predictions")
+      .select("ticker,outcome")
+      .gte("close_time", since)
+      .not("outcome", "is", null);
+    if (predErr) throw new Error(predErr.message);
+
+    const winnerBy = new Map<string, "UP" | "DOWN">();
+    for (const p of (preds ?? []) as any[]) {
+      if (p.outcome === "YES") winnerBy.set(p.ticker, "UP");
+      else if (p.outcome === "NO") winnerBy.set(p.ticker, "DOWN");
+    }
+    const tickers = Array.from(winnerBy.keys());
+    if (tickers.length === 0) return { cells: [], covered_windows: 0, hours };
+
+    // Chunk IN() to avoid URL blowup.
+    const snaps: any[] = [];
+    for (let i = 0; i < tickers.length; i += 100) {
+      const chunk = tickers.slice(i, i + 100);
+      const { data: s, error } = await context.supabase
+        .from("btc_kalshi_odds_snapshots")
+        .select("ticker,seconds_to_close,our_mid")
+        .in("ticker", chunk)
+        .not("our_mid", "is", null)
+        .not("seconds_to_close", "is", null)
+        .order("seconds_to_close", { ascending: false });
+      if (error) throw new Error(error.message);
+      if (s) snaps.push(...s);
+    }
+
+    const byTicker = new Map<string, any[]>();
+    for (const s of snaps) {
+      const arr = byTicker.get(s.ticker) ?? [];
+      arr.push(s);
+      byTicker.set(s.ticker, arr);
+    }
+
+    // grid[threshold][bucket] = { windows, wins }
+    const grid = new Map<string, { windows: number; wins: number }>();
+    const key = (thr: number, bucket: string) => `${thr}|${bucket}`;
+
+    let covered = 0;
+    for (const [ticker, arr] of byTicker.entries()) {
+      const winner = winnerBy.get(ticker);
+      if (!winner) continue;
+      covered++;
+      // Sorted by stc DESC => earliest snapshot first.
+      arr.sort((a, b) => (b.seconds_to_close ?? 0) - (a.seconds_to_close ?? 0));
+      for (const thr of THRESHOLDS) {
+        // Find first snapshot where |mid-0.5|*2 >= thr equivalent side-prob
+        let crossed: { stc: number; side: "UP" | "DOWN" } | null = null;
+        for (const s of arr) {
+          const mid = Number(s.our_mid);
+          if (!Number.isFinite(mid)) continue;
+          const sideProb = Math.max(mid, 1 - mid);
+          if (sideProb >= thr) {
+            crossed = { stc: Number(s.seconds_to_close), side: mid >= 0.5 ? "UP" : "DOWN" };
+            break;
+          }
+        }
+        if (!crossed) continue;
+        const b = bucketOf(crossed.stc);
+        const k = key(thr, b.name);
+        const cell = grid.get(k) ?? { windows: 0, wins: 0 };
+        cell.windows += 1;
+        if (crossed.side === winner) cell.wins += 1;
+        grid.set(k, cell);
+      }
+    }
+
+    const cells: LockCell[] = [];
+    const BUCKETS = ["≥10m", "5-10m", "2-5m", "30s-2m", "<30s"];
+    for (const thr of THRESHOLDS) {
+      for (const bname of BUCKETS) {
+        const cell = grid.get(key(thr, bname));
+        const b = bucketOf(bname === "≥10m" ? 600 : bname === "5-10m" ? 300 : bname === "2-5m" ? 120 : bname === "30s-2m" ? 30 : 0);
+        cells.push({
+          threshold: thr,
+          bucket: bname,
+          bucket_order: b.order,
+          windows: cell?.windows ?? 0,
+          wins: cell?.wins ?? 0,
+          wr: cell && cell.windows > 0 ? cell.wins / cell.windows : null,
+        });
+      }
+    }
+    return { cells, covered_windows: covered, hours };
+  });
+
