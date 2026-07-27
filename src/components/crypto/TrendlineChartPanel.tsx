@@ -217,12 +217,18 @@ export function TrendlineChartPanel() {
       ? (rawCandles as TCandle[]).map(c => c.c)
       : ((shadow?.candles ?? []) as TCandle[]).map(c => c.c)
   ), [tf, rawCandles, shadow?.candles]);
+  const midPriceNow = useMemo<number | null>(() => {
+    const u = shadow?.upperAtNow, l = shadow?.lowerAtNow;
+    return (u != null && l != null && u > l) ? (u + l) / 2 : null;
+  }, [shadow?.upperAtNow, shadow?.lowerAtNow]);
   const ourQuote = useOurQuote({
     spot: displaySpot,
     strike: kalshi?.strike ?? null,
     secondsToClose: kalshiRemainingSec,
     closes1m: closes1mForOdds,
+    midPrice: midPriceNow,
   });
+
 
   return (
     <div className="border border-white/10 rounded-lg bg-black/40 p-3">
