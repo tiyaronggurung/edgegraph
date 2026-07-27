@@ -260,9 +260,23 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
   if (rawMid == null) return null;
   const momTilt  = inp.momentumTiltPct ?? 0;
   const pivTilt  = inp.midPivotTiltPct ?? 0;
-  const mid = Math.min(0.99, Math.max(0.01, rawMid + momTilt + pivTilt));
-  const hs = halfSpread(inp.secondsToClose);
+  let mid = Math.min(0.99, Math.max(0.01, rawMid + momTilt + pivTilt));
 
+  // Pin-lock: when spot pins the strike in the final seconds, Φ collapses to
+  // ~0.5 and quotes flip to -119 coin-flip. Kalshi holds a directional lean
+  // in that regime (last known drift wins). Bias mid toward the side that
+  // momentum + MID pivot agree on when |S-K| is tiny and T is short.
+  const T = Math.max(0, inp.secondsToClose);
+  const distFrac = Math.abs((inp.spot - inp.strike) / inp.strike);
+  if (T < 25 && distFrac < 0.00008) { // ~$8 on $100k
+    const lean = momTilt + pivTilt; // signed
+    if (Math.abs(lean) > 0.002) {
+      const push = Math.sign(lean) * Math.min(0.12, Math.abs(lean) * 6);
+      mid = Math.min(0.97, Math.max(0.03, 0.5 + push));
+    }
+  }
+
+  const hs = halfSpread(inp.secondsToClose);
   let pUpAsk = Math.min(0.995, Math.max(0.005, mid + hs));
   let pDownAsk = Math.min(0.995, Math.max(0.005, (1 - mid) + hs));
 
@@ -271,7 +285,6 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
     else pUpAsk = Math.max(0.005, pUpAsk - 0.001);
   }
 
-  const T = Math.max(0, inp.secondsToClose);
   const timeDecayFrac = Math.max(0, Math.min(1, 1 - T / 900));
 
   return {
@@ -285,6 +298,7 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
     midPivotTiltPct: pivTilt,
   };
 }
+
 
 
 /** American odds string for a probability. "-184" / "+142". */
