@@ -2977,6 +2977,33 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_trendline_config: {
+        Row: {
+          booster_mode: string
+          id: number
+          min_channel_width_pct: number
+          min_swings: number
+          quality_gates_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          booster_mode?: string
+          id?: number
+          min_channel_width_pct?: number
+          min_swings?: number
+          quality_gates_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          booster_mode?: string
+          id?: number
+          min_channel_width_pct?: number
+          min_swings?: number
+          quality_gates_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       btc_trendline_shadow: {
         Row: {
           channel_width_pct: number | null
@@ -2989,6 +3016,7 @@ export type Database = {
           lower_intercept: number | null
           lower_price_now: number | null
           lower_slope: number | null
+          next_return_15m: number | null
           outcome: string | null
           outcome_settled_at: string | null
           seconds_to_close: number | null
@@ -3017,6 +3045,7 @@ export type Database = {
           lower_intercept?: number | null
           lower_price_now?: number | null
           lower_slope?: number | null
+          next_return_15m?: number | null
           outcome?: string | null
           outcome_settled_at?: string | null
           seconds_to_close?: number | null
@@ -3045,6 +3074,7 @@ export type Database = {
           lower_intercept?: number | null
           lower_price_now?: number | null
           lower_slope?: number | null
+          next_return_15m?: number | null
           outcome?: string | null
           outcome_settled_at?: string | null
           seconds_to_close?: number | null
