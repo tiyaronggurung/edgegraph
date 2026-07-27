@@ -64,6 +64,10 @@ export function TrendlineChartPanel() {
   // Records 1 snapshot/sec of Kalshi odds + our odds into btc_kalshi_odds_snapshots.
   useKalshiOddsRecorder([]);
 
+  // Retained last-good UP/DN quote for the pulse-dot pills — prevents blink
+  // when sigma / candles / kalshi momentarily go null between frames.
+  const lastQuoteRef = useRef<ReturnType<typeof computeOurQuote> | null>(null);
+
 
 
   // Live composite BTC spot from Binance+Coinbase WebSockets (~50–200ms/tick).
