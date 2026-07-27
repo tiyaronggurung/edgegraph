@@ -4013,6 +4013,7 @@ function CryptoPage() {
       </LazyOnVisible>
 
       <LazyOnVisible><OddsSideStudyPanel /></LazyOnVisible>
+      <LazyOnVisible><LockThresholdStudyPanel /></LazyOnVisible>
       <LazyOnVisible><OddsComparisonPanel /></LazyOnVisible>
 
 
