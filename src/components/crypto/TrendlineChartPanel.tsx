@@ -83,14 +83,24 @@ export function TrendlineChartPanel() {
   });
 
 
-  const { data: kalshi } = useQuery({
+  const { data: kalshiRaw } = useQuery({
     queryKey: ["kalshi-implied-spot"],
     queryFn: () => kalshiFn(),
-    refetchInterval: 5_000,
-    staleTime: 4_000,
+    refetchInterval: 1_000,
+    staleTime: 800,
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
+    refetchIntervalInBackground: false,
   });
+
+  // Stabilize: retain last-good Kalshi payload so transient failures / null
+  // frames don't blank the "Kalshi vs ours" pill or the OurOdds pill (which
+  // needs `strike` to render).
+  const lastGoodKalshiRef = useRef<typeof kalshiRaw | null>(null);
+  if (kalshiRaw?.ok && kalshiRaw.strike != null) {
+    lastGoodKalshiRef.current = kalshiRaw;
+  }
+  const kalshi = kalshiRaw?.ok ? kalshiRaw : (lastGoodKalshiRef.current ?? kalshiRaw);
 
   // Smooth 1s countdown to Kalshi window close. Kalshi refetches every 5s;
   // between refetches we interpolate locally so the timer never freezes.
