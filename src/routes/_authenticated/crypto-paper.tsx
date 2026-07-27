@@ -130,6 +130,10 @@ function PaperTradingPage() {
       {/* Live Kalshi odds — clickable UP/DOWN places a $10 paper bet */}
       <KalshiOddsWidget enableBetting />
 
+      {/* Our-Odds auto-bet — fires at American −200 on our internal UP/DN quote */}
+      <OurOddsAutoBetPanel />
+
+
       {/* Auto-settle: silently settle due fills every 5s while page is open */}
       <AutoSettler />
 
