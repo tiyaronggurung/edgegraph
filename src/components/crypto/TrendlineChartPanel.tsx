@@ -406,6 +406,9 @@ export function TrendlineChartPanel() {
               ourUpAskProb={ourQuote?.pUpAsk ?? null}
               ourDownAskProb={ourQuote?.pDownAsk ?? null}
               ourMidProb={ourQuote?.mid ?? null}
+              timeDecayFrac={ourQuote?.timeDecayFrac ?? 0}
+              midPivotTiltPct={ourQuote?.midPivotTiltPct ?? 0}
+
             />
 
           </div>
