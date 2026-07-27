@@ -1184,9 +1184,19 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               }
               if (raw) {
                 // 'follow' → bet with the breakout; 'fade' → bet against it.
-                const effective = tlCfg.booster_mode === "fade"
-                  ? (raw === "up" ? "down" : "up")
-                  : raw;
+                // 'hybrid' → fade only on bear_wedge patterns (55/45 edge in
+                // backtest, n=120); follow everything else (bull_wedge 84%,
+                // spikes 92–100%). Spike breakouts always follow regardless.
+                let effective: "up" | "down" = raw;
+                if (tlCfg.booster_mode === "fade") {
+                  effective = raw === "up" ? "down" : "up";
+                } else if (tlCfg.booster_mode === "hybrid") {
+                  const isSpike = spike.detected && spike.direction === raw;
+                  const isBearWedge = trend.isWedge && trend.wedgeBias === "bear";
+                  if (isBearWedge && !isSpike) {
+                    effective = raw === "up" ? "down" : "up";
+                  }
+                }
                 dir = effective === "up" ? "YES" : "NO";
                 conf = Math.max(conf, 0.75);
                 boosterFired = effective;
