@@ -8,6 +8,7 @@ import { getBtcGateConfig } from "./btcGateConfig.server";
 import { logBtcGateDecision } from "./btcGateLog.server";
 import { getChartVerdict } from "./ta/chartVerdict";
 import { detectTrendlines, detectSpike } from "./ta/trendlines";
+import { getTrendlineConfig } from "./ta/trendlineConfig";
 import { computeTaScore, TA_ENGINE_VERSION, type TaScoreResult } from "./ta/taEngine";
 
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
@@ -1151,25 +1152,45 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           let conf = Math.max(0, Math.min(1, chartVerdict.combined.confidence ?? 0));
 
           // Breakout booster: recompute trendlines on the same 1m candle set.
+          // Config-driven: default 'follow' preserves prior behavior exactly.
           try {
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            const tlCfg = await getTrendlineConfig(supabaseAdmin as any);
             const trend = detectTrendlines(recent as any);
             const spike = detectSpike(recent as any, trend);
             const upperNow = trend.upperAtNow;
             const lowerNow = trend.lowerAtNow;
             const spotAboveStrike = spot > strike;
             const spotBelowStrike = spot < strike;
-            // Upside breakout: close above upper trendline AND spot > strike
-            // AND no bearish spike-rejection printing against us.
-            if (upperNow != null && spot > upperNow && spotAboveStrike &&
-                !(spike.detected && spike.direction === "down")) {
-              dir = "YES";
-              conf = Math.max(conf, 0.75);
-              boosterFired = "up";
-            } else if (lowerNow != null && spot < lowerNow && spotBelowStrike &&
-                !(spike.detected && spike.direction === "up")) {
-              dir = "NO";
-              conf = Math.max(conf, 0.75);
-              boosterFired = "down";
+
+            // Quality gates (opt-in). When enabled, booster only fires on
+            // patterns whose channel + swings pass the configured thresholds.
+            const width = trend.channelWidthPct ?? null;
+            const swings = (trend as any).swingsUsed ?? null;
+            const qualityOk =
+              !tlCfg.quality_gates_enabled ||
+              ((width == null || width <= tlCfg.min_channel_width_pct || tlCfg.min_channel_width_pct === 0) &&
+               (swings == null || swings >= tlCfg.min_swings));
+
+            if (tlCfg.booster_mode !== "off" && qualityOk) {
+              // Detect the raw breakout direction first (independent of mode).
+              let raw: "up" | "down" | null = null;
+              if (upperNow != null && spot > upperNow && spotAboveStrike &&
+                  !(spike.detected && spike.direction === "down")) {
+                raw = "up";
+              } else if (lowerNow != null && spot < lowerNow && spotBelowStrike &&
+                  !(spike.detected && spike.direction === "up")) {
+                raw = "down";
+              }
+              if (raw) {
+                // 'follow' → bet with the breakout; 'fade' → bet against it.
+                const effective = tlCfg.booster_mode === "fade"
+                  ? (raw === "up" ? "down" : "up")
+                  : raw;
+                dir = effective === "up" ? "YES" : "NO";
+                conf = Math.max(conf, 0.75);
+                boosterFired = effective;
+              }
             }
           } catch (e) { /* trendline failure is non-fatal */ }
 
@@ -1182,6 +1203,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           }
         }
         void boosterFired; // reserved for future decision-log field
+
+
 
         // ── REVERSION SANITY VETOS (2026-07-23) ────────────────────────────
         // Three soft caps that never flip a pick — they only *moderate*
