@@ -331,6 +331,18 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
   // Report the effective pivot influence for the UI decay bar.
   const effectivePivot = hasMid ? (anchorMid - spotMid) : 0;
 
+  const recommendation = buildRecommendation({
+    mid,
+    pillTilt,
+    momTilt,
+    secondsToClose: inp.secondsToClose,
+    spot,
+    strike,
+    midPrice: midPrice ?? null,
+    buyPrice: inp.buyPrice ?? null,
+    sellPrice: inp.sellPrice ?? null,
+  });
+
   return {
     mid,
     pUpAsk,
@@ -341,6 +353,7 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
     timeDecayFrac,
     midPivotTiltPct: effectivePivot,
     pillGateTiltPct: pillTilt,
+    recommendation,
   };
 }
 
