@@ -84,15 +84,22 @@ export function TrendlineChartPanel() {
 
   // Smooth 1s countdown to Kalshi window close. Kalshi refetches every 5s;
   // between refetches we interpolate locally so the timer never freezes.
+  // Re-anchor rules (avoid visible drift/jitter):
+  //   - ticker rolled → hard reset to new window
+  //   - server value is LOWER than our interp by ≥1s → we're behind real time,
+  //     snap down (monotonic decrease is fine)
+  //   - server value is HIGHER than our interp → ignore (network latency /
+  //     server-side second boundary). Re-anchoring up causes the "up and down"
+  //     wobble the user reported.
   const kalshiAnchorRef = useRef<{ ticker: string; secs: number; at: number } | null>(null);
   if (kalshi?.ok && kalshi.ticker && typeof kalshi.secondsToClose === "number") {
     const prev = kalshiAnchorRef.current;
-    // Re-anchor when the ticker rolls to a new window, or when the fresh
-    // server value is more than 1s off our interpolated value (drift guard).
     const interp = prev
-      ? Math.max(0, prev.secs - Math.round((Date.now() - prev.at) / 1000))
+      ? Math.max(0, prev.secs - Math.floor((Date.now() - prev.at) / 1000))
       : null;
-    if (!prev || prev.ticker !== kalshi.ticker || interp == null || Math.abs(interp - kalshi.secondsToClose) > 1) {
+    const rolled = !prev || prev.ticker !== kalshi.ticker;
+    const behind = interp != null && kalshi.secondsToClose < interp - 1;
+    if (rolled || interp == null || behind) {
       kalshiAnchorRef.current = { ticker: kalshi.ticker, secs: kalshi.secondsToClose, at: Date.now() };
     }
   }
@@ -111,6 +118,7 @@ export function TrendlineChartPanel() {
     return () => cancelAnimationFrame(raf);
   }, []);
   const fmtMMSS = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
 
   // Strike / wedge / spike metadata — only meaningful on 1m; keep the existing shadow query.
   const { data: shadow, isFetching: shadowFetching, refetch: refetchShadow } = useQuery<TrendlineSnapshot>({
