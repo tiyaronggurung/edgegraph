@@ -361,45 +361,45 @@ export function TrendlineChartPanel() {
         </div>
       </div>
 
-      {open && (
-        <>
-          {/* Session W/L ledger — all locked recommendations, settled on strike roll */}
-          {recoHistory.length > 0 && (
-            <div className="mt-2 flex flex-col gap-1.5 px-2 py-1.5 rounded border border-white/10 bg-black/60 backdrop-blur">
-              {(() => {
-                const wins = recoHistory.filter(o => o.won).length;
-                const losses = recoHistory.length - wins;
-                const wr = (wins / recoHistory.length) * 100;
-                return (
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold text-white/70 uppercase tracking-wider">Locked Side Summary</span>
-                    <div className="flex items-center gap-2 text-[11px] font-mono">
-                      <span className="text-white/60">locks <span className="text-white/90 tabular-nums">{recoHistory.length}</span></span>
-                      <span className="text-white/30">·</span>
-                      <span className="text-emerald-300">wins <span className="tabular-nums">{wins}</span></span>
-                      <span className="text-white/30">·</span>
-                      <span className="text-rose-300">losses <span className="tabular-nums">{losses}</span></span>
-                      <span className="text-white/30">·</span>
-                      <span className="tabular-nums text-cyan-200">{wr.toFixed(0)}% WR</span>
-                    </div>
-                  </div>
-                );
-              })()}
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider shrink-0">Trail</span>
-                <div className="flex items-center gap-1 flex-wrap">
-                  {recoHistory.map((o, i) => (
-                    <span
-                      key={i}
-                      className={`h-2.5 w-2.5 rounded-full ${o.won ? "bg-emerald-400" : "bg-rose-400"} ring-1 ring-white/10`}
-                      title={`#${i + 1} · ${o.side} ${o.won ? "WIN" : "LOSS"} · strike $${o.strike.toFixed(0)} · settle $${o.settleSpot.toFixed(2)}`}
-                    />
-                  ))}
+      {/* Session W/L ledger — always visible, never behind the collapse */}
+      {recoHistory.length > 0 && (
+        <div className="mt-2 flex flex-col gap-1.5 px-2 py-1.5 rounded border border-white/10 bg-black/60 backdrop-blur">
+          {(() => {
+            const wins = recoHistory.filter(o => o.won).length;
+            const losses = recoHistory.length - wins;
+            const wr = (wins / recoHistory.length) * 100;
+            return (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold text-white/70 uppercase tracking-wider">Locked Side Summary</span>
+                <div className="flex items-center gap-2 text-[11px] font-mono">
+                  <span className="text-white/60">locks <span className="text-white/90 tabular-nums">{recoHistory.length}</span></span>
+                  <span className="text-white/30">·</span>
+                  <span className="text-emerald-300">wins <span className="tabular-nums">{wins}</span></span>
+                  <span className="text-white/30">·</span>
+                  <span className="text-rose-300">losses <span className="tabular-nums">{losses}</span></span>
+                  <span className="text-white/30">·</span>
+                  <span className="tabular-nums text-cyan-200">{wr.toFixed(0)}% WR</span>
                 </div>
               </div>
+            );
+          })()}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider shrink-0">Trail</span>
+            <div className="flex items-center gap-1 flex-wrap">
+              {recoHistory.map((o, i) => (
+                <span
+                  key={i}
+                  className={`h-2.5 w-2.5 rounded-full ${o.won ? "bg-emerald-400" : "bg-rose-400"} ring-1 ring-white/10`}
+                  title={`#${i + 1} · ${o.side} ${o.won ? "WIN" : "LOSS"} · strike $${o.strike.toFixed(0)} · settle $${o.settleSpot.toFixed(2)}`}
+                />
+              ))}
             </div>
-          )}
+          </div>
+        </div>
+      )}
 
+      {open && (
+        <>
           <div className="flex items-center gap-1.5 mt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
             <span className="text-[10px] text-white/40 mr-1">TF:</span>
             {TF_LIST.map(t => (
