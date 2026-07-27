@@ -4766,6 +4766,16 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      mid_support_study: {
+        Args: { _days?: number }
+        Returns: {
+          avg_mid_dist_pct: number
+          bucket: string
+          edge_vs_baseline: number
+          n: number
+          pct_up: number
+        }[]
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
