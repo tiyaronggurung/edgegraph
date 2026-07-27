@@ -227,7 +227,9 @@ export interface OurQuote {
   downCents: number;   // 0..100
   timeDecayFrac: number; // 0 at open → 1 at close (for UI decay bar)
   midPivotTiltPct: number; // signed fraction actually applied
+  pillGateTiltPct: number; // signed fraction from strike-vs-pills gate
 }
+
 
 /**
  * Trendline MID pivot tilt (signed fraction, capped ±4¢).
