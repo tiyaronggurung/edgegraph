@@ -489,7 +489,7 @@ const MAX_CW = 32;
 const DEFAULT_CW = 6;
 
 function TaChart({
-  candles: candlesProp, shadow, tf, visible, fibOn, liveSpot,
+  candles: candlesProp, shadow, tf, visible, fibOn, liveSpot, ourUpProb,
 }: {
   candles: TCandle[];
   shadow: TrendlineSnapshot | null;
@@ -497,6 +497,7 @@ function TaChart({
   visible: Record<string, boolean>;
   fibOn: boolean;
   liveSpot: number | null;
+  ourUpProb: number | null;
 }) {
 
   // Alias so the rest of the component (which references `data.strike` etc.)
