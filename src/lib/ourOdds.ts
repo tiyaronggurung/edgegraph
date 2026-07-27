@@ -228,6 +228,14 @@ export interface OurQuote {
   timeDecayFrac: number; // 0 at open → 1 at close (for UI decay bar)
   midPivotTiltPct: number; // signed fraction actually applied
   pillGateTiltPct: number; // signed fraction from strike-vs-pills gate
+  recommendation: BetRecommendation; // UI-facing UP/DOWN/WAIT call w/ reason
+}
+
+export interface BetRecommendation {
+  side: "UP" | "DOWN" | "WAIT";
+  strength: "strong" | "lean" | "wait";
+  confidencePct: number; // 0..100 = chosen-side prob (WAIT → mid or 50)
+  reason: string;        // one-liner shown in the UI tooltip/pill
 }
 
 
@@ -323,6 +331,18 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
   // Report the effective pivot influence for the UI decay bar.
   const effectivePivot = hasMid ? (anchorMid - spotMid) : 0;
 
+  const recommendation = buildRecommendation({
+    mid,
+    pillTilt,
+    momTilt,
+    secondsToClose: inp.secondsToClose,
+    spot,
+    strike,
+    midPrice: midPrice ?? null,
+    buyPrice: inp.buyPrice ?? null,
+    sellPrice: inp.sellPrice ?? null,
+  });
+
   return {
     mid,
     pUpAsk,
@@ -333,17 +353,30 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
     timeDecayFrac,
     midPivotTiltPct: effectivePivot,
     pillGateTiltPct: pillTilt,
+    recommendation,
   };
 }
 
 /**
- * Pill-gate tilt (signed fraction, capped ±8¢). Encodes the study-confirmed
- * rule: when the Kalshi strike sits above BOTH the trendline BUY pill and
- * the MID pill (by ≥$5), settlement is heavily biased DOWN in the last 5m.
- * Symmetric for strike below both SELL and MID. Off outside T ≤ 300s.
+ * Pill-gate + MID-distance tilt (signed fraction, capped ±10¢).
  *
- * Historical WR (last 30d, gap ≥ $5, strike above both pills):
- *   T 5-10m: 64.6% · T 2-5m: 68.9% · T 30s-2m: 92.0% · T <30s: 88.5%
+ * Two composable signals, both from the 30d shadow study on 2,777 settled
+ * snapshots. Asymmetric — DOWN edge fires earlier and wider than UP:
+ *
+ *   DOWN (strike above MID, bps > 0):
+ *     bps 5-10  · T<120s → ~97-100% NO      → -10¢
+ *     bps 10-25 · T<120s → ~92% NO          → -10¢
+ *     bps ≥25   · T<300s → ~85-92% NO       → -8¢
+ *     bps 5-25  · T 120-300s → ~65-70% NO   → -5¢
+ *     bps ≥25   · T 300-600s → ~55-60% NO   → -3¢
+ *
+ *   UP (strike below MID, bps < 0) — weaker, tighter:
+ *     bps ≤-25  · T<120s → ~72% YES         → +6¢
+ *     bps ≤-25  · T 120-300s → ~66% YES     → +4¢
+ *     everything else → 0 (>10m reversal trap)
+ *
+ * The historical pill-position rule (strike ≥ $5 beyond BOTH pills) is kept
+ * as an amplifier on top of the MID-distance tilt when both fire same-side.
  */
 export function pillGateTilt(args: {
   spot: number | null | undefined;
@@ -354,31 +387,110 @@ export function pillGateTilt(args: {
   secondsToClose: number;
 }): number {
   const { strike, midPrice, buyPrice, sellPrice, secondsToClose } = args;
-  const MIN_GAP = 5; // $
   if (!(strike != null && strike > 0)) return 0;
   if (!(midPrice != null && midPrice > 0)) return 0;
   const T = Math.max(0, secondsToClose);
-  if (T > 300) return 0; // rule only reliable in last 5 min
+  if (T > 600) return 0;
 
-  // Time weight: 0 at T=300s → 1.0 at T=60s → holds through close.
-  let wT: number;
-  if (T >= 60) wT = 1 - (T - 60) / 240; // 300→0, 60→1
-  else         wT = 1;
-  wT = Math.max(0, Math.min(1, wT));
+  const distBps = ((strike - midPrice) / strike) * 10000; // signed
 
-  // Strike above BOTH BUY & MID by ≥$5 → DOWN lean.
-  if (buyPrice != null && buyPrice > 0
-      && strike >= buyPrice + MIN_GAP
-      && strike >= midPrice + MIN_GAP) {
-    return -0.08 * wT;
+  // --- MID-distance lookup ---
+  let midTilt = 0;
+  if (distBps >= 5) {
+    // strike above MID → DOWN lean
+    if (T < 120) {
+      if (distBps < 25) midTilt = -0.10;
+      else               midTilt = -0.10;
+    } else if (T < 300) {
+      if (distBps < 25) midTilt = -0.05;
+      else               midTilt = -0.08;
+    } else {
+      midTilt = distBps >= 25 ? -0.03 : 0;
+    }
+  } else if (distBps <= -25) {
+    // strike below MID (≥25bps) → UP lean, only close to close
+    if (T < 120)      midTilt = +0.06;
+    else if (T < 300) midTilt = +0.04;
   }
-  // Strike below BOTH SELL & MID by ≥$5 → UP lean.
-  if (sellPrice != null && sellPrice > 0
-      && strike <= sellPrice - MIN_GAP
-      && strike <= midPrice - MIN_GAP) {
-    return +0.08 * wT;
+
+  // --- Pill-position amplifier (legacy rule: strike ≥ $5 beyond BOTH pills) ---
+  const MIN_GAP = 5;
+  let pillAmp = 0;
+  if (T <= 300) {
+    if (buyPrice != null && buyPrice > 0
+        && strike >= buyPrice + MIN_GAP
+        && strike >= midPrice + MIN_GAP) {
+      pillAmp = -0.02;
+    } else if (sellPrice != null && sellPrice > 0
+        && strike <= sellPrice - MIN_GAP
+        && strike <= midPrice - MIN_GAP) {
+      pillAmp = +0.02;
+    }
   }
-  return 0;
+
+  // Only amplify when both signals agree in sign.
+  const combined = (Math.sign(midTilt) === Math.sign(pillAmp)) ? midTilt + pillAmp : midTilt;
+  return Math.max(-0.10, Math.min(0.10, combined));
+}
+
+/**
+ * Turn the final MID + tilt state into a user-facing UP/DOWN recommendation.
+ * Strong  → mid ≥ 0.66 (or ≤ 0.34) AND meaningful pill-gate/momentum tilt
+ * Lean    → mid ≥ 0.58 (or ≤ 0.42)
+ * WAIT    → otherwise (coin-flip zone)
+ */
+export function buildRecommendation(args: {
+  mid: number;
+  pillTilt: number;
+  momTilt: number;
+  secondsToClose: number;
+  spot: number;
+  strike: number;
+  midPrice: number | null;
+  buyPrice: number | null;
+  sellPrice: number | null;
+}): BetRecommendation {
+  const { mid, pillTilt, momTilt, secondsToClose, spot, strike, midPrice } = args;
+  const upProbPct = mid * 100;
+  const downProbPct = (1 - mid) * 100;
+  const tiltCents = (pillTilt + momTilt) * 100;
+  const distBps = midPrice != null && midPrice > 0
+    ? ((strike - midPrice) / strike) * 10000
+    : null;
+
+  const spotSide = spot >= strike ? "above" : "below";
+  const spotDollars = Math.abs(spot - strike);
+
+  // WAIT: coin-flip zone or no clear structure
+  if (mid > 0.42 && mid < 0.58) {
+    return {
+      side: "WAIT",
+      strength: "wait",
+      confidencePct: Math.max(upProbPct, downProbPct),
+      reason: `coin-flip · P(UP)=${upProbPct.toFixed(0)}% · spot $${spotDollars.toFixed(0)} ${spotSide} strike · ${secondsToClose}s left`,
+    };
+  }
+
+  const side: "UP" | "DOWN" = mid >= 0.5 ? "UP" : "DOWN";
+  const conf = side === "UP" ? upProbPct : downProbPct;
+  const strong = conf >= 66 && Math.abs(tiltCents) >= 3;
+
+  const parts: string[] = [`P(${side})=${conf.toFixed(0)}%`];
+  if (distBps != null && Math.abs(distBps) >= 5) {
+    parts.push(`strike ${distBps > 0 ? "+" : ""}${distBps.toFixed(0)}bps vs MID`);
+  }
+  if (Math.abs(tiltCents) >= 2) {
+    parts.push(`pill-tilt ${tiltCents >= 0 ? "+" : ""}${tiltCents.toFixed(1)}¢`);
+  }
+  parts.push(`spot $${spotDollars.toFixed(0)} ${spotSide} strike`);
+  parts.push(`${secondsToClose}s left`);
+
+  return {
+    side,
+    strength: strong ? "strong" : "lean",
+    confidencePct: conf,
+    reason: parts.join(" · "),
+  };
 }
 
 
