@@ -239,7 +239,7 @@ export function OurOddsLiveHunterPanel() {
             {enabled ? `Our-Odds LIVE Hunter ON · REAL $${STAKE_USD}` : `Our-Odds LIVE Hunter OFF · REAL $${STAKE_USD}`}
           </button>
           <span className="text-[11px] text-amber-200/70">
-            REAL MONEY · fires at Kalshi ask when our UP/DN odds hit −200 · ≤{MAX_ASK_CENTS}¢ · 1 shot/side · 3-min warmup
+            REAL MONEY · buys at −200 · auto-sells at +40% (entry × 1.4) · ≤{MAX_ASK_CENTS}¢ · 1 shot/side · 3-min warmup
           </span>
         </div>
         <div className="flex items-center gap-3">
