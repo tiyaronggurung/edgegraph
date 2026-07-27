@@ -11,6 +11,7 @@ import { emaSeries, rsi, macd, bollinger, sessionVwap } from "@/lib/ta/taEngine"
 import { fibLevels, FIB_COLORS } from "@/lib/ta/fib";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { OurOddsPill } from "@/components/crypto/OurOddsPill";
+import { computeUpProbability, realizedVolFromCloses, toAmericanOdds } from "@/lib/ourOdds";
 import type { Candle } from "@/lib/ta/chartSignals";
 
 
