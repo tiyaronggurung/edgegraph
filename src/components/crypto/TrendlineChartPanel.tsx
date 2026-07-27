@@ -1020,19 +1020,23 @@ function TaChart({
             const diffText = diff != null
               ? `${diff >= 0 ? "+" : ""}$${diff.toFixed(2)} ${diff >= 0 ? "above" : "below"} strike`
               : "";
-            // Anchor the delta pill just to the left of the pulse dot so it
-            // stays visible next to the running candle instead of floating far
-            // off-screen against the y-axis. Falls back to the right edge if
-            // the pulse dot is too close to the left padding.
+            // Anchor the delta pill just above the price line so it never
+            // sits on top of the pulse dot or the right-axis price tag.
             const dotX = xFor(nCandles - 1);
             const pillW = 132;
             const pillH = 16;
-            const pillGap = 12;
+            const pillGap = 10;
+            // horizontal: prefer left of the dot; fall back to right of the dot,
+            // clamped so it never overlaps the right-axis price pill.
+            const rightAxisLeft = innerW - PAD_R; // where the axis price tag starts
             const preferLeft = dotX - pillGap - pillW >= PAD_L + 4;
             const pillX = preferLeft
               ? dotX - pillGap - pillW
-              : Math.min(innerW - PAD_R - pillW - 4, dotX + pillGap);
+              : Math.min(rightAxisLeft - pillW - 6, dotX + pillGap);
             const pillTextX = pillX + pillW - 6;
+            // vertical: lift the pill above the dashed price line so it doesn't
+            // overlap the pulse dot or the axis pill visually.
+            const pillCenterY = Math.max(PAD_T + pillH / 2 + 2, yy - 14);
             return (
               <>
                 <line
@@ -1056,15 +1060,21 @@ function TaChart({
                 >
                   ${nowPrice.toFixed(2)}
                 </text>
-                {/* delta-from-strike pill anchored to the pulse dot */}
+                {/* delta-from-strike pill — lifted above the price line */}
                 {diffText && (
                   <>
+                    {/* thin connector from the price line to the pill */}
+                    <line
+                      x1={pillX + pillW / 2} y1={yy}
+                      x2={pillX + pillW / 2} y2={pillCenterY + pillH / 2}
+                      stroke={dashStroke} strokeWidth={1} strokeDasharray="2 2" opacity={0.6}
+                    />
                     <rect
-                      x={pillX} y={yy - pillH / 2} width={pillW} height={pillH} rx={3}
-                      fill="rgba(0,0,0,0.8)" stroke={dashStroke} strokeWidth={1}
+                      x={pillX} y={pillCenterY - pillH / 2} width={pillW} height={pillH} rx={3}
+                      fill="rgba(0,0,0,0.85)" stroke={dashStroke} strokeWidth={1}
                     />
                     <text
-                      x={pillTextX} y={yy + 3} textAnchor="end"
+                      x={pillTextX} y={pillCenterY + 3} textAnchor="end"
                       fill={up ? "rgb(134, 239, 172)" : "rgb(252, 165, 165)"}
                       fontSize={10} fontFamily="monospace" fontWeight={600}
                     >
@@ -1072,6 +1082,7 @@ function TaChart({
                     </text>
                   </>
                 )}
+
               </>
             );
           })()}
