@@ -2,12 +2,20 @@ import { useEffect, useMemo, useRef } from "react";
 import {
   buildRecommendation,
   computeOurQuote,
+  computeUpProbability,
   effectiveVol,
   momentumTilt,
   pillGateTilt,
   type TapeSample,
   type OurQuote,
 } from "@/lib/ourOdds";
+
+// Physics sanity cap: ratcheted mid can never drift more than this many ¢
+// away from the pure spot-vs-strike BS probability. Kills cases where MID
+// pivot + bias + breakouts stack to 89% UP when spot is only $27 above a
+// $100k strike (physics says ~60-65%).
+const PHYSICS_CAP = 0.12;
+
 
 
 const TAPE_MAX = 900;         // ~5 min of ticks at ~300ms cadence
