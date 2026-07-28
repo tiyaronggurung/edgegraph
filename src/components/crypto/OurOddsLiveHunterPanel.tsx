@@ -278,21 +278,21 @@ export function OurOddsLiveHunterPanel() {
             {enabled ? `Our-Odds LIVE Hunter ON · REAL $${STAKE_USD}` : `Our-Odds LIVE Hunter OFF · REAL $${STAKE_USD}`}
           </button>
           <span className="text-[11px] text-amber-200/70">
-            REAL MONEY · buys at −200 · auto-sells at +40% (entry × 1.4) · ≤{MAX_ASK_CENTS}¢ · 1 shot/side · 3-min warmup
+            REAL MONEY · fires on (our_mid − K_mid) ≥ {MIN_EDGE_CENTS}¢ held {REQUIRED_CONSECUTIVE_TICKS} ticks · ≤{MAX_ASK_CENTS}¢ · TP +40% · 1 shot/side · 3-min warmup
           </span>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[11px] font-mono tabular-nums">
-            <span className={pUp != null && pUp >= TRIGGER_PROB ? "text-emerald-300" : "text-muted-foreground"}>
+            <span className={pUp != null && pUp >= MIN_SIDE_PROB ? "text-emerald-300" : "text-muted-foreground"}>
               UP {upAmer != null ? upAmer : (pUp != null ? `${Math.round(pUp * 100)}¢` : "—")}
             </span>
             <span className="mx-1 text-muted-foreground/50">·</span>
-            <span className={pDown != null && pDown >= TRIGGER_PROB ? "text-red-300" : "text-muted-foreground"}>
+            <span className={pDown != null && pDown >= MIN_SIDE_PROB ? "text-red-300" : "text-muted-foreground"}>
               DN {downAmer != null ? downAmer : (pDown != null ? `${Math.round(pDown * 100)}¢` : "—")}
             </span>
-            {yesAsk != null && (
+            {yesAsk != null && yesBid != null && (
               <span className="ml-2 text-muted-foreground">
-                · K ask YES {Math.round(yesAsk * 100)}¢ / NO {yesBid != null ? Math.round((1 - yesBid) * 100) : "—"}¢
+                · K mid YES {Math.round(((yesBid + yesAsk) / 2) * 100)}¢ / NO {Math.round((1 - (yesBid + yesAsk) / 2) * 100)}¢
               </span>
             )}
           </span>
