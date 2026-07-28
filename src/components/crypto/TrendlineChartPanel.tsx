@@ -964,23 +964,23 @@ function TaChart({
             : `\nBalanced flow — no side pressure.`);
         return (
           <div
-            className={`flex items-center gap-3 px-2 py-1 mt-1 border rounded text-[10px] font-mono ${barCls}`}
+            className={`pointer-events-none absolute top-2 right-2 z-20 flex items-center gap-2 px-2 py-1 border rounded text-[10px] font-mono backdrop-blur bg-black/75 shadow-lg ${barCls}`}
             title={title}
           >
-            <span className="text-white/50">FLOW 60s</span>
+            <span className="text-white/50 tracking-wider">FLOW 60s</span>
             {hasData ? (
               <>
                 <span className="flex items-center gap-1">
-                  <span className="text-emerald-300/90">YES</span>
+                  <span className="text-emerald-300/80">Y</span>
                   <span className="tabular-nums text-emerald-200 font-bold">{y}</span>
                 </span>
                 <span className="text-white/20">·</span>
                 <span className="flex items-center gap-1">
-                  <span className="text-rose-300/90">NO</span>
+                  <span className="text-rose-300/80">N</span>
                   <span className="tabular-nums text-rose-200 font-bold">{n}</span>
                 </span>
                 {/* proportional bar */}
-                <span className="flex-1 h-1.5 min-w-[80px] max-w-[240px] rounded overflow-hidden bg-white/10 flex">
+                <span className="h-1.5 w-[80px] rounded overflow-hidden bg-white/10 flex">
                   <span
                     className="h-full bg-emerald-400/80"
                     style={{ width: `${yesPct}%` }}
@@ -999,14 +999,14 @@ function TaChart({
                     {dominant === "YES" ? "↑" : "↓"} {Math.max(yesPct, noPct).toFixed(0)}%
                   </span>
                 )}
-                <span className="text-white/40">trades {trades}</span>
+                <span className="text-white/40">· {trades}t</span>
               </>
             ) : (
               <span className="text-white/40">no data</span>
             )}
             {vol != null && (
-              <span className="text-white/40 ml-auto">
-                vol {vol.toLocaleString()}
+              <span className="text-white/40 hidden lg:inline">
+                · vol {vol.toLocaleString()}
                 {oi != null ? ` · OI ${oi.toLocaleString()}` : ""}
               </span>
             )}
