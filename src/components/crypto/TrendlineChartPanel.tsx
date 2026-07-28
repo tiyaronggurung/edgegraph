@@ -248,8 +248,11 @@ export function TrendlineChartPanel() {
   const currentTicker = shadow?.ticker ?? null;
   const recLive = ourQuote?.recommendation ?? null;
   const secondsToCloseForLock = kalshiRemainingSec ?? null;
-  // First 7 min of the 15m window ⇒ elapsed<420s ⇒ secondsToClose>480.
-  const inLockWindow = secondsToCloseForLock != null && secondsToCloseForLock > 480;
+  // Strictly at the 7-min mark: arm only while we're between minute 7 and
+  // minute 8 of the 15m window (secondsToClose in (420, 480]). Earlier
+  // conviction spikes don't lock — this prevents a 3-min UP pick from
+  // sticking when the trend flips at minute 5.
+  const inLockWindow = secondsToCloseForLock != null && secondsToCloseForLock <= 480 && secondsToCloseForLock > 420;
   useEffect(() => {
     // Strike changed → settle any open lock against the last spot we saw
     // BEFORE the strike rolled, then clear.

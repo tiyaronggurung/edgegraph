@@ -50,9 +50,12 @@ async function fetchKalshiAskCents(ticker: string, side: "YES" | "NO"): Promise<
 export const recordChipStudyPick = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => Input.parse(data))
   .handler(async ({ data }) => {
-    // Only accept locks fired within the first 7 min of the 15m window.
-    if (data.secondsToClose <= 480) {
-      return { ok: false, reason: "outside_7min_window" as const };
+    // Strictly capture at the 7-min mark: accept only when the lock fires
+    // between minute 7 and minute 8 of the 15m window (secondsToClose in
+    // (420, 480]). Earlier locks (minutes 0-6) are rejected so a 3-min pick
+    // can't stick when the trend flips at minute 5.
+    if (data.secondsToClose > 480 || data.secondsToClose <= 420) {
+      return { ok: false, reason: "outside_7min_mark" as const };
     }
     if (data.confidencePct < 75) {
       return { ok: false, reason: "below_threshold" as const };
