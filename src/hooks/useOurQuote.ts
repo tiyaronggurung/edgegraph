@@ -43,7 +43,14 @@ interface WindowState {
   lastSpotSide: 1 | -1 | 0;    // sign(spot - strike) at last tick
   bias: number;                // persistent trendline bias (prob units)
   lastTs: number;
+  // --- side-memory lock (per-window candle-read memory) ---
+  memory: number;              // signed [-1..1], accumulates candle direction
+  lockedSide: 1 | -1 | 0;      // 0 = no lock, ±1 = hard-locked side
+  oppositeStreakSec: number;   // seconds physics has voted opposite the lock
+  // --- rolling spot-side series for anti-fakeout ---
+  sideHist: Array<{ t: number; above: boolean }>;
 }
+
 
 export function useOurQuote(params: {
   spot: number | null | undefined;
@@ -70,11 +77,16 @@ export function useOurQuote(params: {
         lastSpotSide: 0,
         bias: 0,
         lastTs: Date.now(),
+        memory: 0,
+        lockedSide: 0,
+        oppositeStreakSec: 0,
+        sideHist: [],
       };
       lastGoodRef.current = null;
       // keep tape — vol estimation benefits from continuity across windows
     }
   }, [strike]);
+
 
   useEffect(() => {
     if (spot == null || !Number.isFinite(spot) || !(spot > 0)) return;
@@ -105,19 +117,22 @@ export function useOurQuote(params: {
         lastSpotSide: 0,
         bias: 0,
         lastTs: Date.now(),
+        memory: 0,
+        lockedSide: 0,
+        oppositeStreakSec: 0,
+        sideHist: [],
       };
       winRef.current = win;
     }
+    const w = win; // narrow for TS
 
     // Persistent trendline bias: accumulate signed pill-gate + momentum every
-    // tick, decay very slowly. This is the "trendline scope keeps mattering"
-    // piece — once trendlines lean a side hard, odds keep remembering it even
-    // if instantaneous σ blows out.
+    // tick, decay very slowly.
     const now = Date.now();
-    const dtSec = Math.max(0, (now - win.lastTs) / 1000);
-    win.lastTs = now;
+    const dtSec = Math.max(0, (now - w.lastTs) / 1000);
+    w.lastTs = now;
     const decay = Math.pow(BIAS_DECAY_PER_S, dtSec);
-    win.bias *= decay;
+    w.bias *= decay;
     const pTiltNow = pillGateTilt({
       spot,
       strike,
@@ -130,11 +145,11 @@ export function useOurQuote(params: {
       ? Math.sign(pTiltNow)
       : (Math.abs(pTiltNow) > Math.abs(tilt) ? Math.sign(pTiltNow) : Math.sign(tilt));
     if (agreeSign !== 0) {
-      win.bias = Math.max(-BIAS_MAX, Math.min(BIAS_MAX, win.bias + agreeSign * BIAS_STEP));
+      w.bias = Math.max(-BIAS_MAX, Math.min(BIAS_MAX, w.bias + agreeSign * BIAS_STEP));
     }
 
     // Compose base momentum with persistent bias so downstream tilt survives.
-    const compositeTilt = Math.max(-0.10, Math.min(0.10, tilt + win.bias));
+    const compositeTilt = Math.max(-0.10, Math.min(0.10, tilt + w.bias));
 
     const q = computeOurQuote({
       spot,
@@ -151,37 +166,31 @@ export function useOurQuote(params: {
 
     // ---- Ratchet: never reset to 50/50 unless spot actually crosses strike ----
     const spotSide: 1 | -1 | 0 = spot > strike ? 1 : spot < strike ? -1 : 0;
-    const crossed = spotSide !== 0 && win.lastSpotSide !== 0 && spotSide !== win.lastSpotSide;
+    const crossed = spotSide !== 0 && w.lastSpotSide !== 0 && spotSide !== w.lastSpotSide;
     if (crossed) {
-      // Real reversal: release the extreme on the opposite side so odds can flip.
-      if (spotSide > 0) win.minMid = 0.5;
-      else win.maxMid = 0.5;
+      if (spotSide > 0) w.minMid = 0.5;
+      else w.maxMid = 0.5;
     }
-    if (spotSide !== 0) win.lastSpotSide = spotSide;
+    if (spotSide !== 0) w.lastSpotSide = spotSide;
 
     // Register new extremes.
-    if (q.mid > win.maxMid) win.maxMid = q.mid;
-    if (q.mid < win.minMid) win.minMid = q.mid;
+    if (q.mid > w.maxMid) w.maxMid = q.mid;
+    if (q.mid < w.minMid) w.minMid = q.mid;
 
     // Floor / ceiling from ratchet: allow at most GIVEBACK_FRAC retrace toward 0.5.
-    const upFloor = 0.5 + (win.maxMid - 0.5) * (1 - GIVEBACK_FRAC);
-    const dnCeil  = 0.5 - (0.5 - win.minMid) * (1 - GIVEBACK_FRAC);
+    const upFloor = 0.5 + (w.maxMid - 0.5) * (1 - GIVEBACK_FRAC);
+    const dnCeil  = 0.5 - (0.5 - w.minMid) * (1 - GIVEBACK_FRAC);
 
     let ratchetedMid = q.mid;
-    // If the dominant excursion has been to the UP side, prevent collapse below upFloor.
-    if (win.maxMid - 0.5 >= 0.5 - win.minMid) {
+    if (w.maxMid - 0.5 >= 0.5 - w.minMid) {
       ratchetedMid = Math.max(ratchetedMid, upFloor);
     }
-    // If the dominant excursion has been to the DOWN side, prevent rise above dnCeil.
-    if (0.5 - win.minMid > win.maxMid - 0.5) {
+    if (0.5 - w.minMid > w.maxMid - 0.5) {
       ratchetedMid = Math.min(ratchetedMid, dnCeil);
     }
     ratchetedMid = Math.min(0.99, Math.max(0.01, ratchetedMid));
 
     // ---- Physics sanity cap ------------------------------------------------
-    // No matter what MID pivot / bias / breakouts / ratchet do, the final mid
-    // must stay within ±PHYSICS_CAP of the pure BS probability driven only by
-    // (spot, strike, σ, T). This prevents "89% UP on $27 above strike".
     const physicsMid = computeUpProbability({
       spot,
       strike,
@@ -193,6 +202,81 @@ export function useOurQuote(params: {
       const hi = Math.min(0.99, physicsMid + PHYSICS_CAP);
       ratchetedMid = Math.min(hi, Math.max(lo, ratchetedMid));
     }
+
+    // ---- Anti-fakeout: rolling spot-side ratio over last 90s ----------------
+    // If price has been on one side of strike ≥70% of the last 90s, the MID
+    // pivot / brief crossings cannot pull the pill to the opposite side. This
+    // fixes the "$9-22 above strike but pill says DOWN" bug after a 1-2 tick
+    // fake cross.
+    w.sideHist.push({ t: now, above: spot > strike });
+    const histCutoff = now - 120_000;
+    while (w.sideHist.length && w.sideHist[0].t < histCutoff) w.sideHist.shift();
+    const recentCut = now - 90_000;
+    const recent = w.sideHist.filter((x) => x.t >= recentCut);
+    let aboveRatio: number | null = null;
+    if (recent.length >= 10) {
+      const above = recent.filter((x) => x.above).length;
+      aboveRatio = above / recent.length;
+      if (physicsMid != null) {
+        // 70% up-time + currently above → never quote below physics
+        if (aboveRatio >= 0.70 && spotSide > 0) {
+          ratchetedMid = Math.max(ratchetedMid, physicsMid);
+        }
+        // 70% down-time + currently below → never quote above physics
+        if (aboveRatio <= 0.30 && spotSide < 0) {
+          ratchetedMid = Math.min(ratchetedMid, physicsMid);
+        }
+      }
+    }
+
+    // ---- Per-window side memory + hard lock (candle-read persistence) --------
+    // Accumulates signed "who is winning this window" score from physics +
+    // momentum every tick. Once |memory| ≥ 0.55 sustained, hard-locks the pill
+    // to that side (floors mid at 0.55 or ceils at 0.45). MID pivot and brief
+    // fake-outs can no longer flip the recommended side. Unlock only after
+    // 90s of sustained opposing physics.
+    if (physicsMid != null) {
+      const physSig = physicsMid - 0.5;                // signed evidence, ±0.5
+      const momSig = tilt;                             // signed momentum, ±0.03
+      const stepPerSec = Math.sign(physSig) * Math.min(0.04, Math.abs(physSig) * 0.4)
+                      + Math.sign(momSig) * Math.min(0.02, Math.abs(momSig) * 0.5);
+      // Slow decay (half-life ~10 min) so memory persists but doesn't run away.
+      const memDecay = Math.pow(0.5, dtSec / 600);
+      w.memory = Math.max(-1, Math.min(1,
+        w.memory * memDecay + stepPerSec * Math.min(dtSec, 3),
+      ));
+
+      // Lock trigger.
+      if (w.lockedSide === 0 && Math.abs(w.memory) >= 0.55) {
+        w.lockedSide = w.memory > 0 ? 1 : -1;
+        w.oppositeStreakSec = 0;
+      }
+      // Track sustained opposing physics for unlock.
+      if (w.lockedSide !== 0) {
+        const physSide = physSig > 0 ? 1 : physSig < 0 ? -1 : 0;
+        if (physSide !== 0 && physSide !== w.lockedSide) {
+          w.oppositeStreakSec += dtSec;
+        } else {
+          w.oppositeStreakSec = Math.max(0, w.oppositeStreakSec - dtSec);
+        }
+        if (w.oppositeStreakSec >= 90) {
+          // Reversal earned: release the lock; memory follows through naturally.
+          w.lockedSide = 0;
+          w.memory = 0;
+          w.oppositeStreakSec = 0;
+        }
+      }
+
+      // Apply lock: prevent the pill from flipping to the opposite side.
+      if (w.lockedSide > 0) {
+        ratchetedMid = Math.max(ratchetedMid, 0.55);
+      } else if (w.lockedSide < 0) {
+        ratchetedMid = Math.min(ratchetedMid, 0.45);
+      }
+      ratchetedMid = Math.min(0.99, Math.max(0.01, ratchetedMid));
+    }
+
+
 
     // Re-emit quote with ratcheted mid so both cents sides + recommendation reflect it.
     const hs = q.halfSpread;
