@@ -35,7 +35,14 @@ interface QueuedRow {
   our_sigma: number | null;
   our_tilt: number | null;
   delta_up: number | null;
+  kalshi_volume: number | null;
+  kalshi_open_interest: number | null;
+  kalshi_last_price_cents: number | null;
+  kalshi_yes_vol_60s: number | null;
+  kalshi_no_vol_60s: number | null;
+  kalshi_trade_count_60s: number | null;
 }
+
 
 /**
  * Continuously logs Kalshi BTC 15m odds vs our computed odds, 1 sample/sec.
@@ -137,7 +144,14 @@ export function useKalshiOddsRecorder(closes1m: number[] = []): void {
         our_sigma: sigma,
         our_tilt: tilt || null,
         delta_up: ourMid != null && k.yesMid != null ? ourMid - k.yesMid : null,
+        kalshi_volume: k.volume ?? null,
+        kalshi_open_interest: k.openInterest ?? null,
+        kalshi_last_price_cents: k.lastPriceCents ?? null,
+        kalshi_yes_vol_60s: k.yesVol60s ?? null,
+        kalshi_no_vol_60s: k.noVol60s ?? null,
+        kalshi_trade_count_60s: k.tradeCount60s ?? null,
       });
+
     }, 1_000);
     return () => clearInterval(id);
   }, []);

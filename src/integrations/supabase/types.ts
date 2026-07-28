@@ -2081,9 +2081,15 @@ export type Database = {
           delta_up: number | null
           id: number
           kalshi_implied_spot: number | null
+          kalshi_last_price_cents: number | null
+          kalshi_no_vol_60s: number | null
+          kalshi_open_interest: number | null
+          kalshi_trade_count_60s: number | null
+          kalshi_volume: number | null
           kalshi_yes_ask: number | null
           kalshi_yes_bid: number | null
           kalshi_yes_mid: number | null
+          kalshi_yes_vol_60s: number | null
           our_down_ask: number | null
           our_mid: number | null
           our_sigma: number | null
@@ -2101,9 +2107,15 @@ export type Database = {
           delta_up?: number | null
           id?: number
           kalshi_implied_spot?: number | null
+          kalshi_last_price_cents?: number | null
+          kalshi_no_vol_60s?: number | null
+          kalshi_open_interest?: number | null
+          kalshi_trade_count_60s?: number | null
+          kalshi_volume?: number | null
           kalshi_yes_ask?: number | null
           kalshi_yes_bid?: number | null
           kalshi_yes_mid?: number | null
+          kalshi_yes_vol_60s?: number | null
           our_down_ask?: number | null
           our_mid?: number | null
           our_sigma?: number | null
@@ -2121,9 +2133,15 @@ export type Database = {
           delta_up?: number | null
           id?: number
           kalshi_implied_spot?: number | null
+          kalshi_last_price_cents?: number | null
+          kalshi_no_vol_60s?: number | null
+          kalshi_open_interest?: number | null
+          kalshi_trade_count_60s?: number | null
+          kalshi_volume?: number | null
           kalshi_yes_ask?: number | null
           kalshi_yes_bid?: number | null
           kalshi_yes_mid?: number | null
+          kalshi_yes_vol_60s?: number | null
           our_down_ask?: number | null
           our_mid?: number | null
           our_sigma?: number | null

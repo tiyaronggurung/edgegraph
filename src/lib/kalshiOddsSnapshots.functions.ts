@@ -20,7 +20,14 @@ const RowSchema = z.object({
   our_sigma: z.number().nullable().optional(),
   our_tilt: z.number().nullable().optional(),
   delta_up: z.number().nullable().optional(),
+  kalshi_volume: z.number().int().nullable().optional(),
+  kalshi_open_interest: z.number().int().nullable().optional(),
+  kalshi_last_price_cents: z.number().int().nullable().optional(),
+  kalshi_yes_vol_60s: z.number().int().nullable().optional(),
+  kalshi_no_vol_60s: z.number().int().nullable().optional(),
+  kalshi_trade_count_60s: z.number().int().nullable().optional(),
 });
+
 
 export const insertKalshiOddsSnapshotBatch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
