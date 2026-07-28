@@ -311,7 +311,7 @@ export function TrendlineChartPanel() {
         },
       }).catch(() => {})
     );
-  }, [currentTicker, secondsToCloseForLock, recLive, displaySpot, currentStrike, midPriceNow, shadow?.upperAtNow, shadow?.lowerAtNow, kalshi?.closeTime, ourQuote]);
+  }, [currentTicker, secondsToCloseForLock, recLive, displaySpot, currentStrike, midPriceNow, shadow?.upperAtNow, shadow?.lowerAtNow, ourQuote]);
 
   return (
     <div className="border border-white/10 rounded-lg bg-black/40 p-3">
