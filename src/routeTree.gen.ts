@@ -9,67 +9,61 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
-import { Route as SignupRouteImport } from './routes/signup'
-import { Route as PricingRouteImport } from './routes/pricing'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
-import { Route as AuthenticatedStrategiesRouteImport } from './routes/_authenticated/strategies'
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
-import { Route as AuthenticatedPatternsRouteImport } from './routes/_authenticated/patterns'
-import { Route as AuthenticatedPatternPerformanceRouteImport } from './routes/_authenticated/pattern-performance'
-import { Route as AuthenticatedModelValidationRouteImport } from './routes/_authenticated/model-validation'
-import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
-import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedCryptoSandboxRouteImport } from './routes/_authenticated/crypto-sandbox'
-import { Route as AuthenticatedCryptoPaperRouteImport } from './routes/_authenticated/crypto-paper'
-import { Route as AuthenticatedCryptoRouteImport } from './routes/_authenticated/crypto'
-import { Route as AuthenticatedChartRouteImport } from './routes/_authenticated/chart'
-import { Route as AuthenticatedBacktestRouteImport } from './routes/_authenticated/backtest'
-import { Route as AuthenticatedAnalyzeRouteImport } from './routes/_authenticated/analyze'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
-import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
-import { Route as ApiPublicSendDailyDigestsRouteImport } from './routes/api/public/send-daily-digests'
-import { Route as ApiHealthKalshiRouteImport } from './routes/api/health/kalshi'
+import { Route as AuthenticatedAnalyzeRouteImport } from './routes/_authenticated/analyze'
+import { Route as AuthenticatedBacktestRouteImport } from './routes/_authenticated/backtest'
+import { Route as AuthenticatedChartRouteImport } from './routes/_authenticated/chart'
+import { Route as AuthenticatedCryptoRouteImport } from './routes/_authenticated/crypto'
+import { Route as AuthenticatedCryptoPaperRouteImport } from './routes/_authenticated/crypto-paper'
+import { Route as AuthenticatedCryptoSandboxRouteImport } from './routes/_authenticated/crypto-sandbox'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
+import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
+import { Route as AuthenticatedModelValidationRouteImport } from './routes/_authenticated/model-validation'
+import { Route as AuthenticatedPatternPerformanceRouteImport } from './routes/_authenticated/pattern-performance'
+import { Route as AuthenticatedPatternsRouteImport } from './routes/_authenticated/patterns'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedStrategiesRouteImport } from './routes/_authenticated/strategies'
+import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
 import { Route as AuthenticatedAnalysisIdRouteImport } from './routes/_authenticated/analysis.$id'
-import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
-import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
-import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
-import { Route as ApiPublicHooksTripleWindowTickRouteImport } from './routes/api/public/hooks/triple-window-tick'
-import { Route as ApiPublicHooksSettleBtcPredictionsRouteImport } from './routes/api/public/hooks/settle-btc-predictions'
-import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
-import { Route as ApiPublicHooksOddsShadowTickRouteImport } from './routes/api/public/hooks/odds-shadow-tick'
-import { Route as ApiPublicHooksMultiTfShadowRouteImport } from './routes/api/public/hooks/multi-tf-shadow'
-import { Route as ApiPublicHooksMartingaleTickRouteImport } from './routes/api/public/hooks/martingale-tick'
-import { Route as ApiPublicHooksMarketIntelMatchRouteImport } from './routes/api/public/hooks/market-intel-match'
-import { Route as ApiPublicHooksMarketContextTickRouteImport } from './routes/api/public/hooks/market-context-tick'
-import { Route as ApiPublicHooksCryptoStudyRouteImport } from './routes/api/public/hooks/crypto-study'
-import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
-import { Route as ApiPublicHooksCandlesIngestRouteImport } from './routes/api/public/hooks/candles-ingest'
-import { Route as ApiPublicHooksBtcCalibrateRouteImport } from './routes/api/public/hooks/btc-calibrate'
-import { Route as ApiPublicHooksBigFlipTickRouteImport } from './routes/api/public/hooks/big-flip-tick'
-import { Route as ApiPublicHooksBackfillTripleWindowRouteImport } from './routes/api/public/hooks/backfill-triple-window'
-import { Route as ApiPublicHooksBackfillOutcomesRouteImport } from './routes/api/public/hooks/backfill-outcomes'
-import { Route as ApiPublicHooksAutoTradeRouteImport } from './routes/api/public/hooks/auto-trade'
-import { Route as ApiPublicHooksAutoOddsTickRouteImport } from './routes/api/public/hooks/auto-odds-tick'
+import { Route as ApiHealthKalshiRouteImport } from './routes/api/health/kalshi'
+import { Route as ApiPublicSendDailyDigestsRouteImport } from './routes/api/public/send-daily-digests'
+import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
 import { Route as ApiPublicHooksAutoModelBetTickRouteImport } from './routes/api/public/hooks/auto-model-bet-tick'
+import { Route as ApiPublicHooksAutoOddsTickRouteImport } from './routes/api/public/hooks/auto-odds-tick'
+import { Route as ApiPublicHooksAutoTradeRouteImport } from './routes/api/public/hooks/auto-trade'
+import { Route as ApiPublicHooksBackfillOutcomesRouteImport } from './routes/api/public/hooks/backfill-outcomes'
+import { Route as ApiPublicHooksBackfillTripleWindowRouteImport } from './routes/api/public/hooks/backfill-triple-window'
+import { Route as ApiPublicHooksBigFlipTickRouteImport } from './routes/api/public/hooks/big-flip-tick'
+import { Route as ApiPublicHooksBtcCalibrateRouteImport } from './routes/api/public/hooks/btc-calibrate'
+import { Route as ApiPublicHooksCandlesIngestRouteImport } from './routes/api/public/hooks/candles-ingest'
+import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
+import { Route as ApiPublicHooksCryptoStudyRouteImport } from './routes/api/public/hooks/crypto-study'
+import { Route as ApiPublicHooksMarketContextTickRouteImport } from './routes/api/public/hooks/market-context-tick'
+import { Route as ApiPublicHooksMarketIntelMatchRouteImport } from './routes/api/public/hooks/market-intel-match'
+import { Route as ApiPublicHooksMartingaleTickRouteImport } from './routes/api/public/hooks/martingale-tick'
+import { Route as ApiPublicHooksMultiTfShadowRouteImport } from './routes/api/public/hooks/multi-tf-shadow'
+import { Route as ApiPublicHooksOddsShadowTickRouteImport } from './routes/api/public/hooks/odds-shadow-tick'
+import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
+import { Route as ApiPublicHooksSettleBtcPredictionsRouteImport } from './routes/api/public/hooks/settle-btc-predictions'
+import { Route as ApiPublicHooksTripleWindowTickRouteImport } from './routes/api/public/hooks/triple-window-tick'
+import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
+import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
+import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 
-const UnsubscribeRoute = UnsubscribeRouteImport.update({
-  id: '/unsubscribe',
-  path: '/unsubscribe',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PricingRoute = PricingRouteImport.update({
-  id: '/pricing',
-  path: '/pricing',
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -77,87 +71,24 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EmailUnsubscribeRoute = EmailUnsubscribeRouteImport.update({
-  id: '/email/unsubscribe',
-  path: '/email/unsubscribe',
+const UnsubscribeRoute = UnsubscribeRouteImport.update({
+  id: '/unsubscribe',
+  path: '/unsubscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedStrategiesRoute = AuthenticatedStrategiesRouteImport.update({
-  id: '/strategies',
-  path: '/strategies',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedPatternsRoute = AuthenticatedPatternsRouteImport.update({
-  id: '/patterns',
-  path: '/patterns',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedPatternPerformanceRoute =
-  AuthenticatedPatternPerformanceRouteImport.update({
-    id: '/pattern-performance',
-    path: '/pattern-performance',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedModelValidationRoute =
-  AuthenticatedModelValidationRouteImport.update({
-    id: '/model-validation',
-    path: '/model-validation',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedLiveRoute = AuthenticatedLiveRouteImport.update({
-  id: '/live',
-  path: '/live',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
-  id: '/history',
-  path: '/history',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedCryptoSandboxRoute =
-  AuthenticatedCryptoSandboxRouteImport.update({
-    id: '/crypto-sandbox',
-    path: '/crypto-sandbox',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedCryptoPaperRoute =
-  AuthenticatedCryptoPaperRouteImport.update({
-    id: '/crypto-paper',
-    path: '/crypto-paper',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedCryptoRoute = AuthenticatedCryptoRouteImport.update({
-  id: '/crypto',
-  path: '/crypto',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedChartRoute = AuthenticatedChartRouteImport.update({
-  id: '/chart',
-  path: '/chart',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedBacktestRoute = AuthenticatedBacktestRouteImport.update({
-  id: '/backtest',
-  path: '/backtest',
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAnalyzeRoute = AuthenticatedAnalyzeRouteImport.update({
@@ -165,14 +96,88 @@ const AuthenticatedAnalyzeRoute = AuthenticatedAnalyzeRouteImport.update({
   path: '/analyze',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const AuthenticatedBacktestRoute = AuthenticatedBacktestRouteImport.update({
+  id: '/backtest',
+  path: '/backtest',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const LovableEmailSuppressionRoute = LovableEmailSuppressionRouteImport.update({
-  id: '/lovable/email/suppression',
-  path: '/lovable/email/suppression',
+const AuthenticatedChartRoute = AuthenticatedChartRouteImport.update({
+  id: '/chart',
+  path: '/chart',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedCryptoRoute = AuthenticatedCryptoRouteImport.update({
+  id: '/crypto',
+  path: '/crypto',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedCryptoPaperRoute =
+  AuthenticatedCryptoPaperRouteImport.update({
+    id: '/crypto-paper',
+    path: '/crypto-paper',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedCryptoSandboxRoute =
+  AuthenticatedCryptoSandboxRouteImport.update({
+    id: '/crypto-sandbox',
+    path: '/crypto-sandbox',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedLiveRoute = AuthenticatedLiveRouteImport.update({
+  id: '/live',
+  path: '/live',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedModelValidationRoute =
+  AuthenticatedModelValidationRouteImport.update({
+    id: '/model-validation',
+    path: '/model-validation',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPatternPerformanceRoute =
+  AuthenticatedPatternPerformanceRouteImport.update({
+    id: '/pattern-performance',
+    path: '/pattern-performance',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPatternsRoute = AuthenticatedPatternsRouteImport.update({
+  id: '/patterns',
+  path: '/patterns',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedStrategiesRoute = AuthenticatedStrategiesRouteImport.update({
+  id: '/strategies',
+  path: '/strategies',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const EmailUnsubscribeRoute = EmailUnsubscribeRouteImport.update({
+  id: '/email/unsubscribe',
+  path: '/email/unsubscribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAnalysisIdRoute = AuthenticatedAnalysisIdRouteImport.update({
+  id: '/analysis/$id',
+  path: '/analysis/$id',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const ApiHealthKalshiRoute = ApiHealthKalshiRouteImport.update({
+  id: '/api/health/kalshi',
+  path: '/api/health/kalshi',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicSendDailyDigestsRoute =
@@ -181,110 +186,32 @@ const ApiPublicSendDailyDigestsRoute =
     path: '/api/public/send-daily-digests',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiHealthKalshiRoute = ApiHealthKalshiRouteImport.update({
-  id: '/api/health/kalshi',
-  path: '/api/health/kalshi',
+const LovableEmailSuppressionRoute = LovableEmailSuppressionRouteImport.update({
+  id: '/lovable/email/suppression',
+  path: '/lovable/email/suppression',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAnalysisIdRoute = AuthenticatedAnalysisIdRouteImport.update({
-  id: '/analysis/$id',
-  path: '/analysis/$id',
-  getParentRoute: () => AuthenticatedRoute,
+const ApiPublicHooksAutoModelBetTickRoute =
+  ApiPublicHooksAutoModelBetTickRouteImport.update({
+    id: '/api/public/hooks/auto-model-bet-tick',
+    path: '/api/public/hooks/auto-model-bet-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksAutoOddsTickRoute =
+  ApiPublicHooksAutoOddsTickRouteImport.update({
+    id: '/api/public/hooks/auto-odds-tick',
+    path: '/api/public/hooks/auto-odds-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksAutoTradeRoute = ApiPublicHooksAutoTradeRouteImport.update({
+  id: '/api/public/hooks/auto-trade',
+  path: '/api/public/hooks/auto-trade',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const LovableEmailTransactionalSendRoute =
-  LovableEmailTransactionalSendRouteImport.update({
-    id: '/lovable/email/transactional/send',
-    path: '/lovable/email/transactional/send',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const LovableEmailTransactionalPreviewRoute =
-  LovableEmailTransactionalPreviewRouteImport.update({
-    id: '/lovable/email/transactional/preview',
-    path: '/lovable/email/transactional/preview',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const LovableEmailQueueProcessRoute =
-  LovableEmailQueueProcessRouteImport.update({
-    id: '/lovable/email/queue/process',
-    path: '/lovable/email/queue/process',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksTripleWindowTickRoute =
-  ApiPublicHooksTripleWindowTickRouteImport.update({
-    id: '/api/public/hooks/triple-window-tick',
-    path: '/api/public/hooks/triple-window-tick',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksSettleBtcPredictionsRoute =
-  ApiPublicHooksSettleBtcPredictionsRouteImport.update({
-    id: '/api/public/hooks/settle-btc-predictions',
-    path: '/api/public/hooks/settle-btc-predictions',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksRecomputePredictionsRoute =
-  ApiPublicHooksRecomputePredictionsRouteImport.update({
-    id: '/api/public/hooks/recompute-predictions',
-    path: '/api/public/hooks/recompute-predictions',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksOddsShadowTickRoute =
-  ApiPublicHooksOddsShadowTickRouteImport.update({
-    id: '/api/public/hooks/odds-shadow-tick',
-    path: '/api/public/hooks/odds-shadow-tick',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksMultiTfShadowRoute =
-  ApiPublicHooksMultiTfShadowRouteImport.update({
-    id: '/api/public/hooks/multi-tf-shadow',
-    path: '/api/public/hooks/multi-tf-shadow',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksMartingaleTickRoute =
-  ApiPublicHooksMartingaleTickRouteImport.update({
-    id: '/api/public/hooks/martingale-tick',
-    path: '/api/public/hooks/martingale-tick',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksMarketIntelMatchRoute =
-  ApiPublicHooksMarketIntelMatchRouteImport.update({
-    id: '/api/public/hooks/market-intel-match',
-    path: '/api/public/hooks/market-intel-match',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksMarketContextTickRoute =
-  ApiPublicHooksMarketContextTickRouteImport.update({
-    id: '/api/public/hooks/market-context-tick',
-    path: '/api/public/hooks/market-context-tick',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksCryptoStudyRoute =
-  ApiPublicHooksCryptoStudyRouteImport.update({
-    id: '/api/public/hooks/crypto-study',
-    path: '/api/public/hooks/crypto-study',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksCaptureClosingOddsRoute =
-  ApiPublicHooksCaptureClosingOddsRouteImport.update({
-    id: '/api/public/hooks/capture-closing-odds',
-    path: '/api/public/hooks/capture-closing-odds',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksCandlesIngestRoute =
-  ApiPublicHooksCandlesIngestRouteImport.update({
-    id: '/api/public/hooks/candles-ingest',
-    path: '/api/public/hooks/candles-ingest',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksBtcCalibrateRoute =
-  ApiPublicHooksBtcCalibrateRouteImport.update({
-    id: '/api/public/hooks/btc-calibrate',
-    path: '/api/public/hooks/btc-calibrate',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksBigFlipTickRoute =
-  ApiPublicHooksBigFlipTickRouteImport.update({
-    id: '/api/public/hooks/big-flip-tick',
-    path: '/api/public/hooks/big-flip-tick',
+const ApiPublicHooksBackfillOutcomesRoute =
+  ApiPublicHooksBackfillOutcomesRouteImport.update({
+    id: '/api/public/hooks/backfill-outcomes',
+    path: '/api/public/hooks/backfill-outcomes',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksBackfillTripleWindowRoute =
@@ -293,27 +220,100 @@ const ApiPublicHooksBackfillTripleWindowRoute =
     path: '/api/public/hooks/backfill-triple-window',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHooksBackfillOutcomesRoute =
-  ApiPublicHooksBackfillOutcomesRouteImport.update({
-    id: '/api/public/hooks/backfill-outcomes',
-    path: '/api/public/hooks/backfill-outcomes',
+const ApiPublicHooksBigFlipTickRoute =
+  ApiPublicHooksBigFlipTickRouteImport.update({
+    id: '/api/public/hooks/big-flip-tick',
+    path: '/api/public/hooks/big-flip-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHooksAutoTradeRoute = ApiPublicHooksAutoTradeRouteImport.update({
-  id: '/api/public/hooks/auto-trade',
-  path: '/api/public/hooks/auto-trade',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicHooksAutoOddsTickRoute =
-  ApiPublicHooksAutoOddsTickRouteImport.update({
-    id: '/api/public/hooks/auto-odds-tick',
-    path: '/api/public/hooks/auto-odds-tick',
+const ApiPublicHooksBtcCalibrateRoute =
+  ApiPublicHooksBtcCalibrateRouteImport.update({
+    id: '/api/public/hooks/btc-calibrate',
+    path: '/api/public/hooks/btc-calibrate',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHooksAutoModelBetTickRoute =
-  ApiPublicHooksAutoModelBetTickRouteImport.update({
-    id: '/api/public/hooks/auto-model-bet-tick',
-    path: '/api/public/hooks/auto-model-bet-tick',
+const ApiPublicHooksCandlesIngestRoute =
+  ApiPublicHooksCandlesIngestRouteImport.update({
+    id: '/api/public/hooks/candles-ingest',
+    path: '/api/public/hooks/candles-ingest',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksCaptureClosingOddsRoute =
+  ApiPublicHooksCaptureClosingOddsRouteImport.update({
+    id: '/api/public/hooks/capture-closing-odds',
+    path: '/api/public/hooks/capture-closing-odds',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksCryptoStudyRoute =
+  ApiPublicHooksCryptoStudyRouteImport.update({
+    id: '/api/public/hooks/crypto-study',
+    path: '/api/public/hooks/crypto-study',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksMarketContextTickRoute =
+  ApiPublicHooksMarketContextTickRouteImport.update({
+    id: '/api/public/hooks/market-context-tick',
+    path: '/api/public/hooks/market-context-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksMarketIntelMatchRoute =
+  ApiPublicHooksMarketIntelMatchRouteImport.update({
+    id: '/api/public/hooks/market-intel-match',
+    path: '/api/public/hooks/market-intel-match',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksMartingaleTickRoute =
+  ApiPublicHooksMartingaleTickRouteImport.update({
+    id: '/api/public/hooks/martingale-tick',
+    path: '/api/public/hooks/martingale-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksMultiTfShadowRoute =
+  ApiPublicHooksMultiTfShadowRouteImport.update({
+    id: '/api/public/hooks/multi-tf-shadow',
+    path: '/api/public/hooks/multi-tf-shadow',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksOddsShadowTickRoute =
+  ApiPublicHooksOddsShadowTickRouteImport.update({
+    id: '/api/public/hooks/odds-shadow-tick',
+    path: '/api/public/hooks/odds-shadow-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksRecomputePredictionsRoute =
+  ApiPublicHooksRecomputePredictionsRouteImport.update({
+    id: '/api/public/hooks/recompute-predictions',
+    path: '/api/public/hooks/recompute-predictions',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksSettleBtcPredictionsRoute =
+  ApiPublicHooksSettleBtcPredictionsRouteImport.update({
+    id: '/api/public/hooks/settle-btc-predictions',
+    path: '/api/public/hooks/settle-btc-predictions',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksTripleWindowTickRoute =
+  ApiPublicHooksTripleWindowTickRouteImport.update({
+    id: '/api/public/hooks/triple-window-tick',
+    path: '/api/public/hooks/triple-window-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const LovableEmailQueueProcessRoute =
+  LovableEmailQueueProcessRouteImport.update({
+    id: '/lovable/email/queue/process',
+    path: '/lovable/email/queue/process',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const LovableEmailTransactionalPreviewRoute =
+  LovableEmailTransactionalPreviewRouteImport.update({
+    id: '/lovable/email/transactional/preview',
+    path: '/lovable/email/transactional/preview',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const LovableEmailTransactionalSendRoute =
+  LovableEmailTransactionalSendRouteImport.update({
+    id: '/lovable/email/transactional/send',
+    path: '/lovable/email/transactional/send',
     getParentRoute: () => rootRouteImport,
   } as any)
 
@@ -647,32 +647,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/unsubscribe': {
-      id: '/unsubscribe'
-      path: '/unsubscribe'
-      fullPath: '/unsubscribe'
-      preLoaderRoute: typeof UnsubscribeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pricing': {
-      id: '/pricing'
-      path: '/pricing'
-      fullPath: '/pricing'
-      preLoaderRoute: typeof PricingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -682,109 +661,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/email/unsubscribe': {
-      id: '/email/unsubscribe'
-      path: '/email/unsubscribe'
-      fullPath: '/email/unsubscribe'
-      preLoaderRoute: typeof EmailUnsubscribeRouteImport
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/strategies': {
-      id: '/_authenticated/strategies'
-      path: '/strategies'
-      fullPath: '/strategies'
-      preLoaderRoute: typeof AuthenticatedStrategiesRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/unsubscribe': {
+      id: '/unsubscribe'
+      path: '/unsubscribe'
+      fullPath: '/unsubscribe'
+      preLoaderRoute: typeof UnsubscribeRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/patterns': {
-      id: '/_authenticated/patterns'
-      path: '/patterns'
-      fullPath: '/patterns'
-      preLoaderRoute: typeof AuthenticatedPatternsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/pattern-performance': {
-      id: '/_authenticated/pattern-performance'
-      path: '/pattern-performance'
-      fullPath: '/pattern-performance'
-      preLoaderRoute: typeof AuthenticatedPatternPerformanceRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/model-validation': {
-      id: '/_authenticated/model-validation'
-      path: '/model-validation'
-      fullPath: '/model-validation'
-      preLoaderRoute: typeof AuthenticatedModelValidationRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/live': {
-      id: '/_authenticated/live'
-      path: '/live'
-      fullPath: '/live'
-      preLoaderRoute: typeof AuthenticatedLiveRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/history': {
-      id: '/_authenticated/history'
-      path: '/history'
-      fullPath: '/history'
-      preLoaderRoute: typeof AuthenticatedHistoryRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/crypto-sandbox': {
-      id: '/_authenticated/crypto-sandbox'
-      path: '/crypto-sandbox'
-      fullPath: '/crypto-sandbox'
-      preLoaderRoute: typeof AuthenticatedCryptoSandboxRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/crypto-paper': {
-      id: '/_authenticated/crypto-paper'
-      path: '/crypto-paper'
-      fullPath: '/crypto-paper'
-      preLoaderRoute: typeof AuthenticatedCryptoPaperRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/crypto': {
-      id: '/_authenticated/crypto'
-      path: '/crypto'
-      fullPath: '/crypto'
-      preLoaderRoute: typeof AuthenticatedCryptoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/chart': {
-      id: '/_authenticated/chart'
-      path: '/chart'
-      fullPath: '/chart'
-      preLoaderRoute: typeof AuthenticatedChartRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/backtest': {
-      id: '/_authenticated/backtest'
-      path: '/backtest'
-      fullPath: '/backtest'
-      preLoaderRoute: typeof AuthenticatedBacktestRouteImport
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/analyze': {
@@ -794,32 +703,102 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnalyzeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+    '/_authenticated/backtest': {
+      id: '/_authenticated/backtest'
+      path: '/backtest'
+      fullPath: '/backtest'
+      preLoaderRoute: typeof AuthenticatedBacktestRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/lovable/email/suppression': {
-      id: '/lovable/email/suppression'
-      path: '/lovable/email/suppression'
-      fullPath: '/lovable/email/suppression'
-      preLoaderRoute: typeof LovableEmailSuppressionRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_authenticated/chart': {
+      id: '/_authenticated/chart'
+      path: '/chart'
+      fullPath: '/chart'
+      preLoaderRoute: typeof AuthenticatedChartRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/api/public/send-daily-digests': {
-      id: '/api/public/send-daily-digests'
-      path: '/api/public/send-daily-digests'
-      fullPath: '/api/public/send-daily-digests'
-      preLoaderRoute: typeof ApiPublicSendDailyDigestsRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_authenticated/crypto': {
+      id: '/_authenticated/crypto'
+      path: '/crypto'
+      fullPath: '/crypto'
+      preLoaderRoute: typeof AuthenticatedCryptoRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/api/health/kalshi': {
-      id: '/api/health/kalshi'
-      path: '/api/health/kalshi'
-      fullPath: '/api/health/kalshi'
-      preLoaderRoute: typeof ApiHealthKalshiRouteImport
+    '/_authenticated/crypto-paper': {
+      id: '/_authenticated/crypto-paper'
+      path: '/crypto-paper'
+      fullPath: '/crypto-paper'
+      preLoaderRoute: typeof AuthenticatedCryptoPaperRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/crypto-sandbox': {
+      id: '/_authenticated/crypto-sandbox'
+      path: '/crypto-sandbox'
+      fullPath: '/crypto-sandbox'
+      preLoaderRoute: typeof AuthenticatedCryptoSandboxRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/history': {
+      id: '/_authenticated/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof AuthenticatedHistoryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/live': {
+      id: '/_authenticated/live'
+      path: '/live'
+      fullPath: '/live'
+      preLoaderRoute: typeof AuthenticatedLiveRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/model-validation': {
+      id: '/_authenticated/model-validation'
+      path: '/model-validation'
+      fullPath: '/model-validation'
+      preLoaderRoute: typeof AuthenticatedModelValidationRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/pattern-performance': {
+      id: '/_authenticated/pattern-performance'
+      path: '/pattern-performance'
+      fullPath: '/pattern-performance'
+      preLoaderRoute: typeof AuthenticatedPatternPerformanceRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/patterns': {
+      id: '/_authenticated/patterns'
+      path: '/patterns'
+      fullPath: '/patterns'
+      preLoaderRoute: typeof AuthenticatedPatternsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/strategies': {
+      id: '/_authenticated/strategies'
+      path: '/strategies'
+      fullPath: '/strategies'
+      preLoaderRoute: typeof AuthenticatedStrategiesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/email/unsubscribe': {
+      id: '/email/unsubscribe'
+      path: '/email/unsubscribe'
+      fullPath: '/email/unsubscribe'
+      preLoaderRoute: typeof EmailUnsubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/analysis/$id': {
@@ -829,137 +808,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnalysisIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/lovable/email/transactional/send': {
-      id: '/lovable/email/transactional/send'
-      path: '/lovable/email/transactional/send'
-      fullPath: '/lovable/email/transactional/send'
-      preLoaderRoute: typeof LovableEmailTransactionalSendRouteImport
+    '/api/health/kalshi': {
+      id: '/api/health/kalshi'
+      path: '/api/health/kalshi'
+      fullPath: '/api/health/kalshi'
+      preLoaderRoute: typeof ApiHealthKalshiRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/lovable/email/transactional/preview': {
-      id: '/lovable/email/transactional/preview'
-      path: '/lovable/email/transactional/preview'
-      fullPath: '/lovable/email/transactional/preview'
-      preLoaderRoute: typeof LovableEmailTransactionalPreviewRouteImport
+    '/api/public/send-daily-digests': {
+      id: '/api/public/send-daily-digests'
+      path: '/api/public/send-daily-digests'
+      fullPath: '/api/public/send-daily-digests'
+      preLoaderRoute: typeof ApiPublicSendDailyDigestsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/lovable/email/queue/process': {
-      id: '/lovable/email/queue/process'
-      path: '/lovable/email/queue/process'
-      fullPath: '/lovable/email/queue/process'
-      preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
+    '/lovable/email/suppression': {
+      id: '/lovable/email/suppression'
+      path: '/lovable/email/suppression'
+      fullPath: '/lovable/email/suppression'
+      preLoaderRoute: typeof LovableEmailSuppressionRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/triple-window-tick': {
-      id: '/api/public/hooks/triple-window-tick'
-      path: '/api/public/hooks/triple-window-tick'
-      fullPath: '/api/public/hooks/triple-window-tick'
-      preLoaderRoute: typeof ApiPublicHooksTripleWindowTickRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/settle-btc-predictions': {
-      id: '/api/public/hooks/settle-btc-predictions'
-      path: '/api/public/hooks/settle-btc-predictions'
-      fullPath: '/api/public/hooks/settle-btc-predictions'
-      preLoaderRoute: typeof ApiPublicHooksSettleBtcPredictionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/recompute-predictions': {
-      id: '/api/public/hooks/recompute-predictions'
-      path: '/api/public/hooks/recompute-predictions'
-      fullPath: '/api/public/hooks/recompute-predictions'
-      preLoaderRoute: typeof ApiPublicHooksRecomputePredictionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/odds-shadow-tick': {
-      id: '/api/public/hooks/odds-shadow-tick'
-      path: '/api/public/hooks/odds-shadow-tick'
-      fullPath: '/api/public/hooks/odds-shadow-tick'
-      preLoaderRoute: typeof ApiPublicHooksOddsShadowTickRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/multi-tf-shadow': {
-      id: '/api/public/hooks/multi-tf-shadow'
-      path: '/api/public/hooks/multi-tf-shadow'
-      fullPath: '/api/public/hooks/multi-tf-shadow'
-      preLoaderRoute: typeof ApiPublicHooksMultiTfShadowRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/martingale-tick': {
-      id: '/api/public/hooks/martingale-tick'
-      path: '/api/public/hooks/martingale-tick'
-      fullPath: '/api/public/hooks/martingale-tick'
-      preLoaderRoute: typeof ApiPublicHooksMartingaleTickRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/market-intel-match': {
-      id: '/api/public/hooks/market-intel-match'
-      path: '/api/public/hooks/market-intel-match'
-      fullPath: '/api/public/hooks/market-intel-match'
-      preLoaderRoute: typeof ApiPublicHooksMarketIntelMatchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/market-context-tick': {
-      id: '/api/public/hooks/market-context-tick'
-      path: '/api/public/hooks/market-context-tick'
-      fullPath: '/api/public/hooks/market-context-tick'
-      preLoaderRoute: typeof ApiPublicHooksMarketContextTickRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/crypto-study': {
-      id: '/api/public/hooks/crypto-study'
-      path: '/api/public/hooks/crypto-study'
-      fullPath: '/api/public/hooks/crypto-study'
-      preLoaderRoute: typeof ApiPublicHooksCryptoStudyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/capture-closing-odds': {
-      id: '/api/public/hooks/capture-closing-odds'
-      path: '/api/public/hooks/capture-closing-odds'
-      fullPath: '/api/public/hooks/capture-closing-odds'
-      preLoaderRoute: typeof ApiPublicHooksCaptureClosingOddsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/candles-ingest': {
-      id: '/api/public/hooks/candles-ingest'
-      path: '/api/public/hooks/candles-ingest'
-      fullPath: '/api/public/hooks/candles-ingest'
-      preLoaderRoute: typeof ApiPublicHooksCandlesIngestRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/btc-calibrate': {
-      id: '/api/public/hooks/btc-calibrate'
-      path: '/api/public/hooks/btc-calibrate'
-      fullPath: '/api/public/hooks/btc-calibrate'
-      preLoaderRoute: typeof ApiPublicHooksBtcCalibrateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/big-flip-tick': {
-      id: '/api/public/hooks/big-flip-tick'
-      path: '/api/public/hooks/big-flip-tick'
-      fullPath: '/api/public/hooks/big-flip-tick'
-      preLoaderRoute: typeof ApiPublicHooksBigFlipTickRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/backfill-triple-window': {
-      id: '/api/public/hooks/backfill-triple-window'
-      path: '/api/public/hooks/backfill-triple-window'
-      fullPath: '/api/public/hooks/backfill-triple-window'
-      preLoaderRoute: typeof ApiPublicHooksBackfillTripleWindowRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/backfill-outcomes': {
-      id: '/api/public/hooks/backfill-outcomes'
-      path: '/api/public/hooks/backfill-outcomes'
-      fullPath: '/api/public/hooks/backfill-outcomes'
-      preLoaderRoute: typeof ApiPublicHooksBackfillOutcomesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/auto-trade': {
-      id: '/api/public/hooks/auto-trade'
-      path: '/api/public/hooks/auto-trade'
-      fullPath: '/api/public/hooks/auto-trade'
-      preLoaderRoute: typeof ApiPublicHooksAutoTradeRouteImport
+    '/api/public/hooks/auto-model-bet-tick': {
+      id: '/api/public/hooks/auto-model-bet-tick'
+      path: '/api/public/hooks/auto-model-bet-tick'
+      fullPath: '/api/public/hooks/auto-model-bet-tick'
+      preLoaderRoute: typeof ApiPublicHooksAutoModelBetTickRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/auto-odds-tick': {
@@ -969,11 +843,137 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksAutoOddsTickRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/auto-model-bet-tick': {
-      id: '/api/public/hooks/auto-model-bet-tick'
-      path: '/api/public/hooks/auto-model-bet-tick'
-      fullPath: '/api/public/hooks/auto-model-bet-tick'
-      preLoaderRoute: typeof ApiPublicHooksAutoModelBetTickRouteImport
+    '/api/public/hooks/auto-trade': {
+      id: '/api/public/hooks/auto-trade'
+      path: '/api/public/hooks/auto-trade'
+      fullPath: '/api/public/hooks/auto-trade'
+      preLoaderRoute: typeof ApiPublicHooksAutoTradeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/backfill-outcomes': {
+      id: '/api/public/hooks/backfill-outcomes'
+      path: '/api/public/hooks/backfill-outcomes'
+      fullPath: '/api/public/hooks/backfill-outcomes'
+      preLoaderRoute: typeof ApiPublicHooksBackfillOutcomesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/backfill-triple-window': {
+      id: '/api/public/hooks/backfill-triple-window'
+      path: '/api/public/hooks/backfill-triple-window'
+      fullPath: '/api/public/hooks/backfill-triple-window'
+      preLoaderRoute: typeof ApiPublicHooksBackfillTripleWindowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/big-flip-tick': {
+      id: '/api/public/hooks/big-flip-tick'
+      path: '/api/public/hooks/big-flip-tick'
+      fullPath: '/api/public/hooks/big-flip-tick'
+      preLoaderRoute: typeof ApiPublicHooksBigFlipTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/btc-calibrate': {
+      id: '/api/public/hooks/btc-calibrate'
+      path: '/api/public/hooks/btc-calibrate'
+      fullPath: '/api/public/hooks/btc-calibrate'
+      preLoaderRoute: typeof ApiPublicHooksBtcCalibrateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/candles-ingest': {
+      id: '/api/public/hooks/candles-ingest'
+      path: '/api/public/hooks/candles-ingest'
+      fullPath: '/api/public/hooks/candles-ingest'
+      preLoaderRoute: typeof ApiPublicHooksCandlesIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/capture-closing-odds': {
+      id: '/api/public/hooks/capture-closing-odds'
+      path: '/api/public/hooks/capture-closing-odds'
+      fullPath: '/api/public/hooks/capture-closing-odds'
+      preLoaderRoute: typeof ApiPublicHooksCaptureClosingOddsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/crypto-study': {
+      id: '/api/public/hooks/crypto-study'
+      path: '/api/public/hooks/crypto-study'
+      fullPath: '/api/public/hooks/crypto-study'
+      preLoaderRoute: typeof ApiPublicHooksCryptoStudyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/market-context-tick': {
+      id: '/api/public/hooks/market-context-tick'
+      path: '/api/public/hooks/market-context-tick'
+      fullPath: '/api/public/hooks/market-context-tick'
+      preLoaderRoute: typeof ApiPublicHooksMarketContextTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/market-intel-match': {
+      id: '/api/public/hooks/market-intel-match'
+      path: '/api/public/hooks/market-intel-match'
+      fullPath: '/api/public/hooks/market-intel-match'
+      preLoaderRoute: typeof ApiPublicHooksMarketIntelMatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/martingale-tick': {
+      id: '/api/public/hooks/martingale-tick'
+      path: '/api/public/hooks/martingale-tick'
+      fullPath: '/api/public/hooks/martingale-tick'
+      preLoaderRoute: typeof ApiPublicHooksMartingaleTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/multi-tf-shadow': {
+      id: '/api/public/hooks/multi-tf-shadow'
+      path: '/api/public/hooks/multi-tf-shadow'
+      fullPath: '/api/public/hooks/multi-tf-shadow'
+      preLoaderRoute: typeof ApiPublicHooksMultiTfShadowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/odds-shadow-tick': {
+      id: '/api/public/hooks/odds-shadow-tick'
+      path: '/api/public/hooks/odds-shadow-tick'
+      fullPath: '/api/public/hooks/odds-shadow-tick'
+      preLoaderRoute: typeof ApiPublicHooksOddsShadowTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/recompute-predictions': {
+      id: '/api/public/hooks/recompute-predictions'
+      path: '/api/public/hooks/recompute-predictions'
+      fullPath: '/api/public/hooks/recompute-predictions'
+      preLoaderRoute: typeof ApiPublicHooksRecomputePredictionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/settle-btc-predictions': {
+      id: '/api/public/hooks/settle-btc-predictions'
+      path: '/api/public/hooks/settle-btc-predictions'
+      fullPath: '/api/public/hooks/settle-btc-predictions'
+      preLoaderRoute: typeof ApiPublicHooksSettleBtcPredictionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/triple-window-tick': {
+      id: '/api/public/hooks/triple-window-tick'
+      path: '/api/public/hooks/triple-window-tick'
+      fullPath: '/api/public/hooks/triple-window-tick'
+      preLoaderRoute: typeof ApiPublicHooksTripleWindowTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lovable/email/queue/process': {
+      id: '/lovable/email/queue/process'
+      path: '/lovable/email/queue/process'
+      fullPath: '/lovable/email/queue/process'
+      preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lovable/email/transactional/preview': {
+      id: '/lovable/email/transactional/preview'
+      path: '/lovable/email/transactional/preview'
+      fullPath: '/lovable/email/transactional/preview'
+      preLoaderRoute: typeof LovableEmailTransactionalPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lovable/email/transactional/send': {
+      id: '/lovable/email/transactional/send'
+      path: '/lovable/email/transactional/send'
+      fullPath: '/lovable/email/transactional/send'
+      preLoaderRoute: typeof LovableEmailTransactionalSendRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
