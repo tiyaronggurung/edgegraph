@@ -44,6 +44,9 @@ export function OurOddsLiveHunterPanel() {
   const [lastSkip, setLastSkip] = useState<string | null>(null);
   const [lastTp, setLastTp] = useState<string | null>(null);
   const firedKeysRef = useRef<Set<string>>(new Set());
+  // Consecutive-tick counter per (ticker|side): how many ticks in a row we've
+  // seen (our_prob − kalshi_mid) ≥ MIN_EDGE_CENTS with prob ≥ MIN_SIDE_PROB.
+  const edgeStreakRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (typeof window === "undefined") return;
