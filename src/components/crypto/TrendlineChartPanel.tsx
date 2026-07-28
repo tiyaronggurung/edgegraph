@@ -522,8 +522,13 @@ export function TrendlineChartPanel() {
               ourMidProb={ourQuote?.mid ?? null}
               timeDecayFrac={ourQuote?.timeDecayFrac ?? 0}
               midPivotTiltPct={ourQuote?.midPivotTiltPct ?? 0}
-
-
+              kalshiFlow={{
+                yesVol60s: kalshi?.yesVol60s ?? null,
+                noVol60s: kalshi?.noVol60s ?? null,
+                tradeCount60s: kalshi?.tradeCount60s ?? null,
+                volume: kalshi?.volume ?? null,
+                openInterest: kalshi?.openInterest ?? null,
+              }}
             />
 
           </div>
