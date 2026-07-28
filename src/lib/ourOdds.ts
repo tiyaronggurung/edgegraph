@@ -446,6 +446,52 @@ export function pillGateTilt(args: {
 }
 
 /**
+ * Pill-breakout tilt (signed fraction, capped ±6¢).
+ *
+ * Spot penetrating the BUY (upper trendline) pill or SELL (lower trendline)
+ * pill is a directional trigger — Kalshi's spot-only BRTI model can't see
+ * this because it has no trendline pills. Sizing:
+ *
+ *   spot ≥ BUY + $3   → UP breakout   → +3..+6¢ (grows with time-left decay)
+ *   spot ≤ SELL - $3  → DOWN breakout → -3..-6¢
+ *   spot inside pills → 0
+ *
+ * Tilt strengthens as T shrinks (breakouts near close rarely reverse).
+ * Deactivated in the first 2 minutes (warmup — pills are still forming).
+ */
+export function pillBreakoutTilt(args: {
+  spot: number | null | undefined;
+  buyPrice: number | null | undefined;
+  sellPrice: number | null | undefined;
+  midPrice: number | null | undefined;
+  secondsToClose: number;
+}): number {
+  const { spot, buyPrice, sellPrice, secondsToClose } = args;
+  if (!(spot != null && spot > 0)) return 0;
+  const T = Math.max(0, secondsToClose);
+  if (T > 780) return 0; // first ~2min: warmup
+
+  // Time-weight: 0.5 far from close, 1.0 at close.
+  const wT = T >= 600 ? 0.5
+           : T >= 300 ? 0.5 + 0.3 * ((600 - T) / 300)   // → 0.80
+           : T >= 60  ? 0.80 + 0.15 * ((300 - T) / 240) // → 0.95
+           : 0.95 + 0.05 * ((60 - T) / 60);             // → 1.00
+
+  const MIN_BREAK = 3; // $
+  if (buyPrice != null && buyPrice > 0 && spot >= buyPrice + MIN_BREAK) {
+    const excess = Math.min(20, spot - buyPrice); // $3..$20 → 3..6¢
+    const cents = 3 + 3 * ((excess - MIN_BREAK) / (20 - MIN_BREAK));
+    return Math.min(0.06, (cents / 100) * wT);
+  }
+  if (sellPrice != null && sellPrice > 0 && spot <= sellPrice - MIN_BREAK) {
+    const excess = Math.min(20, sellPrice - spot);
+    const cents = 3 + 3 * ((excess - MIN_BREAK) / (20 - MIN_BREAK));
+    return -Math.min(0.06, (cents / 100) * wT);
+  }
+  return 0;
+}
+
+/**
  * Turn the final MID + tilt state into a user-facing UP/DOWN recommendation.
  * Strong  → mid ≥ 0.66 (or ≤ 0.34) AND meaningful pill-gate/momentum tilt
  * Lean    → mid ≥ 0.58 (or ≤ 0.42)
