@@ -319,7 +319,16 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
     sellPrice: inp.sellPrice ?? null,
     secondsToClose: inp.secondsToClose,
   });
-  let mid = Math.min(0.99, Math.max(0.01, anchorMid + momTilt + pillTilt));
+  // Pill-breakout tilt: spot penetrating BUY (resistance) or SELL (support)
+  // is a directional trigger that Kalshi's spot-only model can't see.
+  const brkTilt = pillBreakoutTilt({
+    spot,
+    buyPrice: inp.buyPrice ?? null,
+    sellPrice: inp.sellPrice ?? null,
+    midPrice: midPrice ?? null,
+    secondsToClose: inp.secondsToClose,
+  });
+  let mid = Math.min(0.99, Math.max(0.01, anchorMid + momTilt + pillTilt + brkTilt));
 
   const hs = halfSpread(inp.secondsToClose);
   let pUpAsk = Math.min(0.995, Math.max(0.005, mid + hs));
