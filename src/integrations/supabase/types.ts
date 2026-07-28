@@ -3022,6 +3022,66 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_side_ticks: {
+        Row: {
+          above_strike_ratio_90s: number | null
+          buy_price: number | null
+          close_time: string | null
+          created_at: string
+          evaluated_at: string
+          id: number
+          mem_score: number | null
+          mid_price: number | null
+          reco_conf_pct: number | null
+          reco_side: string | null
+          seconds_to_close: number
+          sell_price: number | null
+          source: string
+          spot: number | null
+          strike: number | null
+          ticker: string
+          user_id: string | null
+        }
+        Insert: {
+          above_strike_ratio_90s?: number | null
+          buy_price?: number | null
+          close_time?: string | null
+          created_at?: string
+          evaluated_at?: string
+          id?: number
+          mem_score?: number | null
+          mid_price?: number | null
+          reco_conf_pct?: number | null
+          reco_side?: string | null
+          seconds_to_close: number
+          sell_price?: number | null
+          source?: string
+          spot?: number | null
+          strike?: number | null
+          ticker: string
+          user_id?: string | null
+        }
+        Update: {
+          above_strike_ratio_90s?: number | null
+          buy_price?: number | null
+          close_time?: string | null
+          created_at?: string
+          evaluated_at?: string
+          id?: number
+          mem_score?: number | null
+          mid_price?: number | null
+          reco_conf_pct?: number | null
+          reco_side?: string | null
+          seconds_to_close?: number
+          sell_price?: number | null
+          source?: string
+          spot?: number | null
+          strike?: number | null
+          ticker?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       btc_spot_ticks: {
         Row: {
           aggressor_side: string | null
