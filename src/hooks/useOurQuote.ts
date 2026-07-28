@@ -77,11 +77,16 @@ export function useOurQuote(params: {
         lastSpotSide: 0,
         bias: 0,
         lastTs: Date.now(),
+        memory: 0,
+        lockedSide: 0,
+        oppositeStreakSec: 0,
+        sideHist: [],
       };
       lastGoodRef.current = null;
       // keep tape — vol estimation benefits from continuity across windows
     }
   }, [strike]);
+
 
   useEffect(() => {
     if (spot == null || !Number.isFinite(spot) || !(spot > 0)) return;
