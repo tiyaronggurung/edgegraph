@@ -231,20 +231,21 @@ export function TrendlineChartPanel() {
     sellPrice: shadow?.lowerAtNow ?? null,
   });
 
-  // --- BET UP/DOWN lock @ 77% within first 7 min (session-only W/L history) -------------------
-  // Once the recommendation chip hits ≥77% conf inside the first 7 min of the
-  // window, freeze that side for the rest of the window. Lock releases when
-  // the strike rolls to the next 15m window. If we cross a strike without
-  // resolving the lock, close it using the last spot vs the old strike and
-  // push a W/L dot.
+  // --- BET UP/DOWN lock @ 75% within first 7 min (session-only W/L history) -------------------
+  // Once the recommendation chip hits ≥75% conf inside the first 7 min of the
+  // window, freeze that side for the rest of the window AND persist it to
+  // btc_model_predictions.study_locked_side (overrides server-side Study Pick).
+  // Lock releases when the strike rolls to the next 15m window.
   type RecoLock = { strike: number; side: "UP" | "DOWN"; lockedAt: number; lockedConf: number };
   type RecoOutcome = { side: "UP" | "DOWN"; won: boolean; strike: number; settleSpot: number };
   const [recoLock, setRecoLock] = useState<RecoLock | null>(null);
   const [recoHistory, setRecoHistory] = useState<RecoOutcome[]>([]);
   const lastSpotRef = useRef<number | null>(null);
+  const chipPickWrittenRef = useRef<string | null>(null); // ticker we've already written
   useEffect(() => { if (displaySpot != null) lastSpotRef.current = displaySpot; }, [displaySpot]);
 
   const currentStrike = shadow?.strike ?? null;
+  const currentTicker = shadow?.ticker ?? null;
   const recLive = ourQuote?.recommendation ?? null;
   const secondsToCloseForLock = kalshiRemainingSec ?? null;
   // First 7 min of the 15m window ⇒ elapsed<420s ⇒ secondsToClose>480.
@@ -261,11 +262,25 @@ export function TrendlineChartPanel() {
       setRecoLock(null);
       return;
     }
-    // Arm lock only when rec crosses ≥77% inside the first 7 min.
-    if (!recoLock && recLive && recLive.side !== "WAIT" && recLive.confidencePct >= 77 && currentStrike != null && inLockWindow) {
+    // Arm lock only when rec crosses ≥75% inside the first 7 min.
+    if (!recoLock && recLive && recLive.side !== "WAIT" && recLive.confidencePct >= 75 && currentStrike != null && inLockWindow) {
       setRecoLock({ strike: currentStrike, side: recLive.side, lockedAt: Date.now(), lockedConf: recLive.confidencePct });
+      // Fire-and-forget: persist as Study Pick in the model accuracy log.
+      if (currentTicker && chipPickWrittenRef.current !== currentTicker && secondsToCloseForLock != null) {
+        chipPickWrittenRef.current = currentTicker;
+        import("@/lib/chipStudyPick.functions").then(({ recordChipStudyPick }) =>
+          recordChipStudyPick({
+            data: {
+              ticker: currentTicker,
+              side: recLive.side as "UP" | "DOWN",
+              confidencePct: recLive.confidencePct,
+              secondsToClose: Math.round(secondsToCloseForLock),
+            },
+          }).catch(() => {})
+        );
+      }
     }
-  }, [currentStrike, recLive, recoLock, inLockWindow]);
+  }, [currentStrike, currentTicker, recLive, recoLock, inLockWindow, secondsToCloseForLock]);
 
   return (
     <div className="border border-white/10 rounded-lg bg-black/40 p-3">
