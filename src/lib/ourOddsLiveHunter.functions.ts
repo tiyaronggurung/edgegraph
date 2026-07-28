@@ -218,8 +218,10 @@ export const fireOurOddsLiveBet = createServerFn({ method: "POST" })
         closeTime: data.closeTime,
         inputsSnapshot: {
           source: "our_odds_live_hunter",
-          trigger: "american_-200",
+          trigger: "dislocation_3c",
           our_prob: data.ourProb,
+          kalshi_mid_prob: data.kalshiMidProb,
+          edge_cents: edgeCents,
           kalshi_ask_cents: data.kalshiAskCents,
           up_cents: data.upCents ?? null,
           down_cents: data.downCents ?? null,
@@ -228,7 +230,8 @@ export const fireOurOddsLiveBet = createServerFn({ method: "POST" })
           strike: data.strike ?? null,
           seconds_to_close: data.secondsToClose ?? null,
           max_ask_cents: MAX_ASK_CENTS,
-          min_prob: MIN_PROB,
+          min_edge_cents: MIN_EDGE_CENTS,
+          min_side_prob: MIN_SIDE_PROB,
           stake_usd: STAKE_USD,
         },
       });
