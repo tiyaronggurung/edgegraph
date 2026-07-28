@@ -298,7 +298,7 @@ export function TrendlineChartPanel() {
         data: {
           ticker: currentTicker,
           secondsToClose: Math.round(secondsToCloseForLock),
-          closeTime: kalshi?.closeTime ?? null,
+          closeTime: secondsToCloseForLock != null ? new Date(Date.now() + secondsToCloseForLock * 1000).toISOString() : null,
           spot: displaySpot ?? null,
           strike: currentStrike ?? null,
           midPrice: midPriceNow ?? null,
