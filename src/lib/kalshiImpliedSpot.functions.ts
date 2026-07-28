@@ -49,8 +49,16 @@ export interface KalshiImpliedSpot {
   yesMid: number | null;
   secondsToClose: number | null;
   impliedSpot: number | null;
+  // ---- volume / flow (added for side-flow study) ----
+  volume: number | null;                // cumulative contracts traded
+  openInterest: number | null;          // current open contracts
+  lastPriceCents: number | null;        // last-trade price in cents (YES side)
+  yesVol60s: number | null;             // YES taker contracts, last 60s
+  noVol60s: number | null;              // NO taker contracts, last 60s
+  tradeCount60s: number | null;         // #trades in last 60s
   error: string | null;
 }
+
 
 export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
   async (): Promise<KalshiImpliedSpot> => {
