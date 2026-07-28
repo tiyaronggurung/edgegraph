@@ -1058,6 +1058,31 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
       } catch { return { lossStreak: 0, prevOutcome1: undefined, prevOutcome2: undefined }; }
     })();
 
+    // Chip-locked Study Pick per ticker (authoritative UI Study Pick).
+    // Written by TrendlineChartPanel via recordChipStudyPick when the on-chart
+    // conviction chip crosses ≥75% within the first 7 min. If present, the
+    // chip's conviction was already ≥75% (≥ our 68% override floor), so on
+    // Model/Study disagreement we always OVERRIDE to the chip side.
+    const chipStudySides = await (async (): Promise<Map<string, "YES" | "NO">> => {
+      try {
+        const tickers: string[] = [];
+        for (const e of events) for (const m of e.markets ?? []) if (m.ticker) tickers.push(m.ticker);
+        if (!tickers.length) return new Map();
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data } = await supabaseAdmin
+          .from("btc_model_predictions")
+          .select("ticker, study_locked_side")
+          .in("ticker", tickers)
+          .not("study_locked_side", "is", null);
+        const map = new Map<string, "YES" | "NO">();
+        for (const r of data ?? []) {
+          const s = (r as any).study_locked_side;
+          if (s === "YES" || s === "NO") map.set((r as any).ticker, s);
+        }
+        return map;
+      } catch { return new Map(); }
+    })();
+
 
 
 
