@@ -18,9 +18,11 @@ import { fireOurOddsLiveBet, autoTakeProfitOurOddsLive } from "@/lib/ourOddsLive
 
 const LS_ENABLED = "crypto.ourOddsLiveHunter";
 const STAKE_USD = 10;
-const TRIGGER_PROB = 2 / 3;          // American −200 ≡ 66.67%
-const MAX_ASK_CENTS = 95;            // skip if Kalshi ask is already pinned
-const MIN_SECS_TO_CLOSE = 15;
+const MIN_EDGE_CENTS = 3;            // our_mid − kalshi_mid ≥ 3¢ on picked side
+const MIN_SIDE_PROB = 0.55;          // never chase below coin-flip
+const REQUIRED_CONSECUTIVE_TICKS = 2;
+const MAX_ASK_CENTS = 85;            // matches server; tighter than legacy −200 mode
+const MIN_SECS_TO_CLOSE = 20;
 const WINDOW_LEN_SECS = 900;
 const WARMUP_SECS = 180;
 const MAX_SECS_TO_CLOSE = WINDOW_LEN_SECS - WARMUP_SECS;
@@ -42,6 +44,9 @@ export function OurOddsLiveHunterPanel() {
   const [lastSkip, setLastSkip] = useState<string | null>(null);
   const [lastTp, setLastTp] = useState<string | null>(null);
   const firedKeysRef = useRef<Set<string>>(new Set());
+  // Consecutive-tick counter per (ticker|side): how many ticks in a row we've
+  // seen (our_prob − kalshi_mid) ≥ MIN_EDGE_CENTS with prob ≥ MIN_SIDE_PROB.
+  const edgeStreakRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -124,24 +129,57 @@ export function OurOddsLiveHunterPanel() {
     if (!quote || pUp == null || pDown == null) return;
     if (yesAsk == null || yesBid == null) return;
 
+    // Kalshi mid probabilities per side (mid of bid/ask on that side).
+    // YES mid prob = (yesBid + yesAsk) / 2. NO mid prob = 1 − YES mid.
+    const kalshiYesMidProb = (yesBid + yesAsk) / 2;
+    const kalshiNoMidProb = 1 - kalshiYesMidProb;
+
+    // Pick the side with the biggest edge (our_prob − kalshi_mid_prob),
+    // provided ourProb ≥ MIN_SIDE_PROB (never bet the losing side).
+    const upEdge = pUp - kalshiYesMidProb;
+    const dnEdge = pDown - kalshiNoMidProb;
     let side: "YES" | "NO" | null = null;
     let prob = 0;
-    if (pUp >= TRIGGER_PROB && pUp >= pDown) { side = "YES"; prob = pUp; }
-    else if (pDown >= TRIGGER_PROB) { side = "NO"; prob = pDown; }
+    let kalshiMidProb = 0;
+    let edgeCents = 0;
+    if (upEdge >= dnEdge && pUp >= MIN_SIDE_PROB) {
+      side = "YES"; prob = pUp; kalshiMidProb = kalshiYesMidProb;
+      edgeCents = Math.round(upEdge * 100);
+    } else if (pDown >= MIN_SIDE_PROB) {
+      side = "NO"; prob = pDown; kalshiMidProb = kalshiNoMidProb;
+      edgeCents = Math.round(dnEdge * 100);
+    }
     if (!side) {
-      const best = Math.max(pUp, pDown);
-      setLastSkip(`best ${Math.round(best * 100)}¢ < ${(TRIGGER_PROB * 100).toFixed(0)}¢`);
+      setLastSkip(`no side ≥ ${(MIN_SIDE_PROB * 100).toFixed(0)}¢ (UP ${Math.round(pUp * 100)} / DN ${Math.round(pDown * 100)})`);
+      return;
+    }
+    if (edgeCents < MIN_EDGE_CENTS) {
+      // Reset any streak on the losing candidate — edge must be sustained.
+      edgeStreakRef.current.clear();
+      setLastSkip(`edge ${edgeCents}¢ < ${MIN_EDGE_CENTS}¢ (${side} ours ${Math.round(prob * 100)} vs K ${Math.round(kalshiMidProb * 100)})`);
       return;
     }
 
-    // Kalshi ask cents for the chosen side. YES side pays yesAsk;
-    // NO side pays (1 - yesBid) (since buying NO fills against yes bid).
+    // Kalshi ask cents for the chosen side. YES pays yesAsk; NO pays (1 − yesBid).
     const kalshiAskCents = side === "YES"
       ? Math.max(1, Math.min(99, Math.round(yesAsk * 100)))
       : Math.max(1, Math.min(99, Math.round((1 - yesBid) * 100)));
 
     if (kalshiAskCents > MAX_ASK_CENTS) {
+      edgeStreakRef.current.clear();
       setLastSkip(`kalshi ${side} ask ${kalshiAskCents}¢ > cap ${MAX_ASK_CENTS}¢`);
+      return;
+    }
+
+    // Consecutive-tick gate: same side must sustain the edge for N ticks.
+    const streakKey = `${ticker}|${side}`;
+    // Reset any streak on the *opposite* side.
+    const opposite = side === "YES" ? `${ticker}|NO` : `${ticker}|YES`;
+    edgeStreakRef.current.delete(opposite);
+    const nextCount = (edgeStreakRef.current.get(streakKey) ?? 0) + 1;
+    edgeStreakRef.current.set(streakKey, nextCount);
+    if (nextCount < REQUIRED_CONSECUTIVE_TICKS) {
+      setLastSkip(`${side} edge ${edgeCents}¢ tick ${nextCount}/${REQUIRED_CONSECUTIVE_TICKS}`);
       return;
     }
 
@@ -151,7 +189,7 @@ export function OurOddsLiveHunterPanel() {
     const closeIso = new Date(Date.now() + secondsToClose * 1000).toISOString();
     firedKeysRef.current.add(key);
     setFiring(true);
-    const label = `${ticker} ${side === "YES" ? "UP" : "DOWN"} @ ${kalshiAskCents}¢`;
+    const label = `${ticker} ${side === "YES" ? "UP" : "DOWN"} +${edgeCents}¢ @ ${kalshiAskCents}¢`;
 
     (async () => {
       try {
@@ -160,6 +198,7 @@ export function OurOddsLiveHunterPanel() {
             ticker,
             side,
             ourProb: prob,
+            kalshiMidProb,
             kalshiAskCents,
             closeTime: closeIso,
             spot,
@@ -239,21 +278,21 @@ export function OurOddsLiveHunterPanel() {
             {enabled ? `Our-Odds LIVE Hunter ON · REAL $${STAKE_USD}` : `Our-Odds LIVE Hunter OFF · REAL $${STAKE_USD}`}
           </button>
           <span className="text-[11px] text-amber-200/70">
-            REAL MONEY · buys at −200 · auto-sells at +40% (entry × 1.4) · ≤{MAX_ASK_CENTS}¢ · 1 shot/side · 3-min warmup
+            REAL MONEY · fires on (our_mid − K_mid) ≥ {MIN_EDGE_CENTS}¢ held {REQUIRED_CONSECUTIVE_TICKS} ticks · ≤{MAX_ASK_CENTS}¢ · TP +40% · 1 shot/side · 3-min warmup
           </span>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[11px] font-mono tabular-nums">
-            <span className={pUp != null && pUp >= TRIGGER_PROB ? "text-emerald-300" : "text-muted-foreground"}>
+            <span className={pUp != null && pUp >= MIN_SIDE_PROB ? "text-emerald-300" : "text-muted-foreground"}>
               UP {upAmer != null ? upAmer : (pUp != null ? `${Math.round(pUp * 100)}¢` : "—")}
             </span>
             <span className="mx-1 text-muted-foreground/50">·</span>
-            <span className={pDown != null && pDown >= TRIGGER_PROB ? "text-red-300" : "text-muted-foreground"}>
+            <span className={pDown != null && pDown >= MIN_SIDE_PROB ? "text-red-300" : "text-muted-foreground"}>
               DN {downAmer != null ? downAmer : (pDown != null ? `${Math.round(pDown * 100)}¢` : "—")}
             </span>
-            {yesAsk != null && (
+            {yesAsk != null && yesBid != null && (
               <span className="ml-2 text-muted-foreground">
-                · K ask YES {Math.round(yesAsk * 100)}¢ / NO {yesBid != null ? Math.round((1 - yesBid) * 100) : "—"}¢
+                · K mid YES {Math.round(((yesBid + yesAsk) / 2) * 100)}¢ / NO {Math.round((1 - (yesBid + yesAsk) / 2) * 100)}¢
               </span>
             )}
           </span>

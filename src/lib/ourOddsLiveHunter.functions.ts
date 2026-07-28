@@ -32,10 +32,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const TRIGGER_KIND = "our_odds_-200" as const;
-const MIN_PROB = 2 / 3;              // American -200
-const MAX_ASK_CENTS = 95;            // skip if Kalshi already pinned to 95+
-const MIN_SECS_TO_CLOSE = 15;        // pin-zone slippage guard
+// Dislocation Hunter: fire when OUR mid probability exceeds Kalshi's mid
+// probability for the same side by ≥ MIN_EDGE_CENTS. Trigger is validated
+// client-side across 2 consecutive ticks; server re-checks the edge here.
+const TRIGGER_KIND = "our_odds_disloc" as const;
+const MIN_EDGE_CENTS = 3;            // our_mid − kalshi_mid ≥ 3¢ on picked side
+const MIN_SIDE_PROB = 0.55;          // never chase < coin-flip
+const MAX_ASK_CENTS = 85;            // avoid pin-zone chases; tighter than −200 mode
+const MIN_SECS_TO_CLOSE = 20;
 const WARMUP_SECS = 180;
 const WINDOW_LEN_SECS = 900;
 const MAX_SECS_TO_CLOSE = WINDOW_LEN_SECS - WARMUP_SECS;
@@ -49,7 +53,8 @@ const FireSchema = z.object({
   ticker: z.string().min(1),
   eventTicker: z.string().nullable().optional(),
   side: z.enum(["YES", "NO"]),
-  ourProb: z.number().min(0).max(1),         // our ask-side probability
+  ourProb: z.number().min(0).max(1),               // our mid prob on picked side
+  kalshiMidProb: z.number().min(0).max(1),         // kalshi mid prob on picked side
   kalshiAskCents: z.number().int().min(1).max(99), // current Kalshi ask for that side
   closeTime: z.string(),
   spot: z.number().nullable().optional(),
@@ -131,8 +136,12 @@ export const fireOurOddsLiveBet = createServerFn({ method: "POST" })
     };
 
     // --- server-side re-check of all gates -------------------------------
-    if (data.ourProb < MIN_PROB) {
-      return reject(`our prob ${(data.ourProb * 100).toFixed(1)}% < ${(MIN_PROB * 100).toFixed(1)}%`);
+    if (data.ourProb < MIN_SIDE_PROB) {
+      return reject(`our prob ${(data.ourProb * 100).toFixed(1)}% < ${(MIN_SIDE_PROB * 100).toFixed(0)}%`);
+    }
+    const edgeCents = Math.round((data.ourProb - data.kalshiMidProb) * 100);
+    if (edgeCents < MIN_EDGE_CENTS) {
+      return reject(`edge ${edgeCents}¢ < ${MIN_EDGE_CENTS}¢ (ours ${(data.ourProb * 100).toFixed(1)}¢ vs K ${(data.kalshiMidProb * 100).toFixed(1)}¢)`);
     }
     if (data.kalshiAskCents > MAX_ASK_CENTS) {
       return reject(`kalshi ask ${data.kalshiAskCents}¢ > cap ${MAX_ASK_CENTS}¢`);
@@ -209,8 +218,10 @@ export const fireOurOddsLiveBet = createServerFn({ method: "POST" })
         closeTime: data.closeTime,
         inputsSnapshot: {
           source: "our_odds_live_hunter",
-          trigger: "american_-200",
+          trigger: "dislocation_3c",
           our_prob: data.ourProb,
+          kalshi_mid_prob: data.kalshiMidProb,
+          edge_cents: edgeCents,
           kalshi_ask_cents: data.kalshiAskCents,
           up_cents: data.upCents ?? null,
           down_cents: data.downCents ?? null,
@@ -219,7 +230,8 @@ export const fireOurOddsLiveBet = createServerFn({ method: "POST" })
           strike: data.strike ?? null,
           seconds_to_close: data.secondsToClose ?? null,
           max_ask_cents: MAX_ASK_CENTS,
-          min_prob: MIN_PROB,
+          min_edge_cents: MIN_EDGE_CENTS,
+          min_side_prob: MIN_SIDE_PROB,
           stake_usd: STAKE_USD,
         },
       });
