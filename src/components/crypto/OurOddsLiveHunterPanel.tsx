@@ -18,9 +18,11 @@ import { fireOurOddsLiveBet, autoTakeProfitOurOddsLive } from "@/lib/ourOddsLive
 
 const LS_ENABLED = "crypto.ourOddsLiveHunter";
 const STAKE_USD = 10;
-const TRIGGER_PROB = 2 / 3;          // American −200 ≡ 66.67%
-const MAX_ASK_CENTS = 95;            // skip if Kalshi ask is already pinned
-const MIN_SECS_TO_CLOSE = 15;
+const MIN_EDGE_CENTS = 3;            // our_mid − kalshi_mid ≥ 3¢ on picked side
+const MIN_SIDE_PROB = 0.55;          // never chase below coin-flip
+const REQUIRED_CONSECUTIVE_TICKS = 2;
+const MAX_ASK_CENTS = 85;            // matches server; tighter than legacy −200 mode
+const MIN_SECS_TO_CLOSE = 20;
 const WINDOW_LEN_SECS = 900;
 const WARMUP_SECS = 180;
 const MAX_SECS_TO_CLOSE = WINDOW_LEN_SECS - WARMUP_SECS;
