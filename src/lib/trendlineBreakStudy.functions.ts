@@ -16,8 +16,9 @@ export const getTrendlineBreakStudy = createServerFn({ method: "GET" })
   .inputValidator((d: { days?: number }) =>
     z.object({ days: z.number().int().min(1).max(60).default(14) }).parse(d ?? {}),
   )
-  .handler(async ({ data, context }): Promise<{ days: number; rows: TrendlineBreakRow[] }> => {
-    const { data: rows, error } = await (context.supabase.rpc as any)(
+  .handler(async ({ data }): Promise<{ days: number; rows: TrendlineBreakRow[] }> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await (supabaseAdmin.rpc as any)(
       "trendline_break_study",
       { _days: data.days },
     );
