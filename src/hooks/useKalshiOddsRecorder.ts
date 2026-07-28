@@ -35,7 +35,14 @@ interface QueuedRow {
   our_sigma: number | null;
   our_tilt: number | null;
   delta_up: number | null;
+  kalshi_volume: number | null;
+  kalshi_open_interest: number | null;
+  kalshi_last_price_cents: number | null;
+  kalshi_yes_vol_60s: number | null;
+  kalshi_no_vol_60s: number | null;
+  kalshi_trade_count_60s: number | null;
 }
+
 
 /**
  * Continuously logs Kalshi BTC 15m odds vs our computed odds, 1 sample/sec.
