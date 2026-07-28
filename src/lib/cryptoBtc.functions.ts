@@ -1656,30 +1656,27 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           const studyModelDisagree =
             studyDir !== "NEUTRAL" && modelDir !== "NEUTRAL" && studyDir !== modelSideDir;
 
-          // FIGHT: only resolve when Study has an opinion AND disagrees.
+          // Override rule (user-set): on disagreement, Study OVERRIDES model
+          // only when its conviction is ≥ 68% (mid of user's 65–70% range).
+          // Below 68% → SKIP as CHOPPY. Regular on-chart 🔒 lock stays 75%.
           if (studyModelDisagree) {
-            const bothWeak = pStudy < 0.55 && pModelForStudyDir < 0.55;
-            if (bothWeak) {
-              strikeVerdict = "CHOPPY";
-              strikeVerdictReason = `fight_window — both weak (P_study ${(pStudy*100).toFixed(0)}% vs P_model ${(pModelForStudyDir*100).toFixed(0)}% for ${studyDir}); no confident side`;
-            } else if (pStudy >= pModelForStudyDir) {
-              // Study wins the fight → lean to Study
+            const STUDY_OVERRIDE_MIN = 0.68;
+            if (pStudy >= STUDY_OVERRIDE_MIN) {
               const leanedSide: "YES" | "NO" = studyDir === "UP" ? "YES" : "NO";
               const prevSide = side;
               side = leanedSide;
               edgePts = -edgePts;
               strikeVerdict = "WEAK";
-              strikeVerdictReason = `fight_won_by_study — P_study ${(pStudy*100).toFixed(0)}% > P_model ${(pModelForStudyDir*100).toFixed(0)}% for ${studyDir}; flipped ${prevSide}→${leanedSide}. Fight ${inFightWindow ? "LIVE" : "locked"} at ${windowElapsedSec}s`;
+              strikeVerdictReason = `study_override — P_study ${(pStudy*100).toFixed(0)}% ≥ 68% for ${studyDir}; flipped ${prevSide}→${leanedSide} (model p=${(pModelForModelDir*100).toFixed(0)}%). ${inFightWindow ? "LIVE" : "locked"} at ${windowElapsedSec}s`;
               entryGate = {
                 ...entryGate,
                 action: "PASS",
-                reason: `fight_won_by_study — flipped ${prevSide}→${leanedSide}; awaiting side_conf ≥0.90 on ${leanedSide}`,
-                allReasons: [...entryGate.allReasons, `fight_won_by_study (P_s ${(pStudy*100).toFixed(0)}% vs P_m ${(pModelForStudyDir*100).toFixed(0)}%)`],
+                reason: `study_override — flipped ${prevSide}→${leanedSide}; awaiting side_conf ≥0.90 on ${leanedSide}`,
+                allReasons: [...entryGate.allReasons, `study_override (P_s ${(pStudy*100).toFixed(0)}% vs P_m ${(pModelForStudyDir*100).toFixed(0)}%)`],
               };
             } else {
-              // Model wins the fight → keep model side, but note the contest
-              strikeVerdict = "WEAK";
-              strikeVerdictReason = `fight_won_by_model — P_model ${(pModelForStudyDir*100).toFixed(0)}% > P_study ${(pStudy*100).toFixed(0)}% for ${studyDir}; kept ${side}/${modelSideDir} (model p=${(pModelForModelDir*100).toFixed(0)}%). Fight ${inFightWindow ? "LIVE" : "locked"} at ${windowElapsedSec}s`;
+              strikeVerdict = "CHOPPY";
+              strikeVerdictReason = `disagreement_skip — Study says ${studyDir} @ P_study ${(pStudy*100).toFixed(0)}% (< 68% override threshold), Model says ${modelSideDir} @ ${(pModelForModelDir*100).toFixed(0)}% → no confident side`;
             }
           }
 
