@@ -630,7 +630,7 @@ const DEFAULT_CW = 6;
 function TaChart({
   candles: candlesProp, shadow, tf, visible, fibOn, liveSpot,
   ourUpAskProb, ourDownAskProb, ourMidProb,
-  timeDecayFrac, midPivotTiltPct,
+  timeDecayFrac, midPivotTiltPct, kalshiFlow,
 }: {
   candles: TCandle[];
   shadow: TrendlineSnapshot | null;
@@ -643,6 +643,13 @@ function TaChart({
   ourMidProb: number | null;
   timeDecayFrac: number;
   midPivotTiltPct: number;
+  kalshiFlow?: {
+    yesVol60s: number | null;
+    noVol60s: number | null;
+    tradeCount60s: number | null;
+    volume: number | null;
+    openInterest: number | null;
+  };
 }) {
 
 
