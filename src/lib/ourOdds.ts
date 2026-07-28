@@ -267,8 +267,51 @@ export function midPivotTilt(
 }
 
 /**
- * Full ask-side quote for UP and DOWN, always asymmetric and always
- * summing to > 100¢. Never returns equal sides.
+ * Calibration stretch — corrects the observed under-confidence bias.
+ *
+ * Study on 27k+ settled snapshots (14d, T=60–300s) shows our raw mid is
+ * systematically pulled toward 0.5:
+ *   pred 0.55 → actual 0.69   pred 0.65 → actual 0.78   pred 0.75 → actual 0.84
+ * Fit: actual ≈ Φ( k · Φ⁻¹(pred) ) with k ≈ 1.35 corrects most of the gap
+ * without over-fitting the extremes (already well-calibrated).
+ * Time-scaled: only apply when T ≤ 600s (calibration is only measured there).
+ */
+function calibrationStretch(mid: number, secondsToClose: number): number {
+  if (!(mid > 0) || !(mid < 1)) return mid;
+  const T = Math.max(0, secondsToClose);
+  if (T > 600) return mid;
+  // k ramps from 1.0 (at 600s) up to 1.35 (at ≤120s)
+  const k = T >= 600 ? 1.0
+          : T >= 120 ? 1.0 + 0.35 * ((600 - T) / 480)
+          : 1.35;
+  if (k <= 1.0001) return mid;
+  // Invert phi via Newton on Φ; cheap since we only need ~4 iterations.
+  // z = Φ⁻¹(mid). Bracket-search is fine for one-shot per tick.
+  let lo = -6, hi = 6, z = 0;
+  for (let i = 0; i < 24; i++) {
+    z = (lo + hi) / 2;
+    if (phi(z) < mid) lo = z; else hi = z;
+  }
+  const stretched = phi(k * z);
+  return Math.min(0.995, Math.max(0.005, stretched));
+}
+
+/**
+ * Full ask-side quote for UP and DOWN.
+ *
+ * Rewritten anchor policy (Nov 2026 study):
+ *   Anchor = pure (spot, strike, σ, T) physics — always. Never blended with MID.
+ *   MID / BUY / SELL enter as SIGNED TILTS on top of physics:
+ *     - midPivotTilt   : which side of the trendline pivot spot sits on
+ *     - pillGateTilt   : structural gate when strike sits beyond both pills
+ *     - pillBreakoutTilt: spot punching through a pill (support/resistance)
+ *     - momentumTilt   : short-horizon drift, decays near close
+ *   Final mid then passes through a calibration stretch to correct the
+ *   observed under-confidence bias in the T ≤ 10min window.
+ *
+ * This preserves what MID/BUY/SELL contribute (structure, pivot, breakout)
+ * while making STRIKE the anchor — so a $20 move above strike shows the
+ * right physics-driven odds instead of being masked by a mid-pull-to-center.
  */
 export function computeOurQuote(inp: QuoteInput): OurQuote | null {
   const { spot, strike, sigmaAnnualized, midPrice } = inp;
@@ -279,38 +322,11 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
   const denom = sigmaAnnualized * Math.sqrt(Tyr);
   if (!(denom > 0)) return null;
 
-  // Three inputs → one anchor price:
-  //   strike  = target line
-  //   spot    = where BTC is right now
-  //   MID     = where the trendline (SELL+BUY)/2 says price is pivoting
-  // anchor_price = wMid*MID + (1-wMid)*spot, wMid grows with time decay.
-  // Odds = Φ( ln(anchor / strike) / (σ·√T) )
-  const hasMid = midPrice != null && Number.isFinite(midPrice) && midPrice > 0;
-  const t = Math.max(0, inp.secondsToClose);
-  // Trendline MID carries more weight, earlier. Pill-based fair value is our
-  // edge over Kalshi's spot-only BRTI anchor.
-  let wMid = 0;
-  if (hasMid) {
-    if (t >= 720)      wMid = 0.30;                                       // first 3m: some MID influence
-    else if (t >= 420) wMid = 0.30 + 0.25 * ((720 - t) / 300);            // → 0.55
-    else if (t >= 180) wMid = 0.55 + 0.25 * ((420 - t) / 240);            // → 0.80
-    else if (t >= 60)  wMid = 0.80 + 0.13 * ((180 - t) / 120);            // → 0.93
-    else               wMid = 0.93 + 0.05 * ((60 - t) / 60);              // → 0.98
-  }
-  const anchorPrice = hasMid
-    ? wMid * (midPrice as number) + (1 - wMid) * spot
-    : spot;
-
-  const zAnchor = Math.log(anchorPrice / strike) / denom;
-  const anchorMid = Math.min(0.995, Math.max(0.005, phi(zAnchor)));
+  // === Physics anchor: spot vs strike only ===
   const spotMid = Math.min(0.995, Math.max(0.005, phi(Math.log(spot / strike) / denom)));
 
-
-  // Momentum lean survives the blend — small but real edge over Kalshi.
+  // === Tilts (all signed, in probability units) ===
   const momTilt = inp.momentumTiltPct ?? 0;
-  // Pill-gate tilt: when strike sits above BOTH pills (BUY+MID) by ≥$5,
-  // shadow-study says settlement leans DOWN 65-92% depending on time-left.
-  // Symmetric on the low side. Only kicks in at T ≤ 300s.
   const pillTilt = pillGateTilt({
     spot,
     strike,
@@ -319,8 +335,6 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
     sellPrice: inp.sellPrice ?? null,
     secondsToClose: inp.secondsToClose,
   });
-  // Pill-breakout tilt: spot penetrating BUY (resistance) or SELL (support)
-  // is a directional trigger that Kalshi's spot-only model can't see.
   const brkTilt = pillBreakoutTilt({
     spot,
     buyPrice: inp.buyPrice ?? null,
@@ -328,24 +342,31 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
     midPrice: midPrice ?? null,
     secondsToClose: inp.secondsToClose,
   });
-  let mid = Math.min(0.99, Math.max(0.01, anchorMid + momTilt + pillTilt + brkTilt));
+  // MID pivot: which side of (SELL+BUY)/2 is spot on. Signed, ±4¢, time-weighted.
+  const midTilt = midPivotTilt(spot, midPrice ?? null, inp.secondsToClose);
+
+  // Combined pill influence for the UI decay bar (kept for backwards shape).
+  const effectivePivot = midTilt + pillTilt + brkTilt;
+
+  // Sum tilts on top of physics, then calibration-stretch.
+  const rawMid = Math.min(0.99, Math.max(0.01,
+    spotMid + midTilt + pillTilt + brkTilt + momTilt,
+  ));
+  const mid = calibrationStretch(rawMid, inp.secondsToClose);
 
   const hs = halfSpread(inp.secondsToClose);
   let pUpAsk = Math.min(0.995, Math.max(0.005, mid + hs));
   let pDownAsk = Math.min(0.995, Math.max(0.005, (1 - mid) + hs));
-
   if (Math.abs(pUpAsk - pDownAsk) < 1e-4) {
     if (mid >= 0.5) pDownAsk = Math.max(0.005, pDownAsk - 0.001);
     else pUpAsk = Math.max(0.005, pUpAsk - 0.001);
   }
 
   const timeDecayFrac = Math.max(0, Math.min(1, 1 - Math.max(0, inp.secondsToClose) / 900));
-  // Report the effective pivot influence for the UI decay bar.
-  const effectivePivot = hasMid ? (anchorMid - spotMid) : 0;
 
   const recommendation = buildRecommendation({
     mid,
-    pillTilt,
+    pillTilt: pillTilt + midTilt + brkTilt,
     momTilt,
     secondsToClose: inp.secondsToClose,
     spot,

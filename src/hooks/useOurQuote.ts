@@ -10,11 +10,12 @@ import {
   type OurQuote,
 } from "@/lib/ourOdds";
 
-// Physics sanity cap: ratcheted mid can never drift more than this many ¢
-// away from the pure spot-vs-strike BS probability. Kills cases where MID
-// pivot + bias + breakouts stack to 89% UP when spot is only $27 above a
-// $100k strike (physics says ~60-65%).
-const PHYSICS_CAP = 0.12;
+// Physics sanity cap: the ratcheted+biased mid may drift up to this many ¢
+// away from the pure spot-vs-strike BS probability. Since computeOurQuote
+// now uses spot-vs-strike as the ANCHOR (not blended with MID), this cap
+// only bounds how far MID pivot + persistent bias + breakouts can stack on
+// top of physics. Wider than before because the anchor itself is honest.
+const PHYSICS_CAP = 0.20;
 
 
 
