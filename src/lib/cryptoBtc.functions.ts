@@ -1844,7 +1844,11 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           modelSource: source,
           edgePts, side, edgeAbs,
           modelSidePreStudy,
-          studyLockedSide: (windowElapsedSec >= 420 ? side : null) as "YES" | "NO" | null,
+          // Only write study_locked_side when it's authoritative: (a) the chip
+          // already locked it (chipSideEarly), or (b) we're past T+420s AND no
+          // chip disagreement forced an override earlier. Never stomp a chip
+          // write with a fresh model side.
+          studyLockedSide: (chipSideEarly ?? (windowElapsedSec >= 420 ? side : null)) as "YES" | "NO" | null,
           kellyFraction: kelly,
           secondsToClose,
           sigmaDistance: sigDist,
