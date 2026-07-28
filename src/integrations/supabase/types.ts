@@ -2560,6 +2560,10 @@ export type Database = {
           snapshot_seconds_to_close: number
           spot_at_snapshot: number
           strike: number
+          study_lock_confidence: number | null
+          study_lock_seconds_to_close: number | null
+          study_lock_source: string | null
+          study_locked_at: string | null
           study_locked_side: string | null
           ta_bb_5m_pctb: number | null
           ta_engine_version: string | null
@@ -2604,6 +2608,10 @@ export type Database = {
           snapshot_seconds_to_close: number
           spot_at_snapshot: number
           strike: number
+          study_lock_confidence?: number | null
+          study_lock_seconds_to_close?: number | null
+          study_lock_source?: string | null
+          study_locked_at?: string | null
           study_locked_side?: string | null
           ta_bb_5m_pctb?: number | null
           ta_engine_version?: string | null
@@ -2648,6 +2656,10 @@ export type Database = {
           snapshot_seconds_to_close?: number
           spot_at_snapshot?: number
           strike?: number
+          study_lock_confidence?: number | null
+          study_lock_seconds_to_close?: number | null
+          study_lock_source?: string | null
+          study_locked_at?: string | null
           study_locked_side?: string | null
           ta_bb_5m_pctb?: number | null
           ta_engine_version?: string | null

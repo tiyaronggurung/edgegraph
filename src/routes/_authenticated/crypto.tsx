@@ -145,6 +145,10 @@ function buildStudyReason(r: {
   taVwapRejUp: boolean;
   taVwapRejDown: boolean;
   flipCount: number;
+  studyLockConfidence?: number | null;
+  studyLockSource?: string | null;
+  studyLockSecondsToClose?: number | null;
+  studyLockedAt?: string | null;
 }, isStudying: boolean): string {
   const L: string[] = [];
   const pickLabel = dirLabel(r.side);
@@ -152,7 +156,11 @@ function buildStudyReason(r: {
   const mp = r.modelSidePreStudy ?? r.side;
   if (mp !== r.side) L.push(`Overrode Model Pick (${dirLabel(mp)}) — Study won the Fight Window.`);
   else L.push(`Agrees with Model Pick (${dirLabel(mp)}).`);
-  if (r.studyLockedSide) L.push(`Study locked side: ${dirLabel(r.studyLockedSide)}.`);
+  if (r.studyLockedSide) {
+    const lockedMin = r.studyLockSecondsToClose != null ? ((900 - r.studyLockSecondsToClose) / 60).toFixed(1) : null;
+    const conf = r.studyLockConfidence != null ? `${r.studyLockConfidence.toFixed(0)}%` : "≥75%";
+    L.push(`Study locked side: ${dirLabel(r.studyLockedSide)} · confidence ${conf}${lockedMin ? ` · at T+${lockedMin}m` : ""}.`);
+  }
 
   L.push(``);
   L.push(`— Signals at snapshot —`);
@@ -1289,6 +1297,12 @@ function ModelAccuracyPanel() {
                       const windowOpenMs = new Date(r.closeTime).getTime() - 15 * 60_000;
                       const msSinceOpen = Date.now() - windowOpenMs;
                       const isStudying = msSinceOpen >= 0 && msSinceOpen < 420_000;
+                      const studyLockLabel = r.studyLockConfidence != null
+                        ? `${r.studyLockConfidence.toFixed(0)}%`
+                        : r.studyLockedSide ? "LOCK" : null;
+                      const studyLockMinute = r.studyLockSecondsToClose != null
+                        ? Math.max(0, (900 - r.studyLockSecondsToClose) / 60)
+                        : null;
                       const reason = buildStudyReason(r, isStudying);
                       return (
                       <tr key={r.ticker} className="border-t border-border transition-all duration-150 ease-out hover:bg-primary/10 hover:shadow-[inset_2px_0_0_hsl(var(--primary))] hover:scale-[1.005] hover:relative hover:z-10">
@@ -1299,7 +1313,14 @@ function ModelAccuracyPanel() {
                             {isStudying ? (
                               <span className="text-muted-foreground text-[10px]" title="Strike Study in progress · Study Pick locks at T+420s (min 7)">⏳ STUDYING</span>
                             ) : (
-                              <span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"} title="Study Pick — locked after 420s study; leans to Study on Study/Model disagreement">{dirLabel(r.side)}</span>
+                              <span className="inline-flex flex-col leading-tight">
+                                <span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"} title="Study Pick — exact locked side from the 6–7 minute trendline study">{dirLabel(r.side)}</span>
+                                {studyLockLabel && (
+                                  <span className="text-[9px] text-muted-foreground">
+                                    {studyLockLabel}{studyLockMinute != null ? ` @ ${studyLockMinute.toFixed(1)}m` : ""}
+                                  </span>
+                                )}
+                              </span>
                             )}
                             <Popover>
                               <PopoverTrigger asChild>

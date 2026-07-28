@@ -87,6 +87,10 @@ export interface BtcMarket {
   modelSidePreStudy: "YES" | "NO";
   // Post-Study lock (final side chosen at T+420s). null before study lock.
   studyLockedSide: "YES" | "NO" | null;
+  studyLockConfidence: number | null;
+  studyLockSource: "trendline_chip" | "server_420" | "manual_correction" | null;
+  studyLockSecondsToClose: number | null;
+  studyLockedAt: string | null;
   edgeAbs: number;
   kellyFraction: number;     // quarter-Kelly bankroll fraction (display only)
   secondsToClose: number;
@@ -1063,7 +1067,14 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
     // conviction chip crosses ≥75% within the first 7 min. If present, the
     // chip's conviction was already ≥75% (≥ our 68% override floor), so on
     // Model/Study disagreement we always OVERRIDE to the chip side.
-    const chipStudySides = await (async (): Promise<Map<string, "YES" | "NO">> => {
+    type StudyLockRow = {
+      side: "YES" | "NO";
+      confidence: number | null;
+      source: "trendline_chip" | "server_420" | "manual_correction" | null;
+      secondsToClose: number | null;
+      lockedAt: string | null;
+    };
+    const chipStudyLocks = await (async (): Promise<Map<string, StudyLockRow>> => {
       try {
         const tickers: string[] = [];
         for (const e of events) for (const m of e.markets ?? []) if (m.ticker) tickers.push(m.ticker);
@@ -1071,13 +1082,22 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data } = await supabaseAdmin
           .from("btc_model_predictions")
-          .select("ticker, study_locked_side")
+          .select("ticker, study_locked_side, study_lock_confidence, study_lock_source, study_lock_seconds_to_close, study_locked_at")
           .in("ticker", tickers)
           .not("study_locked_side", "is", null);
-        const map = new Map<string, "YES" | "NO">();
+        const map = new Map<string, StudyLockRow>();
         for (const r of data ?? []) {
           const s = (r as any).study_locked_side;
-          if (s === "YES" || s === "NO") map.set((r as any).ticker, s);
+          if (s === "YES" || s === "NO") {
+            const src = (r as any).study_lock_source;
+            map.set((r as any).ticker, {
+              side: s,
+              confidence: (r as any).study_lock_confidence != null ? Number((r as any).study_lock_confidence) : null,
+              source: src === "trendline_chip" || src === "server_420" || src === "manual_correction" ? src : null,
+              secondsToClose: (r as any).study_lock_seconds_to_close != null ? Number((r as any).study_lock_seconds_to_close) : null,
+              lockedAt: (r as any).study_locked_at ?? null,
+            });
+          }
         }
         return map;
       } catch { return new Map(); }
@@ -1560,7 +1580,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         // If it disagrees with the current model side, flip side and bypass
         // BOTH the studying window and the hard_gate skip — the user explicitly
         // wanted chip conviction to override in disagreement cases.
-        const chipSideEarly = chipStudySides.get(m.ticker) ?? null;
+        const chipLock = chipStudyLocks.get(m.ticker) ?? null;
+        const chipSideEarly = chipLock?.side ?? null;
         let chipOverrideFired = false;
         if (chipSideEarly && chipSideEarly !== side) {
           const prevSide = side;
@@ -1709,7 +1730,7 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           // Prefer the chip-locked Study Pick (the same value the UI shows in
           // the "Study Pick" column). If present, chip conviction was ≥75%
           // when it wrote, so it already clears our 68% override floor.
-          const chipSide = chipStudySides.get(m.ticker) ?? null;
+          const chipSide = chipStudyLocks.get(m.ticker)?.side ?? null;
           const chipDir: "UP" | "DOWN" | "NEUTRAL" =
             chipSide === "YES" ? "UP" : chipSide === "NO" ? "DOWN" : "NEUTRAL";
           const effectiveStudyDir: "UP" | "DOWN" | "NEUTRAL" =
@@ -1849,6 +1870,10 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           // chip disagreement forced an override earlier. Never stomp a chip
           // write with a fresh model side.
           studyLockedSide: (chipSideEarly ?? (windowElapsedSec >= 420 ? side : null)) as "YES" | "NO" | null,
+          studyLockConfidence: chipLock?.confidence ?? null,
+          studyLockSource: chipLock?.source ?? (windowElapsedSec >= 420 ? "server_420" : null),
+          studyLockSecondsToClose: chipLock?.secondsToClose ?? (windowElapsedSec >= 420 ? secondsToClose : null),
+          studyLockedAt: chipLock?.lockedAt ?? (windowElapsedSec >= 420 ? new Date().toISOString() : null),
           kellyFraction: kelly,
           secondsToClose,
           sigmaDistance: sigDist,
@@ -1955,6 +1980,10 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
               jumpFeatures: jumpByTicker.get(m.ticker),
               modelSidePreStudy: m.modelSidePreStudy,
               studyLockedSide: m.studyLockedSide,
+              studyLockConfidence: m.studyLockConfidence,
+              studyLockSource: m.studyLockSource,
+              studyLockSecondsToClose: m.studyLockSecondsToClose,
+              studyLockedAt: m.studyLockedAt,
               regimeTag: m.regime,
               calibrationBucket: m.calibBucket,
               sideConf: m.sideConf,

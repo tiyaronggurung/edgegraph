@@ -1,6 +1,7 @@
 // Client → server: persist the trendline chip's ≥75% locked side to
 // btc_model_predictions.study_locked_side as the authoritative Study Pick
-// for that window. Overwrites any prior value (chip wins within 7 min).
+// for that window. Also records exact lock metadata for the log. Overwrites
+// any prior value (chip wins within 7 min).
 //
 // SIDE EFFECT: on a valid lock, also auto-fires a $10 paper buy for every
 // user who has a paper_balances row (balance ≥ $10, not bankrupt). The fill
@@ -61,7 +62,13 @@ export const recordChipStudyPick = createServerFn({ method: "POST" })
 
     const { error } = await supabaseAdmin
       .from("btc_model_predictions")
-      .update({ study_locked_side: yesNo })
+      .update({
+        study_locked_side: yesNo,
+        study_lock_confidence: data.confidencePct,
+        study_lock_source: "trendline_chip",
+        study_lock_seconds_to_close: data.secondsToClose,
+        study_locked_at: new Date().toISOString(),
+      } as never)
       .eq("ticker", data.ticker);
     if (error) return { ok: false, reason: "db_error" as const, error: error.message };
 
