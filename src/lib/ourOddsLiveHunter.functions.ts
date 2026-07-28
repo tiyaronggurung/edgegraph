@@ -136,8 +136,12 @@ export const fireOurOddsLiveBet = createServerFn({ method: "POST" })
     };
 
     // --- server-side re-check of all gates -------------------------------
-    if (data.ourProb < MIN_PROB) {
-      return reject(`our prob ${(data.ourProb * 100).toFixed(1)}% < ${(MIN_PROB * 100).toFixed(1)}%`);
+    if (data.ourProb < MIN_SIDE_PROB) {
+      return reject(`our prob ${(data.ourProb * 100).toFixed(1)}% < ${(MIN_SIDE_PROB * 100).toFixed(0)}%`);
+    }
+    const edgeCents = Math.round((data.ourProb - data.kalshiMidProb) * 100);
+    if (edgeCents < MIN_EDGE_CENTS) {
+      return reject(`edge ${edgeCents}¢ < ${MIN_EDGE_CENTS}¢ (ours ${(data.ourProb * 100).toFixed(1)}¢ vs K ${(data.kalshiMidProb * 100).toFixed(1)}¢)`);
     }
     if (data.kalshiAskCents > MAX_ASK_CENTS) {
       return reject(`kalshi ask ${data.kalshiAskCents}¢ > cap ${MAX_ASK_CENTS}¢`);
