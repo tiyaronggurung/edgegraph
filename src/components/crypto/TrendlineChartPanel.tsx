@@ -285,6 +285,34 @@ export function TrendlineChartPanel() {
     }
   }, [currentStrike, currentTicker, recLive, recoLock, inLockWindow, secondsToCloseForLock]);
 
+  // ---- ~10s side-tick recorder (feeds btc_side_ticks for backfill/analysis)
+  const lastTickAtRef = useRef<number>(0);
+  useEffect(() => {
+    if (!currentTicker || secondsToCloseForLock == null) return;
+    if (!recLive) return;
+    const now = Date.now();
+    if (now - lastTickAtRef.current < 9500) return;
+    lastTickAtRef.current = now;
+    import("@/lib/sideTick.functions").then(({ recordSideTick }) =>
+      recordSideTick({
+        data: {
+          ticker: currentTicker,
+          secondsToClose: Math.round(secondsToCloseForLock),
+          closeTime: secondsToCloseForLock != null ? new Date(Date.now() + secondsToCloseForLock * 1000).toISOString() : null,
+          spot: displaySpot ?? null,
+          strike: currentStrike ?? null,
+          midPrice: midPriceNow ?? null,
+          buyPrice: shadow?.upperAtNow ?? null,
+          sellPrice: shadow?.lowerAtNow ?? null,
+          recoSide: (recLive.side as "UP" | "DOWN" | "WAIT"),
+          recoConfPct: recLive.confidencePct ?? null,
+          memScore: (ourQuote as any)?.memScore ?? null,
+          aboveStrikeRatio90s: (ourQuote as any)?.aboveStrikeRatio90s ?? null,
+        },
+      }).catch(() => {})
+    );
+  }, [currentTicker, secondsToCloseForLock, recLive, displaySpot, currentStrike, midPriceNow, shadow?.upperAtNow, shadow?.lowerAtNow, ourQuote]);
+
   return (
     <div className="border border-white/10 rounded-lg bg-black/40 p-3">
       <div
