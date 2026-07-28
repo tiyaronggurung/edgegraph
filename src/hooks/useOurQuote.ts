@@ -43,7 +43,14 @@ interface WindowState {
   lastSpotSide: 1 | -1 | 0;    // sign(spot - strike) at last tick
   bias: number;                // persistent trendline bias (prob units)
   lastTs: number;
+  // --- side-memory lock (per-window candle-read memory) ---
+  memory: number;              // signed [-1..1], accumulates candle direction
+  lockedSide: 1 | -1 | 0;      // 0 = no lock, ±1 = hard-locked side
+  oppositeStreakSec: number;   // seconds physics has voted opposite the lock
+  // --- rolling spot-side series for anti-fakeout ---
+  sideHist: Array<{ t: number; above: boolean }>;
 }
+
 
 export function useOurQuote(params: {
   spot: number | null | undefined;
