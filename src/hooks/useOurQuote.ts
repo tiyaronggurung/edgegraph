@@ -173,6 +173,19 @@ export function useOurQuote(params: {
     const hs = q.halfSpread;
     const pUpAsk = Math.min(0.995, Math.max(0.005, ratchetedMid + hs));
     const pDownAsk = Math.min(0.995, Math.max(0.005, (1 - ratchetedMid) + hs));
+    // Rebuild recommendation from the SAME ratchetedMid the UI odds display,
+    // so BET UP/DOWN chip and UP/DN American odds can never disagree.
+    const recommendation = buildRecommendation({
+      mid: ratchetedMid,
+      pillTilt: pTiltNow,
+      momTilt: tilt,
+      secondsToClose,
+      spot,
+      strike,
+      midPrice: midPrice ?? null,
+      buyPrice: buyPrice ?? null,
+      sellPrice: sellPrice ?? null,
+    });
     const out: OurQuote = {
       ...q,
       mid: ratchetedMid,
@@ -180,6 +193,7 @@ export function useOurQuote(params: {
       pDownAsk,
       upCents: pUpAsk * 100,
       downCents: pDownAsk * 100,
+      recommendation,
     };
 
     lastGoodRef.current = out;
