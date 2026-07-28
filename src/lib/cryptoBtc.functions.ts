@@ -1554,13 +1554,38 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         let strikeVerdict: "SOLID" | "WEAK" | "CHOPPY" | null = null;
         let strikeVerdictReason = "";
 
-        if (studying) {
+        // ── CHIP OVERRIDE (highest priority) ─────────────────────────────
+        // The trendline chip's ≥75% lock (persisted as study_locked_side by
+        // recordChipStudyPick) is the authoritative Study Pick shown to users.
+        // If it disagrees with the current model side, flip side and bypass
+        // BOTH the studying window and the hard_gate skip — the user explicitly
+        // wanted chip conviction to override in disagreement cases.
+        const chipSideEarly = chipStudySides.get(m.ticker) ?? null;
+        let chipOverrideFired = false;
+        if (chipSideEarly && chipSideEarly !== side) {
+          const prevSide = side;
+          side = chipSideEarly;
+          edgePts = -edgePts;
+          chipOverrideFired = true;
+          strikeVerdict = "WEAK";
+          strikeVerdictReason = `chip_override — Study chip locked ${chipSideEarly} (≥75%), flipped ${prevSide}→${chipSideEarly} (model p=${(p*100).toFixed(1)}%)`;
+          entryGate = {
+            ...entryGate,
+            action: "PASS",
+            reason: `chip_override — flipped ${prevSide}→${chipSideEarly}; awaiting side_conf ≥0.90 on ${chipSideEarly}`,
+            allReasons: [...entryGate.allReasons, `chip_override (chip=${chipSideEarly} vs model=${prevSide})`],
+          };
+        }
+
+        if (studying && !chipOverrideFired) {
           entryGate = {
             ...entryGate,
             action: "PASS",
             reason: `strike_study — observing (${studyingSecondsLeft}s left) · ${study.findings.slice(0, 2).join(" · ")}`,
             allReasons: [...entryGate.allReasons, `strike_study (${studyingSecondsLeft}s left)`],
           };
+        } else if (chipOverrideFired) {
+          // Chip already set verdict + gate; skip hard_gate & scoring entirely.
         } else {
           // ── HARD GATES (stability-weighted lock, runs BEFORE any verdict) ──
           // Fixes the "snapshot at T+420s" flaw: a single moment on one side of
