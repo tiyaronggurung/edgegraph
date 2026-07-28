@@ -1681,31 +1681,48 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           const studyModelDisagree =
             studyDir !== "NEUTRAL" && modelDir !== "NEUTRAL" && studyDir !== modelSideDir;
 
+          // Prefer the chip-locked Study Pick (the same value the UI shows in
+          // the "Study Pick" column). If present, chip conviction was ≥75%
+          // when it wrote, so it already clears our 68% override floor.
+          const chipSide = chipStudySides.get(m.ticker) ?? null;
+          const chipDir: "UP" | "DOWN" | "NEUTRAL" =
+            chipSide === "YES" ? "UP" : chipSide === "NO" ? "DOWN" : "NEUTRAL";
+          const effectiveStudyDir: "UP" | "DOWN" | "NEUTRAL" =
+            chipDir !== "NEUTRAL" ? chipDir : studyDir;
+          const usingChip = chipDir !== "NEUTRAL";
+          const effectiveStudyModelDisagree =
+            effectiveStudyDir !== "NEUTRAL" &&
+            modelDir !== "NEUTRAL" &&
+            effectiveStudyDir !== modelSideDir;
+
           // Override rule (user-set): on disagreement, Study OVERRIDES model
           // only when its conviction is ≥ 68% (mid of user's 65–70% range).
+          // Chip-locked side auto-qualifies (chip fires at ≥75%).
           // Below 68% → SKIP as CHOPPY. Regular on-chart 🔒 lock stays 75%.
-          if (studyModelDisagree) {
+          if (effectiveStudyModelDisagree) {
             const STUDY_OVERRIDE_MIN = 0.68;
-            if (pStudy >= STUDY_OVERRIDE_MIN) {
-              const leanedSide: "YES" | "NO" = studyDir === "UP" ? "YES" : "NO";
+            const effPStudy = usingChip ? 0.75 : pStudy;
+            const src = usingChip ? "chip" : "internal";
+            if (effPStudy >= STUDY_OVERRIDE_MIN) {
+              const leanedSide: "YES" | "NO" = effectiveStudyDir === "UP" ? "YES" : "NO";
               const prevSide = side;
               side = leanedSide;
               edgePts = -edgePts;
               strikeVerdict = "WEAK";
-              strikeVerdictReason = `study_override — P_study ${(pStudy*100).toFixed(0)}% ≥ 68% for ${studyDir}; flipped ${prevSide}→${leanedSide} (model p=${(pModelForModelDir*100).toFixed(0)}%). ${inFightWindow ? "LIVE" : "locked"} at ${windowElapsedSec}s`;
+              strikeVerdictReason = `study_override[${src}] — P_study ${(effPStudy*100).toFixed(0)}% ≥ 68% for ${effectiveStudyDir}; flipped ${prevSide}→${leanedSide} (model p=${(pModelForModelDir*100).toFixed(0)}%). ${inFightWindow ? "LIVE" : "locked"} at ${windowElapsedSec}s`;
               entryGate = {
                 ...entryGate,
                 action: "PASS",
-                reason: `study_override — flipped ${prevSide}→${leanedSide}; awaiting side_conf ≥0.90 on ${leanedSide}`,
-                allReasons: [...entryGate.allReasons, `study_override (P_s ${(pStudy*100).toFixed(0)}% vs P_m ${(pModelForStudyDir*100).toFixed(0)}%)`],
+                reason: `study_override[${src}] — flipped ${prevSide}→${leanedSide}; awaiting side_conf ≥0.90 on ${leanedSide}`,
+                allReasons: [...entryGate.allReasons, `study_override[${src}] (P_s ${(effPStudy*100).toFixed(0)}% vs P_m ${(pModelForStudyDir*100).toFixed(0)}%)`],
               };
             } else {
               strikeVerdict = "CHOPPY";
-              strikeVerdictReason = `disagreement_skip — Study says ${studyDir} @ P_study ${(pStudy*100).toFixed(0)}% (< 68% override threshold), Model says ${modelSideDir} @ ${(pModelForModelDir*100).toFixed(0)}% → no confident side`;
+              strikeVerdictReason = `disagreement_skip — Study says ${effectiveStudyDir} @ P_study ${(effPStudy*100).toFixed(0)}% (< 68% override threshold), Model says ${modelSideDir} @ ${(pModelForModelDir*100).toFixed(0)}% → no confident side`;
             }
           }
 
-          if (!studyModelDisagree) {
+          if (!effectiveStudyModelDisagree) {
             if (choppyRegime && !strikeBreakForUs) {
               strikeVerdict = "CHOPPY";
               strikeVerdictReason = heavyChop
