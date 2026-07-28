@@ -523,11 +523,11 @@ export function TrendlineChartPanel() {
               timeDecayFrac={ourQuote?.timeDecayFrac ?? 0}
               midPivotTiltPct={ourQuote?.midPivotTiltPct ?? 0}
               kalshiFlow={{
-                yesVol60s: kalshi?.yesVol60s ?? null,
-                noVol60s: kalshi?.noVol60s ?? null,
+                yesVol60s: kalshiFlow?.yesVol60s ?? null,
+                noVol60s: kalshiFlow?.noVol60s ?? null,
                 tradeCount60s: kalshi?.tradeCount60s ?? null,
-                volume: kalshi?.volume ?? null,
-                openInterest: kalshi?.openInterest ?? null,
+                volume: kalshiFlow?.volume ?? null,
+                openInterest: kalshiFlow?.openInterest ?? null,
               }}
             />
 
@@ -935,11 +935,11 @@ function TaChart({
       </div>
       {(() => {
         // Kalshi per-side flow strip — sits at the top of the trendline chart section.
-        const y = kalshi?.yesVol60s ?? null;
-        const n = kalshi?.noVol60s ?? null;
-        const oi = kalshi?.openInterest ?? null;
-        const vol = kalshi?.volume ?? null;
-        const trades = kalshi?.tradeCount60s ?? 0;
+        const y = kalshiFlow?.yesVol60s ?? null;
+        const n = kalshiFlow?.noVol60s ?? null;
+        const oi = kalshiFlow?.openInterest ?? null;
+        const vol = kalshiFlow?.volume ?? null;
+        const trades = kalshiFlow?.tradeCount60s ?? 0;
         const hasData = y != null && n != null;
         const total = hasData ? (y as number) + (n as number) : 0;
         const yesPct = total > 0 ? ((y as number) / total) * 100 : 0;
