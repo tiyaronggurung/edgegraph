@@ -921,6 +921,86 @@ function TaChart({
           title="Reset zoom & scroll to now"
         >reset</button>
       </div>
+      {(() => {
+        // Kalshi per-side flow strip — sits at the top of the trendline chart section.
+        const y = kalshi?.yesVol60s ?? null;
+        const n = kalshi?.noVol60s ?? null;
+        const oi = kalshi?.openInterest ?? null;
+        const vol = kalshi?.volume ?? null;
+        const trades = kalshi?.tradeCount60s ?? 0;
+        const hasData = y != null && n != null;
+        const total = hasData ? (y as number) + (n as number) : 0;
+        const yesPct = total > 0 ? ((y as number) / total) * 100 : 0;
+        const noPct = 100 - yesPct;
+        const dominant: "YES" | "NO" | null =
+          total >= 5 && yesPct >= 65 ? "YES"
+          : total >= 5 && noPct >= 65 ? "NO"
+          : null;
+        const barCls =
+          dominant === "YES" ? "border-emerald-500/40 bg-emerald-500/10"
+          : dominant === "NO" ? "border-rose-500/40 bg-rose-500/10"
+          : "border-white/10 bg-black/40";
+        const title =
+          `Kalshi taker flow (last 60s):\n` +
+          `  YES buys: ${y ?? "—"} contracts (${hasData ? yesPct.toFixed(0) : "—"}%)\n` +
+          `  NO  buys: ${n ?? "—"} contracts (${hasData ? noPct.toFixed(0) : "—"}%)\n` +
+          `  Trades:   ${trades}\n` +
+          (vol != null ? `  Total window volume: ${vol.toLocaleString()}\n` : "") +
+          (oi != null ? `  Open interest: ${oi.toLocaleString()}\n` : "") +
+          (dominant
+            ? `\n⚠ ${dominant} side dominant — real money pushing that way.`
+            : `\nBalanced flow — no side pressure.`);
+        return (
+          <div
+            className={`flex items-center gap-3 px-2 py-1 mt-1 border rounded text-[10px] font-mono ${barCls}`}
+            title={title}
+          >
+            <span className="text-white/50">FLOW 60s</span>
+            {hasData ? (
+              <>
+                <span className="flex items-center gap-1">
+                  <span className="text-emerald-300/90">YES</span>
+                  <span className="tabular-nums text-emerald-200 font-bold">{y}</span>
+                </span>
+                <span className="text-white/20">·</span>
+                <span className="flex items-center gap-1">
+                  <span className="text-rose-300/90">NO</span>
+                  <span className="tabular-nums text-rose-200 font-bold">{n}</span>
+                </span>
+                {/* proportional bar */}
+                <span className="flex-1 h-1.5 min-w-[80px] max-w-[240px] rounded overflow-hidden bg-white/10 flex">
+                  <span
+                    className="h-full bg-emerald-400/80"
+                    style={{ width: `${yesPct}%` }}
+                  />
+                  <span
+                    className="h-full bg-rose-400/80"
+                    style={{ width: `${noPct}%` }}
+                  />
+                </span>
+                {dominant && (
+                  <span
+                    className={`font-bold ${
+                      dominant === "YES" ? "text-emerald-200" : "text-rose-200"
+                    }`}
+                  >
+                    {dominant === "YES" ? "↑" : "↓"} {Math.max(yesPct, noPct).toFixed(0)}%
+                  </span>
+                )}
+                <span className="text-white/40">trades {trades}</span>
+              </>
+            ) : (
+              <span className="text-white/40">no data</span>
+            )}
+            {vol != null && (
+              <span className="text-white/40 ml-auto">
+                vol {vol.toLocaleString()}
+                {oi != null ? ` · OI ${oi.toLocaleString()}` : ""}
+              </span>
+            )}
+          </div>
+        );
+      })()}
       <div
         ref={scrollRef}
         className="overflow-x-auto overflow-y-hidden border border-white/5 rounded bg-black/30 select-none"
