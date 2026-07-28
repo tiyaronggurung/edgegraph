@@ -48,6 +48,10 @@ export interface SnapshotInput {
   // Post-Study lock (final side chosen by the Fight Window at T+420s).
   // Written on every snapshot >= T+420s so the latest override sticks.
   studyLockedSide?: "YES" | "NO" | null;
+  studyLockConfidence?: number | null;
+  studyLockSource?: "trendline_chip" | "server_420" | "manual_correction" | null;
+  studyLockSecondsToClose?: number | null;
+  studyLockedAt?: string | null;
   // Phase 2 — shadow EV study enrichment.
   regimeTag?: string | null;
   calibrationBucket?: string | null;
@@ -96,7 +100,7 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
   try {
     const { data: existing } = await supabaseAdmin
       .from("btc_model_predictions")
-      .select("id, snapshot_seconds_to_close, outcome, side, live_side, flip_count")
+      .select("id, snapshot_seconds_to_close, outcome, side, live_side, flip_count, study_locked_side")
       .eq("ticker", input.ticker)
       .maybeSingle();
 
@@ -145,7 +149,11 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         jump_features: (input.jumpFeatures ?? null) as never,
         model_side_pre_study: input.modelSidePreStudy ?? input.side,
         study_locked_side: input.studyLockedSide ?? null,
-      });
+        study_lock_confidence: input.studyLockConfidence ?? null,
+        study_lock_source: input.studyLockSource ?? null,
+        study_lock_seconds_to_close: input.studyLockSecondsToClose ?? null,
+        study_locked_at: input.studyLockedAt ?? null,
+      } as never);
 
       return;
     }
@@ -158,6 +166,7 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
       const prevLive = (existing.live_side as string | null) ?? (existing.side as string);
       const nextLive = input.liveSide ?? prevLive;
       const flipped = nextLive !== prevLive;
+      const shouldWriteStudyLock = Boolean(input.studyLockedSide) && !existing.study_locked_side;
       await supabaseAdmin.from("btc_model_predictions").update({
         model_prob: input.modelProb,
         market_yes_price: input.marketYesPrice,
@@ -185,7 +194,13 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
         physics_prob: input.physicsProb ?? null,
         independent_prob: input.independentProb ?? null,
         jump_features: (input.jumpFeatures ?? null) as never,
-        ...(input.studyLockedSide ? { study_locked_side: input.studyLockedSide } : {}),
+        ...(shouldWriteStudyLock ? {
+          study_locked_side: input.studyLockedSide,
+          study_lock_confidence: input.studyLockConfidence ?? null,
+          study_lock_source: input.studyLockSource ?? null,
+          study_lock_seconds_to_close: input.studyLockSecondsToClose ?? null,
+          study_locked_at: input.studyLockedAt ?? new Date().toISOString(),
+        } : {}),
 
 
 
@@ -193,7 +208,7 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
           flip_count: Number(existing.flip_count ?? 0) + 1,
           flipped_at: new Date().toISOString(),
         } : {}),
-      }).eq("id", existing.id);
+      } as never).eq("id", existing.id);
     }
   } catch (e) {
     console.warn("snapshotPrediction failed:", e);
@@ -227,7 +242,7 @@ export async function settleDuePredictions(): Promise<{ settled: number }> {
   try {
     const { data: due } = await supabaseAdmin
       .from("btc_model_predictions")
-      .select("id, ticker, strike, side, close_time")
+      .select("id, ticker, strike, side, study_locked_side, close_time")
       .is("outcome", null)
       .lt("close_time", new Date(Date.now() - 30_000).toISOString())
       .order("close_time", { ascending: true })
@@ -251,7 +266,8 @@ export async function settleDuePredictions(): Promise<{ settled: number }> {
     let settled = 0;
     await Promise.all(results.map(async ({ r, settle, outcome }) => {
       if (!outcome) return;
-      const wasCorrect = outcome === r.side;
+      const finalPick = ((r as { study_locked_side?: string | null }).study_locked_side as "YES" | "NO" | null) ?? (r.side as "YES" | "NO");
+      const wasCorrect = outcome === finalPick;
       await supabaseAdmin
         .from("btc_model_predictions")
         .update({
@@ -319,6 +335,10 @@ export interface PredictionStatsResult {
     taEngineVersion: string | null;
     modelSidePreStudy: "YES" | "NO" | null;
     studyLockedSide: "YES" | "NO" | null;
+    studyLockConfidence: number | null;
+    studyLockSource: string | null;
+    studyLockSecondsToClose: number | null;
+    studyLockedAt: string | null;
   }>;
 }
 
@@ -335,18 +355,22 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
 
   const { data: rows } = await supabaseAdmin
     .from("btc_model_predictions")
-    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, settled_at, live_side, flip_count, chart_verdict, chart_strength, ta_score, ta_reasons, ta_vwap_dist_pct, ta_trend_alignment_score, ta_rsi_1m, ta_rsi_5m, ta_macd_5m_hist, ta_bb_5m_pctb, ta_vwap_rej_up, ta_vwap_rej_down, ta_engine_version, model_side_pre_study, study_locked_side")
+    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, settled_at, live_side, flip_count, chart_verdict, chart_strength, ta_score, ta_reasons, ta_vwap_dist_pct, ta_trend_alignment_score, ta_rsi_1m, ta_rsi_5m, ta_macd_5m_hist, ta_bb_5m_pctb, ta_vwap_rej_up, ta_vwap_rej_down, ta_engine_version, model_side_pre_study, study_locked_side, study_lock_confidence, study_lock_source, study_lock_seconds_to_close, study_locked_at")
     .gte("close_time", cutoff)
     .order("close_time", { ascending: false })
     .limit(500);
 
-  const all = rows ?? [];
-  const settledAll = all.filter(r => r.outcome);
-  const correctAll = settledAll.filter(r => r.was_correct).length;
+    const all = rows ?? [];
+    const pickSide = (r: (typeof all)[number]): "YES" | "NO" =>
+      (((r as { study_locked_side?: string | null }).study_locked_side as "YES" | "NO" | null) ?? (r.side as "YES" | "NO"));
+    const rowCorrect = (r: (typeof all)[number]): boolean | null =>
+      r.outcome ? ((r.outcome as "YES" | "NO") === pickSide(r)) : null;
+    const settledAll = all.filter(r => r.outcome);
+    const correctAll = settledAll.filter(r => rowCorrect(r) === true).length;
   const in24 = settledAll.filter(r => (r.close_time as string) >= since24h);
-  const correct24 = in24.filter(r => r.was_correct).length;
+    const correct24 = in24.filter(r => rowCorrect(r) === true).length;
   const in12 = settledAll.filter(r => (r.close_time as string) >= since12h);
-  const correct12 = in12.filter(r => r.was_correct).length;
+    const correct12 = in12.filter(r => rowCorrect(r) === true).length;
 
   return {
     total: all.length,
@@ -372,13 +396,13 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
     },
     recent: all.map(r => ({
       ticker: r.ticker as string,
-      side: r.side as "YES" | "NO",
+      side: pickSide(r),
       strike: Number(r.strike),
       modelProb: Number(r.model_prob),
       marketYesPrice: Number(r.market_yes_price),
       edgePts: Number(r.edge_pts),
       outcome: (r.outcome as "YES" | "NO" | null) ?? null,
-      wasCorrect: (r.was_correct as boolean | null) ?? null,
+      wasCorrect: rowCorrect(r),
       settlePrice: r.settle_price != null ? Number(r.settle_price) : null,
       closeTime: r.close_time as string,
       settledAt: (r.settled_at as string | null) ?? null,
@@ -399,6 +423,10 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
       taEngineVersion: (r.ta_engine_version as string | null) ?? null,
       modelSidePreStudy: ((r as { model_side_pre_study?: string | null }).model_side_pre_study as "YES" | "NO" | null) ?? (r.side as "YES" | "NO" | null) ?? null,
       studyLockedSide: ((r as { study_locked_side?: string | null }).study_locked_side as "YES" | "NO" | null) ?? null,
+      studyLockConfidence: (r as { study_lock_confidence?: number | string | null }).study_lock_confidence != null ? Number((r as { study_lock_confidence?: number | string | null }).study_lock_confidence) : null,
+      studyLockSource: ((r as { study_lock_source?: string | null }).study_lock_source) ?? null,
+      studyLockSecondsToClose: (r as { study_lock_seconds_to_close?: number | null }).study_lock_seconds_to_close ?? null,
+      studyLockedAt: ((r as { study_locked_at?: string | null }).study_locked_at) ?? null,
     })),
   };
 }
