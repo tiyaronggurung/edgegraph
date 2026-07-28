@@ -42,6 +42,7 @@ import { Route as ApiPublicHooksBackfillOutcomesRouteImport } from './routes/api
 import { Route as ApiPublicHooksBackfillTripleWindowRouteImport } from './routes/api/public/hooks/backfill-triple-window'
 import { Route as ApiPublicHooksBigFlipTickRouteImport } from './routes/api/public/hooks/big-flip-tick'
 import { Route as ApiPublicHooksBtcCalibrateRouteImport } from './routes/api/public/hooks/btc-calibrate'
+import { Route as ApiPublicHooksBtcSnapshotTickRouteImport } from './routes/api/public/hooks/btc-snapshot-tick'
 import { Route as ApiPublicHooksCandlesIngestRouteImport } from './routes/api/public/hooks/candles-ingest'
 import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
 import { Route as ApiPublicHooksCryptoStudyRouteImport } from './routes/api/public/hooks/crypto-study'
@@ -232,6 +233,12 @@ const ApiPublicHooksBtcCalibrateRoute =
     path: '/api/public/hooks/btc-calibrate',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksBtcSnapshotTickRoute =
+  ApiPublicHooksBtcSnapshotTickRouteImport.update({
+    id: '/api/public/hooks/btc-snapshot-tick',
+    path: '/api/public/hooks/btc-snapshot-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksCandlesIngestRoute =
   ApiPublicHooksCandlesIngestRouteImport.update({
     id: '/api/public/hooks/candles-ingest',
@@ -350,6 +357,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/backfill-triple-window': typeof ApiPublicHooksBackfillTripleWindowRoute
   '/api/public/hooks/big-flip-tick': typeof ApiPublicHooksBigFlipTickRoute
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
+  '/api/public/hooks/btc-snapshot-tick': typeof ApiPublicHooksBtcSnapshotTickRoute
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
@@ -398,6 +406,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/backfill-triple-window': typeof ApiPublicHooksBackfillTripleWindowRoute
   '/api/public/hooks/big-flip-tick': typeof ApiPublicHooksBigFlipTickRoute
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
+  '/api/public/hooks/btc-snapshot-tick': typeof ApiPublicHooksBtcSnapshotTickRoute
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
@@ -448,6 +457,7 @@ export interface FileRoutesById {
   '/api/public/hooks/backfill-triple-window': typeof ApiPublicHooksBackfillTripleWindowRoute
   '/api/public/hooks/big-flip-tick': typeof ApiPublicHooksBigFlipTickRoute
   '/api/public/hooks/btc-calibrate': typeof ApiPublicHooksBtcCalibrateRoute
+  '/api/public/hooks/btc-snapshot-tick': typeof ApiPublicHooksBtcSnapshotTickRoute
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
@@ -498,6 +508,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backfill-triple-window'
     | '/api/public/hooks/big-flip-tick'
     | '/api/public/hooks/btc-calibrate'
+    | '/api/public/hooks/btc-snapshot-tick'
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
@@ -546,6 +557,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backfill-triple-window'
     | '/api/public/hooks/big-flip-tick'
     | '/api/public/hooks/btc-calibrate'
+    | '/api/public/hooks/btc-snapshot-tick'
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
@@ -595,6 +607,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backfill-triple-window'
     | '/api/public/hooks/big-flip-tick'
     | '/api/public/hooks/btc-calibrate'
+    | '/api/public/hooks/btc-snapshot-tick'
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
@@ -629,6 +642,7 @@ export interface RootRouteChildren {
   ApiPublicHooksBackfillTripleWindowRoute: typeof ApiPublicHooksBackfillTripleWindowRoute
   ApiPublicHooksBigFlipTickRoute: typeof ApiPublicHooksBigFlipTickRoute
   ApiPublicHooksBtcCalibrateRoute: typeof ApiPublicHooksBtcCalibrateRoute
+  ApiPublicHooksBtcSnapshotTickRoute: typeof ApiPublicHooksBtcSnapshotTickRoute
   ApiPublicHooksCandlesIngestRoute: typeof ApiPublicHooksCandlesIngestRoute
   ApiPublicHooksCaptureClosingOddsRoute: typeof ApiPublicHooksCaptureClosingOddsRoute
   ApiPublicHooksCryptoStudyRoute: typeof ApiPublicHooksCryptoStudyRoute
@@ -878,6 +892,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksBtcCalibrateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/btc-snapshot-tick': {
+      id: '/api/public/hooks/btc-snapshot-tick'
+      path: '/api/public/hooks/btc-snapshot-tick'
+      fullPath: '/api/public/hooks/btc-snapshot-tick'
+      preLoaderRoute: typeof ApiPublicHooksBtcSnapshotTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/candles-ingest': {
       id: '/api/public/hooks/candles-ingest'
       path: '/api/public/hooks/candles-ingest'
@@ -1040,6 +1061,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHooksBackfillTripleWindowRoute,
   ApiPublicHooksBigFlipTickRoute: ApiPublicHooksBigFlipTickRoute,
   ApiPublicHooksBtcCalibrateRoute: ApiPublicHooksBtcCalibrateRoute,
+  ApiPublicHooksBtcSnapshotTickRoute: ApiPublicHooksBtcSnapshotTickRoute,
   ApiPublicHooksCandlesIngestRoute: ApiPublicHooksCandlesIngestRoute,
   ApiPublicHooksCaptureClosingOddsRoute: ApiPublicHooksCaptureClosingOddsRoute,
   ApiPublicHooksCryptoStudyRoute: ApiPublicHooksCryptoStudyRoute,
