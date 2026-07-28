@@ -287,12 +287,15 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
   // Odds = Φ( ln(anchor / strike) / (σ·√T) )
   const hasMid = midPrice != null && Number.isFinite(midPrice) && midPrice > 0;
   const t = Math.max(0, inp.secondsToClose);
+  // Trendline MID carries more weight, earlier. Pill-based fair value is our
+  // edge over Kalshi's spot-only BRTI anchor.
   let wMid = 0;
   if (hasMid) {
-    if (t >= 600)      wMid = 0.15;
-    else if (t >= 300) wMid = 0.15 + 0.35 * ((600 - t) / 300);
-    else if (t >= 60)  wMid = 0.50 + 0.30 * ((300 - t) / 240);
-    else               wMid = 0.80 + 0.15 * ((60 - t) / 60);
+    if (t >= 720)      wMid = 0.30;                                       // first 3m: some MID influence
+    else if (t >= 420) wMid = 0.30 + 0.25 * ((720 - t) / 300);            // → 0.55
+    else if (t >= 180) wMid = 0.55 + 0.25 * ((420 - t) / 240);            // → 0.80
+    else if (t >= 60)  wMid = 0.80 + 0.13 * ((180 - t) / 120);            // → 0.93
+    else               wMid = 0.93 + 0.05 * ((60 - t) / 60);              // → 0.98
   }
   const anchorPrice = hasMid
     ? wMid * (midPrice as number) + (1 - wMid) * spot
@@ -316,7 +319,16 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
     sellPrice: inp.sellPrice ?? null,
     secondsToClose: inp.secondsToClose,
   });
-  let mid = Math.min(0.99, Math.max(0.01, anchorMid + momTilt + pillTilt));
+  // Pill-breakout tilt: spot penetrating BUY (resistance) or SELL (support)
+  // is a directional trigger that Kalshi's spot-only model can't see.
+  const brkTilt = pillBreakoutTilt({
+    spot,
+    buyPrice: inp.buyPrice ?? null,
+    sellPrice: inp.sellPrice ?? null,
+    midPrice: midPrice ?? null,
+    secondsToClose: inp.secondsToClose,
+  });
+  let mid = Math.min(0.99, Math.max(0.01, anchorMid + momTilt + pillTilt + brkTilt));
 
   const hs = halfSpread(inp.secondsToClose);
   let pUpAsk = Math.min(0.995, Math.max(0.005, mid + hs));
@@ -431,6 +443,52 @@ export function pillGateTilt(args: {
   // Only amplify when both signals agree in sign.
   const combined = (Math.sign(midTilt) === Math.sign(pillAmp)) ? midTilt + pillAmp : midTilt;
   return Math.max(-0.10, Math.min(0.10, combined));
+}
+
+/**
+ * Pill-breakout tilt (signed fraction, capped ±6¢).
+ *
+ * Spot penetrating the BUY (upper trendline) pill or SELL (lower trendline)
+ * pill is a directional trigger — Kalshi's spot-only BRTI model can't see
+ * this because it has no trendline pills. Sizing:
+ *
+ *   spot ≥ BUY + $3   → UP breakout   → +3..+6¢ (grows with time-left decay)
+ *   spot ≤ SELL - $3  → DOWN breakout → -3..-6¢
+ *   spot inside pills → 0
+ *
+ * Tilt strengthens as T shrinks (breakouts near close rarely reverse).
+ * Deactivated in the first 2 minutes (warmup — pills are still forming).
+ */
+export function pillBreakoutTilt(args: {
+  spot: number | null | undefined;
+  buyPrice: number | null | undefined;
+  sellPrice: number | null | undefined;
+  midPrice: number | null | undefined;
+  secondsToClose: number;
+}): number {
+  const { spot, buyPrice, sellPrice, secondsToClose } = args;
+  if (!(spot != null && spot > 0)) return 0;
+  const T = Math.max(0, secondsToClose);
+  if (T > 780) return 0; // first ~2min: warmup
+
+  // Time-weight: 0.5 far from close, 1.0 at close.
+  const wT = T >= 600 ? 0.5
+           : T >= 300 ? 0.5 + 0.3 * ((600 - T) / 300)   // → 0.80
+           : T >= 60  ? 0.80 + 0.15 * ((300 - T) / 240) // → 0.95
+           : 0.95 + 0.05 * ((60 - T) / 60);             // → 1.00
+
+  const MIN_BREAK = 3; // $
+  if (buyPrice != null && buyPrice > 0 && spot >= buyPrice + MIN_BREAK) {
+    const excess = Math.min(20, spot - buyPrice); // $3..$20 → 3..6¢
+    const cents = 3 + 3 * ((excess - MIN_BREAK) / (20 - MIN_BREAK));
+    return Math.min(0.06, (cents / 100) * wT);
+  }
+  if (sellPrice != null && sellPrice > 0 && spot <= sellPrice - MIN_BREAK) {
+    const excess = Math.min(20, sellPrice - spot);
+    const cents = 3 + 3 * ((excess - MIN_BREAK) / (20 - MIN_BREAK));
+    return -Math.min(0.06, (cents / 100) * wT);
+  }
+  return 0;
 }
 
 /**
