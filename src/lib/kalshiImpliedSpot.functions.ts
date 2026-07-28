@@ -64,7 +64,10 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
   async (): Promise<KalshiImpliedSpot> => {
     const empty: KalshiImpliedSpot = {
       ok: false, ticker: null, strike: null, yesBid: null, yesAsk: null,
-      yesMid: null, secondsToClose: null, impliedSpot: null, error: null,
+      yesMid: null, secondsToClose: null, impliedSpot: null,
+      volume: null, openInterest: null, lastPriceCents: null,
+      yesVol60s: null, noVol60s: null, tradeCount60s: null,
+      error: null,
     };
     try {
       const res = await fetch(
@@ -81,12 +84,18 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
             yes_bid_dollars?: string;
             yes_ask_dollars?: string;
             status?: string;
+            volume?: number;
+            open_interest?: number;
+            last_price?: number;
           }>;
         }>;
       };
 
       const now = Date.now();
-      let best: { ticker: string; strike: number; bid: number; ask: number; stc: number } | null = null;
+      let best: {
+        ticker: string; strike: number; bid: number; ask: number; stc: number;
+        volume: number | null; openInterest: number | null; lastPrice: number | null;
+      } | null = null;
       for (const ev of json.events ?? []) {
         for (const m of ev.markets ?? []) {
           if (m.status && m.status !== "active") continue;
@@ -97,21 +106,55 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
           const ask = m.yes_ask_dollars != null ? Number(m.yes_ask_dollars) : NaN;
           const strike = m.floor_strike != null ? Number(m.floor_strike) : NaN;
           if (!Number.isFinite(bid) || !Number.isFinite(ask) || !Number.isFinite(strike)) continue;
-          // Pick the soonest-closing market with a tradable quote.
           if (!best || stc < best.stc) {
-            best = { ticker: m.ticker, strike, bid, ask, stc };
+            best = {
+              ticker: m.ticker, strike, bid, ask, stc,
+              volume: m.volume != null ? Number(m.volume) : null,
+              openInterest: m.open_interest != null ? Number(m.open_interest) : null,
+              lastPrice: m.last_price != null ? Number(m.last_price) : null,
+            };
           }
         }
       }
       if (!best) return { ...empty, error: "no open market" };
 
       const yesMid = (best.bid + best.ask) / 2;
-      // Clamp so normInv stays well-defined even at the tape edges.
       const clamped = Math.min(0.995, Math.max(0.005, yesMid));
       const T = Math.max(30, best.stc) / YEAR_SEC;
       const sigmaT = SIGMA_ANNUAL * Math.sqrt(T);
       const z = normInv(clamped);
       const implied = sigmaT > 0 ? best.strike / Math.exp(z * sigmaT) : best.strike;
+
+      // Parallel: fetch last ~60s of trades for per-side flow. Public endpoint,
+      // no auth. Cheap best-effort — nulls if it fails so recorder still runs.
+      let yesVol60s: number | null = null;
+      let noVol60s: number | null = null;
+      let tradeCount60s: number | null = null;
+      try {
+        const minTs = Math.floor(Date.now() / 1000) - 60;
+        const tRes = await fetch(
+          `${KALSHI}/markets/trades?ticker=${encodeURIComponent(best.ticker)}&limit=200&min_ts=${minTs}`,
+          { headers: { accept: "application/json" } },
+        );
+        if (tRes.ok) {
+          const tJson = await tRes.json() as {
+            trades?: Array<{ taker_side?: string; count?: number; created_time?: string }>;
+          };
+          let yes = 0, no = 0, cnt = 0;
+          const cutoff = Date.now() - 60_000;
+          for (const t of tJson.trades ?? []) {
+            const ts = t.created_time ? new Date(t.created_time).getTime() : NaN;
+            if (Number.isFinite(ts) && ts < cutoff) continue;
+            const c = Number(t.count ?? 0);
+            if (!Number.isFinite(c) || c <= 0) continue;
+            cnt += 1;
+            const side = String(t.taker_side ?? "").toLowerCase();
+            if (side === "yes") yes += c;
+            else if (side === "no") no += c;
+          }
+          yesVol60s = yes; noVol60s = no; tradeCount60s = cnt;
+        }
+      } catch { /* best-effort */ }
 
       return {
         ok: true,
@@ -122,6 +165,12 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
         yesMid,
         secondsToClose: best.stc,
         impliedSpot: Number(implied.toFixed(2)),
+        volume: best.volume,
+        openInterest: best.openInterest,
+        lastPriceCents: best.lastPrice != null ? Math.round(best.lastPrice) : null,
+        yesVol60s,
+        noVol60s,
+        tradeCount60s,
         error: null,
       };
     } catch (e) {
@@ -129,3 +178,4 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
     }
   },
 );
+
