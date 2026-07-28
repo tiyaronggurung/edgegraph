@@ -17,8 +17,9 @@ export const getMidSupportStudy = createServerFn({ method: "GET" })
   .inputValidator((d: { days?: number }) =>
     z.object({ days: z.number().int().min(1).max(60).default(14) }).parse(d ?? {}),
   )
-  .handler(async ({ data, context }): Promise<{ days: number; rows: MidSupportRow[] }> => {
-    const { data: rows, error } = await (context.supabase.rpc as any)(
+  .handler(async ({ data }): Promise<{ days: number; rows: MidSupportRow[] }> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await (supabaseAdmin.rpc as any)(
       "mid_support_study",
       { _days: data.days },
     );
