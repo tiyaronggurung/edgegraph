@@ -32,10 +32,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const TRIGGER_KIND = "our_odds_-200" as const;
-const MIN_PROB = 2 / 3;              // American -200
-const MAX_ASK_CENTS = 95;            // skip if Kalshi already pinned to 95+
-const MIN_SECS_TO_CLOSE = 15;        // pin-zone slippage guard
+// Dislocation Hunter: fire when OUR mid probability exceeds Kalshi's mid
+// probability for the same side by ≥ MIN_EDGE_CENTS. Trigger is validated
+// client-side across 2 consecutive ticks; server re-checks the edge here.
+const TRIGGER_KIND = "our_odds_disloc" as const;
+const MIN_EDGE_CENTS = 3;            // our_mid − kalshi_mid ≥ 3¢ on picked side
+const MIN_SIDE_PROB = 0.55;          // never chase < coin-flip
+const MAX_ASK_CENTS = 85;            // avoid pin-zone chases; tighter than −200 mode
+const MIN_SECS_TO_CLOSE = 20;
 const WARMUP_SECS = 180;
 const WINDOW_LEN_SECS = 900;
 const MAX_SECS_TO_CLOSE = WINDOW_LEN_SECS - WARMUP_SECS;
@@ -49,7 +53,8 @@ const FireSchema = z.object({
   ticker: z.string().min(1),
   eventTicker: z.string().nullable().optional(),
   side: z.enum(["YES", "NO"]),
-  ourProb: z.number().min(0).max(1),         // our ask-side probability
+  ourProb: z.number().min(0).max(1),               // our mid prob on picked side
+  kalshiMidProb: z.number().min(0).max(1),         // kalshi mid prob on picked side
   kalshiAskCents: z.number().int().min(1).max(99), // current Kalshi ask for that side
   closeTime: z.string(),
   spot: z.number().nullable().optional(),
