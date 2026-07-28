@@ -177,8 +177,25 @@ export function useOurQuote(params: {
     }
     ratchetedMid = Math.min(0.99, Math.max(0.01, ratchetedMid));
 
+    // ---- Physics sanity cap ------------------------------------------------
+    // No matter what MID pivot / bias / breakouts / ratchet do, the final mid
+    // must stay within ±PHYSICS_CAP of the pure BS probability driven only by
+    // (spot, strike, σ, T). This prevents "89% UP on $27 above strike".
+    const physicsMid = computeUpProbability({
+      spot,
+      strike,
+      secondsToClose,
+      sigmaAnnualized: sigma,
+    });
+    if (physicsMid != null) {
+      const lo = Math.max(0.01, physicsMid - PHYSICS_CAP);
+      const hi = Math.min(0.99, physicsMid + PHYSICS_CAP);
+      ratchetedMid = Math.min(hi, Math.max(lo, ratchetedMid));
+    }
+
     // Re-emit quote with ratcheted mid so both cents sides + recommendation reflect it.
     const hs = q.halfSpread;
+
     const pUpAsk = Math.min(0.995, Math.max(0.005, ratchetedMid + hs));
     const pDownAsk = Math.min(0.995, Math.max(0.005, (1 - ratchetedMid) + hs));
     // Rebuild recommendation from the SAME ratchetedMid the UI odds display,
