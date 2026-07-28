@@ -352,62 +352,8 @@ export function TrendlineChartPanel() {
             kalshiUpProb={kalshi?.yesMid ?? null}
           />
 
-          {(() => {
-            // Kalshi per-side flow chip — YES vs NO taker contracts in last 60s.
-            // Skew ≥ 65% one side + ≥ 5 contracts total = a real push signal.
-            const y = kalshi?.yesVol60s ?? null;
-            const n = kalshi?.noVol60s ?? null;
-            if (y == null || n == null) return null;
-            const total = y + n;
-            if (total <= 0) {
-              return (
-                <span
-                  className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-black/40 text-white/40 font-mono"
-                  title="No Kalshi trades in the last 60s"
-                >
-                  FLOW —
-                </span>
-              );
-            }
-            const yesPct = (y / total) * 100;
-            const noPct = 100 - yesPct;
-            const dominant: "YES" | "NO" | null =
-              total >= 5 && yesPct >= 65 ? "YES"
-              : total >= 5 && noPct >= 65 ? "NO"
-              : null;
-            const cls =
-              dominant === "YES" ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/40"
-              : dominant === "NO" ? "bg-rose-500/20 text-rose-200 border-rose-500/40"
-              : "bg-white/5 text-white/60 border-white/15";
-            const oi = kalshi?.openInterest ?? null;
-            const vol = kalshi?.volume ?? null;
-            const title =
-              `Kalshi taker flow (last 60s):\n` +
-              `  YES buys: ${y} contracts (${yesPct.toFixed(0)}%)\n` +
-              `  NO  buys: ${n} contracts (${noPct.toFixed(0)}%)\n` +
-              `  Trades:   ${kalshi?.tradeCount60s ?? 0}\n` +
-              (vol != null ? `  Total window volume: ${vol.toLocaleString()}\n` : "") +
-              (oi != null ? `  Open interest: ${oi.toLocaleString()}\n` : "") +
-              (dominant
-                ? `\n⚠ ${dominant} side dominant — real money pushing that way.`
-                : `\nBalanced flow — no side pressure.`);
-            return (
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded border font-mono flex items-center gap-1 ${cls}`}
-                title={title}
-              >
-                <span className="text-white/50">FLOW</span>
-                <span className="tabular-nums text-emerald-300/90">{y}</span>
-                <span className="text-white/30">·</span>
-                <span className="tabular-nums text-rose-300/90">{n}</span>
-                {dominant && (
-                  <span className="ml-1 font-bold">
-                    {dominant === "YES" ? "↑" : "↓"} {Math.max(yesPct, noPct).toFixed(0)}%
-                  </span>
-                )}
-              </span>
-            );
-          })()}
+
+
 
 
 
