@@ -287,12 +287,15 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
   // Odds = Φ( ln(anchor / strike) / (σ·√T) )
   const hasMid = midPrice != null && Number.isFinite(midPrice) && midPrice > 0;
   const t = Math.max(0, inp.secondsToClose);
+  // Trendline MID carries more weight, earlier. Pill-based fair value is our
+  // edge over Kalshi's spot-only BRTI anchor.
   let wMid = 0;
   if (hasMid) {
-    if (t >= 600)      wMid = 0.15;
-    else if (t >= 300) wMid = 0.15 + 0.35 * ((600 - t) / 300);
-    else if (t >= 60)  wMid = 0.50 + 0.30 * ((300 - t) / 240);
-    else               wMid = 0.80 + 0.15 * ((60 - t) / 60);
+    if (t >= 720)      wMid = 0.30;                                       // first 3m: some MID influence
+    else if (t >= 420) wMid = 0.30 + 0.25 * ((720 - t) / 300);            // → 0.55
+    else if (t >= 180) wMid = 0.55 + 0.25 * ((420 - t) / 240);            // → 0.80
+    else if (t >= 60)  wMid = 0.80 + 0.13 * ((180 - t) / 120);            // → 0.93
+    else               wMid = 0.93 + 0.05 * ((60 - t) / 60);              // → 0.98
   }
   const anchorPrice = hasMid
     ? wMid * (midPrice as number) + (1 - wMid) * spot
