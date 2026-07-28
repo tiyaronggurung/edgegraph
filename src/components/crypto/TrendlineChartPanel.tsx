@@ -246,7 +246,7 @@ export function TrendlineChartPanel() {
 
   const currentStrike = shadow?.strike ?? null;
   const recLive = ourQuote?.recommendation ?? null;
-  const secondsToCloseForLock = shadow?.seconds_to_close ?? null;
+  const secondsToCloseForLock = kalshiRemainingSec ?? null;
   // First 7 min of the 15m window ⇒ elapsed<420s ⇒ secondsToClose>480.
   const inLockWindow = secondsToCloseForLock != null && secondsToCloseForLock > 480;
   useEffect(() => {
