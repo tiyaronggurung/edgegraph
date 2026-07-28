@@ -101,10 +101,14 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
       .maybeSingle();
 
     if (!existing) {
-      // Skip "noise" rows where both model and market agree on a near-certain
-      // outcome — these have |edge| < 1pt and pollute the hit-rate denominator
-      // without representing any real signal.
-      if (Math.abs(input.edgePts) < 1) return;
+      // Early-row policy: within the first ~3 min of a 15-min window
+      // (secondsToClose >= 720), create the row immediately so users see it
+      // in the log ASAP — Model Pick and Study Pick columns fill in later at
+      // their own natural times (T=0 model, T+420s study). Outside that
+      // early window, keep the |edge| < 1 noise filter so near-certain
+      // markets don't pollute the hit-rate denominator.
+      const isEarlyInWindow = input.secondsToClose >= 720;
+      if (!isEarlyInWindow && Math.abs(input.edgePts) < 1) return;
       // First snapshot: store the model's pick (side) — this is LOCKED for the
       // life of the market, even if model prob drifts across 50% later.
       await supabaseAdmin.from("btc_model_predictions").insert({
