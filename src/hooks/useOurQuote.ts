@@ -91,6 +91,8 @@ export function useOurQuote(params: {
         lockedSide: 0,
         oppositeStreakSec: 0,
         sideHist: [],
+        strikeChangedAt: Date.now(),
+        postStrikeTicks: 0,
       };
       lastGoodRef.current = null;
       // keep tape — vol estimation benefits from continuity across windows
