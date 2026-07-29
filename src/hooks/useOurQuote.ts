@@ -339,5 +339,5 @@ export function useOurQuote(params: {
     lastGoodRef.current = out;
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spot, strike, secondsToClose, closes1m, midPrice, buyPrice, sellPrice]);
+  }, [spot, strike, secondsToClose, closes1m, midPrice, buyPrice, sellPrice, volumeImbalance3m]);
 }
