@@ -56,8 +56,15 @@ export interface KalshiImpliedSpot {
   yesVol60s: number | null;             // YES taker contracts, last 60s
   noVol60s: number | null;              // NO taker contracts, last 60s
   tradeCount60s: number | null;         // #trades in last 60s
+  // ---- cumulative flow for the whole current 15m window (since :00/:15/:30/:45) ----
+  yesVolWindow: number | null;          // YES taker contracts, window-to-date
+  noVolWindow: number | null;           // NO taker contracts, window-to-date
+  tradeCountWindow: number | null;      // #trades, window-to-date
+  /** Per-minute ladder, minute 0 = window open. Only minutes with trades. */
+  flowLadder: Array<{ m: number; yes: number; no: number; trades: number }> | null;
   error: string | null;
 }
+
 
 
 export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
