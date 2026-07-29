@@ -85,7 +85,9 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
             yes_ask_dollars?: string;
             status?: string;
             volume?: number;
+            volume_fp?: string | number;
             open_interest?: number;
+            open_interest_fp?: string | number;
             last_price?: number;
           }>;
         }>;
