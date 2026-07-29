@@ -242,20 +242,22 @@ export function TrendlineChartPanel() {
   const [recoHistory, setRecoHistory] = useState<RecoOutcome[]>([]);
   const lastSpotRef = useRef<number | null>(null);
   const chipPickWrittenRef = useRef<string | null>(null); // ticker we've already written
+  // Late-lock candidate: side that's been ≥80% conf continuously; commits at 120s held.
+  const lateCandRef = useRef<{ ticker: string; side: "UP" | "DOWN"; since: number } | null>(null);
   useEffect(() => { if (displaySpot != null) lastSpotRef.current = displaySpot; }, [displaySpot]);
 
   const currentStrike = shadow?.strike ?? null;
   const currentTicker = shadow?.ticker ?? null;
   const recLive = ourQuote?.recommendation ?? null;
   const secondsToCloseForLock = kalshiRemainingSec ?? null;
-  // Strictly at the 7-min mark: arm only while we're between minute 7 and
-  // minute 8 of the 15m window (secondsToClose in (420, 480]). Earlier
-  // conviction spikes don't lock — this prevents a 3-min UP pick from
-  // sticking when the trend flips at minute 5.
-  const inLockWindow = secondsToCloseForLock != null && secondsToCloseForLock <= 480 && secondsToCloseForLock > 420;
+  // EARLY path: 7-min mark (secondsToClose in (420, 480]) at ≥75%.
+  const inEarlyWindow = secondsToCloseForLock != null && secondsToCloseForLock <= 480 && secondsToCloseForLock > 420;
+  // LATE path: after minute 8, before T-180, at ≥80% held 120s continuously.
+  const inLateWindow  = secondsToCloseForLock != null && secondsToCloseForLock <= 420 && secondsToCloseForLock >= 180;
+  const LATE_CONF = 80;
+  const LATE_HOLD_MS = 120_000;
   useEffect(() => {
-    // Strike changed → settle any open lock against the last spot we saw
-    // BEFORE the strike rolled, then clear.
+    // Strike changed → settle any open lock, then clear candidate.
     if (recoLock && currentStrike != null && currentStrike !== recoLock.strike) {
       const settle = lastSpotRef.current;
       if (settle != null && Number.isFinite(settle)) {
@@ -263,13 +265,15 @@ export function TrendlineChartPanel() {
         setRecoHistory(h => [...h, { side: recoLock.side, won, strike: recoLock.strike, settleSpot: settle }].slice(-10));
       }
       setRecoLock(null);
+      lateCandRef.current = null;
       return;
     }
-    // Arm lock only when rec crosses ≥75% inside the first 7 min.
-    if (!recoLock && recLive && recLive.side !== "WAIT" && recLive.confidencePct >= 75 && currentStrike != null && inLockWindow) {
+    if (recoLock || !recLive || !currentStrike || !currentTicker || secondsToCloseForLock == null) return;
+
+    // EARLY arm: ≥75% inside 7-min mark.
+    if (recLive.side !== "WAIT" && recLive.confidencePct >= 75 && inEarlyWindow) {
       setRecoLock({ strike: currentStrike, side: recLive.side, lockedAt: Date.now(), lockedConf: recLive.confidencePct });
-      // Fire-and-forget: persist as Study Pick in the model accuracy log.
-      if (currentTicker && chipPickWrittenRef.current !== currentTicker && secondsToCloseForLock != null) {
+      if (chipPickWrittenRef.current !== currentTicker) {
         chipPickWrittenRef.current = currentTicker;
         import("@/lib/chipStudyPick.functions").then(({ recordChipStudyPick }) =>
           recordChipStudyPick({
@@ -282,8 +286,39 @@ export function TrendlineChartPanel() {
           }).catch(() => {})
         );
       }
+      return;
     }
-  }, [currentStrike, currentTicker, recLive, recoLock, inLockWindow, secondsToCloseForLock]);
+
+    // LATE arm: ≥80% held 120s continuously inside [T-420, T-180].
+    if (inLateWindow && recLive.side !== "WAIT" && recLive.confidencePct >= LATE_CONF) {
+      const cand = lateCandRef.current;
+      const now = Date.now();
+      if (!cand || cand.ticker !== currentTicker || cand.side !== recLive.side) {
+        lateCandRef.current = { ticker: currentTicker, side: recLive.side as "UP" | "DOWN", since: now };
+      } else if (now - cand.since >= LATE_HOLD_MS) {
+        setRecoLock({ strike: currentStrike, side: recLive.side, lockedAt: now, lockedConf: recLive.confidencePct });
+        if (chipPickWrittenRef.current !== currentTicker) {
+          chipPickWrittenRef.current = currentTicker;
+          import("@/lib/chipStudyPick.functions").then(({ recordChipStudyPick }) =>
+            recordChipStudyPick({
+              data: {
+                ticker: currentTicker,
+                side: recLive.side as "UP" | "DOWN",
+                confidencePct: recLive.confidencePct,
+                secondsToClose: Math.round(secondsToCloseForLock),
+              },
+            }).catch(() => {})
+          );
+        }
+      }
+    } else {
+      // Conf dropped below 80 or side flipped → reset the 120s clock.
+      if (lateCandRef.current && lateCandRef.current.ticker === currentTicker) {
+        lateCandRef.current = null;
+      }
+    }
+  }, [currentStrike, currentTicker, recLive, recoLock, inEarlyWindow, inLateWindow, secondsToCloseForLock]);
+
 
   // ---- ~10s side-tick recorder (feeds btc_side_ticks for backfill/analysis)
   const lastTickAtRef = useRef<number>(0);
