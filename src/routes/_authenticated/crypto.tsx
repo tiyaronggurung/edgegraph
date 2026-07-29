@@ -2310,73 +2310,15 @@ function BigFlipMonitor() {
     return () => { active = false; };
   }, []);
 
-  // Killswitch state (auto-halt after too many losing 15-min windows).
-  const [ks, setKs] = useState<{ halted: boolean; reason: string | null } | null>(null);
-  const refreshKs = async () => {
-    const { data: u } = await supabase.auth.getUser();
-    const uid = u.user?.id;
-    if (!uid) return;
-    const { data } = await supabase
-      .from("big_flip_killswitch")
-      .select("halted,reason")
-      .eq("user_id", uid)
-      .maybeSingle();
-    setKs({ halted: !!data?.halted, reason: data?.reason ?? null });
-  };
-  useEffect(() => { refreshKs(); const t = setInterval(refreshKs, 5_000); return () => clearInterval(t); }, []);
-  const reEnable = async () => {
-    const { data: u } = await supabase.auth.getUser();
-    const uid = u.user?.id;
-    if (!uid) return;
-    await supabase.from("big_flip_killswitch").upsert({
-      user_id: uid, halted: false, reason: null, updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
-    toast.success("Cheap-flip hunter re-enabled");
-    refreshKs();
-  };
-  const turnOff = async () => {
-    const { data: u } = await supabase.auth.getUser();
-    const uid = u.user?.id;
-    if (!uid) return;
-    await supabase.from("big_flip_killswitch").upsert({
-      user_id: uid, halted: true, reason: "manual off", halted_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
-    toast.success("Cheap-flip hunter turned OFF");
-    refreshKs();
-  };
-
   const r = q.data;
   if (!r || !r.ok) return null;
   const fresh = r.flipAt && r.ageSeconds != null && r.ageSeconds < 120;
-
-  if (ks?.halted) {
-    return (
-      <div className="mt-1 rounded border border-red-500/60 bg-red-500/15 px-2 py-1.5 text-[11px] font-mono flex items-center gap-2">
-        <AlertTriangle className="h-3 w-3 text-red-300" />
-        <span className="font-semibold text-red-300">AUTO-TRADE HALTED</span>
-        <span className="text-muted-foreground">·</span>
-        <span className="text-muted-foreground truncate">{ks.reason ?? "killswitch on"}</span>
-        <button
-          onClick={reEnable}
-          className="ml-auto rounded border border-red-400/60 px-2 py-0.5 text-[10px] uppercase text-red-200 hover:bg-red-500/20"
-        >
-          Re-enable
-        </button>
-      </div>
-    );
-  }
 
   if (!r.passed || !fresh) {
     return (
       <div className="mt-1 rounded border border-border/50 bg-muted/10 px-2 py-1 text-[10px] font-mono text-muted-foreground flex items-center gap-2">
         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
         <span className="truncate">Cheap-flip hunter · LIVE $10 · arm T-9m→T-3m · ask ≤15¢ · model conf ≥70% · {r.rejectReason ? `skip: ${r.rejectReason}` : "waiting for setup"}</span>
-        <button
-          onClick={turnOff}
-          className="ml-auto rounded border border-red-500/50 px-2 py-0.5 text-[10px] uppercase text-red-300 hover:bg-red-500/20"
-        >
-          Turn OFF
-        </button>
       </div>
     );
   }
@@ -2397,13 +2339,55 @@ function BigFlipMonitor() {
       <span className="text-muted-foreground">·</span>
       <span className="text-[10px] uppercase text-yellow-300 font-semibold">LIVE $10</span>
       <span className="text-muted-foreground ml-auto">{r.ageSeconds}s ago</span>
-      <button
-        onClick={turnOff}
-        className="rounded border border-red-500/50 px-2 py-0.5 text-[10px] uppercase text-red-300 hover:bg-red-500/20"
-      >
-        Turn OFF
-      </button>
     </div>
+  );
+}
+
+function CheapFlipHunterToggle() {
+  const [ks, setKs] = useState<{ halted: boolean; reason: string | null } | null>(null);
+  const refreshKs = async () => {
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
+    if (!uid) return;
+    const { data } = await supabase
+      .from("big_flip_killswitch")
+      .select("halted,reason")
+      .eq("user_id", uid)
+      .maybeSingle();
+    setKs({ halted: !!data?.halted, reason: data?.reason ?? null });
+  };
+  useEffect(() => { refreshKs(); const t = setInterval(refreshKs, 5_000); return () => clearInterval(t); }, []);
+
+  const toggle = async () => {
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
+    if (!uid) return;
+    const nextHalted = !ks?.halted;
+    await supabase.from("big_flip_killswitch").upsert({
+      user_id: uid,
+      halted: nextHalted,
+      reason: nextHalted ? "manual off" : null,
+      halted_at: nextHalted ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+    toast.success(nextHalted ? "Cheap-flip hunter turned OFF" : "Cheap-flip hunter re-enabled");
+    refreshKs();
+  };
+
+  const halted = !!ks?.halted;
+  return (
+    <button
+      onClick={toggle}
+      title={halted ? `Halted: ${ks?.reason ?? "killswitch on"}` : "Cheap-flip hunter is LIVE — click to turn OFF"}
+      className={`flex items-center gap-1.5 text-xs uppercase tracking-wider px-3 py-1.5 border rounded transition-colors ${
+        halted
+          ? "border-red-500/40 text-red-300 hover:bg-red-500/10"
+          : "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+      }`}
+    >
+      {halted ? <XCircle className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
+      {halted ? "Flip Hunter OFF" : "Flip Hunter ON"}
+    </button>
   );
 }
 
@@ -3857,6 +3841,7 @@ function CryptoPage() {
           >
             Paper Sandbox →
           </Link>
+          <CheapFlipHunterToggle />
           <button onClick={() => q.refetch()} className="flex items-center gap-1 text-xs uppercase tracking-wider px-3 py-1.5 border border-border rounded hover:bg-card">
             {q.isFetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
           </button>
