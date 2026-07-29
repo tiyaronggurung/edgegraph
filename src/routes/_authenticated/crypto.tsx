@@ -3841,6 +3841,7 @@ function CryptoPage() {
           >
             Paper Sandbox →
           </Link>
+          <CheapFlipHunterToggle />
           <button onClick={() => q.refetch()} className="flex items-center gap-1 text-xs uppercase tracking-wider px-3 py-1.5 border border-border rounded hover:bg-card">
             {q.isFetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
           </button>
