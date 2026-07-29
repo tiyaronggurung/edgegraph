@@ -623,6 +623,7 @@ export function TrendlineChartPanel() {
                 </div>
               );
             })()}
+            <div className="relative">
             <TaChart
               candles={candles}
               shadow={shadow ?? null}
