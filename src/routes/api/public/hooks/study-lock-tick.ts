@@ -260,6 +260,7 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
           const { error: upErr } = await supabaseAdmin
             .from("btc_model_predictions")
             .update({
+              ...cvvFields,
               study_locked_side: side,
               study_lock_confidence: confPct,
               study_lock_source: isEarly ? "server_physics_early" : "server_physics_late",
