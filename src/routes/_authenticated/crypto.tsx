@@ -149,6 +149,7 @@ function buildStudyReason(r: {
   studyLockSource?: string | null;
   studyLockSecondsToClose?: number | null;
   studyLockedAt?: string | null;
+  studyLockKalshiPriceCents?: number | null;
 }, isStudying: boolean): string {
   const L: string[] = [];
   const pickLabel = dirLabel(r.side);
