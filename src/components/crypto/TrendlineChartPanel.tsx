@@ -536,8 +536,7 @@ export function TrendlineChartPanel() {
           </div>
 
           <Legend visible={visible} setVisible={setVisible} strike={shadow?.strike ?? null} />
-          <div className="relative">
-            {/* Sticky live-price overlay — always visible, never hidden by scroll */}
+          {/* Live-price row — static block above the chart so it never covers the flow strip */}
             {displaySpot != null && (() => {
               const strike = shadow?.strike ?? null;
               const diff = strike != null ? displaySpot - strike : null;
@@ -571,7 +570,7 @@ export function TrendlineChartPanel() {
                 : (rec?.reason ?? "");
               return (
                 <div
-                  className={`pointer-events-none absolute top-2 left-2 z-20 flex flex-col items-start gap-1`}
+                  className={`mb-2 flex flex-col items-start gap-1`}
                   aria-label="Live BTC composite spot"
                 >
                   <div className={`flex items-center gap-2 px-2 py-1 rounded border ${border} bg-black/75 backdrop-blur font-mono text-[11px] shadow-lg`}>
@@ -624,6 +623,7 @@ export function TrendlineChartPanel() {
                 </div>
               );
             })()}
+            <div className="relative">
             <TaChart
               candles={candles}
               shadow={shadow ?? null}
@@ -648,8 +648,9 @@ export function TrendlineChartPanel() {
                 ladder: kalshi?.flowLadder ?? null,
               }}
             />
+            </div>
 
-          </div>
+
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
             <Stat label="Spot (live)"   value={displaySpot != null ? `$${displaySpot.toFixed(2)}` : "—"} />
