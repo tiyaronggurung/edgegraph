@@ -339,6 +339,7 @@ export interface PredictionStatsResult {
     studyLockSource: string | null;
     studyLockSecondsToClose: number | null;
     studyLockedAt: string | null;
+    studyLockKalshiPriceCents: number | null;
   }>;
 }
 
