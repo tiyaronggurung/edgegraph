@@ -50,13 +50,16 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
         // Load Skip Guard config (shadow by default).
         const { data: gcfg } = await supabaseAdmin
           .from("btc_gate_config")
-          .select("skip_guard_mode, skip_guard_cushion_soft_usd, skip_guard_cushion_hard_usd, skip_guard_min_conf_tight")
+          .select("skip_guard_mode, skip_guard_cushion_soft_usd, skip_guard_cushion_hard_usd, skip_guard_min_conf_tight, max_ask_mode, max_ask_cents")
           .eq("id", 1)
           .maybeSingle();
         const skipMode: "off" | "shadow" | "enforced" = ((gcfg as any)?.skip_guard_mode ?? "shadow");
         const cushionSoft = Number((gcfg as any)?.skip_guard_cushion_soft_usd ?? 25);
         const cushionHard = Number((gcfg as any)?.skip_guard_cushion_hard_usd ?? 15);
         const minConfTight = Number((gcfg as any)?.skip_guard_min_conf_tight ?? 0.82);
+        // Max-Ask filter (#4): tag/skip locks whose entry price is too rich to be profitable.
+        const maxAskMode: "off" | "shadow" | "enforced" = ((gcfg as any)?.max_ask_mode ?? "shadow");
+        const maxAskCents = Number((gcfg as any)?.max_ask_cents ?? 85);
 
         const nowMs = Date.now();
         const earlyMinIso = new Date(nowMs + 421_000).toISOString(); // > 420s
