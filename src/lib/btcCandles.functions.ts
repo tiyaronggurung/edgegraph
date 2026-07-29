@@ -47,14 +47,20 @@ export const getBtcCandles = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<CandlesResult> => {
     const { tf, limit } = data;
 
-    // Read from cache first.
-    const { data: rows, error } = await context.supabase
+    // Read from cache first, with a hard timeout so a slow DB never blanks the chart.
+    const cacheQuery = context.supabase
       .from("btc_candles")
       .select("bucket_start,o,h,l,c,v")
       .eq("tf", tf)
       .order("bucket_start", { ascending: false })
       .limit(limit);
-    if (error) throw new Error(error.message);
+    const timeout = new Promise<{ data: null; error: { message: string } }>((resolve) =>
+      setTimeout(() => resolve({ data: null, error: { message: "cache_timeout" } }), 3000),
+    );
+    const { data: rows, error } = (await Promise.race([cacheQuery, timeout])) as
+      { data: Array<Record<string, unknown>> | null; error: { message: string } | null };
+    if (error && error.message !== "cache_timeout") throw new Error(error.message);
+
 
     const cacheCandles: TCandle[] = (rows ?? [])
       .map((r) => ({
