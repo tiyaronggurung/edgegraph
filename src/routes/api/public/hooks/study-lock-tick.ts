@@ -281,6 +281,7 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
             ticker, locked: side, confPct, ratio: Number(ratio.toFixed(3)),
             askCents, phase: isEarly ? "early" : "late",
             skipGuard: skipMode === "off" ? null : { verdict: skipVerdict, reason: skipReason, cushion: Number(cushion.toFixed(2)) },
+            cvv: cvv ? { mode: cvvCfg.mode, verdict: cvv.verdict, reason: cvv.reason, cushion: cvv.cushionUsd, atr7: cvv.atrUsd, required: cvv.requiredCushionUsd, momentum: cvv.momentumUsd } : null,
           });
         }
 
