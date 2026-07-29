@@ -144,35 +144,71 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
       const z = normInv(clamped);
       const implied = sigmaT > 0 ? best.strike / Math.exp(z * sigmaT) : best.strike;
 
-      // Parallel: fetch last ~60s of trades for per-side flow. Public endpoint,
-      // no auth. Cheap best-effort — nulls if it fails so recorder still runs.
+      // Per-side taker flow. One paginated pull covering the ENTIRE current
+      // 15m window (since :00/:15/:30/:45) — the rolling 60s figure is derived
+      // from the same trade list, so the strip's 60s number and the window
+      // total can never disagree. Public endpoint, no auth, best-effort.
       let yesVol60s: number | null = null;
       let noVol60s: number | null = null;
       let tradeCount60s: number | null = null;
+      let yesVolWindow: number | null = null;
+      let noVolWindow: number | null = null;
+      let tradeCountWindow: number | null = null;
+      let flowLadder: Array<{ m: number; yes: number; no: number; trades: number }> | null = null;
       try {
-        const minTs = Math.floor(Date.now() / 1000) - 60;
-        const tRes = await fetch(
-          `${KALSHI}/markets/trades?ticker=${encodeURIComponent(best.ticker)}&limit=200&min_ts=${minTs}`,
-          { headers: { accept: "application/json" } },
-        );
-        if (tRes.ok) {
-          const tJson = await tRes.json() as {
-            trades?: Array<{ taker_side?: string; count?: number; count_fp?: string; created_time?: string }>;
-          };
-          let yes = 0, no = 0, cnt = 0;
-          const cutoff = Date.now() - 60_000;
-          for (const t of tJson.trades ?? []) {
-            const ts = t.created_time ? new Date(t.created_time).getTime() : NaN;
-            if (Number.isFinite(ts) && ts < cutoff) continue;
-            const c = num(t.count_fp ?? t.count) ?? 0;
-            if (!Number.isFinite(c) || c <= 0) continue;
-            cnt += 1;
-            const side = String(t.taker_side ?? "").toLowerCase();
-            if (side === "yes") yes += c;
-            else if (side === "no") no += c;
-          }
-          yesVol60s = yes; noVol60s = no; tradeCount60s = cnt;
+        const nowMs = Date.now();
+        const winStartMs = Math.floor(nowMs / 900_000) * 900_000;
+        const minTs = Math.floor(winStartMs / 1000);
+        const cutoff60 = nowMs - 60_000;
+
+        type Trade = { taker_side?: string; count?: number; count_fp?: string; created_time?: string };
+        const trades: Trade[] = [];
+        let cursor: string | undefined;
+        // 15m of BTC 15m-market trades fits comfortably; cap pages to stay cheap.
+        for (let page = 0; page < 5; page++) {
+          const url =
+            `${KALSHI}/markets/trades?ticker=${encodeURIComponent(best.ticker)}` +
+            `&limit=1000&min_ts=${minTs}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+          const tRes = await fetch(url, { headers: { accept: "application/json" } });
+          if (!tRes.ok) break;
+          const tJson = await tRes.json() as { trades?: Trade[]; cursor?: string };
+          const batch = tJson.trades ?? [];
+          trades.push(...batch);
+          cursor = tJson.cursor || undefined;
+          if (!cursor || batch.length === 0) break;
         }
+
+        let y60 = 0, n60 = 0, c60 = 0;
+        let yW = 0, nW = 0, cW = 0;
+        const ladder = new Map<number, { yes: number; no: number; trades: number }>();
+        for (const t of trades) {
+          const ts = t.created_time ? new Date(t.created_time).getTime() : NaN;
+          if (!Number.isFinite(ts) || ts < winStartMs) continue;
+          const c = num(t.count_fp ?? t.count) ?? 0;
+          if (!Number.isFinite(c) || c <= 0) continue;
+          const isYes = String(t.taker_side ?? "").toLowerCase() === "yes";
+          const isNo = String(t.taker_side ?? "").toLowerCase() === "no";
+          if (!isYes && !isNo) continue;
+
+          cW += 1;
+          if (isYes) yW += c; else nW += c;
+
+          const m = Math.min(14, Math.max(0, Math.floor((ts - winStartMs) / 60_000)));
+          const b = ladder.get(m) ?? { yes: 0, no: 0, trades: 0 };
+          if (isYes) b.yes += c; else b.no += c;
+          b.trades += 1;
+          ladder.set(m, b);
+
+          if (ts >= cutoff60) {
+            c60 += 1;
+            if (isYes) y60 += c; else n60 += c;
+          }
+        }
+        yesVol60s = y60; noVol60s = n60; tradeCount60s = c60;
+        yesVolWindow = yW; noVolWindow = nW; tradeCountWindow = cW;
+        flowLadder = [...ladder.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .map(([m, v]) => ({ m, yes: Math.round(v.yes), no: Math.round(v.no), trades: v.trades }));
       } catch { /* best-effort */ }
 
       return {
@@ -190,8 +226,13 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
         yesVol60s: yesVol60s != null ? Math.round(yesVol60s) : null,
         noVol60s: noVol60s != null ? Math.round(noVol60s) : null,
         tradeCount60s,
+        yesVolWindow: yesVolWindow != null ? Math.round(yesVolWindow) : null,
+        noVolWindow: noVolWindow != null ? Math.round(noVolWindow) : null,
+        tradeCountWindow,
+        flowLadder,
         error: null,
       };
+
     } catch (e) {
       return { ...empty, error: (e as Error).message };
     }
