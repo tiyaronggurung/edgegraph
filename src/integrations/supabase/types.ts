@@ -1884,6 +1884,10 @@ export type Database = {
           min_side_confidence: number
           positive_edge_mode: string
           require_live_side_agreement: boolean
+          skip_guard_cushion_hard_usd: number
+          skip_guard_cushion_soft_usd: number
+          skip_guard_min_conf_tight: number
+          skip_guard_mode: string
           slippage_buffer_prob: number
           updated_at: string
         }
@@ -1896,6 +1900,10 @@ export type Database = {
           min_side_confidence?: number
           positive_edge_mode?: string
           require_live_side_agreement?: boolean
+          skip_guard_cushion_hard_usd?: number
+          skip_guard_cushion_soft_usd?: number
+          skip_guard_min_conf_tight?: number
+          skip_guard_mode?: string
           slippage_buffer_prob?: number
           updated_at?: string
         }
@@ -1908,6 +1916,10 @@ export type Database = {
           min_side_confidence?: number
           positive_edge_mode?: string
           require_live_side_agreement?: boolean
+          skip_guard_cushion_hard_usd?: number
+          skip_guard_cushion_soft_usd?: number
+          skip_guard_min_conf_tight?: number
+          skip_guard_mode?: string
           slippage_buffer_prob?: number
           updated_at?: string
         }
@@ -2557,6 +2569,9 @@ export type Database = {
           settled_at: string | null
           side: string
           sigma_at_snapshot: number | null
+          skip_guard_cushion_usd: number | null
+          skip_guard_reason: string | null
+          skip_guard_verdict: string | null
           snapshot_seconds_to_close: number
           spot_at_snapshot: number
           strike: number
@@ -2607,6 +2622,9 @@ export type Database = {
           settled_at?: string | null
           side: string
           sigma_at_snapshot?: number | null
+          skip_guard_cushion_usd?: number | null
+          skip_guard_reason?: string | null
+          skip_guard_verdict?: string | null
           snapshot_seconds_to_close: number
           spot_at_snapshot: number
           strike: number
@@ -2657,6 +2675,9 @@ export type Database = {
           settled_at?: string | null
           side?: string
           sigma_at_snapshot?: number | null
+          skip_guard_cushion_usd?: number | null
+          skip_guard_reason?: string | null
+          skip_guard_verdict?: string | null
           snapshot_seconds_to_close?: number
           spot_at_snapshot?: number
           strike?: number
