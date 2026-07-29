@@ -51,6 +51,7 @@ import { Route as ApiPublicHooksMarketIntelMatchRouteImport } from './routes/api
 import { Route as ApiPublicHooksMartingaleTickRouteImport } from './routes/api/public/hooks/martingale-tick'
 import { Route as ApiPublicHooksMultiTfShadowRouteImport } from './routes/api/public/hooks/multi-tf-shadow'
 import { Route as ApiPublicHooksOddsShadowTickRouteImport } from './routes/api/public/hooks/odds-shadow-tick'
+import { Route as ApiPublicHooksPinRiskShadowTickRouteImport } from './routes/api/public/hooks/pin-risk-shadow-tick'
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
 import { Route as ApiPublicHooksSettleBtcPredictionsRouteImport } from './routes/api/public/hooks/settle-btc-predictions'
 import { Route as ApiPublicHooksStudyAutoLiveTickRouteImport } from './routes/api/public/hooks/study-auto-live-tick'
@@ -289,6 +290,12 @@ const ApiPublicHooksOddsShadowTickRoute =
     path: '/api/public/hooks/odds-shadow-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksPinRiskShadowTickRoute =
+  ApiPublicHooksPinRiskShadowTickRouteImport.update({
+    id: '/api/public/hooks/pin-risk-shadow-tick',
+    path: '/api/public/hooks/pin-risk-shadow-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksRecomputePredictionsRoute =
   ApiPublicHooksRecomputePredictionsRouteImport.update({
     id: '/api/public/hooks/recompute-predictions',
@@ -380,6 +387,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/multi-tf-shadow': typeof ApiPublicHooksMultiTfShadowRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
+  '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
@@ -431,6 +439,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/multi-tf-shadow': typeof ApiPublicHooksMultiTfShadowRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
+  '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
@@ -484,6 +493,7 @@ export interface FileRoutesById {
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/multi-tf-shadow': typeof ApiPublicHooksMultiTfShadowRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
+  '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
@@ -537,6 +547,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/multi-tf-shadow'
     | '/api/public/hooks/odds-shadow-tick'
+    | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/study-auto-live-tick'
@@ -588,6 +599,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/multi-tf-shadow'
     | '/api/public/hooks/odds-shadow-tick'
+    | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/study-auto-live-tick'
@@ -640,6 +652,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/multi-tf-shadow'
     | '/api/public/hooks/odds-shadow-tick'
+    | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/study-auto-live-tick'
@@ -677,6 +690,7 @@ export interface RootRouteChildren {
   ApiPublicHooksMartingaleTickRoute: typeof ApiPublicHooksMartingaleTickRoute
   ApiPublicHooksMultiTfShadowRoute: typeof ApiPublicHooksMultiTfShadowRoute
   ApiPublicHooksOddsShadowTickRoute: typeof ApiPublicHooksOddsShadowTickRoute
+  ApiPublicHooksPinRiskShadowTickRoute: typeof ApiPublicHooksPinRiskShadowTickRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
   ApiPublicHooksSettleBtcPredictionsRoute: typeof ApiPublicHooksSettleBtcPredictionsRoute
   ApiPublicHooksStudyAutoLiveTickRoute: typeof ApiPublicHooksStudyAutoLiveTickRoute
@@ -983,6 +997,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksOddsShadowTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/pin-risk-shadow-tick': {
+      id: '/api/public/hooks/pin-risk-shadow-tick'
+      path: '/api/public/hooks/pin-risk-shadow-tick'
+      fullPath: '/api/public/hooks/pin-risk-shadow-tick'
+      preLoaderRoute: typeof ApiPublicHooksPinRiskShadowTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/recompute-predictions': {
       id: '/api/public/hooks/recompute-predictions'
       path: '/api/public/hooks/recompute-predictions'
@@ -1112,6 +1133,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksMartingaleTickRoute: ApiPublicHooksMartingaleTickRoute,
   ApiPublicHooksMultiTfShadowRoute: ApiPublicHooksMultiTfShadowRoute,
   ApiPublicHooksOddsShadowTickRoute: ApiPublicHooksOddsShadowTickRoute,
+  ApiPublicHooksPinRiskShadowTickRoute: ApiPublicHooksPinRiskShadowTickRoute,
   ApiPublicHooksRecomputePredictionsRoute:
     ApiPublicHooksRecomputePredictionsRoute,
   ApiPublicHooksSettleBtcPredictionsRoute:
