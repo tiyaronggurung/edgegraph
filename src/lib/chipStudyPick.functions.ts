@@ -97,8 +97,8 @@ export const recordChipStudyPick = createServerFn({ method: "POST" })
       if (!closeTime) {
         autoSkipped = "no_close_time";
       } else {
-        // 2) Current Kalshi ask on the locked side.
-        const askCents = await fetchKalshiAskCents(data.ticker, yesNo);
+        // 2) Reuse the ask captured at lock (same instant, avoids extra call).
+        const askCents = lockAskCents;
         if (askCents == null) {
           autoSkipped = "no_kalshi_ask";
         } else {
