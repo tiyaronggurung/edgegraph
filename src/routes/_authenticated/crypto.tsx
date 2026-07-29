@@ -2331,7 +2331,17 @@ function BigFlipMonitor() {
     await supabase.from("big_flip_killswitch").upsert({
       user_id: uid, halted: false, reason: null, updated_at: new Date().toISOString(),
     }, { onConflict: "user_id" });
-    toast.success("Big-flip auto-trade re-enabled");
+    toast.success("Cheap-flip hunter re-enabled");
+    refreshKs();
+  };
+  const turnOff = async () => {
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
+    if (!uid) return;
+    await supabase.from("big_flip_killswitch").upsert({
+      user_id: uid, halted: true, reason: "manual off", halted_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+    toast.success("Cheap-flip hunter turned OFF");
     refreshKs();
   };
 
