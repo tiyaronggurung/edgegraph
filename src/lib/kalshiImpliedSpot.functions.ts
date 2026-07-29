@@ -166,7 +166,7 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
         const trades: Trade[] = [];
         let cursor: string | undefined;
         // 15m of BTC 15m-market trades fits comfortably; cap pages to stay cheap.
-        for (let page = 0; page < 5; page++) {
+        for (let page = 0; page < 12; page++) {
           const url =
             `${KALSHI}/markets/trades?ticker=${encodeURIComponent(best.ticker)}` +
             `&limit=1000&min_ts=${minTs}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
