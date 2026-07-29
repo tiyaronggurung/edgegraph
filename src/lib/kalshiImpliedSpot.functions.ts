@@ -112,9 +112,13 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
           if (!best || stc < best.stc) {
             best = {
               ticker: m.ticker, strike, bid, ask, stc,
-              volume: m.volume != null ? Number(m.volume) : null,
-              openInterest: m.open_interest != null ? Number(m.open_interest) : null,
-              lastPrice: m.last_price != null ? Number(m.last_price) : null,
+              // Kalshi returns these as *_fp decimal strings; the legacy
+              // integer fields are absent, which is why volume logged as 0.
+              volume: num(m.volume_fp ?? m.volume),
+              openInterest: num(m.open_interest_fp ?? m.open_interest),
+              lastPrice: m.last_price_dollars != null
+                ? num(m.last_price_dollars) != null ? Number(m.last_price_dollars) * 100 : null
+                : num(m.last_price),
             };
           }
         }
