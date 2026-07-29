@@ -50,13 +50,16 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
         // Load Skip Guard config (shadow by default).
         const { data: gcfg } = await supabaseAdmin
           .from("btc_gate_config")
-          .select("skip_guard_mode, skip_guard_cushion_soft_usd, skip_guard_cushion_hard_usd, skip_guard_min_conf_tight")
+          .select("skip_guard_mode, skip_guard_cushion_soft_usd, skip_guard_cushion_hard_usd, skip_guard_min_conf_tight, max_ask_mode, max_ask_cents")
           .eq("id", 1)
           .maybeSingle();
         const skipMode: "off" | "shadow" | "enforced" = ((gcfg as any)?.skip_guard_mode ?? "shadow");
         const cushionSoft = Number((gcfg as any)?.skip_guard_cushion_soft_usd ?? 25);
         const cushionHard = Number((gcfg as any)?.skip_guard_cushion_hard_usd ?? 15);
         const minConfTight = Number((gcfg as any)?.skip_guard_min_conf_tight ?? 0.82);
+        // Max-Ask filter (#4): tag/skip locks whose entry price is too rich to be profitable.
+        const maxAskMode: "off" | "shadow" | "enforced" = ((gcfg as any)?.max_ask_mode ?? "shadow");
+        const maxAskCents = Number((gcfg as any)?.max_ask_cents ?? 85);
 
         const nowMs = Date.now();
         const earlyMinIso = new Date(nowMs + 421_000).toISOString(); // > 420s
@@ -152,6 +155,26 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
 
           const askCents = await fetchKalshiAskCents(ticker, side);
 
+          // Max-Ask filter: entry too rich => tag SKIP (shadow) or block the lock (enforced).
+          if (maxAskMode !== "off" && askCents != null && Number(askCents) >= maxAskCents) {
+            skipVerdict = "SKIP";
+            skipReason = `max_ask>=${maxAskCents}`;
+            if (maxAskMode === "enforced") {
+              await supabaseAdmin
+                .from("btc_model_predictions")
+                .update({
+                  skip_guard_verdict: "SKIP",
+                  skip_guard_reason: skipReason,
+                  skip_guard_cushion_usd: Number(cushion.toFixed(2)),
+                  study_lock_kalshi_price_cents: askCents,
+                } as never)
+                .eq("ticker", ticker)
+                .is("study_locked_side", null);
+              results.push({ ticker, skipped: "max_ask", askCents });
+              continue;
+            }
+          }
+
           const { error: upErr } = await supabaseAdmin
             .from("btc_model_predictions")
             .update({
@@ -161,8 +184,8 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
               study_lock_seconds_to_close: secondsToClose,
               study_locked_at: new Date().toISOString(),
               study_lock_kalshi_price_cents: askCents,
-              skip_guard_verdict: skipMode === "off" ? null : skipVerdict,
-              skip_guard_reason: skipMode === "off" ? null : skipReason,
+              skip_guard_verdict: skipMode === "off" && maxAskMode === "off" ? null : skipVerdict,
+              skip_guard_reason: skipMode === "off" && maxAskMode === "off" ? null : skipReason,
               skip_guard_cushion_usd: Number(cushion.toFixed(2)),
             } as never)
             .eq("ticker", ticker)
