@@ -167,7 +167,60 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
             skipReason = `cushion_soft<${cushionSoft}_and_conf<${Math.round(minConfTight * 100)}`;
           }
 
+          // ---- Cushion-vs-Volatility gate (shadow + live at once) ----
+          // Always computed and persisted when mode !== "off". In "enforced"
+          // mode a SKIP blocks the lock but still records the side/confidence
+          // that WOULD have been locked, so skipped windows stay scoreable.
+          let cvv: ReturnType<typeof evaluateCvv> | null = null;
+          if (cvvCfg.mode !== "off") {
+            const momentumUsd = signedMomentumUsd(
+              momentumSpots,
+              side,
+              180,
+              190 / Math.max(momentumSpots.length, 1),
+            );
+            cvv = evaluateCvv({
+              cfg: cvvCfg,
+              spot: avgSpot,
+              strike,
+              side,
+              atrUsd: atr7Usd,
+              momentumUsd,
+            });
+          }
+          const cvvFields = cvv
+            ? {
+                cvv_verdict: cvv.verdict,
+                cvv_reason: cvv.reason,
+                cvv_cushion_usd: cvv.cushionUsd,
+                cvv_atr_usd: cvv.atrUsd,
+                cvv_momentum_usd: cvv.momentumUsd,
+              }
+            : {};
+
+          if (cvvCfg.mode === "enforced" && cvv?.verdict === "SKIP") {
+            await supabaseAdmin
+              .from("btc_model_predictions")
+              .update({
+                ...cvvFields,
+                cvv_would_lock_side: side,
+                cvv_would_lock_conf: confPct,
+                skip_guard_verdict: "SKIP",
+                skip_guard_reason: `cvv:${cvv.reason}`,
+                skip_guard_cushion_usd: Number(cushion.toFixed(2)),
+              } as never)
+              .eq("ticker", ticker)
+              .is("study_locked_side", null);
+            results.push({
+              ticker, skipped: "cvv_gate", reason: cvv.reason,
+              cushion: cvv.cushionUsd, atr7: cvv.atrUsd, momentum: cvv.momentumUsd,
+              wouldLock: side, wouldConf: confPct,
+            });
+            continue;
+          }
+
           // Enforced: skip the lock entirely — record verdict without locking.
+
           if (skipMode === "enforced" && skipVerdict === "SKIP") {
             await supabaseAdmin
               .from("btc_model_predictions")
