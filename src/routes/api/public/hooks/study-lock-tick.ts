@@ -50,7 +50,7 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
         // Load Skip Guard config (shadow by default).
         const { data: gcfg } = await supabaseAdmin
           .from("btc_gate_config")
-          .select("skip_guard_mode, skip_guard_cushion_soft_usd, skip_guard_cushion_hard_usd, skip_guard_min_conf_tight, max_ask_mode, max_ask_cents")
+          .select("skip_guard_mode, skip_guard_cushion_soft_usd, skip_guard_cushion_hard_usd, skip_guard_min_conf_tight, max_ask_mode, max_ask_cents, cvv_mode, cvv_atr_mult, cvv_momentum_max_usd, cvv_atr_lookback_hours")
           .eq("id", 1)
           .maybeSingle();
         const skipMode: "off" | "shadow" | "enforced" = ((gcfg as any)?.skip_guard_mode ?? "shadow");
@@ -60,6 +60,13 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
         // Max-Ask filter (#4): tag/skip locks whose entry price is too rich to be profitable.
         const maxAskMode: "off" | "shadow" | "enforced" = ((gcfg as any)?.max_ask_mode ?? "shadow");
         const maxAskCents = Number((gcfg as any)?.max_ask_cents ?? 85);
+
+        // Cushion-vs-Volatility gate. Always evaluated + logged when not "off";
+        // only blocks the lock when mode === "enforced".
+        const cvvCfg = readCvvConfig(gcfg as any);
+        const atr7Usd =
+          cvvCfg.mode === "off" ? null : await getAtr7Usd(supabaseAdmin, cvvCfg.atrLookbackHours);
+
 
         const nowMs = Date.now();
         const earlyMinIso = new Date(nowMs + 421_000).toISOString(); // > 420s
