@@ -65,6 +65,11 @@ export const recordChipStudyPick = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const yesNo: "YES" | "NO" = data.side === "UP" ? "YES" : "NO";
 
+    // Capture Kalshi ask on the locked side at the exact lock moment. This is
+    // the price we would have paid if we auto-traded the Study Pick — used for
+    // future entry sizing and backtest cost analysis.
+    const lockAskCents = await fetchKalshiAskCents(data.ticker, yesNo);
+
     const { error } = await supabaseAdmin
       .from("btc_model_predictions")
       .update({
@@ -73,6 +78,7 @@ export const recordChipStudyPick = createServerFn({ method: "POST" })
         study_lock_source: "trendline_chip",
         study_lock_seconds_to_close: data.secondsToClose,
         study_locked_at: new Date().toISOString(),
+        study_lock_kalshi_price_cents: lockAskCents,
       } as never)
       .eq("ticker", data.ticker);
     if (error) return { ok: false, reason: "db_error" as const, error: error.message };
