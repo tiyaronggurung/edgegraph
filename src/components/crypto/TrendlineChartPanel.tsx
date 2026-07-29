@@ -536,8 +536,7 @@ export function TrendlineChartPanel() {
           </div>
 
           <Legend visible={visible} setVisible={setVisible} strike={shadow?.strike ?? null} />
-          <div className="relative">
-            {/* Sticky live-price overlay — always visible, never hidden by scroll */}
+          {/* Live-price row — static block above the chart so it never covers the flow strip */}
             {displaySpot != null && (() => {
               const strike = shadow?.strike ?? null;
               const diff = strike != null ? displaySpot - strike : null;
