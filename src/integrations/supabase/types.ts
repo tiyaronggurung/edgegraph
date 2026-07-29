@@ -1880,6 +1880,8 @@ export type Database = {
           config_version: number
           id: number
           log_gate_decisions: boolean
+          max_ask_cents: number
+          max_ask_mode: string
           min_calibrated_edge_points: number
           min_side_confidence: number
           positive_edge_mode: string
@@ -1896,6 +1898,8 @@ export type Database = {
           config_version?: number
           id?: number
           log_gate_decisions?: boolean
+          max_ask_cents?: number
+          max_ask_mode?: string
           min_calibrated_edge_points?: number
           min_side_confidence?: number
           positive_edge_mode?: string
@@ -1912,6 +1916,8 @@ export type Database = {
           config_version?: number
           id?: number
           log_gate_decisions?: boolean
+          max_ask_cents?: number
+          max_ask_mode?: string
           min_calibrated_edge_points?: number
           min_side_confidence?: number
           positive_edge_mode?: string
