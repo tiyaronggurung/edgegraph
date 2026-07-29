@@ -47,6 +47,17 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
         const t0 = Date.now();
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+        // Load Skip Guard config (shadow by default).
+        const { data: gcfg } = await supabaseAdmin
+          .from("btc_gate_config")
+          .select("skip_guard_mode, skip_guard_cushion_soft_usd, skip_guard_cushion_hard_usd, skip_guard_min_conf_tight")
+          .eq("id", 1)
+          .maybeSingle();
+        const skipMode: "off" | "shadow" | "enforced" = ((gcfg as any)?.skip_guard_mode ?? "shadow");
+        const cushionSoft = Number((gcfg as any)?.skip_guard_cushion_soft_usd ?? 25);
+        const cushionHard = Number((gcfg as any)?.skip_guard_cushion_hard_usd ?? 15);
+        const minConfTight = Number((gcfg as any)?.skip_guard_min_conf_tight ?? 0.82);
+
         const nowMs = Date.now();
         const earlyMinIso = new Date(nowMs + 421_000).toISOString(); // > 420s
         const earlyMaxIso = new Date(nowMs + 480_000).toISOString();
@@ -77,7 +88,6 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
           }
           const secondsToClose = Math.round((new Date(closeTime).getTime() - nowMs) / 1000);
           const isEarly = closeTime > earlyMinIso && closeTime <= earlyMaxIso;
-          const isLate = closeTime >= lateMinIso && closeTime <= lateMaxIso;
           const threshold = isEarly ? 0.75 : 0.80;
 
           const { data: ticks } = await supabaseAdmin
@@ -110,6 +120,36 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
             continue;
           }
 
+          // Skip Guard: cushion vs strike (avg of latest 10 spots).
+          const recent = spots.slice(0, Math.min(10, spots.length));
+          const avgSpot = recent.reduce((a, b) => a + b, 0) / recent.length;
+          const cushion = Math.abs(avgSpot - strike);
+          const confFrac = confPct / 100;
+          let skipVerdict: "PROCEED" | "SKIP" = "PROCEED";
+          let skipReason: string | null = null;
+          if (cushion < cushionHard) {
+            skipVerdict = "SKIP";
+            skipReason = `cushion_hard<${cushionHard}`;
+          } else if (cushion < cushionSoft && confFrac < minConfTight) {
+            skipVerdict = "SKIP";
+            skipReason = `cushion_soft<${cushionSoft}_and_conf<${Math.round(minConfTight * 100)}`;
+          }
+
+          // Enforced: skip the lock entirely — record verdict without locking.
+          if (skipMode === "enforced" && skipVerdict === "SKIP") {
+            await supabaseAdmin
+              .from("btc_model_predictions")
+              .update({
+                skip_guard_verdict: "SKIP",
+                skip_guard_reason: skipReason,
+                skip_guard_cushion_usd: Number(cushion.toFixed(2)),
+              } as never)
+              .eq("ticker", ticker)
+              .is("study_locked_side", null);
+            results.push({ ticker, skipped: "skip_guard", reason: skipReason, cushion: Number(cushion.toFixed(2)) });
+            continue;
+          }
+
           const askCents = await fetchKalshiAskCents(ticker, side);
 
           const { error: upErr } = await supabaseAdmin
@@ -121,6 +161,9 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
               study_lock_seconds_to_close: secondsToClose,
               study_locked_at: new Date().toISOString(),
               study_lock_kalshi_price_cents: askCents,
+              skip_guard_verdict: skipMode === "off" ? null : skipVerdict,
+              skip_guard_reason: skipMode === "off" ? null : skipReason,
+              skip_guard_cushion_usd: Number(cushion.toFixed(2)),
             } as never)
             .eq("ticker", ticker)
             .is("study_locked_side", null); // race guard
@@ -128,7 +171,11 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
             results.push({ ticker, skipped: "db_error", err: upErr.message });
             continue;
           }
-          results.push({ ticker, locked: side, confPct, ratio: Number(ratio.toFixed(3)), askCents, phase: isEarly ? "early" : "late" });
+          results.push({
+            ticker, locked: side, confPct, ratio: Number(ratio.toFixed(3)),
+            askCents, phase: isEarly ? "early" : "late",
+            skipGuard: skipMode === "off" ? null : { verdict: skipVerdict, reason: skipReason, cushion: Number(cushion.toFixed(2)) },
+          });
         }
 
         return Response.json({ ok: true, checked: (preds ?? []).length, results, durationMs: Date.now() - t0 });
