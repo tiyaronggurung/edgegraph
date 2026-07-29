@@ -648,8 +648,9 @@ export function TrendlineChartPanel() {
                 ladder: kalshi?.flowLadder ?? null,
               }}
             />
+            </div>
 
-          </div>
+
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
             <Stat label="Spot (live)"   value={displaySpot != null ? `$${displaySpot.toFixed(2)}` : "—"} />
