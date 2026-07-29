@@ -1865,15 +1865,17 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
           modelSource: source,
           edgePts, side, edgeAbs,
           modelSidePreStudy,
-          // Only write study_locked_side when it's authoritative: (a) the chip
-          // already locked it (chipSideEarly), or (b) we're past T+420s AND no
-          // chip disagreement forced an override earlier. Never stomp a chip
-          // write with a fresh model side.
-          studyLockedSide: (chipSideEarly ?? (windowElapsedSec >= 420 ? side : null)) as "YES" | "NO" | null,
+          // Only write study_locked_side when authoritative: from the trendline
+          // chip. The old `server_420` fallback (windowElapsedSec >= 420 ? side)
+          // was disabled — `side` is the value-edge vs Kalshi, NOT a physics
+          // direction, so it locked YES while the tape moved DOWN. Server-side
+          // physics locks now come from the /api/public/hooks/study-lock-tick
+          // cron, which requires a ≥75% one-sided spot-vs-strike ratio.
+          studyLockedSide: (chipSideEarly ?? null) as "YES" | "NO" | null,
           studyLockConfidence: chipLock?.confidence ?? null,
-          studyLockSource: chipLock?.source ?? (windowElapsedSec >= 420 ? "server_420" : null),
-          studyLockSecondsToClose: chipLock?.secondsToClose ?? (windowElapsedSec >= 420 ? secondsToClose : null),
-          studyLockedAt: chipLock?.lockedAt ?? (windowElapsedSec >= 420 ? new Date().toISOString() : null),
+          studyLockSource: chipLock?.source ?? null,
+          studyLockSecondsToClose: chipLock?.secondsToClose ?? null,
+          studyLockedAt: chipLock?.lockedAt ?? null,
           kellyFraction: kelly,
           secondsToClose,
           sigmaDistance: sigDist,
