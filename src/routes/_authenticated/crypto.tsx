@@ -1156,6 +1156,15 @@ function ModelAccuracyPanel() {
 
                           </span>
                         </td>
+                        <td className="p-2 text-right font-mono tabular-nums">
+                          {isStudying ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : r.studyLockKalshiPriceCents != null ? (
+                            <span title="Kalshi ask on the locked side at lock time">{r.studyLockKalshiPriceCents}¢</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
                         <td className="p-2">
                           {(() => {
                             const mp = (r as { modelSidePreStudy?: "YES" | "NO" | null }).modelSidePreStudy ?? r.side;
