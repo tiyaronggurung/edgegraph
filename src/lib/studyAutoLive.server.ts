@@ -81,7 +81,7 @@ export async function fireStudyAutoLiveForUser(
   // 2) Lock + window state
   const { data: pred } = await supabaseAdmin
     .from("btc_model_predictions")
-    .select("ticker, close_time, strike, study_locked_side, study_lock_kalshi_price_cents, study_auto_live_fired_at")
+    .select("ticker, close_time, strike, study_locked_side, study_lock_source, study_lock_kalshi_price_cents, study_auto_live_fired_at")
     .eq("ticker", ticker)
     .maybeSingle();
   if (!pred?.study_locked_side || !pred.close_time || !pred.strike) {
@@ -90,11 +90,49 @@ export async function fireStudyAutoLiveForUser(
   if ((pred as any).study_auto_live_fired_at) {
     return { ok: true, fired: false, reason: "already_fired" };
   }
+
+  // AUTHORITATIVE-SOURCE GUARD — never fire on legacy model-side stamps.
+  // Only physics-derived locks are eligible: the client trendline chip
+  // (recordChipStudyPick) or the server-side physics cron (study-lock-tick).
+  // The old `server_420` fallback wrote `side` (Kalshi value-edge, NOT
+  // physics), which is why some fires historically leaned with the model
+  // instead of the actual spot-vs-strike lean.
+  const ALLOWED_SOURCES = new Set([
+    "trendline_chip",
+    "server_physics_early",
+    "server_physics_late",
+  ]);
+  const lockSource = (pred as any).study_lock_source as string | null;
+  if (!lockSource || !ALLOWED_SOURCES.has(lockSource)) {
+    await logSkip(supabaseAdmin, userId, ticker, pred.close_time, pred.strike, pred.study_locked_side, null, 0, `bad_source:${lockSource ?? "null"}`);
+    return { ok: true, fired: false, reason: `bad_source:${lockSource ?? "null"}` };
+  }
+
   const secondsToClose = Math.round((new Date(pred.close_time).getTime() - Date.now()) / 1000);
   if (secondsToClose <= MIN_SECONDS_TO_CLOSE) {
     await logSkip(supabaseAdmin, userId, ticker, pred.close_time, pred.strike, pred.study_locked_side, null, secondsToClose, "retry_window_expired");
     return { ok: true, fired: false, reason: "retry_window_expired", secondsToClose };
   }
+
+  // PHYSICS-AGREEMENT GUARD — refuse if latest spot is on the OPPOSITE side
+  // of strike vs the locked pick. Prevents "already-losing at fire" entries
+  // where the lock is stale or contradicts current tape.
+  try {
+    const { data: latestTick } = await supabaseAdmin
+      .from("btc_spot_ticks")
+      .select("spot, observed_at")
+      .order("observed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const spot = latestTick?.spot;
+    if (typeof spot === "number") {
+      const spotSide: "YES" | "NO" = spot >= pred.strike ? "YES" : "NO";
+      if (spotSide !== pred.study_locked_side) {
+        await logSkip(supabaseAdmin, userId, ticker, pred.close_time, pred.strike, pred.study_locked_side, null, secondsToClose, `spot_disagrees:spot=${spot.toFixed(2)}:strikeSide=${spotSide}`);
+        return { ok: true, fired: false, reason: "spot_disagrees_with_lock", secondsToClose };
+      }
+    }
+  } catch { /* soft fail — do not block on infra error */ }
 
   // 3) Idempotency — per (user, ticker) via crypto_trades marker
   const { data: existing } = await supabaseAdmin
