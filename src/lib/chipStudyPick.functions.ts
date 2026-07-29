@@ -65,6 +65,40 @@ export const recordChipStudyPick = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const yesNo: "YES" | "NO" = data.side === "UP" ? "YES" : "NO";
 
+    // Lock-time side check: refuse to lock if the latest spot is on the
+    // opposite side of strike from our picked side. Prevents "already-losing
+    // at lock" entries that historically flipped-against by settle.
+    try {
+      const { data: predRow0 } = await supabaseAdmin
+        .from("btc_model_predictions")
+        .select("strike")
+        .eq("ticker", data.ticker)
+        .maybeSingle();
+      const strike = predRow0?.strike;
+      if (strike) {
+        const { data: tick } = await supabaseAdmin
+          .from("btc_spot_ticks")
+          .select("spot")
+          .order("observed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const spot = tick?.spot;
+        if (typeof spot === "number") {
+          const spotSide: "YES" | "NO" = spot >= strike ? "YES" : "NO";
+          if (spotSide !== yesNo) {
+            return {
+              ok: false,
+              reason: "side_disagrees_with_spot" as const,
+              spot,
+              strike,
+              spotSide,
+              pickSide: yesNo,
+            };
+          }
+        }
+      }
+    } catch { /* soft fail — do not block lock on infra error */ }
+
     // Capture Kalshi ask on the locked side at the exact lock moment. This is
     // the price we would have paid if we auto-traded the Study Pick — used for
     // future entry sizing and backtest cost analysis.
