@@ -214,6 +214,9 @@ export interface QuoteInput extends UpProbInput {
   midPrice?: number | null; // trendline MID (SELL+BUY)/2 — the anchor
   buyPrice?: number | null; // upper trendline pill (resistance)
   sellPrice?: number | null;// lower trendline pill (support)
+  // Binance BTCUSDT taker buy/sell imbalance over the trailing 3 minutes,
+  // signed −1..+1 ( (buy−sell)/total ). Feeds volumeTilt.
+  volumeImbalance3m?: number | null;
 }
 
 
