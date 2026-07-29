@@ -642,6 +642,10 @@ export function TrendlineChartPanel() {
                 tradeCount60s: kalshi?.tradeCount60s ?? null,
                 volume: kalshi?.volume ?? null,
                 openInterest: kalshi?.openInterest ?? null,
+                yesVolWindow: kalshi?.yesVolWindow ?? null,
+                noVolWindow: kalshi?.noVolWindow ?? null,
+                tradeCountWindow: kalshi?.tradeCountWindow ?? null,
+                ladder: kalshi?.flowLadder ?? null,
               }}
             />
 
@@ -763,6 +767,10 @@ function TaChart({
     tradeCount60s: number | null;
     volume: number | null;
     openInterest: number | null;
+    yesVolWindow: number | null;
+    noVolWindow: number | null;
+    tradeCountWindow: number | null;
+    ladder: Array<{ m: number; yes: number; no: number; trades: number }> | null;
   };
 }) {
 
@@ -1054,6 +1062,20 @@ function TaChart({
         const oi = kalshiFlow?.openInterest ?? null;
         const vol = kalshiFlow?.volume ?? null;
         const trades = kalshiFlow?.tradeCount60s ?? 0;
+        // Window-to-date cumulative side flow (since :00/:15/:30/:45), laddered
+        // per minute by the server from the same trade pull as the 60s figure.
+        const wy = kalshiFlow?.yesVolWindow ?? null;
+        const wn = kalshiFlow?.noVolWindow ?? null;
+        const wTrades = kalshiFlow?.tradeCountWindow ?? 0;
+        const ladder = kalshiFlow?.ladder ?? null;
+        const wHas = wy != null && wn != null && (wy + wn) > 0;
+        const wTotal = wHas ? (wy as number) + (wn as number) : 0;
+        const wYesPct = wTotal > 0 ? ((wy as number) / wTotal) * 100 : 0;
+        const wNoPct = 100 - wYesPct;
+        const wDominant: "YES" | "NO" | null =
+          wTotal >= 20 && wYesPct >= 60 ? "YES"
+          : wTotal >= 20 && wNoPct >= 60 ? "NO"
+          : null;
         const hasData = y != null && n != null;
         const total = hasData ? (y as number) + (n as number) : 0;
         const yesPct = total > 0 ? ((y as number) / total) * 100 : 0;
@@ -1073,14 +1095,24 @@ function TaChart({
           `  Trades:   ${trades}\n` +
           (vol != null ? `  Total window volume: ${vol.toLocaleString()}\n` : "") +
           (oi != null ? `  Open interest: ${oi.toLocaleString()}\n` : "") +
+          (wHas
+            ? `\nWindow-to-date (since window open):\n` +
+              `  YES: ${wy} (${wYesPct.toFixed(0)}%)  NO: ${wn} (${wNoPct.toFixed(0)}%)  ${wTrades} trades\n` +
+              (ladder && ladder.length
+                ? `  Per-minute ladder (m: YES/NO):\n` +
+                  ladder.map((b) => `    m${b.m}: ${b.yes}/${b.no}`).join("\n") + `\n`
+                : "")
+            : "") +
           (dominant
-            ? `\n⚠ ${dominant} side dominant — real money pushing that way.`
-            : `\nBalanced flow — no side pressure.`);
+            ? `\n⚠ ${dominant} side dominant in the last 60s — real money pushing that way.`
+            : `\nBalanced 60s flow — no side pressure.`) +
+          (wDominant ? `\n⚠ ${wDominant} side dominant across the whole window.` : "");
         return (
           <div
-            className={`pointer-events-none absolute top-2 right-2 z-20 flex items-center gap-2 px-2 py-1 border rounded text-[10px] font-mono backdrop-blur bg-black/75 shadow-lg ${barCls}`}
+            className={`pointer-events-none absolute top-2 right-2 z-20 flex flex-col gap-1 px-2 py-1 border rounded text-[10px] font-mono backdrop-blur bg-black/75 shadow-lg ${barCls}`}
             title={title}
           >
+            <div className="flex items-center gap-2">
             <span className="text-white/50 tracking-wider">FLOW 60s</span>
             {hasData ? (
               <>
@@ -1124,6 +1156,63 @@ function TaChart({
                 {oi != null ? ` · OI ${oi.toLocaleString()}` : ""}
               </span>
             )}
+            </div>
+
+            {/* Cumulative window row — every 60s bucket added up since window open. */}
+            <div className="flex items-center gap-2 border-t border-white/10 pt-1">
+              <span className="text-white/50 tracking-wider">WIN 15m</span>
+              {wHas ? (
+                <>
+                  <span className="flex items-center gap-1">
+                    <span className="text-emerald-300/80">Y</span>
+                    <span className="tabular-nums text-emerald-200 font-bold">
+                      {(wy as number).toLocaleString()}
+                    </span>
+                  </span>
+                  <span className="text-white/20">·</span>
+                  <span className="flex items-center gap-1">
+                    <span className="text-rose-300/80">N</span>
+                    <span className="tabular-nums text-rose-200 font-bold">
+                      {(wn as number).toLocaleString()}
+                    </span>
+                  </span>
+                  <span className="h-1.5 w-[80px] rounded overflow-hidden bg-white/10 flex">
+                    <span className="h-full bg-emerald-400/80" style={{ width: `${wYesPct}%` }} />
+                    <span className="h-full bg-rose-400/80" style={{ width: `${wNoPct}%` }} />
+                  </span>
+                  {wDominant && (
+                    <span className={`font-bold ${wDominant === "YES" ? "text-emerald-200" : "text-rose-200"}`}>
+                      {wDominant === "YES" ? "↑" : "↓"} {Math.max(wYesPct, wNoPct).toFixed(0)}%
+                    </span>
+                  )}
+                  <span className="text-white/40">· {wTrades}t</span>
+                  {/* per-minute ladder: one column per elapsed minute, YES above NO */}
+                  {ladder && ladder.length > 0 && (() => {
+                    const peak = Math.max(1, ...ladder.map((b) => b.yes + b.no));
+                    return (
+                      <span className="hidden lg:flex items-end gap-[2px] h-4 ml-1">
+                        {ladder.map((b) => {
+                          const h = Math.max(2, Math.round(((b.yes + b.no) / peak) * 14));
+                          const yFrac = (b.yes + b.no) > 0 ? b.yes / (b.yes + b.no) : 0.5;
+                          return (
+                            <span
+                              key={b.m}
+                              className="w-[3px] flex flex-col justify-end rounded-sm overflow-hidden bg-white/5"
+                              style={{ height: `${h}px` }}
+                            >
+                              <span className="w-full bg-emerald-400/80" style={{ height: `${yFrac * 100}%` }} />
+                              <span className="w-full bg-rose-400/80" style={{ height: `${(1 - yFrac) * 100}%` }} />
+                            </span>
+                          );
+                        })}
+                      </span>
+                    );
+                  })()}
+                </>
+              ) : (
+                <span className="text-white/40">accumulating…</span>
+              )}
+            </div>
           </div>
         );
       })()}
