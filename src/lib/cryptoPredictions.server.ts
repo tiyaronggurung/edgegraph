@@ -432,6 +432,9 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
       studyLockSecondsToClose: (r as { study_lock_seconds_to_close?: number | null }).study_lock_seconds_to_close ?? null,
       studyLockedAt: ((r as { study_locked_at?: string | null }).study_locked_at) ?? null,
       studyLockKalshiPriceCents: (r as { study_lock_kalshi_price_cents?: number | null }).study_lock_kalshi_price_cents != null ? Number((r as { study_lock_kalshi_price_cents?: number | null }).study_lock_kalshi_price_cents) : null,
+      cvvWouldLockSide: ((r as { cvv_would_lock_side?: string | null }).cvv_would_lock_side as "YES" | "NO" | null) ?? null,
+      cvvWouldLockConf: (r as { cvv_would_lock_conf?: number | string | null }).cvv_would_lock_conf != null ? Number((r as { cvv_would_lock_conf?: number | string | null }).cvv_would_lock_conf) : null,
+      skipGuardReason: ((r as { skip_guard_reason?: string | null }).skip_guard_reason) ?? null,
     })),
   };
 }
