@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Zap } from "lucide-re
 import { evalTrendlineShadow, type TrendlineSnapshot } from "@/lib/trendlineShadow.functions";
 import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
 import { getCompositeSpot } from "@/lib/compositeSpot.functions";
+import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
 import { getBtcCandles, TF_LIST, type CandleTf } from "@/lib/btcCandles.functions";
 import { detectSpike, detectTrendlines, type TCandle } from "@/lib/ta/trendlines";
 import { emaSeries, rsi, macd, bollinger, sessionVwap } from "@/lib/ta/taEngine";
@@ -62,6 +63,7 @@ export function TrendlineChartPanel() {
   const candlesFn = useServerFn(getBtcCandles);
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
   const compositeFn = useServerFn(getCompositeSpot);
+  const spotVolFn = useServerFn(getBtcSpotVolume);
 
   // Records 1 snapshot/sec of Kalshi odds + our odds into btc_kalshi_odds_snapshots.
   useKalshiOddsRecorder([]);
@@ -222,6 +224,15 @@ export function TrendlineChartPanel() {
     const u = shadow?.upperAtNow, l = shadow?.lowerAtNow;
     return (u != null && l != null && u > l) ? (u + l) / 2 : null;
   }, [shadow?.upperAtNow, shadow?.lowerAtNow]);
+  // Spot taker buy/sell imbalance — small confirming weight on the study pick.
+  const { data: spotVol } = useQuery({
+    queryKey: ["btc-spot-volume-quote"],
+    queryFn: () => spotVolFn(),
+    refetchInterval: 20_000,
+    placeholderData: keepPreviousData,
+  });
+  const volImb3m = spotVol?.m3?.imbalance ?? null;
+
   const ourQuote = useOurQuote({
     spot: displaySpot,
     strike: kalshi?.strike ?? null,
@@ -230,6 +241,7 @@ export function TrendlineChartPanel() {
     midPrice: midPriceNow,
     buyPrice: shadow?.upperAtNow ?? null,
     sellPrice: shadow?.lowerAtNow ?? null,
+    volumeImbalance3m: volImb3m,
   });
 
   // --- BET UP/DOWN lock @ 75% within first 7 min (session-only W/L history) -------------------
