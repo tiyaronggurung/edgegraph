@@ -1446,13 +1446,56 @@ export const listAutoTradeOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ orders: AutoTradeOrderRow[]; totals: { placed: number; wins: number; losses: number; pnlUsd: number } }> => {
     const { supabase, userId } = context;
-    const { data: rows } = await supabase
-      .from("auto_trade_orders")
-      .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(100);
-    const orders = (rows ?? []) as AutoTradeOrderRow[];
+    const [{ data: rows }, { data: studyRows }] = await Promise.all([
+      supabase
+        .from("auto_trade_orders")
+        .select("id, ticker, side, stake_usd, contracts, limit_cents, status, mode, model_prob, edge_pts, sigma_distance, close_time, pnl_usd, settle_price, created_at, entry_price_cents, contracts_remaining, partial_pnl_usd")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      supabase
+        .from("crypto_trades")
+        .select("id, ticker, side, stake_usd, contracts, market_yes_price, status, model_prob, edge_pts, close_time, pnl_usd, settled_yes_price, created_at, inputs_snapshot")
+        .eq("user_id", userId)
+        .filter("inputs_snapshot->>source", "eq", "study_auto_live")
+        .in("status", ["submitted", "pending", "settled", "closed"])
+        .order("created_at", { ascending: false })
+        .limit(100),
+    ]);
+
+    const nativeOrders = (rows ?? []) as AutoTradeOrderRow[];
+    const studyOrders: AutoTradeOrderRow[] = ((studyRows ?? []) as Array<any>).map(r => {
+      const priceCents = Math.max(1, Math.min(99, Math.round(Number(r.market_yes_price ?? 0) * 100)));
+      const pnl = r.pnl_usd != null ? Number(r.pnl_usd) : null;
+      let status = "placed";
+      if (r.status === "settled" || r.status === "closed") {
+        status = pnl != null && pnl > 0 ? "settled_win" : "settled_loss";
+      }
+      return {
+        id: r.id,
+        ticker: r.ticker,
+        side: r.side as "YES" | "NO",
+        stake_usd: Number(r.stake_usd) || 0,
+        contracts: Number(r.contracts) || 0,
+        limit_cents: priceCents,
+        status,
+        mode: "live",
+        model_prob: Number(r.model_prob) || 0,
+        edge_pts: Number(r.edge_pts) || 0,
+        sigma_distance: 0,
+        close_time: r.close_time,
+        pnl_usd: pnl,
+        settle_price: r.settled_yes_price != null ? Number(r.settled_yes_price) : null,
+        created_at: r.created_at,
+        entry_price_cents: priceCents,
+        contracts_remaining: null,
+        partial_pnl_usd: null,
+      };
+    });
+
+    const orders = [...nativeOrders, ...studyOrders]
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+      .slice(0, 100);
     const wins = orders.filter(o => o.status === "settled_win").length;
     const losses = orders.filter(o => o.status === "settled_loss").length;
     const pnlUsd = orders.reduce((s, o) => s + (Number(o.pnl_usd) || 0), 0);
