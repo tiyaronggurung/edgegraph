@@ -36,6 +36,13 @@ const BIAS_DECAY_PER_S = Math.pow(0.5, 1 / 720);
 const BIAS_STEP = 0.0025;     // per-tick contribution when both signals agree
 const BIAS_MAX = 0.08;        // ±8¢ cap
 
+// Per-window warmup on strike rollover: blank the pill until we have fresh
+// evidence on the NEW strike. Prevents leftover mid / bias / memory-driven
+// signals from the previous 15m window bleeding into the first seconds of
+// the next window.
+const WARMUP_MIN_MS = 2500;
+const WARMUP_MIN_TICKS = 5;
+
 interface WindowState {
   strike: number;
   maxMid: number;              // best (highest) mid seen this window
@@ -49,6 +56,9 @@ interface WindowState {
   oppositeStreakSec: number;   // seconds physics has voted opposite the lock
   // --- rolling spot-side series for anti-fakeout ---
   sideHist: Array<{ t: number; above: boolean }>;
+  // --- per-window warmup on strike change ---
+  strikeChangedAt: number;     // ms timestamp when this new strike appeared
+  postStrikeTicks: number;     // spot ticks recorded since strike change
 }
 
 
