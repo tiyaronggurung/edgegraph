@@ -1033,7 +1033,164 @@ function TaChart({
   const onScroll = () => setViewportTick(v => (v + 1) & 0xffff);
 
   return (
-    <div className="relative mt-2">
+    <>
+      {(() => {
+        // Kalshi per-side flow strip — sits above the trendline chart section.
+        const y = kalshiFlow?.yesVol60s ?? null;
+        const n = kalshiFlow?.noVol60s ?? null;
+        const oi = kalshiFlow?.openInterest ?? null;
+        const vol = kalshiFlow?.volume ?? null;
+        const trades = kalshiFlow?.tradeCount60s ?? 0;
+        const wy = kalshiFlow?.yesVolWindow ?? null;
+        const wn = kalshiFlow?.noVolWindow ?? null;
+        const wTrades = kalshiFlow?.tradeCountWindow ?? 0;
+        const ladder = kalshiFlow?.ladder ?? null;
+        const wHas = wy != null && wn != null && (wy + wn) > 0;
+        const wTotal = wHas ? (wy as number) + (wn as number) : 0;
+        const wYesPct = wTotal > 0 ? ((wy as number) / wTotal) * 100 : 0;
+        const wNoPct = 100 - wYesPct;
+        const wDominant: "YES" | "NO" | null =
+          wTotal >= 20 && wYesPct >= 60 ? "YES"
+          : wTotal >= 20 && wNoPct >= 60 ? "NO"
+          : null;
+        const hasData = y != null && n != null;
+        const total = hasData ? (y as number) + (n as number) : 0;
+        const yesPct = total > 0 ? ((y as number) / total) * 100 : 0;
+        const noPct = 100 - yesPct;
+        const dominant: "YES" | "NO" | null =
+          total >= 5 && yesPct >= 65 ? "YES"
+          : total >= 5 && noPct >= 65 ? "NO"
+          : null;
+        const barCls =
+          dominant === "YES" ? "border-emerald-500/40 bg-emerald-500/10"
+          : dominant === "NO" ? "border-rose-500/40 bg-rose-500/10"
+          : "border-white/10 bg-black/40";
+        const title =
+          `Kalshi taker flow (last 60s):\n` +
+          `  YES buys: ${y ?? "—"} contracts (${hasData ? yesPct.toFixed(0) : "—"}%)\n` +
+          `  NO  buys: ${n ?? "—"} contracts (${hasData ? noPct.toFixed(0) : "—"}%)\n` +
+          `  Trades:   ${trades}\n` +
+          (vol != null ? `  Total window volume: ${vol.toLocaleString()}\n` : "") +
+          (oi != null ? `  Open interest: ${oi.toLocaleString()}\n` : "") +
+          (wHas
+            ? `\nWindow-to-date (since window open):\n` +
+              `  YES: ${wy} (${wYesPct.toFixed(0)}%)  NO: ${wn} (${wNoPct.toFixed(0)}%)  ${wTrades} trades\n` +
+              (ladder && ladder.length
+                ? `  Per-minute ladder (m: YES/NO):\n` +
+                  ladder.map((b) => `    m${b.m}: ${b.yes}/${b.no}`).join("\n") + `\n`
+                : "")
+            : "") +
+          (dominant
+            ? `\n⚠ ${dominant} side dominant in the last 60s — real money pushing that way.`
+            : `\nBalanced 60s flow — no side pressure.`) +
+          (wDominant ? `\n⚠ ${wDominant} side dominant across the whole window.` : "");
+        return (
+          <div
+            className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-3 py-2 border rounded text-[10px] font-mono backdrop-blur bg-black/75 shadow-lg ${barCls}`}
+            title={title}
+          >
+            <div className="flex items-center gap-2">
+            <span className="text-white/50 tracking-wider">FLOW 60s</span>
+            {hasData ? (
+              <>
+                <span className="flex items-center gap-1">
+                  <span className="text-emerald-300/80">Y</span>
+                  <span className="tabular-nums text-emerald-200 font-bold">{y}</span>
+                </span>
+                <span className="text-white/20">·</span>
+                <span className="flex items-center gap-1">
+                  <span className="text-rose-300/80">N</span>
+                  <span className="tabular-nums text-rose-200 font-bold">{n}</span>
+                </span>
+                <span className="h-1.5 w-[80px] rounded overflow-hidden bg-white/10 flex">
+                  <span
+                    className="h-full bg-emerald-400/80"
+                    style={{ width: `${yesPct}%` }}
+                  />
+                  <span
+                    className="h-full bg-rose-400/80"
+                    style={{ width: `${noPct}%` }}
+                  />
+                </span>
+                {dominant && (
+                  <span
+                    className={`font-bold ${
+                      dominant === "YES" ? "text-emerald-200" : "text-rose-200"
+                    }`}
+                  >
+                    {dominant === "YES" ? "↑" : "↓"} {Math.max(yesPct, noPct).toFixed(0)}%
+                  </span>
+                )}
+                <span className="text-white/40">· {trades}t</span>
+              </>
+            ) : (
+              <span className="text-white/40">no data</span>
+            )}
+            {vol != null && (
+              <span className="text-white/40 hidden lg:inline">
+                · vol {vol.toLocaleString()}
+                {oi != null ? ` · OI ${oi.toLocaleString()}` : ""}
+              </span>
+            )}
+            </div>
+
+            <div className="flex items-center gap-2 border-t sm:border-t-0 border-white/10 pt-1 sm:pt-0">
+              <span className="text-white/50 tracking-wider">WIN 15m</span>
+              {wHas ? (
+                <>
+                  <span className="flex items-center gap-1">
+                    <span className="text-emerald-300/80">Y</span>
+                    <span className="tabular-nums text-emerald-200 font-bold">
+                      {(wy as number).toLocaleString()}
+                    </span>
+                  </span>
+                  <span className="text-white/20">·</span>
+                  <span className="flex items-center gap-1">
+                    <span className="text-rose-300/80">N</span>
+                    <span className="tabular-nums text-rose-200 font-bold">
+                      {(wn as number).toLocaleString()}
+                    </span>
+                  </span>
+                  <span className="h-1.5 w-[80px] rounded overflow-hidden bg-white/10 flex">
+                    <span className="h-full bg-emerald-400/80" style={{ width: `${wYesPct}%` }} />
+                    <span className="h-full bg-rose-400/80" style={{ width: `${wNoPct}%` }} />
+                  </span>
+                  {wDominant && (
+                    <span className={`font-bold ${wDominant === "YES" ? "text-emerald-200" : "text-rose-200"}`}>
+                      {wDominant === "YES" ? "↑" : "↓"} {Math.max(wYesPct, wNoPct).toFixed(0)}%
+                    </span>
+                  )}
+                  <span className="text-white/40">· {wTrades}t</span>
+                  {ladder && ladder.length > 0 && (() => {
+                    const peak = Math.max(1, ...ladder.map((b) => b.yes + b.no));
+                    return (
+                      <span className="hidden lg:flex items-end gap-[2px] h-4 ml-1">
+                        {ladder.map((b) => {
+                          const h = Math.max(2, Math.round(((b.yes + b.no) / peak) * 14));
+                          const yFrac = (b.yes + b.no) > 0 ? b.yes / (b.yes + b.no) : 0.5;
+                          return (
+                            <span
+                              key={b.m}
+                              className="w-[3px] flex flex-col justify-end rounded-sm overflow-hidden bg-white/5"
+                              style={{ height: `${h}px` }}
+                            >
+                              <span className="w-full bg-emerald-400/80" style={{ height: `${yFrac * 100}%` }} />
+                              <span className="w-full bg-rose-400/80" style={{ height: `${(1 - yFrac) * 100}%` }} />
+                            </span>
+                          );
+                        })}
+                      </span>
+                    );
+                  })()}
+                </>
+              ) : (
+                <span className="text-white/40">accumulating…</span>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+      <div className="relative mt-2">
       {/* Zoom controls — overlay top-right */}
       <div className="absolute right-2 top-2 z-10 flex items-center gap-1 bg-black/60 border border-white/10 rounded px-1 py-0.5 backdrop-blur">
         <button
