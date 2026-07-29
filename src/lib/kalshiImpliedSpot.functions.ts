@@ -62,6 +62,11 @@ export interface KalshiImpliedSpot {
 
 export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
   async (): Promise<KalshiImpliedSpot> => {
+    const num = (v: unknown): number | null => {
+      if (v == null) return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
     const empty: KalshiImpliedSpot = {
       ok: false, ticker: null, strike: null, yesBid: null, yesAsk: null,
       yesMid: null, secondsToClose: null, impliedSpot: null,
