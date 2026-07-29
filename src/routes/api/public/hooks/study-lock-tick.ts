@@ -1,5 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { verifyCronRequest } from "@/lib/cronAuth";
+import {
+  readCvvConfig,
+  getAtr7Usd,
+  signedMomentumUsd,
+  evaluateCvv,
+} from "@/lib/cushionVolGate.server";
 
 // Server-side Study Pick lock writer.
 // Runs every 60s from pg_cron. Writes btc_model_predictions.study_locked_side
@@ -50,7 +56,7 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
         // Load Skip Guard config (shadow by default).
         const { data: gcfg } = await supabaseAdmin
           .from("btc_gate_config")
-          .select("skip_guard_mode, skip_guard_cushion_soft_usd, skip_guard_cushion_hard_usd, skip_guard_min_conf_tight, max_ask_mode, max_ask_cents")
+          .select("skip_guard_mode, skip_guard_cushion_soft_usd, skip_guard_cushion_hard_usd, skip_guard_min_conf_tight, max_ask_mode, max_ask_cents, cvv_mode, cvv_atr_mult, cvv_momentum_max_usd, cvv_atr_lookback_hours")
           .eq("id", 1)
           .maybeSingle();
         const skipMode: "off" | "shadow" | "enforced" = ((gcfg as any)?.skip_guard_mode ?? "shadow");
@@ -60,6 +66,13 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
         // Max-Ask filter (#4): tag/skip locks whose entry price is too rich to be profitable.
         const maxAskMode: "off" | "shadow" | "enforced" = ((gcfg as any)?.max_ask_mode ?? "shadow");
         const maxAskCents = Number((gcfg as any)?.max_ask_cents ?? 85);
+
+        // Cushion-vs-Volatility gate. Always evaluated + logged when not "off";
+        // only blocks the lock when mode === "enforced".
+        const cvvCfg = readCvvConfig(gcfg as any);
+        const atr7Usd =
+          cvvCfg.mode === "off" ? null : await getAtr7Usd(supabaseAdmin, cvvCfg.atrLookbackHours);
+
 
         const nowMs = Date.now();
         const earlyMinIso = new Date(nowMs + 421_000).toISOString(); // > 420s
@@ -80,6 +93,22 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
 
         const results: Array<Record<string, unknown>> = [];
         const sinceIso = new Date(nowMs - 120_000).toISOString();
+
+        // Wider tick window (newest-first) used only for the CVV 3-min momentum
+        // term. The consensus window above stays at 120s — unchanged behaviour.
+        let momentumSpots: number[] = [];
+        if (cvvCfg.mode !== "off") {
+          const { data: mTicks } = await supabaseAdmin
+            .from("btc_spot_ticks")
+            .select("spot")
+            .gte("observed_at", new Date(nowMs - 190_000).toISOString())
+            .order("observed_at", { ascending: false })
+            .limit(400);
+          momentumSpots = (mTicks ?? [])
+            .map((t: any) => Number(t.spot))
+            .filter((x: number) => Number.isFinite(x));
+        }
+
 
         for (const p of preds ?? []) {
           const ticker = (p as any).ticker as string;
@@ -138,7 +167,60 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
             skipReason = `cushion_soft<${cushionSoft}_and_conf<${Math.round(minConfTight * 100)}`;
           }
 
+          // ---- Cushion-vs-Volatility gate (shadow + live at once) ----
+          // Always computed and persisted when mode !== "off". In "enforced"
+          // mode a SKIP blocks the lock but still records the side/confidence
+          // that WOULD have been locked, so skipped windows stay scoreable.
+          let cvv: ReturnType<typeof evaluateCvv> | null = null;
+          if (cvvCfg.mode !== "off") {
+            const momentumUsd = signedMomentumUsd(
+              momentumSpots,
+              side,
+              180,
+              190 / Math.max(momentumSpots.length, 1),
+            );
+            cvv = evaluateCvv({
+              cfg: cvvCfg,
+              spot: avgSpot,
+              strike,
+              side,
+              atrUsd: atr7Usd,
+              momentumUsd,
+            });
+          }
+          const cvvFields = cvv
+            ? {
+                cvv_verdict: cvv.verdict,
+                cvv_reason: cvv.reason,
+                cvv_cushion_usd: cvv.cushionUsd,
+                cvv_atr_usd: cvv.atrUsd,
+                cvv_momentum_usd: cvv.momentumUsd,
+              }
+            : {};
+
+          if (cvvCfg.mode === "enforced" && cvv?.verdict === "SKIP") {
+            await supabaseAdmin
+              .from("btc_model_predictions")
+              .update({
+                ...cvvFields,
+                cvv_would_lock_side: side,
+                cvv_would_lock_conf: confPct,
+                skip_guard_verdict: "SKIP",
+                skip_guard_reason: `cvv:${cvv.reason}`,
+                skip_guard_cushion_usd: Number(cushion.toFixed(2)),
+              } as never)
+              .eq("ticker", ticker)
+              .is("study_locked_side", null);
+            results.push({
+              ticker, skipped: "cvv_gate", reason: cvv.reason,
+              cushion: cvv.cushionUsd, atr7: cvv.atrUsd, momentum: cvv.momentumUsd,
+              wouldLock: side, wouldConf: confPct,
+            });
+            continue;
+          }
+
           // Enforced: skip the lock entirely — record verdict without locking.
+
           if (skipMode === "enforced" && skipVerdict === "SKIP") {
             await supabaseAdmin
               .from("btc_model_predictions")
@@ -178,6 +260,7 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
           const { error: upErr } = await supabaseAdmin
             .from("btc_model_predictions")
             .update({
+              ...cvvFields,
               study_locked_side: side,
               study_lock_confidence: confPct,
               study_lock_source: isEarly ? "server_physics_early" : "server_physics_late",
@@ -198,6 +281,7 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
             ticker, locked: side, confPct, ratio: Number(ratio.toFixed(3)),
             askCents, phase: isEarly ? "early" : "late",
             skipGuard: skipMode === "off" ? null : { verdict: skipVerdict, reason: skipReason, cushion: Number(cushion.toFixed(2)) },
+            cvv: cvv ? { mode: cvvCfg.mode, verdict: cvv.verdict, reason: cvv.reason, cushion: cvv.cushionUsd, atr7: cvv.atrUsd, required: cvv.requiredCushionUsd, momentum: cvv.momentumUsd } : null,
           });
         }
 
