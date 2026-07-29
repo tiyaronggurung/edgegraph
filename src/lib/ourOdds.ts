@@ -214,6 +214,9 @@ export interface QuoteInput extends UpProbInput {
   midPrice?: number | null; // trendline MID (SELL+BUY)/2 — the anchor
   buyPrice?: number | null; // upper trendline pill (resistance)
   sellPrice?: number | null;// lower trendline pill (support)
+  // Binance BTCUSDT taker buy/sell imbalance over the trailing 3 minutes,
+  // signed −1..+1 ( (buy−sell)/total ). Feeds volumeTilt.
+  volumeImbalance3m?: number | null;
 }
 
 
@@ -228,6 +231,7 @@ export interface OurQuote {
   timeDecayFrac: number; // 0 at open → 1 at close (for UI decay bar)
   midPivotTiltPct: number; // signed fraction actually applied
   pillGateTiltPct: number; // signed fraction from strike-vs-pills gate
+  volumeTiltPct: number;   // signed fraction from spot taker-volume imbalance
   recommendation: BetRecommendation; // UI-facing UP/DOWN/WAIT call w/ reason
 }
 
@@ -313,6 +317,33 @@ function calibrationStretch(mid: number, secondsToClose: number): number {
  * while making STRIKE the anchor — so a $20 move above strike shows the
  * right physics-driven odds instead of being masked by a mid-pull-to-center.
  */
+/**
+ * Spot taker-volume tilt (signed fraction, capped ±2¢).
+ *
+ * Backtest (20d, 1,797 settled windows, Binance 1m taker buy/sell):
+ *   trailing 3m imbalance → outcome: 58.0% all windows, 60.4% at |imb| ≥ 0.30
+ *   trailing 1m imbalance → 52.3%, and only 48.5% on near-strike windows
+ *   near-strike (|spot−strike| ≤ $10), any horizon → ~50%
+ *
+ * So volume is a *weak trend confirmer*, not a decider. It gets a small
+ * weight, only from the 3m window, only above a 0.15 imbalance floor, and
+ * it is switched off in the last 2 minutes where the data shows no edge.
+ */
+export function volumeTilt(
+  imbalance3m: number | null | undefined,
+  secondsToClose: number,
+): number {
+  if (imbalance3m == null || !Number.isFinite(imbalance3m)) return 0;
+  if (secondsToClose < 120) return 0;      // no measurable edge inside T-2m
+  const MIN_IMB = 0.15;
+  const FULL_IMB = 0.35;
+  const MAX_TILT = 0.02;                   // ±2¢ hard cap
+  const mag = Math.abs(imbalance3m);
+  if (mag < MIN_IMB) return 0;
+  const frac = Math.min(1, (mag - MIN_IMB) / (FULL_IMB - MIN_IMB));
+  return Math.sign(imbalance3m) * MAX_TILT * frac;
+}
+
 export function computeOurQuote(inp: QuoteInput): OurQuote | null {
   const { spot, strike, sigmaAnnualized, midPrice } = inp;
   if (!(spot > 0) || !(strike > 0) || !(sigmaAnnualized > 0)) return null;
@@ -344,13 +375,15 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
   });
   // MID pivot: which side of (SELL+BUY)/2 is spot on. Signed, ±4¢, time-weighted.
   const midTilt = midPivotTilt(spot, midPrice ?? null, inp.secondsToClose);
+  // Spot taker-volume confirmation (small weight — see volumeTilt docblock).
+  const volTilt = volumeTilt(inp.volumeImbalance3m ?? null, inp.secondsToClose);
 
   // Combined pill influence for the UI decay bar (kept for backwards shape).
   const effectivePivot = midTilt + pillTilt + brkTilt;
 
   // Sum tilts on top of physics, then calibration-stretch.
   const rawMid = Math.min(0.99, Math.max(0.01,
-    spotMid + midTilt + pillTilt + brkTilt + momTilt,
+    spotMid + midTilt + pillTilt + brkTilt + momTilt + volTilt,
   ));
   const mid = calibrationStretch(rawMid, inp.secondsToClose);
 
@@ -367,7 +400,8 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
   const recommendation = buildRecommendation({
     mid,
     pillTilt: pillTilt + midTilt + brkTilt,
-    momTilt,
+    momTilt: momTilt + volTilt,
+    volTilt,
     secondsToClose: inp.secondsToClose,
     spot,
     strike,
@@ -386,6 +420,7 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
     timeDecayFrac,
     midPivotTiltPct: effectivePivot,
     pillGateTiltPct: pillTilt,
+    volumeTiltPct: volTilt,
     recommendation,
   };
 }
@@ -534,6 +569,7 @@ export function buildRecommendation(args: {
   mid: number;
   pillTilt: number;
   momTilt: number;
+  volTilt?: number;
   secondsToClose: number;
   spot: number;
   strike: number;
@@ -542,6 +578,7 @@ export function buildRecommendation(args: {
   sellPrice: number | null;
 }): BetRecommendation {
   const { mid, pillTilt, momTilt, secondsToClose, spot, strike, midPrice } = args;
+  const volTilt = args.volTilt ?? 0;
   const upProbPct = mid * 100;
   const downProbPct = (1 - mid) * 100;
   const tiltCents = (pillTilt + momTilt) * 100;
@@ -572,6 +609,10 @@ export function buildRecommendation(args: {
   }
   if (Math.abs(tiltCents) >= 2) {
     parts.push(`pill-tilt ${tiltCents >= 0 ? "+" : ""}${tiltCents.toFixed(1)}¢`);
+  }
+  if (Math.abs(volTilt) >= 0.005) {
+    const vc = volTilt * 100;
+    parts.push(`vol ${vc >= 0 ? "+" : ""}${vc.toFixed(1)}¢ ${vc >= 0 ? "buy" : "sell"}-side`);
   }
   parts.push(`spot $${spotDollars.toFixed(0)} ${spotSide} strike`);
   parts.push(`${secondsToClose}s left`);

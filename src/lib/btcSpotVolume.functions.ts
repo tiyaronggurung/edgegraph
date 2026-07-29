@@ -24,6 +24,8 @@ export interface BtcSpotVolume {
   source: string;
   /** Last fully closed 1m candle. */
   m1: SpotVolumeLeg | null;
+  /** Rolling last 3 minutes — the leg that actually carries predictive edge. */
+  m3: SpotVolumeLeg | null;
   /** Rolling last 15 minutes. */
   m15: SpotVolumeLeg | null;
   /** Current 15m Kalshi-aligned window (since :00/:15/:30/:45). */
@@ -35,7 +37,7 @@ export interface BtcSpotVolume {
 export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
   async (): Promise<BtcSpotVolume> => {
     const empty: BtcSpotVolume = {
-      ok: false, source: "binance", m1: null, m15: null, window: null,
+      ok: false, source: "binance", m1: null, m3: null, m15: null, window: null,
       lastCloseTime: null, error: null,
     };
 
@@ -85,6 +87,7 @@ export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
         ok: true,
         source: "binance:BTCUSDT",
         m1: last ? leg([last]) : null,
+        m3: leg(closed.slice(-3)),
         m15: leg(rows.slice(-15)),
         window: leg(winRows),
         lastCloseTime: last ? last[6] : null,
