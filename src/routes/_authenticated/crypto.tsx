@@ -3262,6 +3262,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
           </p>
           <OddsFlipAlert />
           <BigFlipMonitor />
+          <StudyAutoLiveBanner />
           <OurOddsLiveHunterPanel />
 
           {skipReport.data && skipReport.data.totalSettled > 0 && (
