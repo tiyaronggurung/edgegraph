@@ -228,6 +228,50 @@ export async function driveStudyAutoLive(): Promise<{
     }
   }
 
+  // Late-flip guard — SHADOW MODE. Find any study_auto_live trades that are
+  // still open, within T-60s of settle, where current spot has crossed to the
+  // opposite side of strike vs the traded side. Log to auto_trade_skip_log
+  // with reason `late_flip_shadow` so we can validate before wiring live exit.
+  try {
+    const cutoffSoonIso = new Date(Date.now() + 60 * 1000).toISOString();
+    const nowIso2 = new Date().toISOString();
+    const { data: openFires } = await supabaseAdmin
+      .from("crypto_trades")
+      .select("id, user_id, ticker, side, strike, close_time, status")
+      .eq("status", "submitted")
+      .filter("inputs_snapshot->>source", "eq", "study_auto_live")
+      .lte("close_time", cutoffSoonIso)
+      .gt("close_time", nowIso2)
+      .limit(50);
+    for (const t of openFires ?? []) {
+      try {
+        const { data: tick } = await supabaseAdmin
+          .from("btc_spot_ticks")
+          .select("spot")
+          .order("observed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const spot = tick?.spot;
+        const strike = (t as any).strike as number | null;
+        if (typeof spot !== "number" || !strike) continue;
+        const spotSide: "YES" | "NO" = spot >= strike ? "YES" : "NO";
+        if (spotSide !== (t as any).side) {
+          const secs = Math.round((new Date((t as any).close_time).getTime() - Date.now()) / 1000);
+          await supabaseAdmin.from("auto_trade_skip_log").insert({
+            user_id: (t as any).user_id,
+            ticker: (t as any).ticker,
+            close_time: (t as any).close_time,
+            side: (t as any).side,
+            strike,
+            ask_price: null,
+            seconds_to_close: secs,
+            skip_reason: `late_flip_shadow:spot=${spot.toFixed(2)}:strikeSide=${spotSide}:tradeId=${(t as any).id}`,
+          });
+        }
+      } catch { /* per-row noop */ }
+    }
+  } catch { /* soft fail */ }
+
   void nowIso;
   return { attempts, fired, users: userIds.length, tickers: lockedTickers.length, results };
 }
