@@ -642,6 +642,10 @@ export function TrendlineChartPanel() {
                 tradeCount60s: kalshi?.tradeCount60s ?? null,
                 volume: kalshi?.volume ?? null,
                 openInterest: kalshi?.openInterest ?? null,
+                yesVolWindow: kalshi?.yesVolWindow ?? null,
+                noVolWindow: kalshi?.noVolWindow ?? null,
+                tradeCountWindow: kalshi?.tradeCountWindow ?? null,
+                ladder: kalshi?.flowLadder ?? null,
               }}
             />
 
@@ -763,6 +767,10 @@ function TaChart({
     tradeCount60s: number | null;
     volume: number | null;
     openInterest: number | null;
+    yesVolWindow: number | null;
+    noVolWindow: number | null;
+    tradeCountWindow: number | null;
+    ladder: Array<{ m: number; yes: number; no: number; trades: number }> | null;
   };
 }) {
 
