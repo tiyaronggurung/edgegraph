@@ -140,9 +140,22 @@ export function useOurQuote(params: {
     }
     const w: WindowState = win; // narrow for TS
 
+    // ---- Per-window warmup on new strike ---------------------------------
+    // Blank the pill until (a) ≥ WARMUP_MIN_MS have elapsed since strike change
+    // AND (b) we have ≥ WARMUP_MIN_TICKS fresh spot ticks on the new strike.
+    // Skip all bias / ratchet / memory updates during warmup so the first real
+    // quote starts clean from pure physics on the new strike.
+    const nowW = Date.now();
+    w.postStrikeTicks += 1;
+    const warmupElapsed = nowW - w.strikeChangedAt;
+    if (warmupElapsed < WARMUP_MIN_MS || w.postStrikeTicks < WARMUP_MIN_TICKS) {
+      w.lastTs = nowW;
+      return null;
+    }
+
     // Persistent trendline bias: accumulate signed pill-gate + momentum every
     // tick, decay very slowly.
-    const now = Date.now();
+    const now = nowW;
     const dtSec = Math.max(0, (now - w.lastTs) / 1000);
     w.lastTs = now;
     const decay = Math.pow(BIAS_DECAY_PER_S, dtSec);
