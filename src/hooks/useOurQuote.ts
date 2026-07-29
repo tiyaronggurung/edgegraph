@@ -70,8 +70,10 @@ export function useOurQuote(params: {
   midPrice?: number | null | undefined;
   buyPrice?: number | null | undefined;
   sellPrice?: number | null | undefined;
+  /** Binance taker buy/sell imbalance over trailing 3m, signed -1..+1. */
+  volumeImbalance3m?: number | null | undefined;
 }) {
-  const { spot, strike, secondsToClose, closes1m, midPrice, buyPrice, sellPrice } = params;
+  const { spot, strike, secondsToClose, closes1m, midPrice, buyPrice, sellPrice, volumeImbalance3m } = params;
 
   const tapeRef = useRef<TapeSample[]>([]);
   const lastGoodRef = useRef<OurQuote | null>(null);
@@ -187,6 +189,7 @@ export function useOurQuote(params: {
       midPrice: midPrice ?? null,
       buyPrice: buyPrice ?? null,
       sellPrice: sellPrice ?? null,
+      volumeImbalance3m: volumeImbalance3m ?? null,
     });
 
     if (!q) return lastGoodRef.current;
