@@ -2339,12 +2339,6 @@ function BigFlipMonitor() {
       <span className="text-muted-foreground">·</span>
       <span className="text-[10px] uppercase text-yellow-300 font-semibold">LIVE $10</span>
       <span className="text-muted-foreground ml-auto">{r.ageSeconds}s ago</span>
-      <button
-        onClick={turnOff}
-        className="rounded border border-red-500/50 px-2 py-0.5 text-[10px] uppercase text-red-300 hover:bg-red-500/20"
-      >
-        Turn OFF
-      </button>
     </div>
   );
 }
