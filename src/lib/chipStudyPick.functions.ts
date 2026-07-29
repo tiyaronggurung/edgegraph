@@ -50,16 +50,18 @@ async function fetchKalshiAskCents(ticker: string, side: "YES" | "NO"): Promise<
 export const recordChipStudyPick = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => Input.parse(data))
   .handler(async ({ data }) => {
-    // Strictly capture at the 7-min mark: accept only when the lock fires
-    // between minute 7 and minute 8 of the 15m window (secondsToClose in
-    // (420, 480]). Earlier locks (minutes 0-6) are rejected so a 3-min pick
-    // can't stick when the trend flips at minute 5.
-    if (data.secondsToClose > 480 || data.secondsToClose <= 420) {
-      return { ok: false, reason: "outside_7min_mark" as const };
+    // Two accepted lock paths:
+    //   EARLY: secondsToClose in (420, 480]  AND conf >= 75  (7-min mark, primary)
+    //   LATE : secondsToClose in [180, 420]  AND conf >= 80  (studied past 8min,
+    //          held ≥120s at ≥80% on client — see TrendlineChartPanel)
+    // Backtest: late path adds ~37 captures at ~87–92% WR when confirmed 120s.
+    const s = data.secondsToClose;
+    const early = s > 420 && s <= 480 && data.confidencePct >= 75;
+    const late  = s >= 180 && s <= 420 && data.confidencePct >= 80;
+    if (!early && !late) {
+      return { ok: false, reason: "outside_lock_window" as const };
     }
-    if (data.confidencePct < 75) {
-      return { ok: false, reason: "below_threshold" as const };
-    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const yesNo: "YES" | "NO" = data.side === "UP" ? "YES" : "NO";
 
