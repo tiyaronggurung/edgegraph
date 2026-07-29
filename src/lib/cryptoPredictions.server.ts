@@ -339,6 +339,7 @@ export interface PredictionStatsResult {
     studyLockSource: string | null;
     studyLockSecondsToClose: number | null;
     studyLockedAt: string | null;
+    studyLockKalshiPriceCents: number | null;
   }>;
 }
 
@@ -355,7 +356,7 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
 
   const { data: rows } = await supabaseAdmin
     .from("btc_model_predictions")
-    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, settled_at, live_side, flip_count, chart_verdict, chart_strength, ta_score, ta_reasons, ta_vwap_dist_pct, ta_trend_alignment_score, ta_rsi_1m, ta_rsi_5m, ta_macd_5m_hist, ta_bb_5m_pctb, ta_vwap_rej_up, ta_vwap_rej_down, ta_engine_version, model_side_pre_study, study_locked_side, study_lock_confidence, study_lock_source, study_lock_seconds_to_close, study_locked_at")
+    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, settled_at, live_side, flip_count, chart_verdict, chart_strength, ta_score, ta_reasons, ta_vwap_dist_pct, ta_trend_alignment_score, ta_rsi_1m, ta_rsi_5m, ta_macd_5m_hist, ta_bb_5m_pctb, ta_vwap_rej_up, ta_vwap_rej_down, ta_engine_version, model_side_pre_study, study_locked_side, study_lock_confidence, study_lock_source, study_lock_seconds_to_close, study_locked_at, study_lock_kalshi_price_cents")
     .gte("close_time", cutoff)
     .order("close_time", { ascending: false })
     .limit(500);
@@ -427,6 +428,7 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
       studyLockSource: ((r as { study_lock_source?: string | null }).study_lock_source) ?? null,
       studyLockSecondsToClose: (r as { study_lock_seconds_to_close?: number | null }).study_lock_seconds_to_close ?? null,
       studyLockedAt: ((r as { study_locked_at?: string | null }).study_locked_at) ?? null,
+      studyLockKalshiPriceCents: (r as { study_lock_kalshi_price_cents?: number | null }).study_lock_kalshi_price_cents != null ? Number((r as { study_lock_kalshi_price_cents?: number | null }).study_lock_kalshi_price_cents) : null,
     })),
   };
 }
