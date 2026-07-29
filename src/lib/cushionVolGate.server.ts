@@ -137,12 +137,12 @@ export function evaluateCvv(args: {
     reasons.push(`cushion_${cushionUsd.toFixed(0)}<atr7x${cfg.atrMult}_${requiredCushionUsd.toFixed(0)}`);
   }
   // Momentum is judged RELATIVE to the cushion: a $26 swing is harmless behind a
-  // $149 cushion but fatal behind a $4 one. cvv_momentum_max_usd is now only an
-  // absolute ceiling for very large cushions.
-  const momentumLimitUsd = Math.min(0.6 * cushionUsd, Math.max(cfg.momentumMaxUsd, 0.6 * cushionUsd));
+  // $149 cushion but fatal behind a $4 one.
+  const momentumLimitUsd = 0.6 * cushionUsd;
   if (momentumUsd < -momentumLimitUsd) {
     reasons.push(`adverse_momentum_${Math.abs(momentumUsd).toFixed(0)}>${momentumLimitUsd.toFixed(0)}`);
   }
+
 
 
 
