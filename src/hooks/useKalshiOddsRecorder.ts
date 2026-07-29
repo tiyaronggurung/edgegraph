@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
+import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
 import { insertKalshiOddsSnapshotBatch } from "@/lib/kalshiOddsSnapshots.functions";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import {
@@ -41,6 +42,12 @@ interface QueuedRow {
   kalshi_yes_vol_60s: number | null;
   kalshi_no_vol_60s: number | null;
   kalshi_trade_count_60s: number | null;
+  spot_buy_vol_1m: number | null;
+  spot_sell_vol_1m: number | null;
+  spot_vol_imb_1m: number | null;
+  spot_buy_vol_win: number | null;
+  spot_sell_vol_win: number | null;
+  spot_vol_imb_win: number | null;
 }
 
 
@@ -50,6 +57,7 @@ interface QueuedRow {
  */
 export function useKalshiOddsRecorder(closes1m: number[] = []): void {
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
+  const spotVolFn = useServerFn(getBtcSpotVolume);
   const insertFn = useServerFn(insertKalshiOddsSnapshotBatch);
   const live = useLiveCompositeSpot();
 
@@ -64,6 +72,17 @@ export function useKalshiOddsRecorder(closes1m: number[] = []): void {
     refetchIntervalInBackground: false,
   });
 
+  // Binance taker buy/sell split — 10s poll is plenty (1m candle granularity).
+  const { data: spotVol } = useQuery({
+    queryKey: ["btc-spot-volume-recorder"],
+    queryFn: () => spotVolFn(),
+    refetchInterval: 10_000,
+    staleTime: 5_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    refetchIntervalInBackground: false,
+  });
+
   const tapeRef = useRef<TapeSample[]>([]);
   const queueRef = useRef<QueuedRow[]>([]);
   const seenRef = useRef<Set<string>>(new Set());
@@ -71,6 +90,8 @@ export function useKalshiOddsRecorder(closes1m: number[] = []): void {
   closes1mRef.current = closes1m;
   const kalshiRef = useRef(kalshi);
   kalshiRef.current = kalshi;
+  const spotVolRef = useRef(spotVol);
+  spotVolRef.current = spotVol;
   const spotRef = useRef<number | null>(live.spot);
   spotRef.current = live.spot;
 
@@ -97,6 +118,7 @@ export function useKalshiOddsRecorder(closes1m: number[] = []): void {
       if (seenRef.current.has(dedupKey)) return;
 
       const spot = spotRef.current ?? k.impliedSpot ?? null;
+      const sv = spotVolRef.current;
       const tape = tapeRef.current;
       const sigma =
         ewmaVolFromTape(tape) ??
@@ -150,6 +172,12 @@ export function useKalshiOddsRecorder(closes1m: number[] = []): void {
         kalshi_yes_vol_60s: k.yesVol60s ?? null,
         kalshi_no_vol_60s: k.noVol60s ?? null,
         kalshi_trade_count_60s: k.tradeCount60s ?? null,
+        spot_buy_vol_1m: sv?.m1?.buy ?? null,
+        spot_sell_vol_1m: sv?.m1?.sell ?? null,
+        spot_vol_imb_1m: sv?.m1?.imbalance ?? null,
+        spot_buy_vol_win: sv?.window?.buy ?? null,
+        spot_sell_vol_win: sv?.window?.sell ?? null,
+        spot_vol_imb_win: sv?.window?.imbalance ?? null,
       });
 
     }, 1_000);

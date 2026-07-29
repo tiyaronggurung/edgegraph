@@ -26,6 +26,12 @@ const RowSchema = z.object({
   kalshi_yes_vol_60s: z.number().int().nullable().optional(),
   kalshi_no_vol_60s: z.number().int().nullable().optional(),
   kalshi_trade_count_60s: z.number().int().nullable().optional(),
+  spot_buy_vol_1m: z.number().nullable().optional(),
+  spot_sell_vol_1m: z.number().nullable().optional(),
+  spot_vol_imb_1m: z.number().nullable().optional(),
+  spot_buy_vol_win: z.number().nullable().optional(),
+  spot_sell_vol_win: z.number().nullable().optional(),
+  spot_vol_imb_win: z.number().nullable().optional(),
 });
 
 
