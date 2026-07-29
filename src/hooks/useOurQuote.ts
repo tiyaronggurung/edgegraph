@@ -133,10 +133,12 @@ export function useOurQuote(params: {
         lockedSide: 0,
         oppositeStreakSec: 0,
         sideHist: [],
+        strikeChangedAt: Date.now(),
+        postStrikeTicks: 0,
       };
       winRef.current = win;
     }
-    const w = win; // narrow for TS
+    const w: WindowState = win; // narrow for TS
 
     // Persistent trendline bias: accumulate signed pill-gate + momentum every
     // tick, decay very slowly.
