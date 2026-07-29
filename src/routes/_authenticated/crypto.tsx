@@ -1115,9 +1115,16 @@ function ModelAccuracyPanel() {
                       const windowOpenMs = new Date(r.closeTime).getTime() - 15 * 60_000;
                       const msSinceOpen = Date.now() - windowOpenMs;
                       const isStudying = msSinceOpen >= 0 && msSinceOpen < 420_000;
+                      // Study Pick must be the ACTUAL locked side from the trendline
+                      // pill / server physics lock — never the model side dressed up
+                      // as a study pick. No lock => show NO LOCK + why.
+                      const lockedSide = (r as { studyLockedSide?: "YES" | "NO" | null }).studyLockedSide ?? null;
+                      const wouldSide = (r as { cvvWouldLockSide?: "YES" | "NO" | null }).cvvWouldLockSide ?? null;
+                      const wouldConf = (r as { cvvWouldLockConf?: number | null }).cvvWouldLockConf ?? null;
+                      const skipReason = (r as { skipGuardReason?: string | null }).skipGuardReason ?? null;
                       const studyLockLabel = r.studyLockConfidence != null
                         ? `${r.studyLockConfidence.toFixed(0)}%`
-                        : r.studyLockedSide ? "LOCK" : null;
+                        : lockedSide ? "LOCK" : null;
                       const studyLockMinute = r.studyLockSecondsToClose != null
                         ? Math.max(0, (900 - r.studyLockSecondsToClose) / 60)
                         : null;
@@ -1130,16 +1137,28 @@ function ModelAccuracyPanel() {
                           <span className="inline-flex items-center gap-1">
                             {isStudying ? (
                               <span className="text-muted-foreground text-[10px]" title="Strike Study in progress · Study Pick locks at T+420s (min 7)">⏳ STUDYING</span>
-                            ) : (
+                            ) : lockedSide ? (
                               <span className="inline-flex flex-col leading-tight">
-                                <span className={r.side === "YES" ? "text-emerald-400" : "text-red-400"} title="Study Pick — exact locked side from the 6–7 minute trendline study">{dirLabel(r.side)}</span>
+                                <span className={lockedSide === "YES" ? "text-emerald-400" : "text-red-400"} title="Study Pick — exact locked side from the 6–7 minute trendline study">{dirLabel(lockedSide)}</span>
                                 {studyLockLabel && (
                                   <span className="text-[9px] text-muted-foreground">
                                     {studyLockLabel}{studyLockMinute != null ? ` @ ${studyLockMinute.toFixed(1)}m` : ""}
+                                    {r.studyLockSource ? ` · ${r.studyLockSource === "trendline_chip" ? "pill" : "srv"}` : ""}
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="inline-flex flex-col leading-tight">
+                                <span className="text-muted-foreground text-[10px]" title="No Study Pick was locked for this window — the trendline pill never reached the lock threshold or a gate blocked it. The model pick is NOT a study pick.">NO LOCK</span>
+                                {(wouldSide || skipReason) && (
+                                  <span className="text-[9px] text-muted-foreground/70" title={skipReason ?? undefined}>
+                                    {wouldSide ? `would ${dirLabel(wouldSide)}${wouldConf != null ? ` ${wouldConf.toFixed(0)}%` : ""}` : ""}
+                                    {skipReason ? `${wouldSide ? " · " : ""}${skipReason.slice(0, 22)}` : ""}
                                   </span>
                                 )}
                               </span>
                             )}
+
                             <Popover>
                               <PopoverTrigger asChild>
                                 <button
