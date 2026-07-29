@@ -1033,37 +1033,14 @@ function TaChart({
   const onScroll = () => setViewportTick(v => (v + 1) & 0xffff);
 
   return (
-    <div className="relative mt-2">
-      {/* Zoom controls — overlay top-right */}
-      <div className="absolute right-2 top-2 z-10 flex items-center gap-1 bg-black/60 border border-white/10 rounded px-1 py-0.5 backdrop-blur">
-        <button
-          onClick={() => zoomBy(1 / 1.25)}
-          className="w-6 h-6 text-white/70 hover:text-white text-sm leading-none"
-          title="Zoom out"
-        >−</button>
-        <span className="text-[9px] text-white/40 font-mono tabular-nums w-8 text-center">
-          {(candleW / DEFAULT_CW).toFixed(2)}×
-        </span>
-        <button
-          onClick={() => zoomBy(1.25)}
-          className="w-6 h-6 text-white/70 hover:text-white text-sm leading-none"
-          title="Zoom in"
-        >+</button>
-        <button
-          onClick={resetZoom}
-          className="px-1.5 h-6 text-[10px] text-white/60 hover:text-white font-mono"
-          title="Reset zoom & scroll to now"
-        >reset</button>
-      </div>
+    <>
       {(() => {
-        // Kalshi per-side flow strip — sits at the top of the trendline chart section.
+        // Kalshi per-side flow strip — sits above the trendline chart section.
         const y = kalshiFlow?.yesVol60s ?? null;
         const n = kalshiFlow?.noVol60s ?? null;
         const oi = kalshiFlow?.openInterest ?? null;
         const vol = kalshiFlow?.volume ?? null;
         const trades = kalshiFlow?.tradeCount60s ?? 0;
-        // Window-to-date cumulative side flow (since :00/:15/:30/:45), laddered
-        // per minute by the server from the same trade pull as the 60s figure.
         const wy = kalshiFlow?.yesVolWindow ?? null;
         const wn = kalshiFlow?.noVolWindow ?? null;
         const wTrades = kalshiFlow?.tradeCountWindow ?? 0;
@@ -1109,7 +1086,7 @@ function TaChart({
           (wDominant ? `\n⚠ ${wDominant} side dominant across the whole window.` : "");
         return (
           <div
-            className={`pointer-events-none absolute top-2 right-2 z-20 flex flex-col gap-1 px-2 py-1 border rounded text-[10px] font-mono backdrop-blur bg-black/75 shadow-lg ${barCls}`}
+            className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-3 py-2 border rounded text-[10px] font-mono backdrop-blur bg-black/75 shadow-lg ${barCls}`}
             title={title}
           >
             <div className="flex items-center gap-2">
@@ -1125,7 +1102,6 @@ function TaChart({
                   <span className="text-rose-300/80">N</span>
                   <span className="tabular-nums text-rose-200 font-bold">{n}</span>
                 </span>
-                {/* proportional bar */}
                 <span className="h-1.5 w-[80px] rounded overflow-hidden bg-white/10 flex">
                   <span
                     className="h-full bg-emerald-400/80"
@@ -1158,8 +1134,7 @@ function TaChart({
             )}
             </div>
 
-            {/* Cumulative window row — every 60s bucket added up since window open. */}
-            <div className="flex items-center gap-2 border-t border-white/10 pt-1">
+            <div className="flex items-center gap-2 border-t sm:border-t-0 border-white/10 pt-1 sm:pt-0">
               <span className="text-white/50 tracking-wider">WIN 15m</span>
               {wHas ? (
                 <>
@@ -1186,7 +1161,6 @@ function TaChart({
                     </span>
                   )}
                   <span className="text-white/40">· {wTrades}t</span>
-                  {/* per-minute ladder: one column per elapsed minute, YES above NO */}
                   {ladder && ladder.length > 0 && (() => {
                     const peak = Math.max(1, ...ladder.map((b) => b.yes + b.no));
                     return (
@@ -1216,6 +1190,28 @@ function TaChart({
           </div>
         );
       })()}
+      <div className="relative mt-2">
+      {/* Zoom controls — overlay top-right */}
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-1 bg-black/60 border border-white/10 rounded px-1 py-0.5 backdrop-blur">
+        <button
+          onClick={() => zoomBy(1 / 1.25)}
+          className="w-6 h-6 text-white/70 hover:text-white text-sm leading-none"
+          title="Zoom out"
+        >−</button>
+        <span className="text-[9px] text-white/40 font-mono tabular-nums w-8 text-center">
+          {(candleW / DEFAULT_CW).toFixed(2)}×
+        </span>
+        <button
+          onClick={() => zoomBy(1.25)}
+          className="w-6 h-6 text-white/70 hover:text-white text-sm leading-none"
+          title="Zoom in"
+        >+</button>
+        <button
+          onClick={resetZoom}
+          className="px-1.5 h-6 text-[10px] text-white/60 hover:text-white font-mono"
+          title="Reset zoom & scroll to now"
+        >reset</button>
+      </div>
       <div
         ref={scrollRef}
         className="overflow-x-auto overflow-y-hidden border border-white/5 rounded bg-black/30 select-none"
@@ -1777,6 +1773,6 @@ function TaChart({
         </g>
       </svg>
       </div>
-    </div>
+    </div></>
   );
 }
