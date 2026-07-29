@@ -1,0 +1,1 @@
+ALTER TABLE public.btc_model_predictions ADD COLUMN IF NOT EXISTS study_lock_kalshi_price_cents INTEGER;

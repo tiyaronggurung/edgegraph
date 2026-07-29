@@ -2561,6 +2561,7 @@ export type Database = {
           spot_at_snapshot: number
           strike: number
           study_lock_confidence: number | null
+          study_lock_kalshi_price_cents: number | null
           study_lock_seconds_to_close: number | null
           study_lock_source: string | null
           study_locked_at: string | null
@@ -2609,6 +2610,7 @@ export type Database = {
           spot_at_snapshot: number
           strike: number
           study_lock_confidence?: number | null
+          study_lock_kalshi_price_cents?: number | null
           study_lock_seconds_to_close?: number | null
           study_lock_source?: string | null
           study_locked_at?: string | null
@@ -2657,6 +2659,7 @@ export type Database = {
           spot_at_snapshot?: number
           strike?: number
           study_lock_confidence?: number | null
+          study_lock_kalshi_price_cents?: number | null
           study_lock_seconds_to_close?: number | null
           study_lock_source?: string | null
           study_locked_at?: string | null
