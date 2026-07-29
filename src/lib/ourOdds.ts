@@ -393,23 +393,28 @@ export function computeOurQuote(inp: QuoteInput): OurQuote | null {
 /**
  * Pill-gate + MID-distance tilt (signed fraction, capped ±10¢).
  *
- * Two composable signals, both from the 30d shadow study on 2,777 settled
- * snapshots. Asymmetric — DOWN edge fires earlier and wider than UP:
+ * Re-fit on the 30d shadow study (settled snapshots, buckets with n≥15).
+ * MID = (BUY+SELL)/2, dist = (strike − MID) in bps. %UP observed:
  *
- *   DOWN (strike above MID, bps > 0):
- *     bps 5-10  · T<120s → ~97-100% NO      → -10¢
- *     bps 10-25 · T<120s → ~92% NO          → -10¢
- *     bps ≥25   · T<300s → ~85-92% NO       → -8¢
- *     bps 5-25  · T 120-300s → ~65-70% NO   → -5¢
- *     bps ≥25   · T 300-600s → ~55-60% NO   → -3¢
+ *   bucket            <30s   30s-2m  2-5m   5-10m  >10m
+ *   A  ≤ -25bps       98.3   96.1    97.8   83.3   86.1   → UP at ALL horizons
+ *   B  -25..-10       84.4   76.5    68.7   62.1   50.5   → mild UP, decays
+ *   C  -10..-5        60.4   44.2    36.8   53.2   51.2   → no stable sign → 0
+ *   D  |dist| ≤ 5     41.6   43.9    51.1   48.6   56.0   → coin flip → 0
+ *   E  +5..10         19.8   24.0    22.2   28.3   44.4   → DOWN through 10m
+ *   F  +10..25        14.7   19.0    28.3   41.5   69.5   → DOWN <5m, TRAP >10m
+ *   G  ≥ +25bps       50.0*  11.4    23.1   20.9   —      (*n=26, noise)
  *
- *   UP (strike below MID, bps < 0) — weaker, tighter:
- *     bps ≤-25  · T<120s → ~72% YES         → +6¢
- *     bps ≤-25  · T 120-300s → ~66% YES     → +4¢
- *     everything else → 0 (>10m reversal trap)
+ * Corrections vs the previous table:
+ *   1. UP side is NOT time-limited at extreme distance — bucket A is 83-98%
+ *      UP even beyond 10m, so it now fires at every horizon.
+ *   2. Bucket B carries a real (if smaller) UP edge inside 5m — was 0.
+ *   3. Bucket E stays DOWN through 5-10m (28% UP) — was 0 past 300s.
+ *   4. F/G invert past 10m (F is 69.5% UP) → hard 0 there, never a DOWN tilt.
  *
- * The historical pill-position rule (strike ≥ $5 beyond BOTH pills) is kept
- * as an amplifier on top of the MID-distance tilt when both fire same-side.
+ * The legacy pill-position amplifier (strike beyond BOTH pills) is kept, but
+ * the UP leg now needs a $25 gap, not $5 — the $5 rule was far too permissive
+ * on the UP side and fired all over bucket C/D noise.
  */
 export function pillGateTilt(args: {
   spot: number | null | undefined;
@@ -423,40 +428,46 @@ export function pillGateTilt(args: {
   if (!(strike != null && strike > 0)) return 0;
   if (!(midPrice != null && midPrice > 0)) return 0;
   const T = Math.max(0, secondsToClose);
-  if (T > 600) return 0;
 
   const distBps = ((strike - midPrice) / strike) * 10000; // signed
+  const late = T < 120;
+  const mid5 = T < 300;
+  const mid10 = T < 600;
 
-  // --- MID-distance lookup ---
+  // --- MID-distance lookup (signed fraction of $1) ---
   let midTilt = 0;
-  if (distBps >= 5) {
-    // strike above MID → DOWN lean
-    if (T < 120) {
-      if (distBps < 25) midTilt = -0.10;
-      else               midTilt = -0.10;
-    } else if (T < 300) {
-      if (distBps < 25) midTilt = -0.05;
-      else               midTilt = -0.08;
-    } else {
-      midTilt = distBps >= 25 ? -0.03 : 0;
-    }
+  if (distBps >= 25) {
+    // G — strongest DOWN cell, but only once inside 10m.
+    midTilt = mid5 ? -0.10 : mid10 ? -0.08 : 0;
+  } else if (distBps >= 10) {
+    // F — DOWN inside 5m, fading by 10m, inverted beyond → hard 0.
+    midTilt = late ? -0.10 : mid5 ? -0.07 : mid10 ? -0.03 : 0;
+  } else if (distBps >= 5) {
+    // E — DOWN and time-stable all the way out to 10m.
+    midTilt = late ? -0.10 : mid5 ? -0.08 : mid10 ? -0.06 : 0;
   } else if (distBps <= -25) {
-    // strike below MID (≥25bps) → UP lean, only close to close
-    if (T < 120)      midTilt = +0.06;
-    else if (T < 300) midTilt = +0.04;
+    // A — UP at every horizon, including > 10m.
+    midTilt = late ? +0.10 : mid5 ? +0.09 : mid10 ? +0.05 : +0.05;
+  } else if (distBps <= -10) {
+    // B — mild UP, decays to nothing by 10m.
+    midTilt = late ? +0.06 : mid5 ? +0.04 : mid10 ? +0.02 : 0;
   }
+  // C (-10..-5) and D (|dist| ≤ 5) carry no edge → 0.
 
-  // --- Pill-position amplifier (legacy rule: strike ≥ $5 beyond BOTH pills) ---
-  const MIN_GAP = 5;
+  // --- Pill-position amplifier (strike beyond BOTH pills) ---
+  // DOWN keeps the $5 gap; UP requires $25 — the study shows the below-MID
+  // UP signal only becomes reliable at extreme distance.
+  const MIN_GAP_DOWN = 5;
+  const MIN_GAP_UP = 25;
   let pillAmp = 0;
   if (T <= 300) {
     if (buyPrice != null && buyPrice > 0
-        && strike >= buyPrice + MIN_GAP
-        && strike >= midPrice + MIN_GAP) {
+        && strike >= buyPrice + MIN_GAP_DOWN
+        && strike >= midPrice + MIN_GAP_DOWN) {
       pillAmp = -0.02;
     } else if (sellPrice != null && sellPrice > 0
-        && strike <= sellPrice - MIN_GAP
-        && strike <= midPrice - MIN_GAP) {
+        && strike <= sellPrice - MIN_GAP_UP
+        && strike <= midPrice - MIN_GAP_UP) {
       pillAmp = +0.02;
     }
   }
@@ -465,6 +476,7 @@ export function pillGateTilt(args: {
   const combined = (Math.sign(midTilt) === Math.sign(pillAmp)) ? midTilt + pillAmp : midTilt;
   return Math.max(-0.10, Math.min(0.10, combined));
 }
+
 
 /**
  * Pill-breakout tilt (signed fraction, capped ±6¢).
