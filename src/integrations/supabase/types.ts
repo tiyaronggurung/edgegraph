@@ -2896,6 +2896,87 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_pin_risk_shadow: {
+        Row: {
+          close_time: string
+          created_at: string
+          cushion_decay_usd_per_min: number | null
+          cushion_usd: number | null
+          flipped: boolean | null
+          id: number
+          implied_vs_composite_usd: number | null
+          locked_side: string
+          losing_ask_climb_cents: number | null
+          losing_vol_ratio: number | null
+          observed_at: string
+          outcome: string | null
+          score_ask_climb: number
+          score_cushion: number
+          score_divergence: number
+          score_ta: number
+          score_total: number
+          score_volume: number
+          seconds_to_close: number
+          spot: number | null
+          strike: number
+          ta_flipped_against: boolean | null
+          ta_score: number | null
+          ticker: string
+        }
+        Insert: {
+          close_time: string
+          created_at?: string
+          cushion_decay_usd_per_min?: number | null
+          cushion_usd?: number | null
+          flipped?: boolean | null
+          id?: number
+          implied_vs_composite_usd?: number | null
+          locked_side: string
+          losing_ask_climb_cents?: number | null
+          losing_vol_ratio?: number | null
+          observed_at?: string
+          outcome?: string | null
+          score_ask_climb?: number
+          score_cushion?: number
+          score_divergence?: number
+          score_ta?: number
+          score_total?: number
+          score_volume?: number
+          seconds_to_close: number
+          spot?: number | null
+          strike: number
+          ta_flipped_against?: boolean | null
+          ta_score?: number | null
+          ticker: string
+        }
+        Update: {
+          close_time?: string
+          created_at?: string
+          cushion_decay_usd_per_min?: number | null
+          cushion_usd?: number | null
+          flipped?: boolean | null
+          id?: number
+          implied_vs_composite_usd?: number | null
+          locked_side?: string
+          losing_ask_climb_cents?: number | null
+          losing_vol_ratio?: number | null
+          observed_at?: string
+          outcome?: string | null
+          score_ask_climb?: number
+          score_cushion?: number
+          score_divergence?: number
+          score_ta?: number
+          score_total?: number
+          score_volume?: number
+          seconds_to_close?: number
+          spot?: number | null
+          strike?: number
+          ta_flipped_against?: boolean | null
+          ta_score?: number | null
+          ticker?: string
+        }
+        Relationships: []
+      }
       btc_polymarket_triple_window: {
         Row: {
           actual_outcome: string | null
