@@ -570,7 +570,7 @@ export function TrendlineChartPanel() {
                 : (rec?.reason ?? "");
               return (
                 <div
-                  className={`pointer-events-none absolute top-2 left-2 z-20 flex flex-col items-start gap-1`}
+                  className={`mb-2 flex flex-col items-start gap-1`}
                   aria-label="Live BTC composite spot"
                 >
                   <div className={`flex items-center gap-2 px-2 py-1 rounded border ${border} bg-black/75 backdrop-blur font-mono text-[11px] shadow-lg`}>
