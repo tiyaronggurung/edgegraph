@@ -7,31 +7,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
-const STAKE_CENTS = 1000;
-const MAX_ASK_CENTS = 89; // fire only if ask <= 89¢ (i.e. < 90¢)
-const MIN_SECONDS_TO_CLOSE = 60; // stop retrying inside T-60s
+// Fire logic lives in ./studyAutoLive.server so both the auth'd server fn
+// (open-tab retry) and the pg_cron driver (tab closed) share one code path.
 
-async function fetchKalshiAskCents(ticker: string, side: "YES" | "NO"): Promise<number | null> {
-  try {
-    const res = await fetch(`${KALSHI}/markets/${encodeURIComponent(ticker)}`, {
-      headers: { accept: "application/json" },
-    });
-    if (!res.ok) return null;
-    const j = await res.json() as {
-      market?: { yes_bid?: number; yes_ask?: number; yes_bid_dollars?: string; yes_ask_dollars?: string };
-    };
-    const m = j.market;
-    if (!m) return null;
-    const yesBid = typeof m.yes_bid === "number" ? m.yes_bid : (m.yes_bid_dollars != null ? Math.round(Number(m.yes_bid_dollars) * 100) : NaN);
-    const yesAsk = typeof m.yes_ask === "number" ? m.yes_ask : (m.yes_ask_dollars != null ? Math.round(Number(m.yes_ask_dollars) * 100) : NaN);
-    if (!Number.isFinite(yesBid) || !Number.isFinite(yesAsk)) return null;
-    if (side === "YES") return Math.max(1, Math.min(99, Math.round(yesAsk)));
-    return Math.max(1, Math.min(99, Math.round(100 - yesBid)));
-  } catch {
-    return null;
-  }
-}
 
 export const getStudyAutoLiveSettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
