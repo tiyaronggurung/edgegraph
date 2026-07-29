@@ -54,6 +54,7 @@ import { Route as ApiPublicHooksOddsShadowTickRouteImport } from './routes/api/p
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
 import { Route as ApiPublicHooksSettleBtcPredictionsRouteImport } from './routes/api/public/hooks/settle-btc-predictions'
 import { Route as ApiPublicHooksStudyAutoLiveTickRouteImport } from './routes/api/public/hooks/study-auto-live-tick'
+import { Route as ApiPublicHooksStudyLockTickRouteImport } from './routes/api/public/hooks/study-lock-tick'
 import { Route as ApiPublicHooksTripleWindowTickRouteImport } from './routes/api/public/hooks/triple-window-tick'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
@@ -306,6 +307,12 @@ const ApiPublicHooksStudyAutoLiveTickRoute =
     path: '/api/public/hooks/study-auto-live-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksStudyLockTickRoute =
+  ApiPublicHooksStudyLockTickRouteImport.update({
+    id: '/api/public/hooks/study-lock-tick',
+    path: '/api/public/hooks/study-lock-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksTripleWindowTickRoute =
   ApiPublicHooksTripleWindowTickRouteImport.update({
     id: '/api/public/hooks/triple-window-tick',
@@ -376,6 +383,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
+  '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -426,6 +434,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
+  '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -478,6 +487,7 @@ export interface FileRoutesById {
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
+  '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -530,6 +540,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/study-auto-live-tick'
+    | '/api/public/hooks/study-lock-tick'
     | '/api/public/hooks/triple-window-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
@@ -580,6 +591,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/study-auto-live-tick'
+    | '/api/public/hooks/study-lock-tick'
     | '/api/public/hooks/triple-window-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
@@ -631,6 +643,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/study-auto-live-tick'
+    | '/api/public/hooks/study-lock-tick'
     | '/api/public/hooks/triple-window-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
@@ -667,6 +680,7 @@ export interface RootRouteChildren {
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
   ApiPublicHooksSettleBtcPredictionsRoute: typeof ApiPublicHooksSettleBtcPredictionsRoute
   ApiPublicHooksStudyAutoLiveTickRoute: typeof ApiPublicHooksStudyAutoLiveTickRoute
+  ApiPublicHooksStudyLockTickRoute: typeof ApiPublicHooksStudyLockTickRoute
   ApiPublicHooksTripleWindowTickRoute: typeof ApiPublicHooksTripleWindowTickRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
@@ -990,6 +1004,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksStudyAutoLiveTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/study-lock-tick': {
+      id: '/api/public/hooks/study-lock-tick'
+      path: '/api/public/hooks/study-lock-tick'
+      fullPath: '/api/public/hooks/study-lock-tick'
+      preLoaderRoute: typeof ApiPublicHooksStudyLockTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/triple-window-tick': {
       id: '/api/public/hooks/triple-window-tick'
       path: '/api/public/hooks/triple-window-tick'
@@ -1096,6 +1117,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksSettleBtcPredictionsRoute:
     ApiPublicHooksSettleBtcPredictionsRoute,
   ApiPublicHooksStudyAutoLiveTickRoute: ApiPublicHooksStudyAutoLiveTickRoute,
+  ApiPublicHooksStudyLockTickRoute: ApiPublicHooksStudyLockTickRoute,
   ApiPublicHooksTripleWindowTickRoute: ApiPublicHooksTripleWindowTickRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
