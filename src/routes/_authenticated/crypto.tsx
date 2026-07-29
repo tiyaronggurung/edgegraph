@@ -1088,6 +1088,7 @@ function ModelAccuracyPanel() {
                       <th className="text-left p-2">Closed</th>
                       <th className="text-left p-2">Ticker</th>
                       <th className="text-left p-2" title="Study Pick — locked side after the 420s Strike Study. On Study/Model disagreement the side leans to Study. This is now the pick compared to settlement.">Study Pick</th>
+                      <th className="text-right p-2" title="Kalshi ask price (¢) on the locked side at the exact moment the Study Pick was captured. This is what an auto-trade on the Study Pick would have paid.">Lock¢</th>
                       <th className="text-left p-2" title="Model Pick — the original raw model pick (p ≥ 50%) frozen at the first snapshot. Never overwritten by Study/Fight. This is the classic model pick shown for a long time.">Model Pick</th>
                       <th className="text-left p-2" title="Raw model direction (live): P(YES) ≥ 50%? Updates with the current tick — no longer the win/loss comparator.">Raw model</th>
                       {/* Live column hidden (kept in data model) */}
