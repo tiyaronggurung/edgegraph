@@ -79,6 +79,7 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
       yesMid: null, secondsToClose: null, impliedSpot: null,
       volume: null, openInterest: null, lastPriceCents: null,
       yesVol60s: null, noVol60s: null, tradeCount60s: null,
+      yesVolWindow: null, noVolWindow: null, tradeCountWindow: null, flowLadder: null,
       error: null,
     };
     try {
