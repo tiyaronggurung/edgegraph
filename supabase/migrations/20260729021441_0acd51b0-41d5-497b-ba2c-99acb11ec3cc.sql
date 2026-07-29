@@ -1,1 +1,0 @@
-CREATE INDEX IF NOT EXISTS btc_candles_tf_bucket_desc_idx ON public.btc_candles (tf, bucket_start DESC);
