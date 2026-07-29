@@ -1773,6 +1773,6 @@ function TaChart({
         </g>
       </svg>
       </div>
-    </div>
+    </div></>
   );
 }
