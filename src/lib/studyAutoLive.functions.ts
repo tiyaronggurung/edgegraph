@@ -152,7 +152,7 @@ export const fireStudyAutoLive = createServerFn({ method: "POST" })
       return {
         ok: true,
         fired: result.fillCount > 0,
-        reason: (result.fillCount > 0 ? "filled" : "unfilled") as const,
+        reason: result.fillCount > 0 ? ("filled" as const) : ("unfilled" as const),
         askCents,
         contracts,
         fillCount: result.fillCount,
