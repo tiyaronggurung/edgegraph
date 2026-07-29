@@ -2407,6 +2407,77 @@ function BigFlipMonitor() {
   );
 }
 
+function StudyAutoLiveBanner() {
+  const [settings, setSettings] = useState<{ enabled: boolean; hasKeys: boolean } | null>(null);
+  const [stats, setStats] = useState<{ fires: any[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = async () => {
+    try {
+      const { getStudyAutoLiveSettings, getStudyAutoLiveStats } = await import("@/lib/studyAutoLive.functions");
+      const [s, t] = await Promise.all([getStudyAutoLiveSettings(), getStudyAutoLiveStats()]);
+      setSettings(s);
+      setStats(t);
+    } catch { /* noop */ }
+  };
+  useEffect(() => { refresh(); const t = setInterval(refresh, 10_000); return () => clearInterval(t); }, []);
+
+  const toggle = async () => {
+    if (!settings) return;
+    setBusy(true);
+    try {
+      const { setStudyAutoLiveEnabled } = await import("@/lib/studyAutoLive.functions");
+      const r = await setStudyAutoLiveEnabled({ data: { enabled: !settings.enabled } });
+      if (r.ok) {
+        toast.success(`Study auto-bet ${r.enabled ? "ON" : "OFF"}`);
+        setSettings({ ...settings, enabled: !!r.enabled });
+      } else {
+        toast.error(r.error ?? "Failed");
+      }
+    } finally { setBusy(false); }
+  };
+
+  if (!settings) return null;
+  const fireCount = stats?.fires?.length ?? 0;
+  const on = settings.enabled;
+  const disabled = !settings.hasKeys;
+
+  const border = on
+    ? "border-emerald-500/60 bg-emerald-500/10"
+    : "border-border/50 bg-muted/10";
+  const dot = on ? "bg-emerald-400" : "bg-muted-foreground/60";
+  return (
+    <div className={`mt-1 rounded border px-2 py-1.5 text-[11px] font-mono flex items-center gap-2 ${border}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+      <span className={`font-semibold ${on ? "text-emerald-300" : "text-foreground"}`}>
+        STUDY PICK AUTO-BET {on ? "· LIVE $10" : "· OFF"}
+      </span>
+      <span className="text-muted-foreground">·</span>
+      <span className="text-muted-foreground truncate">
+        fires on lock · ask &lt; 90¢ · retry 10s · 1 bet / 15m · hold to settle
+      </span>
+      <span className="text-muted-foreground ml-auto">today: {fireCount}</span>
+      {disabled ? (
+        <span className="rounded border border-yellow-500/50 px-2 py-0.5 text-[10px] uppercase text-yellow-300">
+          Connect Kalshi keys
+        </span>
+      ) : (
+        <button
+          onClick={toggle}
+          disabled={busy}
+          className={`rounded border px-2 py-0.5 text-[10px] uppercase disabled:opacity-50 ${
+            on
+              ? "border-red-500/50 text-red-300 hover:bg-red-500/20"
+              : "border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/20"
+          }`}
+        >
+          {on ? "Turn OFF" : "Turn ON"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
   const qc = useQueryClient();
   const listFn = useServerFn(listAutoTradeOrders);
@@ -3262,6 +3333,7 @@ function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
           </p>
           <OddsFlipAlert />
           <BigFlipMonitor />
+          <StudyAutoLiveBanner />
           <OurOddsLiveHunterPanel />
 
           {skipReport.data && skipReport.data.totalSettled > 0 && (

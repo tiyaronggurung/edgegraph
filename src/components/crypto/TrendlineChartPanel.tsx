@@ -1,6 +1,7 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Zap } from "lucide-react";
 import { evalTrendlineShadow, type TrendlineSnapshot } from "@/lib/trendlineShadow.functions";
 import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
@@ -318,6 +319,41 @@ export function TrendlineChartPanel() {
       }
     }
   }, [currentStrike, currentTicker, recLive, recoLock, inEarlyWindow, inLateWindow, secondsToCloseForLock]);
+
+  // ---- Study Pick Auto-Bet (real-money) retry loop.
+  // Server enforces toggle_off / no_keys / already_fired / ask≥90¢ / T-60s cutoff.
+  // We just poll every 10s once a chip lock exists for this ticker.
+  const autoLiveFiredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!recoLock || !currentTicker) return;
+    if (autoLiveFiredRef.current === currentTicker) return;
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const { fireStudyAutoLive } = await import("@/lib/studyAutoLive.functions");
+        const r = await fireStudyAutoLive({ data: { ticker: currentTicker } });
+        if (r?.fired) {
+          autoLiveFiredRef.current = currentTicker;
+          const cts = (r as any).contracts ?? 0;
+          const ask = (r as any).askCents ?? "?";
+          toast.success(`STUDY AUTO-BET → ${recoLock.side} · ${cts}× @ ${ask}¢`, {
+            description: `${currentTicker.slice(-16)} · $10 · hold to settle`,
+          });
+          return;
+        }
+        const reason = (r as any)?.reason;
+        if (reason === "toggle_off" || reason === "no_keys" || reason === "no_lock" || reason === "already_fired" || reason === "retry_window_expired") {
+          autoLiveFiredRef.current = currentTicker; // stop polling for this window
+        }
+      } catch { /* noop, retry on next tick */ }
+    };
+    tick();
+    const iv = setInterval(tick, 10_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [recoLock, currentTicker]);
+
+
 
 
   // ---- ~10s side-tick recorder (feeds btc_side_ticks for backfill/analysis)
