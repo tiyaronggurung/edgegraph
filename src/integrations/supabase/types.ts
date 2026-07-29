@@ -2128,7 +2128,13 @@ export type Database = {
           seconds_to_close: number | null
           snap_bucket_sec: number
           snapped_at: string
+          spot_buy_vol_1m: number | null
+          spot_buy_vol_win: number | null
           spot_composite: number | null
+          spot_sell_vol_1m: number | null
+          spot_sell_vol_win: number | null
+          spot_vol_imb_1m: number | null
+          spot_vol_imb_win: number | null
           strike: number
           ticker: string
         }
@@ -2154,7 +2160,13 @@ export type Database = {
           seconds_to_close?: number | null
           snap_bucket_sec: number
           snapped_at?: string
+          spot_buy_vol_1m?: number | null
+          spot_buy_vol_win?: number | null
           spot_composite?: number | null
+          spot_sell_vol_1m?: number | null
+          spot_sell_vol_win?: number | null
+          spot_vol_imb_1m?: number | null
+          spot_vol_imb_win?: number | null
           strike: number
           ticker: string
         }
@@ -2180,7 +2192,13 @@ export type Database = {
           seconds_to_close?: number | null
           snap_bucket_sec?: number
           snapped_at?: string
+          spot_buy_vol_1m?: number | null
+          spot_buy_vol_win?: number | null
           spot_composite?: number | null
+          spot_sell_vol_1m?: number | null
+          spot_sell_vol_win?: number | null
+          spot_vol_imb_1m?: number | null
+          spot_vol_imb_win?: number | null
           strike?: number
           ticker?: string
         }

@@ -62,6 +62,11 @@ export interface KalshiImpliedSpot {
 
 export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
   async (): Promise<KalshiImpliedSpot> => {
+    const num = (v: unknown): number | null => {
+      if (v == null) return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
     const empty: KalshiImpliedSpot = {
       ok: false, ticker: null, strike: null, yesBid: null, yesAsk: null,
       yesMid: null, secondsToClose: null, impliedSpot: null,
@@ -85,8 +90,11 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
             yes_ask_dollars?: string;
             status?: string;
             volume?: number;
+            volume_fp?: string;
             open_interest?: number;
+            open_interest_fp?: string;
             last_price?: number;
+            last_price_dollars?: string;
           }>;
         }>;
       };
@@ -109,9 +117,13 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
           if (!best || stc < best.stc) {
             best = {
               ticker: m.ticker, strike, bid, ask, stc,
-              volume: m.volume != null ? Number(m.volume) : null,
-              openInterest: m.open_interest != null ? Number(m.open_interest) : null,
-              lastPrice: m.last_price != null ? Number(m.last_price) : null,
+              // Kalshi returns these as *_fp decimal strings; the legacy
+              // integer fields are absent, which is why volume logged as 0.
+              volume: num(m.volume_fp ?? m.volume),
+              openInterest: num(m.open_interest_fp ?? m.open_interest),
+              lastPrice: m.last_price_dollars != null
+                ? num(m.last_price_dollars) != null ? Number(m.last_price_dollars) * 100 : null
+                : num(m.last_price),
             };
           }
         }
@@ -138,14 +150,14 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
         );
         if (tRes.ok) {
           const tJson = await tRes.json() as {
-            trades?: Array<{ taker_side?: string; count?: number; created_time?: string }>;
+            trades?: Array<{ taker_side?: string; count?: number; count_fp?: string; created_time?: string }>;
           };
           let yes = 0, no = 0, cnt = 0;
           const cutoff = Date.now() - 60_000;
           for (const t of tJson.trades ?? []) {
             const ts = t.created_time ? new Date(t.created_time).getTime() : NaN;
             if (Number.isFinite(ts) && ts < cutoff) continue;
-            const c = Number(t.count ?? 0);
+            const c = num(t.count_fp ?? t.count) ?? 0;
             if (!Number.isFinite(c) || c <= 0) continue;
             cnt += 1;
             const side = String(t.taker_side ?? "").toLowerCase();
@@ -165,11 +177,11 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
         yesMid,
         secondsToClose: best.stc,
         impliedSpot: Number(implied.toFixed(2)),
-        volume: best.volume,
-        openInterest: best.openInterest,
+        volume: best.volume != null ? Math.round(best.volume) : null,
+        openInterest: best.openInterest != null ? Math.round(best.openInterest) : null,
         lastPriceCents: best.lastPrice != null ? Math.round(best.lastPrice) : null,
-        yesVol60s,
-        noVol60s,
+        yesVol60s: yesVol60s != null ? Math.round(yesVol60s) : null,
+        noVol60s: noVol60s != null ? Math.round(noVol60s) : null,
         tradeCount60s,
         error: null,
       };
