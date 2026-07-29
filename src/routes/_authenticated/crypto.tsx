@@ -2343,6 +2343,54 @@ function BigFlipMonitor() {
   );
 }
 
+function CheapFlipHunterToggle() {
+  const [ks, setKs] = useState<{ halted: boolean; reason: string | null } | null>(null);
+  const refreshKs = async () => {
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
+    if (!uid) return;
+    const { data } = await supabase
+      .from("big_flip_killswitch")
+      .select("halted,reason")
+      .eq("user_id", uid)
+      .maybeSingle();
+    setKs({ halted: !!data?.halted, reason: data?.reason ?? null });
+  };
+  useEffect(() => { refreshKs(); const t = setInterval(refreshKs, 5_000); return () => clearInterval(t); }, []);
+
+  const toggle = async () => {
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
+    if (!uid) return;
+    const nextHalted = !ks?.halted;
+    await supabase.from("big_flip_killswitch").upsert({
+      user_id: uid,
+      halted: nextHalted,
+      reason: nextHalted ? "manual off" : null,
+      halted_at: nextHalted ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+    toast.success(nextHalted ? "Cheap-flip hunter turned OFF" : "Cheap-flip hunter re-enabled");
+    refreshKs();
+  };
+
+  const halted = !!ks?.halted;
+  return (
+    <button
+      onClick={toggle}
+      title={halted ? `Halted: ${ks?.reason ?? "killswitch on"}` : "Cheap-flip hunter is LIVE — click to turn OFF"}
+      className={`flex items-center gap-1.5 text-xs uppercase tracking-wider px-3 py-1.5 border rounded transition-colors ${
+        halted
+          ? "border-red-500/40 text-red-300 hover:bg-red-500/10"
+          : "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+      }`}
+    >
+      {halted ? <XCircle className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
+      {halted ? "Flip Hunter OFF" : "Flip Hunter ON"}
+    </button>
+  );
+}
+
 function AutoTradePanel({ markets }: { markets: BtcMarket[] }) {
   const qc = useQueryClient();
   const listFn = useServerFn(listAutoTradeOrders);
