@@ -150,14 +150,14 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
         );
         if (tRes.ok) {
           const tJson = await tRes.json() as {
-            trades?: Array<{ taker_side?: string; count?: number; created_time?: string }>;
+            trades?: Array<{ taker_side?: string; count?: number; count_fp?: string; created_time?: string }>;
           };
           let yes = 0, no = 0, cnt = 0;
           const cutoff = Date.now() - 60_000;
           for (const t of tJson.trades ?? []) {
             const ts = t.created_time ? new Date(t.created_time).getTime() : NaN;
             if (Number.isFinite(ts) && ts < cutoff) continue;
-            const c = Number(t.count ?? 0);
+            const c = num(t.count_fp ?? t.count) ?? 0;
             if (!Number.isFinite(c) || c <= 0) continue;
             cnt += 1;
             const side = String(t.taker_side ?? "").toLowerCase();
