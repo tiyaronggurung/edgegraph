@@ -340,6 +340,9 @@ export interface PredictionStatsResult {
     studyLockSecondsToClose: number | null;
     studyLockedAt: string | null;
     studyLockKalshiPriceCents: number | null;
+    cvvWouldLockSide: "YES" | "NO" | null;
+    cvvWouldLockConf: number | null;
+    skipGuardReason: string | null;
   }>;
 }
 
