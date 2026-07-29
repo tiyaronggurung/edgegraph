@@ -94,6 +94,22 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
         const results: Array<Record<string, unknown>> = [];
         const sinceIso = new Date(nowMs - 120_000).toISOString();
 
+        // Wider tick window (newest-first) used only for the CVV 3-min momentum
+        // term. The consensus window above stays at 120s — unchanged behaviour.
+        let momentumSpots: number[] = [];
+        if (cvvCfg.mode !== "off") {
+          const { data: mTicks } = await supabaseAdmin
+            .from("btc_spot_ticks")
+            .select("spot")
+            .gte("observed_at", new Date(nowMs - 190_000).toISOString())
+            .order("observed_at", { ascending: false })
+            .limit(400);
+          momentumSpots = (mTicks ?? [])
+            .map((t: any) => Number(t.spot))
+            .filter((x: number) => Number.isFinite(x));
+        }
+
+
         for (const p of preds ?? []) {
           const ticker = (p as any).ticker as string;
           const closeTime = (p as any).close_time as string;
