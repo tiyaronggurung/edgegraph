@@ -2560,6 +2560,7 @@ export type Database = {
           snapshot_seconds_to_close: number
           spot_at_snapshot: number
           strike: number
+          study_auto_live_fired_at: string | null
           study_lock_confidence: number | null
           study_lock_kalshi_price_cents: number | null
           study_lock_seconds_to_close: number | null
@@ -2609,6 +2610,7 @@ export type Database = {
           snapshot_seconds_to_close: number
           spot_at_snapshot: number
           strike: number
+          study_auto_live_fired_at?: string | null
           study_lock_confidence?: number | null
           study_lock_kalshi_price_cents?: number | null
           study_lock_seconds_to_close?: number | null
@@ -2658,6 +2660,7 @@ export type Database = {
           snapshot_seconds_to_close?: number
           spot_at_snapshot?: number
           strike?: number
+          study_auto_live_fired_at?: string | null
           study_lock_confidence?: number | null
           study_lock_kalshi_price_cents?: number | null
           study_lock_seconds_to_close?: number | null
@@ -4412,6 +4415,7 @@ export type Database = {
           risk_tolerance: string
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
+          study_auto_live_enabled: boolean
           subscription_status: string
           subscription_tier: string
         }
@@ -4433,6 +4437,7 @@ export type Database = {
           risk_tolerance?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          study_auto_live_enabled?: boolean
           subscription_status?: string
           subscription_tier?: string
         }
@@ -4454,6 +4459,7 @@ export type Database = {
           risk_tolerance?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          study_auto_live_enabled?: boolean
           subscription_status?: string
           subscription_tier?: string
         }
