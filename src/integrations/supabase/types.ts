@@ -1878,6 +1878,10 @@ export type Database = {
         Row: {
           btc_entry_gate_enabled: boolean
           config_version: number
+          cvv_atr_lookback_hours: number
+          cvv_atr_mult: number
+          cvv_mode: string
+          cvv_momentum_max_usd: number
           id: number
           log_gate_decisions: boolean
           max_ask_cents: number
@@ -1896,6 +1900,10 @@ export type Database = {
         Insert: {
           btc_entry_gate_enabled?: boolean
           config_version?: number
+          cvv_atr_lookback_hours?: number
+          cvv_atr_mult?: number
+          cvv_mode?: string
+          cvv_momentum_max_usd?: number
           id?: number
           log_gate_decisions?: boolean
           max_ask_cents?: number
@@ -1914,6 +1922,10 @@ export type Database = {
         Update: {
           btc_entry_gate_enabled?: boolean
           config_version?: number
+          cvv_atr_lookback_hours?: number
+          cvv_atr_mult?: number
+          cvv_mode?: string
+          cvv_momentum_max_usd?: number
           id?: number
           log_gate_decisions?: boolean
           max_ask_cents?: number
@@ -2558,6 +2570,13 @@ export type Database = {
           chart_verdict: string | null
           close_time: string
           created_at: string
+          cvv_atr_usd: number | null
+          cvv_cushion_usd: number | null
+          cvv_momentum_usd: number | null
+          cvv_reason: string | null
+          cvv_verdict: string | null
+          cvv_would_lock_conf: number | null
+          cvv_would_lock_side: string | null
           edge_pts: number
           event_ticker: string | null
           flip_count: number
@@ -2611,6 +2630,13 @@ export type Database = {
           chart_verdict?: string | null
           close_time: string
           created_at?: string
+          cvv_atr_usd?: number | null
+          cvv_cushion_usd?: number | null
+          cvv_momentum_usd?: number | null
+          cvv_reason?: string | null
+          cvv_verdict?: string | null
+          cvv_would_lock_conf?: number | null
+          cvv_would_lock_side?: string | null
           edge_pts: number
           event_ticker?: string | null
           flip_count?: number
@@ -2664,6 +2690,13 @@ export type Database = {
           chart_verdict?: string | null
           close_time?: string
           created_at?: string
+          cvv_atr_usd?: number | null
+          cvv_cushion_usd?: number | null
+          cvv_momentum_usd?: number | null
+          cvv_reason?: string | null
+          cvv_verdict?: string | null
+          cvv_would_lock_conf?: number | null
+          cvv_would_lock_side?: string | null
           edge_pts?: number
           event_ticker?: string | null
           flip_count?: number
