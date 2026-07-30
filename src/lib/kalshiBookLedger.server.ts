@@ -72,11 +72,11 @@ type Trade = {
   no_price_dollars?: string;
 };
 
-/** Trades strictly newer than sinceSec, oldest-first. Max 4 pages. */
+/** Trades strictly newer than sinceSec, oldest-first. Max 12 pages (12k trades). */
 async function fetchNewTrades(ticker: string, sinceSec: number) {
   const out: Trade[] = [];
   let cursor: string | undefined;
-  for (let page = 0; page < 4; page++) {
+  for (let page = 0; page < 12; page++) {
     const url =
       `${KALSHI}/markets/trades?ticker=${encodeURIComponent(ticker)}` +
       `&limit=1000&min_ts=${sinceSec}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
@@ -115,11 +115,16 @@ export async function snapshotKalshiBook(): Promise<{
 
   const trades = await fetchNewTrades(market.ticker, sinceSec);
 
-  let yesVol = Number(existing?.yes_vol ?? 0) || 0;
-  let noVol = Number(existing?.no_vol ?? 0) || 0;
-  let yesCost = Number(existing?.yes_cost ?? 0) || 0;
-  let noCost = Number(existing?.no_cost ?? 0) || 0;
-  let count = Number(existing?.trade_count ?? 0) || 0;
+  // A row written by recordTrendlineBook() is a FULL-window recompute and has no
+  // last_trade_ts. Accumulating deltas on top of it double-counts the whole
+  // window (that's what made the ledger diverge from the trendline strip), so in
+  // that case we recompute from zero over the trades we just pulled.
+  const fresh = existing?.last_trade_ts == null;
+  let yesVol = fresh ? 0 : Number(existing?.yes_vol ?? 0) || 0;
+  let noVol = fresh ? 0 : Number(existing?.no_vol ?? 0) || 0;
+  let yesCost = fresh ? 0 : Number(existing?.yes_cost ?? 0) || 0;
+  let noCost = fresh ? 0 : Number(existing?.no_cost ?? 0) || 0;
+  let count = fresh ? 0 : Number(existing?.trade_count ?? 0) || 0;
   let maxTs = sinceSec;
   let added = 0;
 

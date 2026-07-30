@@ -55,6 +55,8 @@ export async function recordTrendlineBook(): Promise<{
     house_if_yes: r2(flow.houseIfYes),
     house_if_no: r2(flow.houseIfNo),
     house_lean: flow.houseLean,
+    // Full-window recompute: no incremental cursor (see snapshotKalshiBook).
+    last_trade_ts: null,
     last_seen_at: new Date(nowMs).toISOString(),
   };
 

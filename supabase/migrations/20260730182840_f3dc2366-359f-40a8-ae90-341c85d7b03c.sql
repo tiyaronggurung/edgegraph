@@ -1,0 +1,1 @@
+DELETE FROM public.kalshi_book_ledger WHERE close_time > now() - INTERVAL '12 hours';
