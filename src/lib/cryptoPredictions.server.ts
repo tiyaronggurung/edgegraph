@@ -367,8 +367,19 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
     .limit(500);
 
     const all = rows ?? [];
+    // A Study Pick only counts when the trendline study actually locked at or
+    // above the documented conviction threshold. Sub-threshold rows (older
+    // backfills wrote 3%–60% "locks") are NOT study picks.
+    const MIN_STUDY_LOCK_CONF = 75;
+    const lockOf = (r: (typeof all)[number]): "YES" | "NO" | null => {
+      const s = (r as { study_locked_side?: string | null }).study_locked_side as "YES" | "NO" | null;
+      if (s !== "YES" && s !== "NO") return null;
+      const c = (r as { study_lock_confidence?: number | string | null }).study_lock_confidence;
+      if (c != null && Number(c) < MIN_STUDY_LOCK_CONF) return null;
+      return s;
+    };
     const pickSide = (r: (typeof all)[number]): "YES" | "NO" =>
-      (((r as { study_locked_side?: string | null }).study_locked_side as "YES" | "NO" | null) ?? (r.side as "YES" | "NO"));
+      lockOf(r) ?? (r.side as "YES" | "NO");
     const rowCorrect = (r: (typeof all)[number]): boolean | null =>
       r.outcome ? ((r.outcome as "YES" | "NO") === pickSide(r)) : null;
     const settledAll = all.filter(r => r.outcome);
