@@ -3973,6 +3973,84 @@ export type Database = {
           },
         ]
       }
+      kalshi_book_ledger: {
+        Row: {
+          close_time: string | null
+          created_at: string
+          house_if_no: number | null
+          house_if_yes: number | null
+          house_lean: string | null
+          house_pnl: number | null
+          id: string
+          last_seen_at: string
+          no_avg_cents: number | null
+          no_cost: number | null
+          no_payout: number | null
+          no_vol: number | null
+          outcome: string | null
+          settled_at: string | null
+          strike: number | null
+          ticker: string
+          total_collected: number | null
+          trade_count: number | null
+          window_start: string
+          yes_avg_cents: number | null
+          yes_cost: number | null
+          yes_payout: number | null
+          yes_vol: number | null
+        }
+        Insert: {
+          close_time?: string | null
+          created_at?: string
+          house_if_no?: number | null
+          house_if_yes?: number | null
+          house_lean?: string | null
+          house_pnl?: number | null
+          id?: string
+          last_seen_at?: string
+          no_avg_cents?: number | null
+          no_cost?: number | null
+          no_payout?: number | null
+          no_vol?: number | null
+          outcome?: string | null
+          settled_at?: string | null
+          strike?: number | null
+          ticker: string
+          total_collected?: number | null
+          trade_count?: number | null
+          window_start: string
+          yes_avg_cents?: number | null
+          yes_cost?: number | null
+          yes_payout?: number | null
+          yes_vol?: number | null
+        }
+        Update: {
+          close_time?: string | null
+          created_at?: string
+          house_if_no?: number | null
+          house_if_yes?: number | null
+          house_lean?: string | null
+          house_pnl?: number | null
+          id?: string
+          last_seen_at?: string
+          no_avg_cents?: number | null
+          no_cost?: number | null
+          no_payout?: number | null
+          no_vol?: number | null
+          outcome?: string | null
+          settled_at?: string | null
+          strike?: number | null
+          ticker?: string
+          total_collected?: number | null
+          trade_count?: number | null
+          window_start?: string
+          yes_avg_cents?: number | null
+          yes_cost?: number | null
+          yes_payout?: number | null
+          yes_vol?: number | null
+        }
+        Relationships: []
+      }
       live_predictions: {
         Row: {
           away_team: string

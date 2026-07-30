@@ -66,6 +66,7 @@ const OddsSideStudyPanel = lazy(() => import("@/components/crypto/OddsSideStudyP
 const LockThresholdStudyPanel = lazy(() => import("@/components/crypto/OddsSideStudyPanel").then(m => ({ default: m.LockThresholdStudyPanel })));
 const TrendlineBreakStudyPanel = lazy(() => import("@/components/crypto/TrendlineBreakStudyPanel").then(m => ({ default: m.TrendlineBreakStudyPanel })));
 const MidSupportStudyPanel = lazy(() => import("@/components/crypto/MidSupportStudyPanel").then(m => ({ default: m.MidSupportStudyPanel })));
+const KalshiBookLedgerPanel = lazy(() => import("@/components/crypto/KalshiBookLedgerPanel").then(m => ({ default: m.KalshiBookLedgerPanel })));
 
 const TrendlinePatternReportPanel = lazy(() => import("@/components/crypto/TrendlinePatternReportPanel").then(m => ({ default: m.TrendlinePatternReportPanel })));
 const JumpBacktestPanel = lazy(() => import("@/components/crypto/JumpBacktestPanel").then(m => ({ default: m.JumpBacktestPanel })));
@@ -4018,6 +4019,7 @@ function CryptoPage() {
       <LazyOnVisible><LockThresholdStudyPanel /></LazyOnVisible>
       <LazyOnVisible><TrendlineBreakStudyPanel /></LazyOnVisible>
       <LazyOnVisible><MidSupportStudyPanel /></LazyOnVisible>
+      <LazyOnVisible><KalshiBookLedgerPanel /></LazyOnVisible>
       <LazyOnVisible><OddsComparisonPanel /></LazyOnVisible>
 
 
