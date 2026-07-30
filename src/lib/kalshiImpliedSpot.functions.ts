@@ -216,6 +216,7 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
 
         let y60 = 0, n60 = 0, c60 = 0;
         let yW = 0, nW = 0, cW = 0;
+        let yCost = 0, nCost = 0;
         const ladder = new Map<number, { yes: number; no: number; trades: number }>();
         for (const t of trades) {
           const ts = t.created_time ? new Date(t.created_time).getTime() : NaN;
@@ -228,6 +229,16 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
 
           cW += 1;
           if (isYes) yW += c; else nW += c;
+
+          // Price paid by the aggressor, in dollars per contract.
+          const yPx = t.yes_price_dollars != null
+            ? num(t.yes_price_dollars)
+            : (num(t.yes_price) != null ? (num(t.yes_price) as number) / 100 : null);
+          const nPx = t.no_price_dollars != null
+            ? num(t.no_price_dollars)
+            : (num(t.no_price) != null ? (num(t.no_price) as number) / 100 : null);
+          if (isYes && yPx != null) yCost += c * yPx;
+          if (isNo && nPx != null) nCost += c * nPx;
 
           const m = Math.min(14, Math.max(0, Math.floor((ts - winStartMs) / 60_000)));
           const b = ladder.get(m) ?? { yes: 0, no: 0, trades: 0 };
@@ -242,12 +253,27 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
         }
         yesVol60s = y60; noVol60s = n60; tradeCount60s = c60;
         yesVolWindow = yW; noVolWindow = nW; tradeCountWindow = cW;
+        yesCostWindow = yCost; noCostWindow = nCost;
         flowLadder = [...ladder.entries()]
           .sort((a, b) => a[0] - b[0])
           .map(([m, v]) => ({ m, yes: Math.round(v.yes), no: Math.round(v.no), trades: v.trades }));
       } catch { /* best-effort */ }
 
+      // Book economics: takers pay cost, winners get $1/contract.
+      const yPayout = yesVolWindow != null ? yesVolWindow : null;
+      const nPayout = noVolWindow != null ? noVolWindow : null;
+      const collected =
+        yesCostWindow != null && noCostWindow != null ? yesCostWindow + noCostWindow : null;
+      const houseIfYes = collected != null && yPayout != null ? collected - yPayout : null;
+      const houseIfNo = collected != null && nPayout != null ? collected - nPayout : null;
+      const houseLean: "YES" | "NO" | null =
+        houseIfYes == null || houseIfNo == null
+          ? null
+          : houseIfYes === houseIfNo ? null : houseIfYes > houseIfNo ? "YES" : "NO";
+      const r2 = (x: number | null) => (x == null ? null : Number(x.toFixed(2)));
+
       return {
+
         ok: true,
         ticker: best.ticker,
         strike: best.strike,
