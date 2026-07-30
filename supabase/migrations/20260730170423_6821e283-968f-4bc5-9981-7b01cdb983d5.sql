@@ -1,0 +1,1 @@
+select cron.alter_job(378, command := $cron$SELECT net.http_post(url := 'https://project--921f21f3-4144-4400-a0a1-781603e22b1b.lovable.app/api/public/hooks/kalshi-book-tick', headers := '{"Content-Type":"application/json","x-cron-secret":"G17G6C6bZ+mb+v9qoDEidNLB+wQt/K685c27WGx0VPg="}'::jsonb, body := '{}'::jsonb, timeout_milliseconds := 60000) AS request_id;$cron$);
