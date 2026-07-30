@@ -1236,17 +1236,24 @@ function ModelAccuracyPanel() {
                         <td className="p-2 text-center">
                           {(() => {
                             const sw = (r as { studyWasCorrect?: boolean | null }).studyWasCorrect ?? null;
+                            const t7w = (r as { studyT7WasCorrect?: boolean | null }).studyT7WasCorrect ?? null;
                             if (lockedSide) {
                               if (sw === true) return <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>;
                               if (sw === false) return <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>;
                               return <span className="text-muted-foreground">pending</span>;
                             }
-                            // No study lock — grade the model pick, clearly marked.
+                            if ((r as { studyT7Side?: "YES" | "NO" | null }).studyT7Side) {
+                              if (t7w === true) return <span className="inline-flex items-center gap-1 text-emerald-400/80" title="7-minute study side vs settlement (no hard lock)"><CheckCircle2 className="h-3 w-3" />WIN <span className="text-[9px]">t7</span></span>;
+                              if (t7w === false) return <span className="inline-flex items-center gap-1 text-red-400/80" title="7-minute study side vs settlement (no hard lock)"><XCircle className="h-3 w-3" />LOSS <span className="text-[9px]">t7</span></span>;
+                              return <span className="text-muted-foreground">pending</span>;
+                            }
+                            // No study data at all — grade the model pick, clearly marked.
                             return (
-                              <span className="text-muted-foreground/70 text-[10px]" title="No Study Pick locked — showing the model pick's result, not a study result.">
+                              <span className="text-muted-foreground/70 text-[10px]" title="No study data recorded — showing the model pick's result.">
                                 {r.wasCorrect === true ? "model WIN" : r.wasCorrect === false ? "model LOSS" : "pending"}
                               </span>
                             );
+
                           })()}
                         </td>
 
