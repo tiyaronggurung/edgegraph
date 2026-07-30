@@ -341,7 +341,7 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
           });
         }
 
-        return Response.json({ ok: true, checked: (preds ?? []).length, results, durationMs: Date.now() - t0 });
+        return Response.json({ ok: true, checked: (preds ?? []).length, results, t7: t7Results, durationMs: Date.now() - t0 });
       },
     },
   },
