@@ -12,6 +12,10 @@ export interface BookWindowRow {
   no_vol: number | null;
   yes_avg_cents: number | null;
   no_avg_cents: number | null;
+  yes_cost?: number | null;
+  no_cost?: number | null;
+  yes_payout?: number | null;
+  no_payout?: number | null;
   total_collected: number | null;
   house_if_yes: number | null;
   house_if_no: number | null;
@@ -103,7 +107,7 @@ export const getKalshiBookReport = createServerFn({ method: "GET" })
     const { data: rows, error } = await supabaseAdmin
       .from("kalshi_book_ledger")
       .select(
-        "ticker, window_start, close_time, yes_vol, no_vol, yes_avg_cents, no_avg_cents, total_collected, house_if_yes, house_if_no, house_lean, outcome, house_pnl, last_seen_at",
+        "ticker, window_start, close_time, yes_vol, no_vol, yes_avg_cents, no_avg_cents, yes_cost, no_cost, yes_payout, no_payout, total_collected, house_if_yes, house_if_no, house_lean, outcome, house_pnl, last_seen_at",
       )
       .gte("window_start", since)
       .order("window_start", { ascending: false })

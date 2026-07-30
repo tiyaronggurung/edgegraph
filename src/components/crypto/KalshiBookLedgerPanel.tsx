@@ -9,6 +9,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+const cash = (v: number | null | undefined) =>
+  v == null ? "—" : `${v < 0 ? "-" : ""}$${Math.abs(v) >= 1000 ? Math.round(Math.abs(v)).toLocaleString() : Math.abs(v).toFixed(2)}`;
+
 const money = (n: number | null | undefined) =>
   n == null ? "—" : `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`;
 
@@ -33,44 +36,78 @@ function LiveWindowCard({ live }: { live: LiveBookWindow }) {
       <div className="h-1.5 w-full rounded bg-border/60 overflow-hidden">
         <div className="h-full bg-primary" style={{ width: `${live.pct_elapsed}%` }} />
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1 text-[11px]">
-        <div>
-          <div className="text-muted-foreground">UP vol / avg</div>
-          <div className="tabular-nums">
-            {live.yes_vol == null ? "—" : Math.round(live.yes_vol).toLocaleString()}
-            {live.yes_avg_cents == null ? "" : ` @ ${live.yes_avg_cents}¢`}
+      {(() => {
+        const yAvg = live.yes_avg_cents ?? null;
+        const nAvg = live.no_avg_cents ?? null;
+        const yCost = live.yes_cost ?? null;
+        const nCost = live.no_cost ?? null;
+        const yPay = live.yes_payout ?? null;
+        const nPay = live.no_payout ?? null;
+        const coll = live.total_collected ?? null;
+        const hY = live.house_if_yes ?? null;
+        const hN = live.house_if_no ?? null;
+        const lean = live.house_lean ?? null;
+        const has = (yCost ?? 0) + (nCost ?? 0) > 0;
+        if (!has) return <div className="text-[11px] text-muted-foreground">accumulating…</div>;
+        return (
+          <div
+            className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] border-t border-border/50 pt-1"
+            title={
+              `Window-to-date taker cost basis (real Kalshi prints):\n` +
+              `  UP  (YES): ${yPay ?? "—"} contracts @ avg ${yAvg != null ? yAvg.toFixed(1) + "¢" : "—"} = ${cash(yCost)} paid\n` +
+              `  DOWN (NO): ${nPay ?? "—"} contracts @ avg ${nAvg != null ? nAvg.toFixed(1) + "¢" : "—"} = ${cash(nCost)} paid\n` +
+              `  Collected by the book: ${cash(coll)}\n` +
+              `  Payout owed if UP wins:   ${cash(yPay)}  → book P/L ${cash(hY)}\n` +
+              `  Payout owed if DOWN wins: ${cash(nPay)}  → book P/L ${cash(hN)}`
+            }
+          >
+            <span className="text-muted-foreground tracking-wider">COST 15m</span>
+            <span className="flex items-center gap-1">
+              <span className="text-green-600/80">UP avg</span>
+              <span className="tabular-nums font-bold text-green-600">
+                {yAvg != null ? `${yAvg.toFixed(1)}¢` : "—"}
+              </span>
+              <span className="text-muted-foreground">({cash(yCost)})</span>
+            </span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="flex items-center gap-1">
+              <span className="text-red-600/80">DN avg</span>
+              <span className="tabular-nums font-bold text-red-600">
+                {nAvg != null ? `${nAvg.toFixed(1)}¢` : "—"}
+              </span>
+              <span className="text-muted-foreground">({cash(nCost)})</span>
+            </span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="text-muted-foreground">
+              pool <span className="tabular-nums text-foreground">{cash(coll)}</span>
+            </span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="text-muted-foreground">
+              payout <span className="tabular-nums text-green-600">{cash(yPay)}</span>
+              <span className="text-muted-foreground/40"> / </span>
+              <span className="tabular-nums text-red-600">{cash(nPay)}</span>
+            </span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="text-muted-foreground">
+              book P/L{" "}
+              <span className={`tabular-nums ${(hY ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>{cash(hY)}</span>
+              <span className="text-muted-foreground/40"> / </span>
+              <span className={`tabular-nums ${(hN ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>{cash(hN)}</span>
+            </span>
+            {lean && (
+              <Badge variant="outline" className="text-[10px] py-0">
+                book leans {lean === "YES" ? "↑ UP" : "↓ DOWN"}
+              </Badge>
+            )}
+            <span className="text-muted-foreground/40">·</span>
+            <span className="text-muted-foreground tabular-nums">
+              vol {live.yes_vol == null ? "—" : Math.round(live.yes_vol).toLocaleString()} /{" "}
+              {live.no_vol == null ? "—" : Math.round(live.no_vol).toLocaleString()}
+              {live.stale_seconds != null && ` · last print ${live.stale_seconds}s ago`}
+            </span>
           </div>
-        </div>
-        <div>
-          <div className="text-muted-foreground">DOWN vol / avg</div>
-          <div className="tabular-nums">
-            {live.no_vol == null ? "—" : Math.round(live.no_vol).toLocaleString()}
-            {live.no_avg_cents == null ? "" : ` @ ${live.no_avg_cents}¢`}
-          </div>
-        </div>
-        <div>
-          <div className="text-muted-foreground">collected</div>
-          <div className="tabular-nums">{money(live.total_collected)}</div>
-        </div>
-        <div>
-          <div className="text-muted-foreground">house lean</div>
-          <div>{live.house_lean === "YES" ? "↑ UP" : live.house_lean === "NO" ? "↓ DOWN" : "—"}</div>
-        </div>
-        <div>
-          <div className="text-muted-foreground">book P/L if UP</div>
-          <div className={`tabular-nums ${pnlTone(live.house_if_yes)}`}>{money(live.house_if_yes)}</div>
-        </div>
-        <div>
-          <div className="text-muted-foreground">book P/L if DOWN</div>
-          <div className={`tabular-nums ${pnlTone(live.house_if_no)}`}>{money(live.house_if_no)}</div>
-        </div>
-        <div className="col-span-2">
-          <div className="text-muted-foreground">last print</div>
-          <div className="tabular-nums">
-            {live.stale_seconds == null ? "—" : `${live.stale_seconds}s ago`}
-          </div>
-        </div>
-      </div>
+        );
+      })()}
     </div>
   );
 }
