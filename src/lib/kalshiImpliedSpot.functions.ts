@@ -292,7 +292,22 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
         noVolWindow: noVolWindow != null ? Math.round(noVolWindow) : null,
         tradeCountWindow,
         flowLadder,
+        yesCostWindow: r2(yesCostWindow),
+        noCostWindow: r2(noCostWindow),
+        yesAvgCents:
+          yesCostWindow != null && yesVolWindow != null && yesVolWindow > 0
+            ? Number(((yesCostWindow / yesVolWindow) * 100).toFixed(1)) : null,
+        noAvgCents:
+          noCostWindow != null && noVolWindow != null && noVolWindow > 0
+            ? Number(((noCostWindow / noVolWindow) * 100).toFixed(1)) : null,
+        yesPayout: r2(yPayout),
+        noPayout: r2(nPayout),
+        totalCostWindow: r2(collected),
+        houseIfYes: r2(houseIfYes),
+        houseIfNo: r2(houseIfNo),
+        houseLean,
         error: null,
+
       };
 
     } catch (e) {
