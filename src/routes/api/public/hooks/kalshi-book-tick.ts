@@ -13,12 +13,17 @@ export const Route = createFileRoute("/api/public/hooks/kalshi-book-tick")({
           const { snapshotKalshiBook, settleKalshiBook, backfillKalshiBook } = await import(
             "@/lib/kalshiBookLedger.server"
           );
+          const { recordTrendlineBook } = await import("@/lib/kalshiBookTrendline.server");
           const snap = await snapshotKalshiBook();
+          // Overwrite with the richer full-window tape the trendline chart uses,
+          // so the ledger log matches the live COST 15m strip exactly.
+          const trend = await recordTrendlineBook();
           const settle = await settleKalshiBook();
           const backfill = await backfillKalshiBook(2);
-          return new Response(JSON.stringify({ ok: true, snap, settle, backfill }), {
+          return new Response(JSON.stringify({ ok: true, snap, trend, settle, backfill }), {
             headers: { "Content-Type": "application/json" },
           });
+
         } catch (e) {
           return new Response(
             JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }),
