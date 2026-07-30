@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   getKalshiBookReport,
   type BookBucketRow,
+  type LiveBookWindow,
 } from "@/lib/kalshiBookReport.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,64 @@ const money = (n: number | null | undefined) =>
 function pnlTone(n: number | null | undefined) {
   if (n == null) return "text-muted-foreground";
   return n > 0 ? "text-green-600 font-semibold" : n < 0 ? "text-red-600 font-semibold" : "";
+}
+
+function LiveWindowCard({ live }: { live: LiveBookWindow }) {
+  const mmss = `${Math.floor(live.seconds_to_close / 60)}:${String(live.seconds_to_close % 60).padStart(2, "0")}`;
+  return (
+    <div className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-1.5">
+      <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
+        <span className="font-mono">{live.ticker}</span>
+        <span className="flex items-center gap-2">
+          <Badge variant="outline" className="bg-primary/10 border-primary/40">
+            LIVE · min {live.minute_of_15}/15
+          </Badge>
+          <span className="tabular-nums text-muted-foreground">{mmss} left</span>
+        </span>
+      </div>
+      <div className="h-1.5 w-full rounded bg-border/60 overflow-hidden">
+        <div className="h-full bg-primary" style={{ width: `${live.pct_elapsed}%` }} />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1 text-[11px]">
+        <div>
+          <div className="text-muted-foreground">UP vol / avg</div>
+          <div className="tabular-nums">
+            {live.yes_vol == null ? "—" : Math.round(live.yes_vol).toLocaleString()}
+            {live.yes_avg_cents == null ? "" : ` @ ${live.yes_avg_cents}¢`}
+          </div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">DOWN vol / avg</div>
+          <div className="tabular-nums">
+            {live.no_vol == null ? "—" : Math.round(live.no_vol).toLocaleString()}
+            {live.no_avg_cents == null ? "" : ` @ ${live.no_avg_cents}¢`}
+          </div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">collected</div>
+          <div className="tabular-nums">{money(live.total_collected)}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">house lean</div>
+          <div>{live.house_lean === "YES" ? "↑ UP" : live.house_lean === "NO" ? "↓ DOWN" : "—"}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">book P/L if UP</div>
+          <div className={`tabular-nums ${pnlTone(live.house_if_yes)}`}>{money(live.house_if_yes)}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">book P/L if DOWN</div>
+          <div className={`tabular-nums ${pnlTone(live.house_if_no)}`}>{money(live.house_if_no)}</div>
+        </div>
+        <div className="col-span-2">
+          <div className="text-muted-foreground">last print</div>
+          <div className="tabular-nums">
+            {live.stale_seconds == null ? "—" : `${live.stale_seconds}s ago`}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function BucketTable({ title, rows }: { title: string; rows: BookBucketRow[] }) {
@@ -64,7 +123,7 @@ export function KalshiBookLedgerPanel() {
   const { data, isLoading } = useQuery({
     queryKey: ["kalshi-book-report", days],
     queryFn: () => fn({ data: { days } }),
-    refetchInterval: 60_000,
+    refetchInterval: 15_000,
   });
 
   const t = data?.totals;
@@ -113,15 +172,17 @@ export function KalshiBookLedgerPanel() {
               )}
             </div>
 
+            {data!.live && <LiveWindowCard live={data!.live} />}
+
             <BucketTable title="Per week" rows={data!.perWeek} />
             <BucketTable title="Per day" rows={data!.perDay} />
             <BucketTable title="Per hour (last 24)" rows={data!.perHour} />
 
             <div className="space-y-1">
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Last 15m windows
+                Every 15m window — end P/L log ({data!.recent.length})
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
                 <table className="w-full text-xs">
                   <thead className="text-muted-foreground">
                     <tr className="text-left">
