@@ -94,6 +94,62 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
         const results: Array<Record<string, unknown>> = [];
         const sinceIso = new Date(nowMs - 120_000).toISOString();
 
+        // ---- T+7min snapshot (always recorded, never gated) -----------------
+        // Every 15-min window gets a permanent record of what the study saw at
+        // the 7-minute mark, regardless of consensus thresholds or any gate.
+        // This is what the dashboard shows so a window is never blank.
+        const t7Results: Array<Record<string, unknown>> = [];
+        {
+          const { data: t7Rows } = await supabaseAdmin
+            .from("btc_model_predictions")
+            .select("ticker, close_time, strike")
+            .is("study_t7_side", null)
+            .gte("close_time", new Date(nowMs + 400_000).toISOString())
+            .lte("close_time", new Date(nowMs + 545_000).toISOString())
+            .limit(20);
+
+          if ((t7Rows ?? []).length > 0) {
+            const { data: t7Ticks } = await supabaseAdmin
+              .from("btc_spot_ticks")
+              .select("spot")
+              .gte("observed_at", sinceIso)
+              .order("observed_at", { ascending: false })
+              .limit(240);
+            const t7Spots = (t7Ticks ?? [])
+              .map((t: any) => Number(t.spot))
+              .filter((x: number) => Number.isFinite(x));
+
+            for (const row of t7Rows ?? []) {
+              const tk = (row as any).ticker as string;
+              const stk = Number((row as any).strike);
+              if (!stk || !Number.isFinite(stk) || t7Spots.length < 5) {
+                t7Results.push({ ticker: tk, t7: "insufficient_data", n: t7Spots.length });
+                continue;
+              }
+              const aboveN = t7Spots.filter((s) => s >= stk).length;
+              const r7 = aboveN / t7Spots.length;
+              const t7Side: "YES" | "NO" = r7 >= 0.5 ? "YES" : "NO";
+              const t7Conf = Math.round(Math.max(r7, 1 - r7) * 100);
+              const secs = Math.round((new Date((row as any).close_time as string).getTime() - nowMs) / 1000);
+              await supabaseAdmin
+                .from("btc_model_predictions")
+                .update({
+                  study_t7_side: t7Side,
+                  study_t7_conf: t7Conf,
+                  study_t7_ratio: Number(r7.toFixed(4)),
+                  study_t7_spot: Number(t7Spots[0].toFixed(2)),
+                  study_t7_seconds_to_close: secs,
+                  study_t7_at: new Date().toISOString(),
+                  study_t7_source: "live_spot_ticks",
+                } as never)
+                .eq("ticker", tk)
+                .is("study_t7_side", null);
+              t7Results.push({ ticker: tk, t7Side, t7Conf, secs });
+            }
+          }
+        }
+
+
         // Wider tick window (newest-first) used only for the CVV 3-min momentum
         // term. The consensus window above stays at 120s — unchanged behaviour.
         let momentumSpots: number[] = [];
@@ -285,7 +341,7 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
           });
         }
 
-        return Response.json({ ok: true, checked: (preds ?? []).length, results, durationMs: Date.now() - t0 });
+        return Response.json({ ok: true, checked: (preds ?? []).length, results, t7: t7Results, durationMs: Date.now() - t0 });
       },
     },
   },

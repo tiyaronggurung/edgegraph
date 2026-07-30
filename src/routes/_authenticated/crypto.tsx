@@ -1147,9 +1147,25 @@ function ModelAccuracyPanel() {
                                   </span>
                                 )}
                               </span>
+                            ) : (r as { studyT7Side?: "YES" | "NO" | null }).studyT7Side ? (
+                              (() => {
+                                const t7 = (r as { studyT7Side?: "YES" | "NO" | null }).studyT7Side as "YES" | "NO";
+                                const t7c = (r as { studyT7Conf?: number | null }).studyT7Conf ?? null;
+                                const t7s = (r as { studyT7SecondsToClose?: number | null }).studyT7SecondsToClose ?? null;
+                                const minute = t7s != null ? Math.max(0, (900 - t7s) / 60) : 7;
+                                return (
+                                  <span className="inline-flex flex-col leading-tight">
+                                    <span className={t7 === "YES" ? "text-emerald-400" : "text-red-400"} title="Study side recorded at the 7-minute mark of the window (spot-vs-strike consensus). No hard lock fired — this is the study observation, not a traded lock.">{dirLabel(t7)}</span>
+                                    <span className="text-[9px] text-muted-foreground" title={skipReason ?? undefined}>
+                                      {t7c != null ? `${t7c.toFixed(0)}% ` : ""}@ {minute.toFixed(1)}m · t7
+                                      {skipReason ? ` · ${skipReason.slice(0, 18)}` : ""}
+                                    </span>
+                                  </span>
+                                );
+                              })()
                             ) : (
                               <span className="inline-flex flex-col leading-tight">
-                                <span className="text-muted-foreground text-[10px]" title="No Study Pick was locked for this window — the trendline pill never reached the lock threshold or a gate blocked it. The model pick is NOT a study pick.">NO LOCK</span>
+                                <span className="text-muted-foreground text-[10px]" title="No study data recorded for this window (no ticks captured at the 7-minute mark).">NO DATA</span>
                                 {(wouldSide || skipReason) && (
                                   <span className="text-[9px] text-muted-foreground/70" title={skipReason ?? undefined}>
                                     {wouldSide ? `would ${dirLabel(wouldSide)}${wouldConf != null ? ` ${wouldConf.toFixed(0)}%` : ""}` : ""}
@@ -1158,6 +1174,7 @@ function ModelAccuracyPanel() {
                                 )}
                               </span>
                             )}
+
 
                             <Popover>
                               <PopoverTrigger asChild>
@@ -1219,17 +1236,24 @@ function ModelAccuracyPanel() {
                         <td className="p-2 text-center">
                           {(() => {
                             const sw = (r as { studyWasCorrect?: boolean | null }).studyWasCorrect ?? null;
+                            const t7w = (r as { studyT7WasCorrect?: boolean | null }).studyT7WasCorrect ?? null;
                             if (lockedSide) {
                               if (sw === true) return <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>;
                               if (sw === false) return <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>;
                               return <span className="text-muted-foreground">pending</span>;
                             }
-                            // No study lock — grade the model pick, clearly marked.
+                            if ((r as { studyT7Side?: "YES" | "NO" | null }).studyT7Side) {
+                              if (t7w === true) return <span className="inline-flex items-center gap-1 text-emerald-400/80" title="7-minute study side vs settlement (no hard lock)"><CheckCircle2 className="h-3 w-3" />WIN <span className="text-[9px]">t7</span></span>;
+                              if (t7w === false) return <span className="inline-flex items-center gap-1 text-red-400/80" title="7-minute study side vs settlement (no hard lock)"><XCircle className="h-3 w-3" />LOSS <span className="text-[9px]">t7</span></span>;
+                              return <span className="text-muted-foreground">pending</span>;
+                            }
+                            // No study data at all — grade the model pick, clearly marked.
                             return (
-                              <span className="text-muted-foreground/70 text-[10px]" title="No Study Pick locked — showing the model pick's result, not a study result.">
+                              <span className="text-muted-foreground/70 text-[10px]" title="No study data recorded — showing the model pick's result.">
                                 {r.wasCorrect === true ? "model WIN" : r.wasCorrect === false ? "model LOSS" : "pending"}
                               </span>
                             );
+
                           })()}
                         </td>
 

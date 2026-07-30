@@ -345,6 +345,14 @@ export interface PredictionStatsResult {
     cvvWouldLockSide: "YES" | "NO" | null;
     cvvWouldLockConf: number | null;
     skipGuardReason: string | null;
+    /** Always-recorded snapshot of what the study saw at the 7-minute mark. */
+    studyT7Side: "YES" | "NO" | null;
+    studyT7Conf: number | null;
+    studyT7SecondsToClose: number | null;
+    studyT7Source: string | null;
+    /** T+7 snapshot graded against settlement (null until settled). */
+    studyT7WasCorrect: boolean | null;
+
   }>;
 }
 
@@ -361,7 +369,7 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
 
   const { data: rows } = await supabaseAdmin
     .from("btc_model_predictions")
-    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, settled_at, live_side, flip_count, chart_verdict, chart_strength, ta_score, ta_reasons, ta_vwap_dist_pct, ta_trend_alignment_score, ta_rsi_1m, ta_rsi_5m, ta_macd_5m_hist, ta_bb_5m_pctb, ta_vwap_rej_up, ta_vwap_rej_down, ta_engine_version, model_side_pre_study, study_locked_side, study_lock_confidence, study_lock_source, study_lock_seconds_to_close, study_locked_at, study_lock_kalshi_price_cents, cvv_would_lock_side, cvv_would_lock_conf, skip_guard_reason")
+    .select("ticker, side, strike, model_prob, market_yes_price, edge_pts, outcome, was_correct, settle_price, close_time, settled_at, live_side, flip_count, chart_verdict, chart_strength, ta_score, ta_reasons, ta_vwap_dist_pct, ta_trend_alignment_score, ta_rsi_1m, ta_rsi_5m, ta_macd_5m_hist, ta_bb_5m_pctb, ta_vwap_rej_up, ta_vwap_rej_down, ta_engine_version, model_side_pre_study, study_locked_side, study_lock_confidence, study_lock_source, study_lock_seconds_to_close, study_locked_at, study_lock_kalshi_price_cents, cvv_would_lock_side, cvv_would_lock_conf, skip_guard_reason, study_t7_side, study_t7_conf, study_t7_seconds_to_close, study_t7_source")
     .gte("close_time", cutoff)
     .order("close_time", { ascending: false })
     .limit(500);
@@ -378,8 +386,19 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
       if (c != null && Number(c) < MIN_STUDY_LOCK_CONF) return null;
       return s;
     };
+    // T+7 snapshot: what the study actually saw at the 7-minute mark. Always
+    // present going forward, so the Study Pick column is never blank.
+    const t7Of = (r: (typeof all)[number]): "YES" | "NO" | null => {
+      const s = (r as { study_t7_side?: string | null }).study_t7_side as "YES" | "NO" | null;
+      return s === "YES" || s === "NO" ? s : null;
+    };
+    const t7ConfOf = (r: (typeof all)[number]): number | null => {
+      const c = (r as { study_t7_conf?: number | string | null }).study_t7_conf;
+      return c != null ? Number(c) : null;
+    };
     const pickSide = (r: (typeof all)[number]): "YES" | "NO" =>
-      lockOf(r) ?? (r.side as "YES" | "NO");
+      lockOf(r) ?? t7Of(r) ?? (r.side as "YES" | "NO");
+
     const rowCorrect = (r: (typeof all)[number]): boolean | null =>
       r.outcome ? ((r.outcome as "YES" | "NO") === pickSide(r)) : null;
     const settledAll = all.filter(r => r.outcome);
@@ -459,6 +478,12 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
             : null)),
       skipGuardReason: ((r as { skip_guard_reason?: string | null }).skip_guard_reason)
         ?? (!lockOf(r) && (r as { study_locked_side?: string | null }).study_locked_side ? "below_lock_threshold" : null),
+      studyT7Side: t7Of(r),
+      studyT7Conf: t7ConfOf(r),
+      studyT7SecondsToClose: (r as { study_t7_seconds_to_close?: number | null }).study_t7_seconds_to_close ?? null,
+      studyT7Source: ((r as { study_t7_source?: string | null }).study_t7_source) ?? null,
+      studyT7WasCorrect: t7Of(r) && r.outcome ? (r.outcome as "YES" | "NO") === t7Of(r) : null,
     })),
+
   };
 }
