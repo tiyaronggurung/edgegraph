@@ -176,7 +176,7 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
           }
           const secondsToClose = Math.round((new Date(closeTime).getTime() - nowMs) / 1000);
           const isEarly = closeTime > earlyMinIso && closeTime <= earlyMaxIso;
-          const threshold = isEarly ? 0.75 : 0.80;
+          const baseThreshold = isEarly ? 0.75 : 0.80;
 
           const { data: ticks } = await supabaseAdmin
             .from("btc_spot_ticks")
@@ -191,14 +191,45 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
           }
           const above = spots.filter((s: number) => s >= strike).length;
           const ratio = above / spots.length;
+
+          // ---- Book P/L lean tilt -------------------------------------
+          // House economics for THIS window: the side Kalshi profits from
+          // makes our agreeing lock a little easier and a fighting lock a
+          // little harder. Physics still decides the side.
+          const provSide: "YES" | "NO" = ratio >= 0.5 ? "YES" : "NO";
+          const provConf = Math.max(ratio, 1 - ratio);
+          const bookTilt = computeBookLeanTilt(bookByTicker.get(ticker) ?? null, provSide, provConf);
+          const threshold = Math.min(0.95, Math.max(0.70, baseThreshold + bookTilt.thresholdDelta));
+
           let side: "YES" | "NO" | null = null;
           let confPct = 0;
           if (ratio >= threshold) { side = "YES"; confPct = Math.round(ratio * 100); }
           else if (1 - ratio >= threshold) { side = "NO"; confPct = Math.round((1 - ratio) * 100); }
           if (!side) {
-            results.push({ ticker, skipped: "no_consensus", ratio: Number(ratio.toFixed(3)) });
+            results.push({
+              ticker, skipped: "no_consensus", ratio: Number(ratio.toFixed(3)),
+              threshold: Number(threshold.toFixed(3)), book: bookTilt.reason,
+            });
             continue;
           }
+
+          if (bookTilt.block) {
+            await supabaseAdmin
+              .from("btc_model_predictions")
+              .update({
+                skip_guard_verdict: "SKIP",
+                skip_guard_reason: `book:${bookTilt.reason}`,
+              } as never)
+              .eq("ticker", ticker)
+              .is("study_locked_side", null);
+            results.push({
+              ticker, skipped: "book_lean", reason: bookTilt.reason,
+              lean: bookTilt.lean, strength: bookTilt.strength, wouldLock: side, wouldConf: confPct,
+            });
+            continue;
+          }
+
+
 
           // Physics sanity: latest spot must agree with picked side.
           const latestSpot = spots[0];
