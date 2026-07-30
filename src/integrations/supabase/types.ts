@@ -3983,6 +3983,7 @@ export type Database = {
           house_pnl: number | null
           id: string
           last_seen_at: string
+          last_trade_ts: number | null
           no_avg_cents: number | null
           no_cost: number | null
           no_payout: number | null
@@ -4008,6 +4009,7 @@ export type Database = {
           house_pnl?: number | null
           id?: string
           last_seen_at?: string
+          last_trade_ts?: number | null
           no_avg_cents?: number | null
           no_cost?: number | null
           no_payout?: number | null
@@ -4033,6 +4035,7 @@ export type Database = {
           house_pnl?: number | null
           id?: string
           last_seen_at?: string
+          last_trade_ts?: number | null
           no_avg_cents?: number | null
           no_cost?: number | null
           no_payout?: number | null
