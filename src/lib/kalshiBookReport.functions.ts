@@ -120,7 +120,14 @@ export const getKalshiBookReport = createServerFn({ method: "GET" })
     const nowMs = Date.now();
     const curStartMs = Math.floor(nowMs / 900_000) * 900_000;
     const isCurrent = (r: BookWindowRow) => new Date(r.window_start).getTime() === curStartMs;
-    const liveRow = all.find((r) => isCurrent(r) && !r.outcome) ?? null;
+    // Prefer the row for the current bucket; if the last snapshot lags, fall
+    // back to the newest unsettled window that has not closed yet.
+    const liveRow =
+      all.find((r) => isCurrent(r) && !r.outcome) ??
+      all.find(
+        (r) => !r.outcome && (!r.close_time || new Date(r.close_time).getTime() > nowMs - 60_000),
+      ) ??
+      null;
     const live: LiveBookWindow | null = liveRow
       ? (() => {
           const startMs = new Date(liveRow.window_start).getTime();
