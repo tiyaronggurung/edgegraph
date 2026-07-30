@@ -4,8 +4,14 @@
 // house P/L. Settlement backfills the realized outcome + realized house P/L.
 import { getKalshiImpliedSpot } from "./kalshiImpliedSpot.functions";
 
-export async function snapshotKalshiBook(): Promise<{ ok: boolean; ticker?: string; error?: string }> {
-  const snap = await getKalshiImpliedSpot();
+export async function snapshotKalshiBook(): Promise<{ ok: boolean; ticker?: string; error?: string; skipped?: boolean }> {
+  // Kalshi rate-limits (429) when several cron ticks land together; retry a
+  // couple of times with backoff so the per-minute log does not go blank.
+  let snap = await getKalshiImpliedSpot();
+  for (let i = 0; i < 3 && (!snap.ok || !snap.ticker); i++) {
+    await new Promise((r) => setTimeout(r, 1200 * (i + 1)));
+    snap = await getKalshiImpliedSpot();
+  }
   if (!snap.ok || !snap.ticker) return { ok: false, error: snap.error ?? "no market" };
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -34,6 +40,18 @@ export async function snapshotKalshiBook(): Promise<{ ok: boolean; ticker?: stri
     house_lean: snap.houseLean,
     last_seen_at: new Date(nowMs).toISOString(),
   };
+
+  // Never clobber a populated window row with an empty flow read.
+  if (!((snap.totalCostWindow ?? 0) > 0)) {
+    const { data: existing } = await supabaseAdmin
+      .from("kalshi_book_ledger")
+      .select("total_collected")
+      .eq("ticker", snap.ticker)
+      .maybeSingle();
+    if ((existing?.total_collected ?? 0) > 0) {
+      return { ok: true, ticker: snap.ticker, skipped: true };
+    }
+  }
 
   const { error } = await supabaseAdmin
     .from("kalshi_book_ledger")
