@@ -345,6 +345,14 @@ export interface PredictionStatsResult {
     cvvWouldLockSide: "YES" | "NO" | null;
     cvvWouldLockConf: number | null;
     skipGuardReason: string | null;
+    /** Always-recorded snapshot of what the study saw at the 7-minute mark. */
+    studyT7Side: "YES" | "NO" | null;
+    studyT7Conf: number | null;
+    studyT7SecondsToClose: number | null;
+    studyT7Source: string | null;
+    /** T+7 snapshot graded against settlement (null until settled). */
+    studyT7WasCorrect: boolean | null;
+
   }>;
 }
 
