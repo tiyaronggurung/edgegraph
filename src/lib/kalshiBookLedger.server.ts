@@ -72,11 +72,11 @@ type Trade = {
   no_price_dollars?: string;
 };
 
-/** Trades strictly newer than sinceSec, oldest-first. Max 4 pages. */
+/** Trades strictly newer than sinceSec, oldest-first. Max 12 pages (12k trades). */
 async function fetchNewTrades(ticker: string, sinceSec: number) {
   const out: Trade[] = [];
   let cursor: string | undefined;
-  for (let page = 0; page < 4; page++) {
+  for (let page = 0; page < 12; page++) {
     const url =
       `${KALSHI}/markets/trades?ticker=${encodeURIComponent(ticker)}` +
       `&limit=1000&min_ts=${sinceSec}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
