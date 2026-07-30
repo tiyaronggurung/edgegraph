@@ -2625,6 +2625,13 @@ export type Database = {
           study_lock_source: string | null
           study_locked_at: string | null
           study_locked_side: string | null
+          study_t7_at: string | null
+          study_t7_conf: number | null
+          study_t7_ratio: number | null
+          study_t7_seconds_to_close: number | null
+          study_t7_side: string | null
+          study_t7_source: string | null
+          study_t7_spot: number | null
           ta_bb_5m_pctb: number | null
           ta_engine_version: string | null
           ta_macd_5m_hist: number | null
@@ -2685,6 +2692,13 @@ export type Database = {
           study_lock_source?: string | null
           study_locked_at?: string | null
           study_locked_side?: string | null
+          study_t7_at?: string | null
+          study_t7_conf?: number | null
+          study_t7_ratio?: number | null
+          study_t7_seconds_to_close?: number | null
+          study_t7_side?: string | null
+          study_t7_source?: string | null
+          study_t7_spot?: number | null
           ta_bb_5m_pctb?: number | null
           ta_engine_version?: string | null
           ta_macd_5m_hist?: number | null
@@ -2745,6 +2759,13 @@ export type Database = {
           study_lock_source?: string | null
           study_locked_at?: string | null
           study_locked_side?: string | null
+          study_t7_at?: string | null
+          study_t7_conf?: number | null
+          study_t7_ratio?: number | null
+          study_t7_seconds_to_close?: number | null
+          study_t7_side?: string | null
+          study_t7_source?: string | null
+          study_t7_spot?: number | null
           ta_bb_5m_pctb?: number | null
           ta_engine_version?: string | null
           ta_macd_5m_hist?: number | null
