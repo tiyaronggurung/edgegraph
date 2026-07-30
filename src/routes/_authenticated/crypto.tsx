@@ -1217,10 +1217,22 @@ function ModelAccuracyPanel() {
                         <td className="p-2 text-right">{r.edgePts >= 0 ? "+" : ""}{r.edgePts.toFixed(1)}</td>
                         <td className="p-2 text-right">{r.settlePrice != null ? fmt$(r.settlePrice) : "—"}</td>
                         <td className="p-2 text-center">
-                          {r.wasCorrect === true && <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>}
-                          {r.wasCorrect === false && <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>}
-                          {r.wasCorrect === null && <span className="text-muted-foreground">pending</span>}
+                          {(() => {
+                            const sw = (r as { studyWasCorrect?: boolean | null }).studyWasCorrect ?? null;
+                            if (lockedSide) {
+                              if (sw === true) return <span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" />WIN</span>;
+                              if (sw === false) return <span className="inline-flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" />LOSS</span>;
+                              return <span className="text-muted-foreground">pending</span>;
+                            }
+                            // No study lock — grade the model pick, clearly marked.
+                            return (
+                              <span className="text-muted-foreground/70 text-[10px]" title="No Study Pick locked — showing the model pick's result, not a study result.">
+                                {r.wasCorrect === true ? "model WIN" : r.wasCorrect === false ? "model LOSS" : "pending"}
+                              </span>
+                            );
+                          })()}
                         </td>
+
                       </tr>
                       );
                     })}
