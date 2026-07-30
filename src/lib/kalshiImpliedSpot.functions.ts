@@ -182,6 +182,10 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
       let noVolWindow: number | null = null;
       let tradeCountWindow: number | null = null;
       let flowLadder: Array<{ m: number; yes: number; no: number; trades: number }> | null = null;
+      // Taker cost basis — what each side actually paid to enter this window.
+      let yesCostWindow: number | null = null;
+      let noCostWindow: number | null = null;
+
       try {
         const nowMs = Date.now();
         const winStartMs = Math.floor(nowMs / 900_000) * 900_000;
