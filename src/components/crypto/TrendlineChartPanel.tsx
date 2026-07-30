@@ -783,6 +783,17 @@ function TaChart({
     noVolWindow: number | null;
     tradeCountWindow: number | null;
     ladder: Array<{ m: number; yes: number; no: number; trades: number }> | null;
+    yesAvgCents?: number | null;
+    noAvgCents?: number | null;
+    yesCostWindow?: number | null;
+    noCostWindow?: number | null;
+    yesPayout?: number | null;
+    noPayout?: number | null;
+    totalCostWindow?: number | null;
+    houseIfYes?: number | null;
+    houseIfNo?: number | null;
+    houseLean?: "YES" | "NO" | null;
+
   };
 }) {
 
