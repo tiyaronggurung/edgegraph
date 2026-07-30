@@ -478,6 +478,12 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
             : null)),
       skipGuardReason: ((r as { skip_guard_reason?: string | null }).skip_guard_reason)
         ?? (!lockOf(r) && (r as { study_locked_side?: string | null }).study_locked_side ? "below_lock_threshold" : null),
+      studyT7Side: t7Of(r),
+      studyT7Conf: t7ConfOf(r),
+      studyT7SecondsToClose: (r as { study_t7_seconds_to_close?: number | null }).study_t7_seconds_to_close ?? null,
+      studyT7Source: ((r as { study_t7_source?: string | null }).study_t7_source) ?? null,
+      studyT7WasCorrect: t7Of(r) && r.outcome ? (r.outcome as "YES" | "NO") === t7Of(r) : null,
     })),
+
   };
 }
