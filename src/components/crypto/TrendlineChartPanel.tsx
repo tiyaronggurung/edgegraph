@@ -1210,7 +1210,93 @@ function TaChart({
                 <span className="text-white/40">accumulating…</span>
               )}
             </div>
+
+            {/* ── Cost basis / payout exposure — who paid what, and which side the book leans to ── */}
+            {(() => {
+              const yAvg = kalshiFlow?.yesAvgCents ?? null;
+              const nAvg = kalshiFlow?.noAvgCents ?? null;
+              const yCost = kalshiFlow?.yesCostWindow ?? null;
+              const nCost = kalshiFlow?.noCostWindow ?? null;
+              const yPay = kalshiFlow?.yesPayout ?? null;
+              const nPay = kalshiFlow?.noPayout ?? null;
+              const coll = kalshiFlow?.totalCostWindow ?? null;
+              const hY = kalshiFlow?.houseIfYes ?? null;
+              const hN = kalshiFlow?.houseIfNo ?? null;
+              const lean = kalshiFlow?.houseLean ?? null;
+              const has = (yCost ?? 0) + (nCost ?? 0) > 0;
+              const money = (v: number | null | undefined) =>
+                v == null ? "—" : `$${Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(2)}`;
+              const costTitle =
+                `Window-to-date taker cost basis (real Kalshi prints):\n` +
+                `  UP  (YES): ${yPay ?? "—"} contracts @ avg ${yAvg != null ? yAvg.toFixed(1) + "¢" : "—"} = ${money(yCost)} paid\n` +
+                `  DOWN (NO): ${nPay ?? "—"} contracts @ avg ${nAvg != null ? nAvg.toFixed(1) + "¢" : "—"} = ${money(nCost)} paid\n` +
+                `  Collected by the book: ${money(coll)}\n` +
+                `  Payout owed if UP wins:   ${money(yPay)}  → book P/L ${money(hY)}\n` +
+                `  Payout owed if DOWN wins: ${money(nPay)}  → book P/L ${money(hN)}\n` +
+                (lean
+                  ? `\n⚠ Book leans ${lean === "YES" ? "UP" : "DOWN"} — Kalshi keeps more money if that side settles in the money (smaller payout obligation).`
+                  : `\nBalanced book — payout exposure is even on both sides.`);
+              return (
+                <div
+                  className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/10 pt-1"
+                  title={costTitle}
+                >
+                  <span className="text-white/50 tracking-wider">COST 15m</span>
+                  {has ? (
+                    <>
+                      <span className="flex items-center gap-1">
+                        <span className="text-emerald-300/80">UP avg</span>
+                        <span className="tabular-nums text-emerald-200 font-bold">
+                          {yAvg != null ? `${yAvg.toFixed(1)}¢` : "—"}
+                        </span>
+                        <span className="text-white/40">({money(yCost)})</span>
+                      </span>
+                      <span className="text-white/20">·</span>
+                      <span className="flex items-center gap-1">
+                        <span className="text-rose-300/80">DN avg</span>
+                        <span className="tabular-nums text-rose-200 font-bold">
+                          {nAvg != null ? `${nAvg.toFixed(1)}¢` : "—"}
+                        </span>
+                        <span className="text-white/40">({money(nCost)})</span>
+                      </span>
+                      <span className="text-white/20">·</span>
+                      <span className="text-white/50">
+                        pool <span className="tabular-nums text-white/80">{money(coll)}</span>
+                      </span>
+                      <span className="text-white/20">·</span>
+                      <span className="text-white/50">
+                        payout{" "}
+                        <span className="tabular-nums text-emerald-200">{money(yPay)}</span>
+                        <span className="text-white/25"> / </span>
+                        <span className="tabular-nums text-rose-200">{money(nPay)}</span>
+                      </span>
+                      <span className="text-white/20">·</span>
+                      <span className="text-white/50">
+                        book P/L{" "}
+                        <span className={`tabular-nums ${(hY ?? 0) >= 0 ? "text-emerald-200" : "text-rose-200"}`}>
+                          {money(hY)}
+                        </span>
+                        <span className="text-white/25"> / </span>
+                        <span className={`tabular-nums ${(hN ?? 0) >= 0 ? "text-emerald-200" : "text-rose-200"}`}>
+                          {money(hN)}
+                        </span>
+                      </span>
+                      {lean && (
+                        <span
+                          className={`font-bold ${lean === "YES" ? "text-emerald-200" : "text-rose-200"}`}
+                        >
+                          book leans {lean === "YES" ? "↑ UP" : "↓ DOWN"}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-white/40">accumulating…</span>
+                  )}
+                </div>
+              );
+            })()}
           </div>
+
         );
       })()}
       <div className="relative mt-2">
