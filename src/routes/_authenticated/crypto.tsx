@@ -4019,6 +4019,7 @@ function CryptoPage() {
       <LazyOnVisible><LockThresholdStudyPanel /></LazyOnVisible>
       <LazyOnVisible><TrendlineBreakStudyPanel /></LazyOnVisible>
       <LazyOnVisible><MidSupportStudyPanel /></LazyOnVisible>
+      <LazyOnVisible><KalshiBookLedgerPanel /></LazyOnVisible>
       <LazyOnVisible><OddsComparisonPanel /></LazyOnVisible>
 
 
