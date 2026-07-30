@@ -6,6 +6,7 @@ import {
   signedMomentumUsd,
   evaluateCvv,
 } from "@/lib/cushionVolGate.server";
+import { computeBookLeanTilt, type BookLedgerRow } from "@/lib/bookLeanTilt.server";
 
 // Server-side Study Pick lock writer.
 // Runs every 60s from pg_cron. Writes btc_model_predictions.study_locked_side
