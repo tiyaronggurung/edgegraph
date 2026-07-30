@@ -1109,7 +1109,7 @@ function TaChart({
           (wDominant ? `\n⚠ ${wDominant} side dominant across the whole window.` : "");
         return (
           <div
-            className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-3 py-2 border rounded text-[10px] font-mono backdrop-blur bg-black/75 shadow-lg ${barCls}`}
+            className={`flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-2 px-3 py-2 border rounded text-[10px] font-mono backdrop-blur bg-black/75 shadow-lg ${barCls}`}
             title={title}
           >
             <div className="flex items-center gap-2">
