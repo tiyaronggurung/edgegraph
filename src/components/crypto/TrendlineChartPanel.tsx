@@ -646,6 +646,17 @@ export function TrendlineChartPanel() {
                 noVolWindow: kalshi?.noVolWindow ?? null,
                 tradeCountWindow: kalshi?.tradeCountWindow ?? null,
                 ladder: kalshi?.flowLadder ?? null,
+                yesAvgCents: kalshi?.yesAvgCents ?? null,
+                noAvgCents: kalshi?.noAvgCents ?? null,
+                yesCostWindow: kalshi?.yesCostWindow ?? null,
+                noCostWindow: kalshi?.noCostWindow ?? null,
+                yesPayout: kalshi?.yesPayout ?? null,
+                noPayout: kalshi?.noPayout ?? null,
+                totalCostWindow: kalshi?.totalCostWindow ?? null,
+                houseIfYes: kalshi?.houseIfYes ?? null,
+                houseIfNo: kalshi?.houseIfNo ?? null,
+                houseLean: kalshi?.houseLean ?? null,
+
               }}
             />
             </div>
