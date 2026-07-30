@@ -439,15 +439,26 @@ export async function computePredictionStats(): Promise<PredictionStatsResult> {
       taVwapRejDown: Boolean(r.ta_vwap_rej_down),
       taEngineVersion: (r.ta_engine_version as string | null) ?? null,
       modelSidePreStudy: ((r as { model_side_pre_study?: string | null }).model_side_pre_study as "YES" | "NO" | null) ?? (r.side as "YES" | "NO" | null) ?? null,
-      studyLockedSide: ((r as { study_locked_side?: string | null }).study_locked_side as "YES" | "NO" | null) ?? null,
-      studyLockConfidence: (r as { study_lock_confidence?: number | string | null }).study_lock_confidence != null ? Number((r as { study_lock_confidence?: number | string | null }).study_lock_confidence) : null,
-      studyLockSource: ((r as { study_lock_source?: string | null }).study_lock_source) ?? null,
-      studyLockSecondsToClose: (r as { study_lock_seconds_to_close?: number | null }).study_lock_seconds_to_close ?? null,
-      studyLockedAt: ((r as { study_locked_at?: string | null }).study_locked_at) ?? null,
+      studyLockedSide: lockOf(r),
+      studyWasCorrect: lockOf(r) && r.outcome ? (r.outcome as "YES" | "NO") === lockOf(r) : null,
+      studyLockConfidence: lockOf(r) != null && (r as { study_lock_confidence?: number | string | null }).study_lock_confidence != null
+        ? Number((r as { study_lock_confidence?: number | string | null }).study_lock_confidence)
+        : null,
+      studyLockSource: lockOf(r) ? (((r as { study_lock_source?: string | null }).study_lock_source) ?? null) : null,
+      studyLockSecondsToClose: lockOf(r) ? ((r as { study_lock_seconds_to_close?: number | null }).study_lock_seconds_to_close ?? null) : null,
+      studyLockedAt: lockOf(r) ? (((r as { study_locked_at?: string | null }).study_locked_at) ?? null) : null,
       studyLockKalshiPriceCents: (r as { study_lock_kalshi_price_cents?: number | null }).study_lock_kalshi_price_cents != null ? Number((r as { study_lock_kalshi_price_cents?: number | null }).study_lock_kalshi_price_cents) : null,
-      cvvWouldLockSide: ((r as { cvv_would_lock_side?: string | null }).cvv_would_lock_side as "YES" | "NO" | null) ?? null,
-      cvvWouldLockConf: (r as { cvv_would_lock_conf?: number | string | null }).cvv_would_lock_conf != null ? Number((r as { cvv_would_lock_conf?: number | string | null }).cvv_would_lock_conf) : null,
-      skipGuardReason: ((r as { skip_guard_reason?: string | null }).skip_guard_reason) ?? null,
+      // When a sub-threshold "lock" exists, surface it as a would-lock instead
+      // of dressing it up as a Study Pick.
+      cvvWouldLockSide: ((r as { cvv_would_lock_side?: string | null }).cvv_would_lock_side as "YES" | "NO" | null)
+        ?? (lockOf(r) ? null : (((r as { study_locked_side?: string | null }).study_locked_side as "YES" | "NO" | null) ?? null)),
+      cvvWouldLockConf: (r as { cvv_would_lock_conf?: number | string | null }).cvv_would_lock_conf != null
+        ? Number((r as { cvv_would_lock_conf?: number | string | null }).cvv_would_lock_conf)
+        : (lockOf(r) ? null : ((r as { study_lock_confidence?: number | string | null }).study_lock_confidence != null
+            ? Number((r as { study_lock_confidence?: number | string | null }).study_lock_confidence)
+            : null)),
+      skipGuardReason: ((r as { skip_guard_reason?: string | null }).skip_guard_reason)
+        ?? (!lockOf(r) && (r as { study_locked_side?: string | null }).study_locked_side ? "below_lock_threshold" : null),
     })),
   };
 }
