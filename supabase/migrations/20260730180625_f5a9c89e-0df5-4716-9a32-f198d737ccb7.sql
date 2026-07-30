@@ -1,0 +1,1 @@
+ALTER TABLE public.kalshi_book_ledger ADD COLUMN IF NOT EXISTS last_trade_ts BIGINT;
