@@ -335,6 +335,8 @@ export interface PredictionStatsResult {
     taEngineVersion: string | null;
     modelSidePreStudy: "YES" | "NO" | null;
     studyLockedSide: "YES" | "NO" | null;
+    /** Study Pick graded on its own locked side (null when no valid lock). */
+    studyWasCorrect: boolean | null;
     studyLockConfidence: number | null;
     studyLockSource: string | null;
     studyLockSecondsToClose: number | null;
