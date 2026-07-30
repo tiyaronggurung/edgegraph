@@ -62,6 +62,28 @@ export interface KalshiImpliedSpot {
   tradeCountWindow: number | null;      // #trades, window-to-date
   /** Per-minute ladder, minute 0 = window open. Only minutes with trades. */
   flowLadder: Array<{ m: number; yes: number; no: number; trades: number }> | null;
+  // ---- window-to-date taker cost basis (what each side actually paid) ----
+  /** Dollars paid by YES takers this window (Σ count × yes_price). */
+  yesCostWindow: number | null;
+  /** Dollars paid by NO takers this window (Σ count × no_price). */
+  noCostWindow: number | null;
+  /** Volume-weighted average entry price for YES takers, in cents. */
+  yesAvgCents: number | null;
+  /** Volume-weighted average entry price for NO takers, in cents. */
+  noAvgCents: number | null;
+  /** $1 × contracts — what Kalshi must pay out if YES settles in the money. */
+  yesPayout: number | null;
+  /** $1 × contracts — what Kalshi must pay out if NO settles in the money. */
+  noPayout: number | null;
+  /** Total taker dollars collected this window (yesCost + noCost). */
+  totalCostWindow: number | null;
+  /** House P/L if YES wins (collected − YES payout). */
+  houseIfYes: number | null;
+  /** House P/L if NO wins (collected − NO payout). */
+  houseIfNo: number | null;
+  /** Side the book profits more from — i.e. the outcome Kalshi "leans" toward. */
+  houseLean: "YES" | "NO" | null;
+
   error: string | null;
 }
 
@@ -80,7 +102,11 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
       volume: null, openInterest: null, lastPriceCents: null,
       yesVol60s: null, noVol60s: null, tradeCount60s: null,
       yesVolWindow: null, noVolWindow: null, tradeCountWindow: null, flowLadder: null,
+      yesCostWindow: null, noCostWindow: null, yesAvgCents: null, noAvgCents: null,
+      yesPayout: null, noPayout: null, totalCostWindow: null,
+      houseIfYes: null, houseIfNo: null, houseLean: null,
       error: null,
+
     };
     try {
       const res = await fetch(
@@ -156,13 +182,22 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
       let noVolWindow: number | null = null;
       let tradeCountWindow: number | null = null;
       let flowLadder: Array<{ m: number; yes: number; no: number; trades: number }> | null = null;
+      // Taker cost basis — what each side actually paid to enter this window.
+      let yesCostWindow: number | null = null;
+      let noCostWindow: number | null = null;
+
       try {
         const nowMs = Date.now();
         const winStartMs = Math.floor(nowMs / 900_000) * 900_000;
         const minTs = Math.floor(winStartMs / 1000);
         const cutoff60 = nowMs - 60_000;
 
-        type Trade = { taker_side?: string; count?: number; count_fp?: string; created_time?: string };
+        type Trade = {
+          taker_side?: string; count?: number; count_fp?: string; created_time?: string;
+          yes_price?: number; no_price?: number;
+          yes_price_dollars?: string; no_price_dollars?: string;
+        };
+
         const trades: Trade[] = [];
         let cursor: string | undefined;
         // 15m of BTC 15m-market trades fits comfortably; cap pages to stay cheap.
@@ -181,6 +216,7 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
 
         let y60 = 0, n60 = 0, c60 = 0;
         let yW = 0, nW = 0, cW = 0;
+        let yCost = 0, nCost = 0;
         const ladder = new Map<number, { yes: number; no: number; trades: number }>();
         for (const t of trades) {
           const ts = t.created_time ? new Date(t.created_time).getTime() : NaN;
@@ -193,6 +229,16 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
 
           cW += 1;
           if (isYes) yW += c; else nW += c;
+
+          // Price paid by the aggressor, in dollars per contract.
+          const yPx = t.yes_price_dollars != null
+            ? num(t.yes_price_dollars)
+            : (num(t.yes_price) != null ? (num(t.yes_price) as number) / 100 : null);
+          const nPx = t.no_price_dollars != null
+            ? num(t.no_price_dollars)
+            : (num(t.no_price) != null ? (num(t.no_price) as number) / 100 : null);
+          if (isYes && yPx != null) yCost += c * yPx;
+          if (isNo && nPx != null) nCost += c * nPx;
 
           const m = Math.min(14, Math.max(0, Math.floor((ts - winStartMs) / 60_000)));
           const b = ladder.get(m) ?? { yes: 0, no: 0, trades: 0 };
@@ -207,12 +253,27 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
         }
         yesVol60s = y60; noVol60s = n60; tradeCount60s = c60;
         yesVolWindow = yW; noVolWindow = nW; tradeCountWindow = cW;
+        yesCostWindow = yCost; noCostWindow = nCost;
         flowLadder = [...ladder.entries()]
           .sort((a, b) => a[0] - b[0])
           .map(([m, v]) => ({ m, yes: Math.round(v.yes), no: Math.round(v.no), trades: v.trades }));
       } catch { /* best-effort */ }
 
+      // Book economics: takers pay cost, winners get $1/contract.
+      const yPayout = yesVolWindow != null ? yesVolWindow : null;
+      const nPayout = noVolWindow != null ? noVolWindow : null;
+      const collected =
+        yesCostWindow != null && noCostWindow != null ? yesCostWindow + noCostWindow : null;
+      const houseIfYes = collected != null && yPayout != null ? collected - yPayout : null;
+      const houseIfNo = collected != null && nPayout != null ? collected - nPayout : null;
+      const houseLean: "YES" | "NO" | null =
+        houseIfYes == null || houseIfNo == null
+          ? null
+          : houseIfYes === houseIfNo ? null : houseIfYes > houseIfNo ? "YES" : "NO";
+      const r2 = (x: number | null) => (x == null ? null : Number(x.toFixed(2)));
+
       return {
+
         ok: true,
         ticker: best.ticker,
         strike: best.strike,
@@ -231,7 +292,22 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
         noVolWindow: noVolWindow != null ? Math.round(noVolWindow) : null,
         tradeCountWindow,
         flowLadder,
+        yesCostWindow: r2(yesCostWindow),
+        noCostWindow: r2(noCostWindow),
+        yesAvgCents:
+          yesCostWindow != null && yesVolWindow != null && yesVolWindow > 0
+            ? Number(((yesCostWindow / yesVolWindow) * 100).toFixed(1)) : null,
+        noAvgCents:
+          noCostWindow != null && noVolWindow != null && noVolWindow > 0
+            ? Number(((noCostWindow / noVolWindow) * 100).toFixed(1)) : null,
+        yesPayout: r2(yPayout),
+        noPayout: r2(nPayout),
+        totalCostWindow: r2(collected),
+        houseIfYes: r2(houseIfYes),
+        houseIfNo: r2(houseIfNo),
+        houseLean,
         error: null,
+
       };
 
     } catch (e) {
