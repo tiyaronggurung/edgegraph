@@ -1147,9 +1147,25 @@ function ModelAccuracyPanel() {
                                   </span>
                                 )}
                               </span>
+                            ) : (r as { studyT7Side?: "YES" | "NO" | null }).studyT7Side ? (
+                              (() => {
+                                const t7 = (r as { studyT7Side?: "YES" | "NO" | null }).studyT7Side as "YES" | "NO";
+                                const t7c = (r as { studyT7Conf?: number | null }).studyT7Conf ?? null;
+                                const t7s = (r as { studyT7SecondsToClose?: number | null }).studyT7SecondsToClose ?? null;
+                                const minute = t7s != null ? Math.max(0, (900 - t7s) / 60) : 7;
+                                return (
+                                  <span className="inline-flex flex-col leading-tight">
+                                    <span className={t7 === "YES" ? "text-emerald-400" : "text-red-400"} title="Study side recorded at the 7-minute mark of the window (spot-vs-strike consensus). No hard lock fired — this is the study observation, not a traded lock.">{dirLabel(t7)}</span>
+                                    <span className="text-[9px] text-muted-foreground" title={skipReason ?? undefined}>
+                                      {t7c != null ? `${t7c.toFixed(0)}% ` : ""}@ {minute.toFixed(1)}m · t7
+                                      {skipReason ? ` · ${skipReason.slice(0, 18)}` : ""}
+                                    </span>
+                                  </span>
+                                );
+                              })()
                             ) : (
                               <span className="inline-flex flex-col leading-tight">
-                                <span className="text-muted-foreground text-[10px]" title="No Study Pick was locked for this window — the trendline pill never reached the lock threshold or a gate blocked it. The model pick is NOT a study pick.">NO LOCK</span>
+                                <span className="text-muted-foreground text-[10px]" title="No study data recorded for this window (no ticks captured at the 7-minute mark).">NO DATA</span>
                                 {(wouldSide || skipReason) && (
                                   <span className="text-[9px] text-muted-foreground/70" title={skipReason ?? undefined}>
                                     {wouldSide ? `would ${dirLabel(wouldSide)}${wouldConf != null ? ` ${wouldConf.toFixed(0)}%` : ""}` : ""}
@@ -1158,6 +1174,7 @@ function ModelAccuracyPanel() {
                                 )}
                               </span>
                             )}
+
 
                             <Popover>
                               <PopoverTrigger asChild>
