@@ -7,6 +7,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export interface BookWindowRow {
   ticker: string;
   window_start: string;
+  close_time?: string | null;
   yes_vol: number | null;
   no_vol: number | null;
   yes_avg_cents: number | null;
@@ -17,6 +18,14 @@ export interface BookWindowRow {
   house_lean: string | null;
   outcome: string | null;
   house_pnl: number | null;
+  last_seen_at?: string | null;
+}
+
+export interface LiveBookWindow extends BookWindowRow {
+  minute_of_15: number; // 1..15, which minute of the window we are in
+  seconds_to_close: number;
+  pct_elapsed: number;
+  stale_seconds: number | null;
 }
 
 export interface BookBucketRow {
@@ -31,6 +40,7 @@ export interface BookBucketRow {
 
 export interface KalshiBookReport {
   days: number;
+  live: LiveBookWindow | null;
   recent: BookWindowRow[];
   perHour: BookBucketRow[];
   perDay: BookBucketRow[];
@@ -93,13 +103,37 @@ export const getKalshiBookReport = createServerFn({ method: "GET" })
     const { data: rows, error } = await supabaseAdmin
       .from("kalshi_book_ledger")
       .select(
-        "ticker, window_start, yes_vol, no_vol, yes_avg_cents, no_avg_cents, total_collected, house_if_yes, house_if_no, house_lean, outcome, house_pnl",
+        "ticker, window_start, close_time, yes_vol, no_vol, yes_avg_cents, no_avg_cents, total_collected, house_if_yes, house_if_no, house_lean, outcome, house_pnl, last_seen_at",
       )
       .gte("window_start", since)
       .order("window_start", { ascending: false })
       .limit(5000);
     if (error) throw new Error(error.message);
     const all = (rows ?? []) as BookWindowRow[];
+
+    // Current (in-flight) 15m window: the row whose window_start is the
+    // current 15m bucket. Everything else is a completed window log entry.
+    const nowMs = Date.now();
+    const curStart = new Date(Math.floor(nowMs / 900_000) * 900_000).toISOString();
+    const liveRow = all.find((r) => r.window_start === curStart && !r.outcome) ?? null;
+    const live: LiveBookWindow | null = liveRow
+      ? (() => {
+          const startMs = new Date(liveRow.window_start).getTime();
+          const closeMs = liveRow.close_time
+            ? new Date(liveRow.close_time).getTime()
+            : startMs + 900_000;
+          const elapsed = Math.max(0, Math.min(900, Math.round((nowMs - startMs) / 1000)));
+          return {
+            ...liveRow,
+            minute_of_15: Math.min(15, Math.floor(elapsed / 60) + 1),
+            seconds_to_close: Math.max(0, Math.round((closeMs - nowMs) / 1000)),
+            pct_elapsed: Math.round((elapsed / 900) * 100),
+            stale_seconds: liveRow.last_seen_at
+              ? Math.round((nowMs - new Date(liveRow.last_seen_at).getTime()) / 1000)
+              : null,
+          };
+        })()
+      : null;
 
     const perHour = bucketize(all, (d) => iso(d).slice(0, 13) + ":00Z");
     const perDay = bucketize(all, (d) => iso(d).slice(0, 10));
@@ -116,7 +150,8 @@ export const getKalshiBookReport = createServerFn({ method: "GET" })
 
     return {
       days: data.days,
-      recent: all.slice(0, 32),
+      live,
+      recent: all.filter((r) => r.window_start !== curStart).slice(0, 96),
       perHour: perHour.slice(0, 24),
       perDay: perDay.slice(0, 14),
       perWeek: perWeek.slice(0, 6),
