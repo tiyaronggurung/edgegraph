@@ -10,12 +10,13 @@ export const Route = createFileRoute("/api/public/hooks/kalshi-book-tick")({
         const auth = await verifyCronRequest(request);
         if (auth) return auth;
         try {
-          const { snapshotKalshiBook, settleKalshiBook } = await import(
+          const { snapshotKalshiBook, settleKalshiBook, backfillKalshiBook } = await import(
             "@/lib/kalshiBookLedger.server"
           );
           const snap = await snapshotKalshiBook();
           const settle = await settleKalshiBook();
-          return new Response(JSON.stringify({ ok: true, snap, settle }), {
+          const backfill = await backfillKalshiBook(2);
+          return new Response(JSON.stringify({ ok: true, snap, settle, backfill }), {
             headers: { "Content-Type": "application/json" },
           });
         } catch (e) {
