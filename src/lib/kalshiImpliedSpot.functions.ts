@@ -102,7 +102,11 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
       volume: null, openInterest: null, lastPriceCents: null,
       yesVol60s: null, noVol60s: null, tradeCount60s: null,
       yesVolWindow: null, noVolWindow: null, tradeCountWindow: null, flowLadder: null,
+      yesCostWindow: null, noCostWindow: null, yesAvgCents: null, noAvgCents: null,
+      yesPayout: null, noPayout: null, totalCostWindow: null,
+      houseIfYes: null, houseIfNo: null, houseLean: null,
       error: null,
+
     };
     try {
       const res = await fetch(
