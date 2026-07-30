@@ -192,7 +192,12 @@ export const getKalshiImpliedSpot = createServerFn({ method: "GET" }).handler(
         const minTs = Math.floor(winStartMs / 1000);
         const cutoff60 = nowMs - 60_000;
 
-        type Trade = { taker_side?: string; count?: number; count_fp?: string; created_time?: string };
+        type Trade = {
+          taker_side?: string; count?: number; count_fp?: string; created_time?: string;
+          yes_price?: number; no_price?: number;
+          yes_price_dollars?: string; no_price_dollars?: string;
+        };
+
         const trades: Trade[] = [];
         let cursor: string | undefined;
         // 15m of BTC 15m-market trades fits comfortably; cap pages to stay cheap.
