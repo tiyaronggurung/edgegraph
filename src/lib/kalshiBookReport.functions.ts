@@ -118,8 +118,9 @@ export const getKalshiBookReport = createServerFn({ method: "GET" })
     // Current (in-flight) 15m window: the row whose window_start is the
     // current 15m bucket. Everything else is a completed window log entry.
     const nowMs = Date.now();
-    const curStart = new Date(Math.floor(nowMs / 900_000) * 900_000).toISOString();
-    const liveRow = all.find((r) => r.window_start === curStart && !r.outcome) ?? null;
+    const curStartMs = Math.floor(nowMs / 900_000) * 900_000;
+    const isCurrent = (r: BookWindowRow) => new Date(r.window_start).getTime() === curStartMs;
+    const liveRow = all.find((r) => isCurrent(r) && !r.outcome) ?? null;
     const live: LiveBookWindow | null = liveRow
       ? (() => {
           const startMs = new Date(liveRow.window_start).getTime();
@@ -155,7 +156,7 @@ export const getKalshiBookReport = createServerFn({ method: "GET" })
     return {
       days: data.days,
       live,
-      recent: all.filter((r) => r.window_start !== curStart).slice(0, 96),
+      recent: all.filter((r) => !isCurrent(r)).slice(0, 96),
       perHour: perHour.slice(0, 24),
       perDay: perDay.slice(0, 14),
       perWeek: perWeek.slice(0, 6),
