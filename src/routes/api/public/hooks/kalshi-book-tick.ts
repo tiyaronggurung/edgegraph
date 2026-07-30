@@ -14,10 +14,14 @@ export const Route = createFileRoute("/api/public/hooks/kalshi-book-tick")({
             "@/lib/kalshiBookLedger.server"
           );
           const { recordTrendlineBook } = await import("@/lib/kalshiBookTrendline.server");
-          const snap = await snapshotKalshiBook();
-          // Overwrite with the richer full-window tape the trendline chart uses,
-          // so the ledger log matches the live COST 15m strip exactly.
+          // The trendline full-window tape is the source of truth for the live
+          // window; the incremental snapshot is only a fallback when that tape
+          // isn't available (running both stacks deltas on a full recompute and
+          // double-counts the window).
           const trend = await recordTrendlineBook();
+          const snap = trend.ok
+            ? { ok: true, skipped: "trendline authoritative" as const }
+            : await snapshotKalshiBook();
           const settle = await settleKalshiBook();
           const backfill = await backfillKalshiBook(2);
           return new Response(JSON.stringify({ ok: true, snap, trend, settle, backfill }), {
