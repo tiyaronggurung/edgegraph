@@ -62,6 +62,28 @@ export interface KalshiImpliedSpot {
   tradeCountWindow: number | null;      // #trades, window-to-date
   /** Per-minute ladder, minute 0 = window open. Only minutes with trades. */
   flowLadder: Array<{ m: number; yes: number; no: number; trades: number }> | null;
+  // ---- window-to-date taker cost basis (what each side actually paid) ----
+  /** Dollars paid by YES takers this window (Σ count × yes_price). */
+  yesCostWindow: number | null;
+  /** Dollars paid by NO takers this window (Σ count × no_price). */
+  noCostWindow: number | null;
+  /** Volume-weighted average entry price for YES takers, in cents. */
+  yesAvgCents: number | null;
+  /** Volume-weighted average entry price for NO takers, in cents. */
+  noAvgCents: number | null;
+  /** $1 × contracts — what Kalshi must pay out if YES settles in the money. */
+  yesPayout: number | null;
+  /** $1 × contracts — what Kalshi must pay out if NO settles in the money. */
+  noPayout: number | null;
+  /** Total taker dollars collected this window (yesCost + noCost). */
+  totalCostWindow: number | null;
+  /** House P/L if YES wins (collected − YES payout). */
+  houseIfYes: number | null;
+  /** House P/L if NO wins (collected − NO payout). */
+  houseIfNo: number | null;
+  /** Side the book profits more from — i.e. the outcome Kalshi "leans" toward. */
+  houseLean: "YES" | "NO" | null;
+
   error: string | null;
 }
 
