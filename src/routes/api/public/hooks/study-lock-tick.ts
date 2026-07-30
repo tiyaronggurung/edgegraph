@@ -92,8 +92,20 @@ export const Route = createFileRoute("/api/public/hooks/study-lock-tick")({
           .limit(20);
         if (predsErr) return Response.json({ ok: false, error: predsErr.message }, { status: 500 });
 
+        // Live Kalshi book economics for the candidate windows (may be empty).
+        const bookByTicker = new Map<string, BookLedgerRow>();
+        const candidateTickers = (preds ?? []).map((p: any) => p.ticker as string);
+        if (candidateTickers.length) {
+          const { data: ledger } = await supabaseAdmin
+            .from("kalshi_book_ledger")
+            .select("ticker, total_collected, house_if_yes, house_if_no, house_lean, yes_vol, no_vol")
+            .in("ticker", candidateTickers);
+          for (const r of (ledger ?? []) as BookLedgerRow[]) bookByTicker.set(r.ticker, r);
+        }
+
         const results: Array<Record<string, unknown>> = [];
         const sinceIso = new Date(nowMs - 120_000).toISOString();
+
 
         // ---- T+7min snapshot (always recorded, never gated) -----------------
         // Every 15-min window gets a permanent record of what the study saw at
