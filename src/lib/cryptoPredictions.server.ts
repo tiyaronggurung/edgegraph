@@ -111,7 +111,11 @@ export async function snapshotPrediction(input: SnapshotInput): Promise<void> {
       // their own natural times (T=0 model, T+420s study). Outside that
       // early window, keep the |edge| < 1 noise filter so near-certain
       // markets don't pollute the hit-rate denominator.
-      const isEarlyInWindow = input.secondsToClose >= 720;
+      // Widened from 720s → 120s: when the first ticks of a window are lost
+      // (Kalshi 429 / cron miss), the row used to be blocked by the |edge| < 1
+      // noise filter and the window never appeared in the log at all. Now any
+      // first snapshot with >= 2 min left creates the pending row.
+      const isEarlyInWindow = input.secondsToClose >= 120;
       if (!isEarlyInWindow && Math.abs(input.edgePts) < 1) return;
       // First snapshot: store the model's pick (side) — this is LOCKED for the
       // life of the market, even if model prob drifts across 50% later.
