@@ -1040,9 +1040,14 @@ function ModelAccuracyPanel() {
             />
             <Cell
               label="Win rate (12h)"
-              value={s.byWindow.last12h.settled ? pct(s.byWindow.last12h.winRate) : "—"}
-              sub={`${s.byWindow.last12h.correct}/${s.byWindow.last12h.settled}`}
+              value={s.byWindow.last12h.settled >= 3 ? pct(s.byWindow.last12h.winRate) : "—"}
+              sub={
+                s.byWindow.last12h.settled >= 3
+                  ? `${s.byWindow.last12h.correct}/${s.byWindow.last12h.settled}`
+                  : `${s.byWindow.last12h.correct}/${s.byWindow.last12h.settled} · too few`
+              }
             />
+
             <Cell
               label={`Last ${last20.length} settled`}
               value={last20.length ? (
