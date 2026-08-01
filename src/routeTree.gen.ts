@@ -53,6 +53,7 @@ import { Route as ApiPublicHooksMarketIntelMatchRouteImport } from './routes/api
 import { Route as ApiPublicHooksMartingaleTickRouteImport } from './routes/api/public/hooks/martingale-tick'
 import { Route as ApiPublicHooksMultiTfShadowRouteImport } from './routes/api/public/hooks/multi-tf-shadow'
 import { Route as ApiPublicHooksOddsShadowTickRouteImport } from './routes/api/public/hooks/odds-shadow-tick'
+import { Route as ApiPublicHooksOpsAutoTradeTickRouteImport } from './routes/api/public/hooks/ops-auto-trade-tick'
 import { Route as ApiPublicHooksOpsDailyBacktestRouteImport } from './routes/api/public/hooks/ops-daily-backtest'
 import { Route as ApiPublicHooksPinRiskShadowTickRouteImport } from './routes/api/public/hooks/pin-risk-shadow-tick'
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
@@ -304,6 +305,12 @@ const ApiPublicHooksOddsShadowTickRoute =
     path: '/api/public/hooks/odds-shadow-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksOpsAutoTradeTickRoute =
+  ApiPublicHooksOpsAutoTradeTickRouteImport.update({
+    id: '/api/public/hooks/ops-auto-trade-tick',
+    path: '/api/public/hooks/ops-auto-trade-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksOpsDailyBacktestRoute =
   ApiPublicHooksOpsDailyBacktestRouteImport.update({
     id: '/api/public/hooks/ops-daily-backtest',
@@ -409,6 +416,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/multi-tf-shadow': typeof ApiPublicHooksMultiTfShadowRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
+  '/api/public/hooks/ops-auto-trade-tick': typeof ApiPublicHooksOpsAutoTradeTickRoute
   '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -464,6 +472,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/multi-tf-shadow': typeof ApiPublicHooksMultiTfShadowRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
+  '/api/public/hooks/ops-auto-trade-tick': typeof ApiPublicHooksOpsAutoTradeTickRoute
   '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -521,6 +530,7 @@ export interface FileRoutesById {
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/multi-tf-shadow': typeof ApiPublicHooksMultiTfShadowRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
+  '/api/public/hooks/ops-auto-trade-tick': typeof ApiPublicHooksOpsAutoTradeTickRoute
   '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -578,6 +588,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/multi-tf-shadow'
     | '/api/public/hooks/odds-shadow-tick'
+    | '/api/public/hooks/ops-auto-trade-tick'
     | '/api/public/hooks/ops-daily-backtest'
     | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
@@ -633,6 +644,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/multi-tf-shadow'
     | '/api/public/hooks/odds-shadow-tick'
+    | '/api/public/hooks/ops-auto-trade-tick'
     | '/api/public/hooks/ops-daily-backtest'
     | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
@@ -689,6 +701,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/multi-tf-shadow'
     | '/api/public/hooks/odds-shadow-tick'
+    | '/api/public/hooks/ops-auto-trade-tick'
     | '/api/public/hooks/ops-daily-backtest'
     | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
@@ -729,6 +742,7 @@ export interface RootRouteChildren {
   ApiPublicHooksMartingaleTickRoute: typeof ApiPublicHooksMartingaleTickRoute
   ApiPublicHooksMultiTfShadowRoute: typeof ApiPublicHooksMultiTfShadowRoute
   ApiPublicHooksOddsShadowTickRoute: typeof ApiPublicHooksOddsShadowTickRoute
+  ApiPublicHooksOpsAutoTradeTickRoute: typeof ApiPublicHooksOpsAutoTradeTickRoute
   ApiPublicHooksOpsDailyBacktestRoute: typeof ApiPublicHooksOpsDailyBacktestRoute
   ApiPublicHooksPinRiskShadowTickRoute: typeof ApiPublicHooksPinRiskShadowTickRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
@@ -1051,6 +1065,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksOddsShadowTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/ops-auto-trade-tick': {
+      id: '/api/public/hooks/ops-auto-trade-tick'
+      path: '/api/public/hooks/ops-auto-trade-tick'
+      fullPath: '/api/public/hooks/ops-auto-trade-tick'
+      preLoaderRoute: typeof ApiPublicHooksOpsAutoTradeTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/ops-daily-backtest': {
       id: '/api/public/hooks/ops-daily-backtest'
       path: '/api/public/hooks/ops-daily-backtest'
@@ -1197,6 +1218,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksMartingaleTickRoute: ApiPublicHooksMartingaleTickRoute,
   ApiPublicHooksMultiTfShadowRoute: ApiPublicHooksMultiTfShadowRoute,
   ApiPublicHooksOddsShadowTickRoute: ApiPublicHooksOddsShadowTickRoute,
+  ApiPublicHooksOpsAutoTradeTickRoute: ApiPublicHooksOpsAutoTradeTickRoute,
   ApiPublicHooksOpsDailyBacktestRoute: ApiPublicHooksOpsDailyBacktestRoute,
   ApiPublicHooksPinRiskShadowTickRoute: ApiPublicHooksPinRiskShadowTickRoute,
   ApiPublicHooksRecomputePredictionsRoute:
