@@ -24,7 +24,7 @@ export function OpsStatusBanner({ dash, onRefresh }: { dash: OpsDashboard; onRef
   const meta = LEVEL_META[level];
   const Icon = meta.Icon;
 
-  const unacked = (dash.alerts ?? []).filter(
+  const unacked = ((dash.alerts ?? []) as OpsAlertRow[]).filter(
     (a) => a.level === "red" && !a.acknowledged_at && !a.resolved_at,
   );
 
