@@ -1,65 +1,40 @@
-# Study Pick Auto-Bet (Real Money)
+# BTC 15m Operating Manual — admin-only $1k → $100k page
 
-Fire **one** real Kalshi $10 buy per 15-min window when the Study Pick locks, if Kalshi's ask on the locked side is **< 90¢**. Two worlds: **A** = what makes a lock (already built). **B** = what makes us fire (new).
+A new admin-only page at `/ops-manual`, linked from the crypto dashboard. Pure control and analytics layer: **no automated execution is wired in**. Everything is decision support, logging, and risk gating.
 
----
+## Page layout (top to bottom)
 
-## World A — Study Pick Lock Rules (already live, unchanged)
+1. **Status banner** — Green / Yellow / Orange / Red with trigger time, metric, current value, threshold, action taken, resume conditions, manual-review flag. Red alerts persist until acknowledged; acknowledging never restores trading.
+2. **Trade Qualification Card** — permanent BET ONLY IF / STAKE / STOP / SUNDAY / BANK checklist, with each condition live-evaluated against the current 15m window (green tick / red cross).
+3. **Staking panel** — morning bankroll, active unit %, dollar stake, bets remaining, consecutive losses, daily P/L, distance to +20% and −20% stops, current mode and the reason for it. Depth-protection warning above ~$40k bankroll (order > 15% of visible book ⇒ flagged "split entry required", never auto-placed).
+4. **P/L dashboard** — summary cards (current / morning / all-time-high bankroll, drawdown, today / week / month / all-time P/L, withdrawn, active bankroll, wins, losses, overall + rolling-30 + rolling-100 win rate), session table with every listed column, discipline score, and the full chart set (bankroll curve, drawdown, daily and weekly P/L, rolling win rates, and by-hour / cushion / ask / confidence breakdowns).
+5. **Routine backtest panel** — the five windows (last 30 bets, last 100 bets, 7d, 30d, all history), every listed metric, all bucket tables, and the daily backtest status.
+6. **Withdrawal tracker** — milestone ladder from $10k, required withdrawal, pending/complete, protected profit, trading bankroll after withdrawal.
+7. **Alerts + audit log** — kill-switch events, rule violations, staking-mode changes, threshold-change history.
 
-Auto-bet only consumes locks; it never invents new ones.
+## Qualification logic (single shared module)
 
-- **A1 Primary** — `secondsToClose ∈ (420, 480]` AND chip confidence **≥ 75%** → lock instantly
-- **A2 Late** — `secondsToClose ∈ [180, 420]` AND chip confidence **≥ 80%** held continuously **≥ 120s** → lock
-- **A3 Hard gates (upstream)** — dominance ≥ 70%, trajectory agreement, flip-count < 5, distance ≥ 0.05% of strike
-- No lock by T-180s → CHOPPY, no fire
+Six conditions, all required: T7 study lock exists · study confidence ≥ 90% · |spot − strike| ≥ $40 · ask ≤ 80¢ · model agrees with study · ≥ 120s left. Excluded UTC hours 01, 04, 11, 18; preferred hours 22, 00, 05, 06, 08, 13, 14 tracked separately. The same module drives the live qualification card and the historical backtest, so they can never drift.
 
----
+Backtest integrity: reconstruction reads only decision-time fields already stored on each window (`study_t7_*`, `study_lock_*`, model side/prob at snapshot, ask cents at lock, cushion at lock). Settlement fields are used only to grade the outcome, never to decide qualification. Every window stores its pass/fail reason.
 
-## World B — Kalshi Auto-Fire Rules (new)
+## Status and mode rules (as specified, no loosening)
 
-### B1 — User eligibility
-- `profiles.study_auto_live_enabled = true` (new toggle, default OFF)
-- `kalshi_api_key_id` + `kalshi_private_key_pem` present
+- Healthy ≥ 88% rolling-30 · Watch 82–88% · Risk Reduced < 82% · Kill Switch when rolling-100 < 78% or drawdown > 30%.
+- Standard 10% unit (allowed ≥ 82% rolling-30), Risk Reduced 6% (auto below 82%, needs 30 fresh settled bets to exit), Trading Disabled on any kill-switch condition, feed outage/stale tick, Kalshi structure/fee/settlement change, or two rule violations in one week.
+- Daily stops: 4 bets, 2 consecutive losses, +20%, −20%, any rule violation, any outage.
+- Stake fixed at day open, never recalculated intraday, never increased after a loss.
 
-### B2 — Price gate
-- Fetch Kalshi ask on the locked side at fire time
-- **Fire if `ask < 90¢`** · **Skip if `ask ≥ 90¢`** (log `ask_ge_90c`) · **Skip if ask = null** (log `no_kalshi_ask`)
+## Technical section
 
-### B3 — One bet per window (new — the rule you just added)
-- **Hard cap: exactly 1 successful fire per (user, ticker)**. `ticker` = the 15-min window, so this = 1 bet per 15 min.
-- **Retry loop until placed**: on transient failure (ask ≥ 90¢, Kalshi 5xx, order rejected, no fill), re-attempt every **10s**.
-- **Retry window**: keeps trying from lock time up to **T-60s** remaining, then gives up (skip reason `retry_window_expired`).
-- Each retry re-fetches the live ask and re-checks the < 90¢ gate — so if price falls from 91¢ → 88¢ we still catch it, and if it climbs above 90¢ we keep waiting.
-- **After a successful fill: STOP.** Set `study_auto_live_fired_at` on the prediction row → no further attempts for that window even if lock updates or chip re-fires.
+- **Migration** adds admin-only tables (RLS + GRANTs, admin-scoped via the existing `profiles.is_admin` check): `ops_daily_snapshots`, `ops_trades`, `ops_window_evaluations`, `ops_alerts`, `ops_rule_violations`, `ops_mode_changes`, `ops_withdrawals`, `ops_backtest_runs`, `ops_threshold_changes`. Decision snapshots stored as jsonb and never overwritten after settlement.
+- **`src/lib/opsManual/rules.ts`** — pure, unit-tested qualification, bucketing, status, staking-mode and discipline-score functions. No I/O.
+- **`src/lib/opsManual/opsManual.functions.ts`** — auth'd server fns: run backtest, read dashboards, open the trading day, log a trade, acknowledge an alert, record a withdrawal, change a threshold (versioned with old value, new value, timestamp, actor, reason).
+- **`src/routes/api/public/hooks/ops-daily-backtest.ts`** + a pg_cron job — one run per day after prior-day windows settle; writes a row into `ops_backtest_runs`.
+- **`src/routes/_authenticated/ops-manual.tsx`** + panels under `src/components/ops/`. Admin gate mirrors the existing `/admin` page.
+- Nav entry and a link from the crypto page.
+- Nothing in `cryptoAutoTrade`, `studyAutoLive`, the study-lock path, or any existing execution code is modified.
 
-### B4 — Sizing / order
-- **$10 flat** stake · Contracts = `floor(1000 / askCents)` · Side: YES if UP, NO if DOWN · **IOC** at current ask
-- Uses the same Kalshi signer as Cheap-flip / Our-Odds Hunter
-- Records into `auto_trade_orders` with `trigger='study_auto_live'`, `mode='live'` (settlement + P&L pipelines already handle it)
+## Explicitly out of scope
 
-### B5 — Exit
-- **Hold to settle.** No TP, no SL.
-
-### B6 — Safety
-- Never touches paper flow, PRED, Cheap-flip Hunter, Our-Odds Hunter, manual buttons, or ladder/exit logic.
-- Independent of the existing `big_flip_killswitch`.
-
----
-
-## Data changes
-- `profiles.study_auto_live_enabled boolean not null default false`
-- `btc_model_predictions.study_auto_live_fired_at timestamptz` (idempotency marker)
-- Extra `auto_trade_skip_log` reasons: `ask_ge_90c`, `no_kalshi_ask`, `retry_window_expired`, `toggle_off`, `no_keys`, `already_fired`
-
-## Server
-- Extend `src/lib/chipStudyPick.functions.ts`: after existing paper block, spawn a retry loop per eligible user that polls the ask every 10s until fire or `secondsToClose ≤ 60`.
-- Loop lives inside the request handler — simple `while` with `await sleep(10_000)` and a hard deadline computed from lock time + `secondsToClose`. Bails on first successful fill or expiry.
-
-## UI
-- New card on `/crypto` near the Cheap-flip banner:
-  - Toggle (ON/OFF)
-  - Line: *"$10 on Kalshi at lock. Skip if ask ≥ 90¢. Retry every 10s until T-60s. Hold to settle. 1 bet / 15 min."*
-  - Today's fires / wins / P&L from `auto_trade_orders` where `trigger='study_auto_live'`
-  - Disabled if Kalshi keys missing
-
-Confirm and I'll build it.
+No auto-execution, no stake changes to existing auto-trade paths, no edits to current gates or thresholds.
