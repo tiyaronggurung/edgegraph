@@ -196,7 +196,7 @@ export async function runOpsAutoTradeForUser(
   // 2-4) session gates
   const s = await loadOpsSessionState(db, userId);
   if (!s.dayOpened) return { ok: true, fired: 0, reason: "day_not_opened", attempts: [] };
-  if (s.stops.stopped) return { ok: true, fired: 0, reason: `session_stopped:${s.stops.stopReason ?? "stop"}`, attempts: [] };
+  if (s.stops.stopped) return { ok: true, fired: 0, reason: `session_stopped:${s.stops.reason ?? "stop"}`, attempts: [] };
   if (s.staking.mode === "disabled") return { ok: true, fired: 0, reason: `staking_disabled:${s.staking.reason}`, attempts: [] };
   if (s.stops.betsRemaining <= 0) return { ok: true, fired: 0, reason: "daily_bet_limit", attempts: [] };
 
