@@ -4564,12 +4564,15 @@ export type Database = {
         Row: {
           ask_cents: number | null
           bankroll_after: number | null
+          contracts: number | null
           created_at: string
+          crypto_trade_id: string | null
           cushion_usd: number | null
           decision_at: string
           decision_snapshot: Json
           discipline_score: number
           id: string
+          kalshi_order_id: string | null
           model_conf: number | null
           model_side: string | null
           notes: string | null
@@ -4580,6 +4583,7 @@ export type Database = {
           seconds_left: number | null
           session_date: string
           side: string | null
+          source: string
           spot_at_lock: number | null
           stake: number
           strike: number | null
@@ -4594,12 +4598,15 @@ export type Database = {
         Insert: {
           ask_cents?: number | null
           bankroll_after?: number | null
+          contracts?: number | null
           created_at?: string
+          crypto_trade_id?: string | null
           cushion_usd?: number | null
           decision_at?: string
           decision_snapshot?: Json
           discipline_score?: number
           id?: string
+          kalshi_order_id?: string | null
           model_conf?: number | null
           model_side?: string | null
           notes?: string | null
@@ -4610,6 +4617,7 @@ export type Database = {
           seconds_left?: number | null
           session_date: string
           side?: string | null
+          source?: string
           spot_at_lock?: number | null
           stake?: number
           strike?: number | null
@@ -4624,12 +4632,15 @@ export type Database = {
         Update: {
           ask_cents?: number | null
           bankroll_after?: number | null
+          contracts?: number | null
           created_at?: string
+          crypto_trade_id?: string | null
           cushion_usd?: number | null
           decision_at?: string
           decision_snapshot?: Json
           discipline_score?: number
           id?: string
+          kalshi_order_id?: string | null
           model_conf?: number | null
           model_side?: string | null
           notes?: string | null
@@ -4640,6 +4651,7 @@ export type Database = {
           seconds_left?: number | null
           session_date?: string
           side?: string | null
+          source?: string
           spot_at_lock?: number | null
           stake?: number
           strike?: number | null
@@ -5112,6 +5124,7 @@ export type Database = {
           is_admin: boolean
           kalshi_api_key_id: string | null
           kalshi_private_key_pem: string | null
+          ops_auto_trade_enabled: boolean
           preferred_sports: string[]
           risk_tolerance: string
           stripe_customer_id: string | null
@@ -5134,6 +5147,7 @@ export type Database = {
           is_admin?: boolean
           kalshi_api_key_id?: string | null
           kalshi_private_key_pem?: string | null
+          ops_auto_trade_enabled?: boolean
           preferred_sports?: string[]
           risk_tolerance?: string
           stripe_customer_id?: string | null
@@ -5156,6 +5170,7 @@ export type Database = {
           is_admin?: boolean
           kalshi_api_key_id?: string | null
           kalshi_private_key_pem?: string | null
+          ops_auto_trade_enabled?: boolean
           preferred_sports?: string[]
           risk_tolerance?: string
           stripe_customer_id?: string | null

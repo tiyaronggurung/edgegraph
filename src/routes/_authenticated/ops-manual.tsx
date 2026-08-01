@@ -12,6 +12,7 @@ import { OpsPnlDashboard } from "@/components/ops/OpsPnlDashboard";
 import { OpsBacktestPanel } from "@/components/ops/OpsBacktestPanel";
 import { OpsAlertsPanel } from "@/components/ops/OpsAlertsPanel";
 import { OpsKalshiAccount } from "@/components/ops/OpsKalshiAccount";
+import { OpsAutoTradePanel } from "@/components/ops/OpsAutoTradePanel";
 
 export const Route = createFileRoute("/_authenticated/ops-manual")({
   head: () => ({
@@ -65,6 +66,7 @@ function OpsManualPage() {
         <>
           <OpsStatusBanner dash={q.data} onRefresh={() => q.refetch()} />
           <OpsKalshiAccount />
+          <OpsAutoTradePanel />
           <OpsQualificationCard dash={q.data} />
           <OpsStakingPanel dash={q.data} onRefresh={() => q.refetch()} />
           <OpsPnlDashboard dash={q.data} />
