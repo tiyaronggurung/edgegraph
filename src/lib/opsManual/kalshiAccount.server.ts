@@ -183,13 +183,19 @@ export async function loadKalshiAccount(
   }
 
   const days = Math.max(1, Math.min(90, opts?.days ?? 30));
-  const minTs = Math.floor((Date.now() - days * 86_400_000) / 1000);
+  const minMs = Date.now() - days * 86_400_000;
 
   try {
     const [bal, pos, settle] = await Promise.all([
       kalshiGet<{ balance?: number; payout?: number }>("/portfolio/balance", keyId, pem),
-      kalshiGet<{ market_positions?: RawPosition[] }>("/portfolio/positions?limit=200", keyId, pem),
-      kalshiGet<{ settlements?: RawSettlement[] }>(`/portfolio/settlements?limit=200&min_ts=${minTs}`, keyId, pem),
+      // Positions is best-effort: some key scopes reject it, and it must never
+      // hide the balance / settled P/L below.
+      kalshiGet<{ market_positions?: RawPosition[] }>("/portfolio/positions", keyId, pem).catch(
+        () => ({ market_positions: [] as RawPosition[] }),
+      ),
+      kalshiGet<{ settlements?: RawSettlement[] }>(`/portfolio/settlements?limit=200`, keyId, pem).catch(
+        () => ({ settlements: [] as RawSettlement[] }),
+      ),
     ]);
 
     const openPositions = (pos.market_positions ?? [])
@@ -220,7 +226,8 @@ export async function loadKalshiAccount(
         marketResult: s.market_result ?? null,
       };
     });
-    rows.sort((a, b) => (b.settledAt ?? "").localeCompare(a.settledAt ?? ""));
+    const windowed = rows.filter((r) => !r.settledAt || new Date(r.settledAt).getTime() >= minMs);
+    windowed.sort((a, b) => (b.settledAt ?? "").localeCompare(a.settledAt ?? ""));
 
     const agg = (list: KalshiSettlementRow[]) => {
       const wins = list.filter((r) => r.result === "win").length;
@@ -240,10 +247,11 @@ export async function loadKalshiAccount(
       };
     };
 
+    const rowsW = windowed;
     const todayKey = new Date().toISOString().slice(0, 10);
-    const todayRows = rows.filter((r) => (r.settledAt ?? "").slice(0, 10) === todayKey);
-    const btcRows = rows.filter((r) => r.ticker.startsWith("KXBTC"));
-    const t = agg(rows);
+    const todayRows = rowsW.filter((r) => (r.settledAt ?? "").slice(0, 10) === todayKey);
+    const btcRows = rowsW.filter((r) => r.ticker.startsWith("KXBTC"));
+    const t = agg(rowsW);
     const tb = agg(btcRows);
     const td = agg(todayRows);
 
@@ -253,7 +261,7 @@ export async function loadKalshiAccount(
       payout: typeof bal.payout === "number" ? c2d(bal.payout) : null,
       openPositions,
       openExposure: Math.round(openPositions.reduce((a, p) => a + p.exposure, 0) * 100) / 100,
-      settlements: rows.slice(0, 100),
+      settlements: rowsW.slice(0, 100),
       totals: t,
       today: { n: td.n, wins: td.wins, losses: td.losses, pnl: td.pnl, cost: td.cost },
       btcOnly: { n: tb.n, wins: tb.wins, losses: tb.losses, winRate: tb.winRate, pnl: tb.pnl },
