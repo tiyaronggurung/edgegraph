@@ -4294,6 +4294,446 @@ export type Database = {
         }
         Relationships: []
       }
+      ops_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          action_taken: string | null
+          code: string
+          created_at: string
+          current_value: number | null
+          details: Json
+          id: string
+          level: string
+          manual_review_required: boolean
+          metric: string | null
+          resolved_at: string | null
+          resume_conditions: string | null
+          threshold_value: number | null
+          triggered_at: string
+          user_id: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          action_taken?: string | null
+          code: string
+          created_at?: string
+          current_value?: number | null
+          details?: Json
+          id?: string
+          level: string
+          manual_review_required?: boolean
+          metric?: string | null
+          resolved_at?: string | null
+          resume_conditions?: string | null
+          threshold_value?: number | null
+          triggered_at?: string
+          user_id: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          action_taken?: string | null
+          code?: string
+          created_at?: string
+          current_value?: number | null
+          details?: Json
+          id?: string
+          level?: string
+          manual_review_required?: boolean
+          metric?: string | null
+          resolved_at?: string | null
+          resume_conditions?: string | null
+          threshold_value?: number | null
+          triggered_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ops_backtest_runs: {
+        Row: {
+          created_at: string
+          id: string
+          max_drawdown_pct: number | null
+          results: Json
+          rolling100_wr: number | null
+          rolling30_wr: number | null
+          run_at: string
+          status: string
+          through_date: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          max_drawdown_pct?: number | null
+          results?: Json
+          rolling100_wr?: number | null
+          rolling30_wr?: number | null
+          run_at?: string
+          status?: string
+          through_date?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          max_drawdown_pct?: number | null
+          results?: Json
+          rolling100_wr?: number | null
+          rolling30_wr?: number | null
+          run_at?: string
+          status?: string
+          through_date?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ops_daily_snapshots: {
+        Row: {
+          all_time_high_bankroll: number
+          bets_placed: number
+          closing_bankroll: number | null
+          consecutive_losses: number
+          created_at: string
+          daily_pnl: number
+          id: string
+          mode_reason: string | null
+          morning_bankroll: number
+          review_only: boolean
+          session_date: string
+          staking_mode: string
+          stop_reason: string | null
+          stopped: boolean
+          unit_pct: number
+          unit_usd: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          all_time_high_bankroll?: number
+          bets_placed?: number
+          closing_bankroll?: number | null
+          consecutive_losses?: number
+          created_at?: string
+          daily_pnl?: number
+          id?: string
+          mode_reason?: string | null
+          morning_bankroll: number
+          review_only?: boolean
+          session_date: string
+          staking_mode?: string
+          stop_reason?: string | null
+          stopped?: boolean
+          unit_pct?: number
+          unit_usd?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          all_time_high_bankroll?: number
+          bets_placed?: number
+          closing_bankroll?: number | null
+          consecutive_losses?: number
+          created_at?: string
+          daily_pnl?: number
+          id?: string
+          mode_reason?: string | null
+          morning_bankroll?: number
+          review_only?: boolean
+          session_date?: string
+          staking_mode?: string
+          stop_reason?: string | null
+          stopped?: boolean
+          unit_pct?: number
+          unit_usd?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ops_mode_changes: {
+        Row: {
+          actor: string
+          changed_at: string
+          created_at: string
+          from_mode: string | null
+          id: string
+          reason: string
+          to_mode: string
+          user_id: string
+        }
+        Insert: {
+          actor?: string
+          changed_at?: string
+          created_at?: string
+          from_mode?: string | null
+          id?: string
+          reason: string
+          to_mode: string
+          user_id: string
+        }
+        Update: {
+          actor?: string
+          changed_at?: string
+          created_at?: string
+          from_mode?: string | null
+          id?: string
+          reason?: string
+          to_mode?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ops_rule_violations: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          occurred_at: string
+          rule_code: string
+          session_date: string
+          trade_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          occurred_at?: string
+          rule_code: string
+          session_date: string
+          trade_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          occurred_at?: string
+          rule_code?: string
+          session_date?: string
+          trade_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ops_rule_violations_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "ops_trades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ops_threshold_changes: {
+        Row: {
+          actor: string
+          changed_at: string
+          created_at: string
+          id: string
+          new_value: string
+          previous_value: string | null
+          reason: string
+          threshold_key: string
+          user_id: string | null
+        }
+        Insert: {
+          actor?: string
+          changed_at?: string
+          created_at?: string
+          id?: string
+          new_value: string
+          previous_value?: string | null
+          reason: string
+          threshold_key: string
+          user_id?: string | null
+        }
+        Update: {
+          actor?: string
+          changed_at?: string
+          created_at?: string
+          id?: string
+          new_value?: string
+          previous_value?: string | null
+          reason?: string
+          threshold_key?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ops_trades: {
+        Row: {
+          ask_cents: number | null
+          bankroll_after: number | null
+          created_at: string
+          cushion_usd: number | null
+          decision_at: string
+          decision_snapshot: Json
+          discipline_score: number
+          id: string
+          model_conf: number | null
+          model_side: string | null
+          notes: string | null
+          potential_profit: number | null
+          realized_pnl: number | null
+          result: string | null
+          rule_status: string
+          seconds_left: number | null
+          session_date: string
+          side: string | null
+          spot_at_lock: number | null
+          stake: number
+          strike: number | null
+          study_conf: number | null
+          study_side: string | null
+          ticker: string
+          updated_at: string
+          user_id: string
+          utc_hour: number | null
+          violations: string[]
+        }
+        Insert: {
+          ask_cents?: number | null
+          bankroll_after?: number | null
+          created_at?: string
+          cushion_usd?: number | null
+          decision_at?: string
+          decision_snapshot?: Json
+          discipline_score?: number
+          id?: string
+          model_conf?: number | null
+          model_side?: string | null
+          notes?: string | null
+          potential_profit?: number | null
+          realized_pnl?: number | null
+          result?: string | null
+          rule_status?: string
+          seconds_left?: number | null
+          session_date: string
+          side?: string | null
+          spot_at_lock?: number | null
+          stake?: number
+          strike?: number | null
+          study_conf?: number | null
+          study_side?: string | null
+          ticker: string
+          updated_at?: string
+          user_id: string
+          utc_hour?: number | null
+          violations?: string[]
+        }
+        Update: {
+          ask_cents?: number | null
+          bankroll_after?: number | null
+          created_at?: string
+          cushion_usd?: number | null
+          decision_at?: string
+          decision_snapshot?: Json
+          discipline_score?: number
+          id?: string
+          model_conf?: number | null
+          model_side?: string | null
+          notes?: string | null
+          potential_profit?: number | null
+          realized_pnl?: number | null
+          result?: string | null
+          rule_status?: string
+          seconds_left?: number | null
+          session_date?: string
+          side?: string | null
+          spot_at_lock?: number | null
+          stake?: number
+          strike?: number | null
+          study_conf?: number | null
+          study_side?: string | null
+          ticker?: string
+          updated_at?: string
+          user_id?: string
+          utc_hour?: number | null
+          violations?: string[]
+        }
+        Relationships: []
+      }
+      ops_window_evaluations: {
+        Row: {
+          close_time: string | null
+          created_at: string
+          decision_snapshot: Json
+          evaluated_at: string
+          fail_reasons: string[]
+          filters: Json
+          id: string
+          outcome: string | null
+          qualified: boolean
+          ticker: string
+          user_id: string | null
+        }
+        Insert: {
+          close_time?: string | null
+          created_at?: string
+          decision_snapshot?: Json
+          evaluated_at?: string
+          fail_reasons?: string[]
+          filters?: Json
+          id?: string
+          outcome?: string | null
+          qualified?: boolean
+          ticker: string
+          user_id?: string | null
+        }
+        Update: {
+          close_time?: string | null
+          created_at?: string
+          decision_snapshot?: Json
+          evaluated_at?: string
+          fail_reasons?: string[]
+          filters?: Json
+          id?: string
+          outcome?: string | null
+          qualified?: boolean
+          ticker?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ops_withdrawals: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          milestone_from: number
+          milestone_to: number
+          required_amount: number
+          status: string
+          updated_at: string
+          user_id: string
+          withdrawn_amount: number
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          milestone_from: number
+          milestone_to: number
+          required_amount: number
+          status?: string
+          updated_at?: string
+          user_id: string
+          withdrawn_amount?: number
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          milestone_from?: number
+          milestone_to?: number
+          required_amount?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+          withdrawn_amount?: number
+        }
+        Relationships: []
+      }
       paper_balances: {
         Row: {
           balance_cents: number
@@ -5126,6 +5566,7 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      is_ops_admin: { Args: { _user_id: string }; Returns: boolean }
       mid_support_study: {
         Args: { _days?: number }
         Returns: {
