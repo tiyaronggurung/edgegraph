@@ -11,7 +11,9 @@ export const Route = createFileRoute("/api/public/hooks/btc-snapshot-tick")({
         if (__cronAuth) return __cronAuth;
         // Kalshi 429s used to kill the whole tick, so a window could open with
         // no pending row until minutes later. Retry with backoff before giving up.
-        const { computeBtcMarkets, flushPredictionTracking } = await import("@/lib/cryptoBtc.functions");
+        const { computeBtcMarkets } = await import("@/lib/cryptoBtc.functions");
+        const { flushPredictionTracking } = await import("@/lib/predictionTracking.server");
+
         let lastErr: unknown = null;
         for (let attempt = 0; attempt < 3; attempt++) {
           try {

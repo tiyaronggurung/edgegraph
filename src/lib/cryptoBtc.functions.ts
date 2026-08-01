@@ -14,14 +14,9 @@ import { computeTaScore, TA_ENGINE_VERSION, type TaScoreResult } from "./ta/taEn
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
 const COINBASE = "https://api.exchange.coinbase.com";
 
-// Holds the in-flight prediction snapshot/settle work started by the most
-// recent computeBtcMarkets() call. Cron callers await flushPredictionTracking()
-// so the edge runtime cannot cancel it when the Response returns.
-let __predictionTracking: Promise<void> | null = null;
+// Prediction-tracking state lives in ./predictionTracking.server (module-scope
+// siblings are stripped from this file by the server-fn split transform).
 
-export async function flushPredictionTracking(): Promise<void> {
-  try { await __predictionTracking; } catch { /* already swallowed inside */ }
-}
 
 
 export interface BtcCandle {
@@ -1936,7 +1931,7 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
     // cron callers can await it — on the edge runtime an un-awaited promise is
     // killed the moment the Response is returned, which silently dropped every
     // pending prediction row when nobody had /crypto open.
-    __predictionTracking = (async () => {
+    const __track = (async () => {
       try {
         const { snapshotPrediction, settleDuePredictions } = await import("./cryptoPredictions.server");
         const { buildJumpFeatures } = await import("./cryptoJumpBuilder.server");
@@ -2011,6 +2006,9 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         console.warn("prediction tracking failed:", e);
       }
     })();
+    (await import("./predictionTracking.server")).setPredictionTracking(__track);
+
+
 
     // ── SHADOW: MarketIntel telemetry (Phase 1) ─────────────────────────
     // Runs in its OWN IIFE so upstream prediction/settlement failures do not
