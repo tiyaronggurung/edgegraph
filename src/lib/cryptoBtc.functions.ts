@@ -14,6 +14,16 @@ import { computeTaScore, TA_ENGINE_VERSION, type TaScoreResult } from "./ta/taEn
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
 const COINBASE = "https://api.exchange.coinbase.com";
 
+// Holds the in-flight prediction snapshot/settle work started by the most
+// recent computeBtcMarkets() call. Cron callers await flushPredictionTracking()
+// so the edge runtime cannot cancel it when the Response returns.
+let __predictionTracking: Promise<void> | null = null;
+
+export async function flushPredictionTracking(): Promise<void> {
+  try { await __predictionTracking; } catch { /* already swallowed inside */ }
+}
+
+
 export interface BtcCandle {
   t: number; o: number; h: number; l: number; c: number; v: number;
 }
