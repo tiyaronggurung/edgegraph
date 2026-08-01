@@ -11,11 +11,14 @@ export const Route = createFileRoute("/api/public/hooks/btc-snapshot-tick")({
         if (__cronAuth) return __cronAuth;
         // Kalshi 429s used to kill the whole tick, so a window could open with
         // no pending row until minutes later. Retry with backoff before giving up.
-        const { computeBtcMarkets } = await import("@/lib/cryptoBtc.functions");
+        const { computeBtcMarkets, flushPredictionTracking } = await import("@/lib/cryptoBtc.functions");
         let lastErr: unknown = null;
         for (let attempt = 0; attempt < 3; attempt++) {
           try {
             const res = await computeBtcMarkets();
+            // Must await: the snapshot/settle work is started fire-and-forget,
+            // and the edge runtime cancels it as soon as we return a Response.
+            await flushPredictionTracking();
             return new Response(
               JSON.stringify({ ok: true, markets: res?.markets?.length ?? 0, attempt: attempt + 1 }),
               { headers: { "Content-Type": "application/json" } },
