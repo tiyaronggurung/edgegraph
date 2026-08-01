@@ -1922,7 +1922,11 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
     // Track every model call (regardless of user bets) and settle past ones.
     // Best-effort: never throws, never blocks the response. Dynamic import so
     // the server-only module never enters the client graph.
-    void (async () => {
+    // Fire-and-forget for interactive callers, but the promise is retained so
+    // cron callers can await it — on the edge runtime an un-awaited promise is
+    // killed the moment the Response is returned, which silently dropped every
+    // pending prediction row when nobody had /crypto open.
+    __predictionTracking = (async () => {
       try {
         const { snapshotPrediction, settleDuePredictions } = await import("./cryptoPredictions.server");
         const { buildJumpFeatures } = await import("./cryptoJumpBuilder.server");
