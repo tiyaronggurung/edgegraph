@@ -1931,7 +1931,7 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
     // cron callers can await it — on the edge runtime an un-awaited promise is
     // killed the moment the Response is returned, which silently dropped every
     // pending prediction row when nobody had /crypto open.
-    __predictionTracking = (async () => {
+    const __track = (async () => {
       try {
         const { snapshotPrediction, settleDuePredictions } = await import("./cryptoPredictions.server");
         const { buildJumpFeatures } = await import("./cryptoJumpBuilder.server");
