@@ -2006,7 +2006,8 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
         console.warn("prediction tracking failed:", e);
       }
     })();
-    void import("./predictionTracking.server").then((m) => m.setPredictionTracking(__track));
+    (await import("./predictionTracking.server")).setPredictionTracking(__track);
+
 
 
     // ── SHADOW: MarketIntel telemetry (Phase 1) ─────────────────────────
