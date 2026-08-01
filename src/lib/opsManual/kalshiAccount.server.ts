@@ -188,7 +188,7 @@ export async function loadKalshiAccount(
   try {
     const [bal, pos, settle] = await Promise.all([
       kalshiGet<{ balance?: number; payout?: number }>("/portfolio/balance", keyId, pem),
-      kalshiGet<{ market_positions?: RawPosition[] }>("/portfolio/positions?count_filter=position,resting_order_count&limit=200", keyId, pem),
+      kalshiGet<{ market_positions?: RawPosition[] }>("/portfolio/positions?limit=200", keyId, pem),
       kalshiGet<{ settlements?: RawSettlement[] }>(`/portfolio/settlements?limit=200&min_ts=${minTs}`, keyId, pem),
     ]);
 
