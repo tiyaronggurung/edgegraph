@@ -26,6 +26,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
 import { Route as AuthenticatedModelValidationRouteImport } from './routes/_authenticated/model-validation'
+import { Route as AuthenticatedOpsManualRouteImport } from './routes/_authenticated/ops-manual'
 import { Route as AuthenticatedPatternPerformanceRouteImport } from './routes/_authenticated/pattern-performance'
 import { Route as AuthenticatedPatternsRouteImport } from './routes/_authenticated/patterns'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -150,6 +151,11 @@ const AuthenticatedModelValidationRoute =
     path: '/model-validation',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedOpsManualRoute = AuthenticatedOpsManualRouteImport.update({
+  id: '/ops-manual',
+  path: '/ops-manual',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedPatternPerformanceRoute =
   AuthenticatedPatternPerformanceRouteImport.update({
     id: '/pattern-performance',
@@ -376,6 +382,7 @@ export interface FileRoutesByFullPath {
   '/history': typeof AuthenticatedHistoryRoute
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
+  '/ops-manual': typeof AuthenticatedOpsManualRoute
   '/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
   '/patterns': typeof AuthenticatedPatternsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -430,6 +437,7 @@ export interface FileRoutesByTo {
   '/history': typeof AuthenticatedHistoryRoute
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
+  '/ops-manual': typeof AuthenticatedOpsManualRoute
   '/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
   '/patterns': typeof AuthenticatedPatternsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -486,6 +494,7 @@ export interface FileRoutesById {
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/live': typeof AuthenticatedLiveRoute
   '/_authenticated/model-validation': typeof AuthenticatedModelValidationRoute
+  '/_authenticated/ops-manual': typeof AuthenticatedOpsManualRoute
   '/_authenticated/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
   '/_authenticated/patterns': typeof AuthenticatedPatternsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -542,6 +551,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/live'
     | '/model-validation'
+    | '/ops-manual'
     | '/pattern-performance'
     | '/patterns'
     | '/settings'
@@ -596,6 +606,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/live'
     | '/model-validation'
+    | '/ops-manual'
     | '/pattern-performance'
     | '/patterns'
     | '/settings'
@@ -651,6 +662,7 @@ export interface FileRouteTypes {
     | '/_authenticated/history'
     | '/_authenticated/live'
     | '/_authenticated/model-validation'
+    | '/_authenticated/ops-manual'
     | '/_authenticated/pattern-performance'
     | '/_authenticated/patterns'
     | '/_authenticated/settings'
@@ -848,6 +860,13 @@ declare module '@tanstack/react-router' {
       path: '/model-validation'
       fullPath: '/model-validation'
       preLoaderRoute: typeof AuthenticatedModelValidationRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/ops-manual': {
+      id: '/_authenticated/ops-manual'
+      path: '/ops-manual'
+      fullPath: '/ops-manual'
+      preLoaderRoute: typeof AuthenticatedOpsManualRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/pattern-performance': {
@@ -1117,6 +1136,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedLiveRoute: typeof AuthenticatedLiveRoute
   AuthenticatedModelValidationRoute: typeof AuthenticatedModelValidationRoute
+  AuthenticatedOpsManualRoute: typeof AuthenticatedOpsManualRoute
   AuthenticatedPatternPerformanceRoute: typeof AuthenticatedPatternPerformanceRoute
   AuthenticatedPatternsRoute: typeof AuthenticatedPatternsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -1136,6 +1156,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedLiveRoute: AuthenticatedLiveRoute,
   AuthenticatedModelValidationRoute: AuthenticatedModelValidationRoute,
+  AuthenticatedOpsManualRoute: AuthenticatedOpsManualRoute,
   AuthenticatedPatternPerformanceRoute: AuthenticatedPatternPerformanceRoute,
   AuthenticatedPatternsRoute: AuthenticatedPatternsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,

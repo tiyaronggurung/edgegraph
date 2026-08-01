@@ -62,7 +62,7 @@ function OpsManualPage() {
 
       {q.data && (
         <>
-          <OpsStatusBanner dash={q.data} />
+          <OpsStatusBanner dash={q.data} onRefresh={() => q.refetch()} />
           <OpsQualificationCard dash={q.data} />
           <OpsStakingPanel dash={q.data} onRefresh={() => q.refetch()} />
           <OpsPnlDashboard dash={q.data} />
