@@ -126,12 +126,25 @@ export type KalshiAccountSnapshot = {
 type RawSettlement = {
   ticker?: string;
   market_result?: string;
+  // Current Kalshi shape: *_fp counts and *_dollars costs are strings,
+  // revenue / value stay in cents.
+  yes_count_fp?: string;
+  no_count_fp?: string;
+  yes_total_cost_dollars?: string;
+  no_total_cost_dollars?: string;
+  fee_cost?: string;
+  // Legacy numeric shape (kept as fallback).
   yes_count?: number;
   no_count?: number;
   yes_total_cost?: number;
   no_total_cost?: number;
   revenue?: number;
   settled_time?: string;
+};
+
+const num = (v: unknown): number => {
+  const n = typeof v === "string" ? Number(v) : typeof v === "number" ? v : 0;
+  return Number.isFinite(n) ? n : 0;
 };
 
 type RawPosition = {
@@ -187,7 +200,11 @@ export async function loadKalshiAccount(
 
   try {
     const [bal, pos, settle] = await Promise.all([
-      kalshiGet<{ balance?: number; payout?: number }>("/portfolio/balance", keyId, pem),
+      kalshiGet<{ balance?: number; balance_dollars?: string; portfolio_value?: number }>(
+        "/portfolio/balance",
+        keyId,
+        pem,
+      ),
       // Positions is best-effort: some key scopes reject it, and it must never
       // hide the balance / settled P/L below.
       kalshiGet<{ market_positions?: RawPosition[] }>("/portfolio/positions", keyId, pem).catch(
@@ -209,23 +226,32 @@ export async function loadKalshiAccount(
       }));
 
     const rows: KalshiSettlementRow[] = (settle.settlements ?? []).map((s) => {
-      const yes = s.yes_count ?? 0;
-      const no = s.no_count ?? 0;
-      const cost = c2d((s.yes_total_cost ?? 0) + (s.no_total_cost ?? 0));
+      const yes = num(s.yes_count_fp) || num(s.yes_count);
+      const no = num(s.no_count_fp) || num(s.no_count);
+      const cost =
+        Math.round(
+          (num(s.yes_total_cost_dollars) +
+            num(s.no_total_cost_dollars) +
+            c2d(s.yes_total_cost) +
+            c2d(s.no_total_cost) +
+            num(s.fee_cost)) *
+            100,
+        ) / 100;
       const revenue = c2d(s.revenue);
       const pnl = Math.round((revenue - cost) * 100) / 100;
       return {
         ticker: s.ticker ?? "—",
         settledAt: s.settled_time ?? null,
-        side: yes > 0 ? "yes" : no > 0 ? "no" : null,
+        side: yes > 0 ? ("yes" as const) : no > 0 ? ("no" as const) : null,
         contracts: yes + no,
         cost,
         revenue,
         pnl,
-        result: pnl >= 0 ? "win" : "loss",
+        result: (pnl >= 0 ? "win" : "loss") as "win" | "loss",
         marketResult: s.market_result ?? null,
       };
     });
+
     const windowed = rows.filter((r) => !r.settledAt || new Date(r.settledAt).getTime() >= minMs);
     windowed.sort((a, b) => (b.settledAt ?? "").localeCompare(a.settledAt ?? ""));
 
@@ -257,8 +283,11 @@ export async function loadKalshiAccount(
 
     return {
       connected: true,
-      balance: c2d(bal.balance),
-      payout: typeof bal.payout === "number" ? c2d(bal.payout) : null,
+      balance:
+        bal.balance_dollars != null && Number.isFinite(Number(bal.balance_dollars))
+          ? Math.round(Number(bal.balance_dollars) * 100) / 100
+          : c2d(bal.balance),
+      payout: typeof bal.portfolio_value === "number" ? c2d(bal.portfolio_value) : null,
       openPositions,
       openExposure: Math.round(openPositions.reduce((a, p) => a + p.exposure, 0) * 100) / 100,
       settlements: rowsW.slice(0, 100),
