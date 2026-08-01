@@ -14,6 +14,16 @@ import { computeTaScore, TA_ENGINE_VERSION, type TaScoreResult } from "./ta/taEn
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
 const COINBASE = "https://api.exchange.coinbase.com";
 
+// Holds the in-flight prediction snapshot/settle work started by the most
+// recent computeBtcMarkets() call. Cron callers await flushPredictionTracking()
+// so the edge runtime cannot cancel it when the Response returns.
+let __predictionTracking: Promise<void> | null = null;
+
+export async function flushPredictionTracking(): Promise<void> {
+  try { await __predictionTracking; } catch { /* already swallowed inside */ }
+}
+
+
 export interface BtcCandle {
   t: number; o: number; h: number; l: number; c: number; v: number;
 }
@@ -1922,7 +1932,11 @@ export async function computeBtcMarkets(): Promise<BtcMarketsResult> {
     // Track every model call (regardless of user bets) and settle past ones.
     // Best-effort: never throws, never blocks the response. Dynamic import so
     // the server-only module never enters the client graph.
-    void (async () => {
+    // Fire-and-forget for interactive callers, but the promise is retained so
+    // cron callers can await it — on the edge runtime an un-awaited promise is
+    // killed the moment the Response is returned, which silently dropped every
+    // pending prediction row when nobody had /crypto open.
+    __predictionTracking = (async () => {
       try {
         const { snapshotPrediction, settleDuePredictions } = await import("./cryptoPredictions.server");
         const { buildJumpFeatures } = await import("./cryptoJumpBuilder.server");
