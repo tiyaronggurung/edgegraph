@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { usePlan } from "@/hooks/usePlan";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Menu, X, Zap, LogOut, ChevronDown, Sparkles, Shield } from "lucide-react";
+import { Menu, X, Zap, LogOut, ChevronDown, Sparkles, Shield, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type LinkItem = { to: string; label: string; search?: Record<string, string> };
