@@ -140,7 +140,7 @@ export function OpsAutoTradePanel() {
         <div>
           <div className="text-xs font-bold uppercase tracking-widest mb-2">Auto-fired bets</div>
           <div className="space-y-1">
-            {d.autoTrades.map((t) => (
+            {(d.autoTrades as Array<Record<string, any>>).map((t) => (
               <div key={t.id} className="text-xs flex items-center justify-between gap-2 border-b border-border/50 py-1">
                 <span className="truncate">{t.ticker}</span>
                 <span className="text-muted-foreground">
