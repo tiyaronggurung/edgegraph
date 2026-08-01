@@ -109,3 +109,11 @@ export const opsRecordThresholdChange = createServerFn({ method: "POST" })
     const { recordThresholdChange } = await import("./opsManual.ops");
     return await recordThresholdChange(context.supabase, context.userId, data);
   });
+
+/** Live Kalshi account (real money): balance, open exposure, settled P/L. */
+export const opsGetKalshiAccount = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { loadKalshiAccount } = await import("./kalshiAccount.server");
+    return await loadKalshiAccount(context.supabase as never, context.userId, { days: 30 });
+  });
