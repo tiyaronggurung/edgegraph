@@ -26,6 +26,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
 import { Route as AuthenticatedModelValidationRouteImport } from './routes/_authenticated/model-validation'
+import { Route as AuthenticatedOpsManualRouteImport } from './routes/_authenticated/ops-manual'
 import { Route as AuthenticatedPatternPerformanceRouteImport } from './routes/_authenticated/pattern-performance'
 import { Route as AuthenticatedPatternsRouteImport } from './routes/_authenticated/patterns'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -52,6 +53,7 @@ import { Route as ApiPublicHooksMarketIntelMatchRouteImport } from './routes/api
 import { Route as ApiPublicHooksMartingaleTickRouteImport } from './routes/api/public/hooks/martingale-tick'
 import { Route as ApiPublicHooksMultiTfShadowRouteImport } from './routes/api/public/hooks/multi-tf-shadow'
 import { Route as ApiPublicHooksOddsShadowTickRouteImport } from './routes/api/public/hooks/odds-shadow-tick'
+import { Route as ApiPublicHooksOpsDailyBacktestRouteImport } from './routes/api/public/hooks/ops-daily-backtest'
 import { Route as ApiPublicHooksPinRiskShadowTickRouteImport } from './routes/api/public/hooks/pin-risk-shadow-tick'
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
 import { Route as ApiPublicHooksSettleBtcPredictionsRouteImport } from './routes/api/public/hooks/settle-btc-predictions'
@@ -149,6 +151,11 @@ const AuthenticatedModelValidationRoute =
     path: '/model-validation',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedOpsManualRoute = AuthenticatedOpsManualRouteImport.update({
+  id: '/ops-manual',
+  path: '/ops-manual',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedPatternPerformanceRoute =
   AuthenticatedPatternPerformanceRouteImport.update({
     id: '/pattern-performance',
@@ -297,6 +304,12 @@ const ApiPublicHooksOddsShadowTickRoute =
     path: '/api/public/hooks/odds-shadow-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksOpsDailyBacktestRoute =
+  ApiPublicHooksOpsDailyBacktestRouteImport.update({
+    id: '/api/public/hooks/ops-daily-backtest',
+    path: '/api/public/hooks/ops-daily-backtest',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPinRiskShadowTickRoute =
   ApiPublicHooksPinRiskShadowTickRouteImport.update({
     id: '/api/public/hooks/pin-risk-shadow-tick',
@@ -369,6 +382,7 @@ export interface FileRoutesByFullPath {
   '/history': typeof AuthenticatedHistoryRoute
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
+  '/ops-manual': typeof AuthenticatedOpsManualRoute
   '/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
   '/patterns': typeof AuthenticatedPatternsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -395,6 +409,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/multi-tf-shadow': typeof ApiPublicHooksMultiTfShadowRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
+  '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
@@ -422,6 +437,7 @@ export interface FileRoutesByTo {
   '/history': typeof AuthenticatedHistoryRoute
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
+  '/ops-manual': typeof AuthenticatedOpsManualRoute
   '/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
   '/patterns': typeof AuthenticatedPatternsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -448,6 +464,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/multi-tf-shadow': typeof ApiPublicHooksMultiTfShadowRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
+  '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
@@ -477,6 +494,7 @@ export interface FileRoutesById {
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/live': typeof AuthenticatedLiveRoute
   '/_authenticated/model-validation': typeof AuthenticatedModelValidationRoute
+  '/_authenticated/ops-manual': typeof AuthenticatedOpsManualRoute
   '/_authenticated/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
   '/_authenticated/patterns': typeof AuthenticatedPatternsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -503,6 +521,7 @@ export interface FileRoutesById {
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
   '/api/public/hooks/multi-tf-shadow': typeof ApiPublicHooksMultiTfShadowRoute
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
+  '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
@@ -532,6 +551,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/live'
     | '/model-validation'
+    | '/ops-manual'
     | '/pattern-performance'
     | '/patterns'
     | '/settings'
@@ -558,6 +578,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/multi-tf-shadow'
     | '/api/public/hooks/odds-shadow-tick'
+    | '/api/public/hooks/ops-daily-backtest'
     | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
@@ -585,6 +606,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/live'
     | '/model-validation'
+    | '/ops-manual'
     | '/pattern-performance'
     | '/patterns'
     | '/settings'
@@ -611,6 +633,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/multi-tf-shadow'
     | '/api/public/hooks/odds-shadow-tick'
+    | '/api/public/hooks/ops-daily-backtest'
     | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
@@ -639,6 +662,7 @@ export interface FileRouteTypes {
     | '/_authenticated/history'
     | '/_authenticated/live'
     | '/_authenticated/model-validation'
+    | '/_authenticated/ops-manual'
     | '/_authenticated/pattern-performance'
     | '/_authenticated/patterns'
     | '/_authenticated/settings'
@@ -665,6 +689,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/martingale-tick'
     | '/api/public/hooks/multi-tf-shadow'
     | '/api/public/hooks/odds-shadow-tick'
+    | '/api/public/hooks/ops-daily-backtest'
     | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
@@ -704,6 +729,7 @@ export interface RootRouteChildren {
   ApiPublicHooksMartingaleTickRoute: typeof ApiPublicHooksMartingaleTickRoute
   ApiPublicHooksMultiTfShadowRoute: typeof ApiPublicHooksMultiTfShadowRoute
   ApiPublicHooksOddsShadowTickRoute: typeof ApiPublicHooksOddsShadowTickRoute
+  ApiPublicHooksOpsDailyBacktestRoute: typeof ApiPublicHooksOpsDailyBacktestRoute
   ApiPublicHooksPinRiskShadowTickRoute: typeof ApiPublicHooksPinRiskShadowTickRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
   ApiPublicHooksSettleBtcPredictionsRoute: typeof ApiPublicHooksSettleBtcPredictionsRoute
@@ -834,6 +860,13 @@ declare module '@tanstack/react-router' {
       path: '/model-validation'
       fullPath: '/model-validation'
       preLoaderRoute: typeof AuthenticatedModelValidationRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/ops-manual': {
+      id: '/_authenticated/ops-manual'
+      path: '/ops-manual'
+      fullPath: '/ops-manual'
+      preLoaderRoute: typeof AuthenticatedOpsManualRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/pattern-performance': {
@@ -1018,6 +1051,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksOddsShadowTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/ops-daily-backtest': {
+      id: '/api/public/hooks/ops-daily-backtest'
+      path: '/api/public/hooks/ops-daily-backtest'
+      fullPath: '/api/public/hooks/ops-daily-backtest'
+      preLoaderRoute: typeof ApiPublicHooksOpsDailyBacktestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/pin-risk-shadow-tick': {
       id: '/api/public/hooks/pin-risk-shadow-tick'
       path: '/api/public/hooks/pin-risk-shadow-tick'
@@ -1096,6 +1136,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedLiveRoute: typeof AuthenticatedLiveRoute
   AuthenticatedModelValidationRoute: typeof AuthenticatedModelValidationRoute
+  AuthenticatedOpsManualRoute: typeof AuthenticatedOpsManualRoute
   AuthenticatedPatternPerformanceRoute: typeof AuthenticatedPatternPerformanceRoute
   AuthenticatedPatternsRoute: typeof AuthenticatedPatternsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -1115,6 +1156,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedLiveRoute: AuthenticatedLiveRoute,
   AuthenticatedModelValidationRoute: AuthenticatedModelValidationRoute,
+  AuthenticatedOpsManualRoute: AuthenticatedOpsManualRoute,
   AuthenticatedPatternPerformanceRoute: AuthenticatedPatternPerformanceRoute,
   AuthenticatedPatternsRoute: AuthenticatedPatternsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
@@ -1155,6 +1197,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksMartingaleTickRoute: ApiPublicHooksMartingaleTickRoute,
   ApiPublicHooksMultiTfShadowRoute: ApiPublicHooksMultiTfShadowRoute,
   ApiPublicHooksOddsShadowTickRoute: ApiPublicHooksOddsShadowTickRoute,
+  ApiPublicHooksOpsDailyBacktestRoute: ApiPublicHooksOpsDailyBacktestRoute,
   ApiPublicHooksPinRiskShadowTickRoute: ApiPublicHooksPinRiskShadowTickRoute,
   ApiPublicHooksRecomputePredictionsRoute:
     ApiPublicHooksRecomputePredictionsRoute,
@@ -1170,13 +1213,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

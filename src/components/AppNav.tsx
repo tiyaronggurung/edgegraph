@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { usePlan } from "@/hooks/usePlan";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Menu, X, Zap, LogOut, ChevronDown, Sparkles, Shield } from "lucide-react";
+import { Menu, X, Zap, LogOut, ChevronDown, Sparkles, Shield, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type LinkItem = { to: string; label: string; search?: Record<string, string> };
@@ -164,10 +164,16 @@ export function AppNav() {
         </div>
         <div className="hidden lg:flex items-center gap-3">
           {isAdmin && (
+            <Link to="/ops-manual" className="text-xs uppercase tracking-wider text-muted-foreground hover:text-[color:var(--color-primary)] flex items-center gap-1">
+              <Target className="h-3 w-3" /> Ops
+            </Link>
+          )}
+          {isAdmin && (
             <Link to="/admin" className="text-xs uppercase tracking-wider text-muted-foreground hover:text-[color:var(--color-primary)] flex items-center gap-1">
               <Shield className="h-3 w-3" /> Admin
             </Link>
           )}
+
           {tier === "free" && (
             <Link
               to="/pricing"
