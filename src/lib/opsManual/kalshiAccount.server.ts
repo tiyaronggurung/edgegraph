@@ -244,22 +244,26 @@ export async function loadKalshiAccount(
     const rows: KalshiSettlementRow[] = (settle.settlements ?? []).map((s) => {
       const yes = num(s.yes_count_fp) || num(s.yes_count);
       const no = num(s.no_count_fp) || num(s.no_count);
+      const fee = num(s.fee_cost);
       const cost =
         Math.round(
           (num(s.yes_total_cost_dollars) +
             num(s.no_total_cost_dollars) +
             c2d(s.yes_total_cost) +
             c2d(s.no_total_cost) +
-            num(s.fee_cost)) *
+            fee) *
             100,
         ) / 100;
-      const revenue = c2d(s.revenue);
+      // Offsetting YES+NO contracts (a round trip that closed flat) are paid
+      // out at $1 per matched pair and are NOT included in `revenue`.
+      const matched = Math.min(yes, no);
+      const revenue = Math.round((c2d(s.revenue) + matched) * 100) / 100;
       const pnl = Math.round((revenue - cost) * 100) / 100;
       return {
         ticker: s.ticker ?? "—",
         settledAt: s.settled_time ?? null,
-        side: yes > 0 ? ("yes" as const) : no > 0 ? ("no" as const) : null,
-        contracts: yes + no,
+        side: yes > no ? ("yes" as const) : no > yes ? ("no" as const) : yes > 0 ? ("yes" as const) : null,
+        contracts: Math.round(Math.max(yes, no) * 100) / 100,
         cost,
         revenue,
         pnl,

@@ -62,7 +62,7 @@ export function OpsKalshiAccount({ onBankroll }: { onBankroll?: (v: number) => v
             <Stat label="Today P/L" value={usd(a.today.pnl)} tone={tone(a.today.pnl)} />
             <Stat label="Settled (30d)" value={`${a.totals.n} · ${a.totals.wins}W / ${a.totals.losses}L`} />
             <Stat label="Win Rate" value={pct(a.totals.winRate)} />
-            <Stat label="ROI on Cost" value={pct(a.totals.roi)} tone={tone(a.totals.roi)} />
+            <Stat label="ROI on Turnover" value={pct(a.totals.roi)} tone={tone(a.totals.roi)} />
             <Stat
               label="BTC 15m Only"
               value={`${usd(a.btcOnly.pnl)} · ${pct(a.btcOnly.winRate)} (${a.btcOnly.n})`}
