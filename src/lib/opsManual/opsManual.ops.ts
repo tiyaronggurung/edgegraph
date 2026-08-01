@@ -140,7 +140,7 @@ export async function runAndStoreBacktest(supabase: SB, userId: string) {
     rolling30_wr: out.rolling30Wr,
     rolling100_wr: out.rolling100Wr,
     max_drawdown_pct: out.maxDrawdownPct,
-    results: out as unknown as Record<string, unknown>,
+    results: JSON.parse(JSON.stringify(out)),
   });
   if (error) return { ok: false as const, error: error.message, backtest: out };
   return { ok: true as const, backtest: out };

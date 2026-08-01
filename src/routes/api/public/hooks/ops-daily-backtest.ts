@@ -22,7 +22,7 @@ export const Route = createFileRoute("/api/public/hooks/ops-daily-backtest")({
             rolling30_wr: out.rolling30Wr,
             rolling100_wr: out.rolling100Wr,
             max_drawdown_pct: out.maxDrawdownPct,
-            results: out as unknown as Record<string, unknown>,
+            results: JSON.parse(JSON.stringify(out)),
           });
           if (error) {
             return Response.json({ ok: false, error: error.message }, { status: 500 });
