@@ -154,6 +154,24 @@ type RawPosition = {
   resting_orders_count?: number;
 };
 
+/** Pages through settlements (newest pages first) up to ~1000 rows. */
+async function fetchAllSettlements(
+  keyId: string,
+  pem: string,
+): Promise<{ settlements: RawSettlement[] }> {
+  const out: RawSettlement[] = [];
+  let cursor = "";
+  for (let page = 0; page < 5; page++) {
+    const q = `/portfolio/settlements?limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+    const res = await kalshiGet<{ settlements?: RawSettlement[]; cursor?: string }>(q, keyId, pem);
+    const rows = res.settlements ?? [];
+    out.push(...rows);
+    cursor = res.cursor ?? "";
+    if (!cursor || rows.length === 0) break;
+  }
+  return { settlements: out };
+}
+
 export async function loadKalshiAccount(
   supabase: {
     from: (t: string) => {
@@ -210,9 +228,7 @@ export async function loadKalshiAccount(
       kalshiGet<{ market_positions?: RawPosition[] }>("/portfolio/positions", keyId, pem).catch(
         () => ({ market_positions: [] as RawPosition[] }),
       ),
-      kalshiGet<{ settlements?: RawSettlement[] }>(`/portfolio/settlements?limit=200`, keyId, pem).catch(
-        () => ({ settlements: [] as RawSettlement[] }),
-      ),
+      fetchAllSettlements(keyId, pem).catch(() => ({ settlements: [] as RawSettlement[] })),
     ]);
 
     const openPositions = (pos.market_positions ?? [])
