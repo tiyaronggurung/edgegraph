@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, ShieldAlert, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { opsAcknowledgeAlert } from "@/lib/opsManual/opsManual.functions";
-import type { OpsDashboard } from "./types";
+import type { OpsDashboard, OpsAlertRow } from "./types";
 import { cn } from "@/lib/utils";
 
 const LEVEL_META = {
