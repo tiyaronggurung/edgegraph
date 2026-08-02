@@ -37,6 +37,7 @@ function Bar({ left, right, leftLabel, rightLabel }: {
 export function VolumeFlowPanel() {
   const spotVolFn = useServerFn(getBtcSpotVolume);
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
+  const polyVolFn = useServerFn(fetchPolymarketBtcVolume);
 
   const { data: sv } = useQuery({
     queryKey: ["btc-spot-volume-panel"],
@@ -50,12 +51,21 @@ export function VolumeFlowPanel() {
     refetchInterval: 5_000,
     placeholderData: keepPreviousData,
   });
+  const { data: pv } = useQuery({
+    queryKey: ["poly-volume-panel"],
+    queryFn: () => polyVolFn(),
+    refetchInterval: 5_000,
+    placeholderData: keepPreviousData,
+  });
 
   const spotImb = sv?.window?.imbalance ?? null;
   const yesV = k?.yesVol60s ?? 0;
   const noV = k?.noVol60s ?? 0;
   const kTotal = yesV + noV;
   const kImb = kTotal > 0 ? (yesV - noV) / kTotal : null;
+  const pImb60 = pv?.imbalance60s ?? null;
+  const pSide = pImb60 == null ? null : pImb60 > 0.05 ? "UP" : pImb60 < -0.05 ? "DOWN" : "FLAT";
+
 
   const spotSide = spotImb == null ? null : spotImb > 0.02 ? "UP" : spotImb < -0.02 ? "DOWN" : "FLAT";
   const kSide = kImb == null ? null : kImb > 0.05 ? "UP" : kImb < -0.05 ? "DOWN" : "FLAT";
