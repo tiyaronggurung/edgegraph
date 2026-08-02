@@ -2470,19 +2470,43 @@ function BigFlipMonitor() {
 }
 
 function StudyAutoLiveBanner() {
-  const [settings, setSettings] = useState<{ enabled: boolean; hasKeys: boolean } | null>(null);
+  const [settings, setSettings] = useState<{ enabled: boolean; hasKeys: boolean; stakeCents?: number } | null>(null);
   const [stats, setStats] = useState<{ fires: any[] } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [stakeInput, setStakeInput] = useState<string>("");
+  const [stakeBusy, setStakeBusy] = useState(false);
+  const stakeDirty = useRef(false);
 
   const refresh = async () => {
     try {
       const { getStudyAutoLiveSettings, getStudyAutoLiveStats } = await import("@/lib/studyAutoLive.functions");
       const [s, t] = await Promise.all([getStudyAutoLiveSettings(), getStudyAutoLiveStats()]);
       setSettings(s);
+      if (!stakeDirty.current) setStakeInput((((s as any).stakeCents ?? 1000) / 100).toString());
       setStats(t);
     } catch { /* noop */ }
   };
   useEffect(() => { refresh(); const t = setInterval(refresh, 10_000); return () => clearInterval(t); }, []);
+
+  const saveStake = async () => {
+    const dollars = Number(stakeInput);
+    if (!Number.isFinite(dollars) || dollars < 1 || dollars > 100) {
+      toast.error("Stake must be between $1 and $100");
+      return;
+    }
+    setStakeBusy(true);
+    try {
+      const { setStudyAutoStake } = await import("@/lib/studyAutoLive.functions");
+      const r = await setStudyAutoStake({ data: { stakeCents: Math.round(dollars * 100) } });
+      if (r.ok) {
+        toast.success(`Study auto-bet stake set to $${dollars}`);
+        stakeDirty.current = false;
+        setSettings((prev) => (prev ? { ...prev, stakeCents: r.stakeCents } : prev));
+      } else {
+        toast.error(r.error ?? "Failed");
+      }
+    } finally { setStakeBusy(false); }
+  };
 
   const toggle = async () => {
     if (!settings) return;
@@ -2503,22 +2527,42 @@ function StudyAutoLiveBanner() {
   const fireCount = stats?.fires?.length ?? 0;
   const on = settings.enabled;
   const disabled = !settings.hasKeys;
+  const stakeUsd = ((settings.stakeCents ?? 1000) / 100).toFixed(2).replace(/\.00$/, "");
 
   const border = on
     ? "border-emerald-500/60 bg-emerald-500/10"
     : "border-border/50 bg-muted/10";
   const dot = on ? "bg-emerald-400" : "bg-muted-foreground/60";
   return (
-    <div className={`mt-1 rounded border px-2 py-1.5 text-[11px] font-mono flex items-center gap-2 ${border}`}>
+    <div className={`mt-1 rounded border px-2 py-1.5 text-[11px] font-mono flex flex-wrap items-center gap-2 ${border}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
       <span className={`font-semibold ${on ? "text-emerald-300" : "text-foreground"}`}>
-        STUDY PICK AUTO-BET {on ? "· LIVE $10" : "· OFF"}
+        STUDY PICK AUTO-BET {on ? `· LIVE $${stakeUsd}` : "· OFF"}
       </span>
       <span className="text-muted-foreground">·</span>
       <span className="text-muted-foreground truncate">
         fires on lock · ask &lt; 90¢ · retry 10s · 1 bet / 15m · hold to settle
       </span>
-      <span className="text-muted-foreground ml-auto">today: {fireCount}</span>
+      <label className="ml-auto flex items-center gap-1 text-muted-foreground">
+        stake $
+        <input
+          type="number"
+          min={1}
+          max={100}
+          step={1}
+          value={stakeInput}
+          onChange={(e) => { stakeDirty.current = true; setStakeInput(e.target.value); }}
+          className="w-16 rounded border border-border/60 bg-background px-1 py-0.5 text-[11px] text-foreground"
+        />
+        <button
+          onClick={saveStake}
+          disabled={stakeBusy}
+          className="rounded border border-border/60 px-2 py-0.5 text-[10px] uppercase hover:bg-muted/40 disabled:opacity-50"
+        >
+          Save
+        </button>
+      </label>
+      <span className="text-muted-foreground">today: {fireCount}</span>
       {disabled ? (
         <span className="rounded border border-yellow-500/50 px-2 py-0.5 text-[10px] uppercase text-yellow-300">
           Connect Kalshi keys
