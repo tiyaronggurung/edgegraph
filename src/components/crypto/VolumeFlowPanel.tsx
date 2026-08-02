@@ -115,12 +115,54 @@ export function VolumeFlowPanel() {
           </div>
         </div>
 
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-medium">Polymarket flow · last 60s</span>
+            <span className="text-muted-foreground">
+              imbalance {pct(pImb60)}{pSide ? ` · ${pSide}` : ""}
+            </span>
+          </div>
+          <Bar
+            left={pv?.s60?.upShares ?? 0}
+            right={pv?.s60?.downShares ?? 0}
+            leftLabel="Up takers"
+            rightLabel="Down takers"
+          />
+          <div className="flex items-center justify-between pt-1">
+            <span className="font-medium">Polymarket flow · last 15m</span>
+            <span className="text-muted-foreground">imbalance {pct(pv?.imbalance15m)}</span>
+          </div>
+          <Bar
+            left={pv?.w15?.upShares ?? 0}
+            right={pv?.w15?.downShares ?? 0}
+            leftLabel="Up takers"
+            rightLabel="Down takers"
+          />
+          <div className="flex justify-between text-[11px] text-muted-foreground">
+            <span>
+              Avg cost 15m · Up {pv?.avgCostUp != null ? `${(pv.avgCostUp * 100).toFixed(1)}¢` : "—"}
+              {" / "}
+              Down {pv?.avgCostDown != null ? `${(pv.avgCostDown * 100).toFixed(1)}¢` : "—"}
+            </span>
+            <span>{pv?.w15?.trades ?? 0} prints</span>
+          </div>
+          <div className="flex justify-between text-[11px] text-muted-foreground">
+            <span>
+              Notional 15m · Up ${Math.round(pv?.w15?.upNotional ?? 0).toLocaleString()} / Down $
+              {Math.round(pv?.w15?.downNotional ?? 0).toLocaleString()}
+            </span>
+            <span>Current 5m window imbalance {pct(pv?.imbalance)}</span>
+          </div>
+        </div>
+
         <p className="text-[11px] text-muted-foreground">
           Spot flow from Binance BTCUSDT taker buy/sell split; Kalshi flow from
-          aggressor side of the last 60s of prints on {k?.ticker ?? "the front market"}.
-          Agreement on both books is the confirmation signal; a split means one
-          book is leading the other.
+          aggressor side of the last 60s of prints on {k?.ticker ?? "the front market"};
+          Polymarket flow from taker prints on its 5-minute BTC Up/Down books
+          (15m = current plus two prior windows). Agreement across books is the
+          confirmation signal; a split means one book is leading the other.
         </p>
+
       </CardContent>
     </Card>
   );
