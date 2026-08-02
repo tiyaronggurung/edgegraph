@@ -70,7 +70,7 @@ export async function fireStudyAutoLiveForUser(
   // 1) Eligibility
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("study_auto_live_enabled, kalshi_api_key_id, kalshi_private_key_pem")
+    .select("study_auto_live_enabled, kalshi_api_key_id, kalshi_private_key_pem, study_auto_stake_cents")
     .eq("id", userId)
     .maybeSingle();
   if (!profile?.study_auto_live_enabled) return { ok: true, fired: false, reason: "toggle_off" };
@@ -120,8 +120,9 @@ export async function fireStudyAutoLiveForUser(
     return { ok: true, fired: false, reason: "ask_ge_90c", askCents, secondsToClose };
   }
 
-  // 5) Fire
-  const contracts = Math.max(1, Math.floor(STAKE_CENTS / askCents));
+  // 5) Fire — stake is per-user (default $10, max $100)
+  const stakeCents = Math.max(100, Math.min(10000, Number((profile as any).study_auto_stake_cents) || STAKE_CENTS));
+  const contracts = Math.max(1, Math.floor(stakeCents / askCents));
   const { submitKalshiBuy } = await import("./cryptoTrades.functions");
   try {
     const result = await submitKalshiBuy(supabaseAdmin, userId, {
@@ -131,7 +132,7 @@ export async function fireStudyAutoLiveForUser(
       limitPriceCents: askCents,
       strike: pred.strike,
       closeTime: pred.close_time,
-      stakeUsd: STAKE_CENTS / 100,
+      stakeUsd: stakeCents / 100,
       inputsSnapshot: {
         source: "study_auto_live",
         locked_side: pred.study_locked_side,
