@@ -5130,6 +5130,7 @@ export type Database = {
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           study_auto_live_enabled: boolean
+          study_auto_stake_cents: number
           subscription_status: string
           subscription_tier: string
         }
@@ -5153,6 +5154,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           study_auto_live_enabled?: boolean
+          study_auto_stake_cents?: number
           subscription_status?: string
           subscription_tier?: string
         }
@@ -5176,6 +5178,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           study_auto_live_enabled?: boolean
+          study_auto_stake_cents?: number
           subscription_status?: string
           subscription_tier?: string
         }
