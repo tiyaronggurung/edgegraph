@@ -136,8 +136,6 @@ export const recordChipStudyPick = createServerFn({ method: "POST" })
         if (askCents == null) {
           autoSkipped = "no_kalshi_ask";
         } else {
-          const contracts = Math.max(1, Math.floor(STAKE_CENTS / askCents));
-
           // 3) Users already auto-fired for this ticker (idempotency).
           const { data: existing } = await supabaseAdmin
             .from("paper_fills")
@@ -147,39 +145,56 @@ export const recordChipStudyPick = createServerFn({ method: "POST" })
             .filter("entry_snapshot->>source", "eq", "study_auto");
           const already = new Set((existing ?? []).map((r: any) => r.user_id as string));
 
-          // 4) Eligible balances.
+          // 4) Eligible balances (min $1 stake floor).
           const { data: balances } = await supabaseAdmin
             .from("paper_balances")
             .select("user_id, balance_cents, bankrupt_at")
             .is("bankrupt_at", null)
-            .gte("balance_cents", STAKE_CENTS);
-          const targets = (balances ?? []).filter((b: any) => !already.has(b.user_id));
+            .gte("balance_cents", 100);
+          const candidates = (balances ?? []).filter((b: any) => !already.has(b.user_id));
+
+          // 4b) Per-user stake preference (default $10, capped $100).
+          const { data: profileRows } = await supabaseAdmin
+            .from("profiles")
+            .select("id, study_auto_stake_cents")
+            .in("id", candidates.map((b: any) => b.user_id as string));
+          const stakeByUser = new Map<string, number>(
+            ((profileRows ?? []) as any[]).map((p) => [
+              p.id as string,
+              Math.max(100, Math.min(10000, Number(p.study_auto_stake_cents) || STAKE_CENTS)),
+            ]),
+          );
+
+          const targets = candidates
+            .map((b: any) => ({ ...b, stake_cents: stakeByUser.get(b.user_id) ?? STAKE_CENTS }))
+            .filter((b: any) => b.balance_cents >= b.stake_cents);
 
           if (targets.length) {
-            const snapshot = {
-              source: "study_auto",
-              side: data.side,
-              conf: data.confidencePct,
-              locked_at: new Date().toISOString(),
-              ask_cents: askCents,
-            };
+            const lockedAt = new Date().toISOString();
             const rows = targets.map((b: any) => ({
               user_id: b.user_id,
               ticker: data.ticker,
               close_time: closeTime,
               button: "manual" as const,
               side: yesNo,
-              contracts,
+              contracts: Math.max(1, Math.floor(b.stake_cents / askCents)),
               fill_price_cents: askCents,
-              stake_cents: STAKE_CENTS,
-              entry_snapshot: snapshot,
+              stake_cents: b.stake_cents,
+              entry_snapshot: {
+                source: "study_auto",
+                side: data.side,
+                conf: data.confidencePct,
+                locked_at: lockedAt,
+                ask_cents: askCents,
+                stake_cents: b.stake_cents,
+              },
               status: "open" as const,
             }));
 
             const { data: inserted, error: insErr } = await supabaseAdmin
               .from("paper_fills")
               .insert(rows)
-              .select("user_id");
+              .select("user_id, stake_cents");
 
             if (insErr) {
               autoSkipped = `insert_err:${insErr.message}`;
@@ -188,13 +203,14 @@ export const recordChipStudyPick = createServerFn({ method: "POST" })
               // Debit each user's balance atomically (loop, small N).
               for (const row of inserted ?? []) {
                 const uid = (row as any).user_id as string;
+                const debit = Number((row as any).stake_cents) || STAKE_CENTS;
                 const { data: cur } = await supabaseAdmin
                   .from("paper_balances")
                   .select("balance_cents")
                   .eq("user_id", uid)
                   .maybeSingle();
                 if (!cur) continue;
-                const newBal = cur.balance_cents - STAKE_CENTS;
+                const newBal = cur.balance_cents - debit;
                 await supabaseAdmin
                   .from("paper_balances")
                   .update({
