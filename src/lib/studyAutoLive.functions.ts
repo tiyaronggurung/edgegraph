@@ -17,12 +17,13 @@ export const getStudyAutoLiveSettings = createServerFn({ method: "GET" })
     const { supabase } = context as { supabase: any };
     const { data } = await supabase
       .from("profiles")
-      .select("study_auto_live_enabled, kalshi_api_key_id, kalshi_private_key_pem")
+      .select("study_auto_live_enabled, kalshi_api_key_id, kalshi_private_key_pem, study_auto_stake_cents")
       .eq("id", (context as any).userId)
       .maybeSingle();
     return {
       enabled: !!data?.study_auto_live_enabled,
       hasKeys: !!(data?.kalshi_api_key_id && data?.kalshi_private_key_pem),
+      stakeCents: Math.max(100, Math.min(10000, Number(data?.study_auto_stake_cents) || 1000)),
     };
   });
 
@@ -37,6 +38,22 @@ export const setStudyAutoLiveEnabled = createServerFn({ method: "POST" })
       .eq("id", (context as any).userId);
     if (error) return { ok: false, error: error.message };
     return { ok: true, enabled: data.enabled };
+  });
+
+// Per-user stake for the Study Pick auto-bet ($1–$100).
+export const setStudyAutoStake = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({ stakeCents: z.number().int().min(100).max(10000) }).parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context as { supabase: any };
+    const { error } = await supabase
+      .from("profiles")
+      .update({ study_auto_stake_cents: data.stakeCents } as never)
+      .eq("id", (context as any).userId);
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const, stakeCents: data.stakeCents };
   });
 
 const FireInput = z.object({ ticker: z.string().min(1) });
