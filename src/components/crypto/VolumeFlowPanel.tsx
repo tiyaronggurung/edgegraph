@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
 import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
+import { fetchPolymarketBtcVolume } from "@/lib/polymarketVolume.functions";
+
 
 function pct(x: number | null | undefined): string {
   if (x == null || !Number.isFinite(x)) return "—";
