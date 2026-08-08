@@ -74,7 +74,7 @@ export function OpsAlertsPanel({ dash, onRefresh }: { dash: OpsDashboard; onRefr
         <div className="grid sm:grid-cols-3 gap-2 text-[11px]">
           <div className="border border-emerald-500/40 rounded p-2">
             <b className="text-emerald-400">Green — healthy</b>
-            <div className="text-muted-foreground">Rolling 30 win rate at or above 88%. Standard 10% unit.</div>
+            <div className="text-muted-foreground">Rolling 30 win rate at or above 88%. Standard compounding unit (5%, 3% at $10k+).</div>
           </div>
           <div className="border border-yellow-500/40 rounded p-2">
             <b className="text-yellow-400">Yellow — watch</b>
