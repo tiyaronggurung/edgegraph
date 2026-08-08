@@ -23,8 +23,13 @@ export const OPS_RULES = {
   DAILY_PROFIT_STOP_PCT: 0.20,
   DAILY_LOSS_STOP_PCT: 0.20,
 
-  UNIT_STANDARD_PCT: 0.10,
-  UNIT_RISK_REDUCED_PCT: 0.06,
+  // Compounding unit: % of the morning bankroll, re-sized every day as the
+  // bankroll grows. Tier steps down once capital is meaningful.
+  UNIT_STANDARD_PCT: 0.05,          // below the tier-down bankroll
+  UNIT_STANDARD_PCT_LARGE: 0.03,    // at/above UNIT_TIER_DOWN_BANKROLL
+  UNIT_TIER_DOWN_BANKROLL: 10_000,
+  RISK_REDUCED_MULTIPLIER: 0.6,     // risk-reduced = 60% of the standard unit
+  UNIT_RISK_REDUCED_PCT: 0.03,      // legacy alias (5% × 0.6)
 
   WR_HEALTHY_30: 0.88,
   WR_WATCH_30: 0.82,
