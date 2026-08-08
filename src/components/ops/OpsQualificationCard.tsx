@@ -47,8 +47,9 @@ export function OpsQualificationCard({ dash }: { dash: OpsDashboard }) {
         <div>
           <div className="text-xs font-bold uppercase tracking-widest mb-2">Stake</div>
           <ul className="space-y-1 text-xs text-muted-foreground">
-            <li>10% of morning bankroll</li>
-            <li>6% while in Risk Reduced mode</li>
+            <li>Compounding 5% of morning bankroll</li>
+            <li>Steps down to 3% once bankroll reaches $10k</li>
+            <li>60% of that unit while in Risk Reduced mode</li>
             <li>Flat for the entire day — never recalculated intraday</li>
           </ul>
         </div>
