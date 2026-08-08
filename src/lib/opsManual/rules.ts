@@ -295,6 +295,13 @@ export interface StakingResult {
   reason: string;
 }
 
+/** Compounding unit tier: 5% of bankroll, stepping down to 3% at $10k+. */
+export function resolveStandardUnitPct(bankroll: number): number {
+  const R = OPS_RULES;
+  const bank = Math.max(0, bankroll || 0);
+  return bank >= R.UNIT_TIER_DOWN_BANKROLL ? R.UNIT_STANDARD_PCT_LARGE : R.UNIT_STANDARD_PCT;
+}
+
 export function computeStakingMode(inp: StakingInput): StakingResult {
   const R = OPS_RULES;
   const bank = Math.max(0, inp.morningBankroll || 0);
@@ -308,24 +315,33 @@ export function computeStakingMode(inp: StakingInput): StakingResult {
   if (inp.structureChange) return disabled("Kalshi market structure, fee, or settlement source changed");
   if ((inp.weeklyViolations ?? 0) >= 2) return disabled("Two operating-rule violations occurred this week");
 
+  const stdPct = resolveStandardUnitPct(bank);
+  const pctLabel = (p: number) => `${(p * 100).toFixed(p * 100 % 1 === 0 ? 0 : 1)}%`;
+
   if (inp.status === "risk_reduced") {
     const settled = inp.betsSettledSinceRiskReduced ?? 0;
+    const reducedPct = round4(stdPct * R.RISK_REDUCED_MULTIPLIER);
     return {
       mode: "risk_reduced",
-      unitPct: R.UNIT_RISK_REDUCED_PCT,
-      unitUsd: round2(bank * R.UNIT_RISK_REDUCED_PCT),
-      reason: `Rolling 30-bet win rate below 82% — 6% unit until ${Math.max(0, R.RECOVERY_BETS_REQUIRED - settled)} more settled bets recover the rate`,
+      unitPct: reducedPct,
+      unitUsd: round2(bank * reducedPct),
+      reason: `Rolling 30-bet win rate below 82% — ${pctLabel(reducedPct)} unit until ${Math.max(0, R.RECOVERY_BETS_REQUIRED - settled)} more settled bets recover the rate`,
     };
   }
 
+  const tierNote =
+    bank >= R.UNIT_TIER_DOWN_BANKROLL
+      ? ` (bankroll ≥ $${(R.UNIT_TIER_DOWN_BANKROLL / 1000).toFixed(0)}k — capital-protection tier)`
+      : "";
+
   return {
     mode: "standard",
-    unitPct: R.UNIT_STANDARD_PCT,
-    unitUsd: round2(bank * R.UNIT_STANDARD_PCT),
+    unitPct: stdPct,
+    unitUsd: round2(bank * stdPct),
     reason:
-      inp.status === "healthy"
-        ? "Rolling 30-bet win rate ≥ 88% — standard 10% unit"
-        : "Rolling 30-bet win rate 82–88% — standard 10% unit, watch level",
+      (inp.status === "healthy"
+        ? `Rolling 30-bet win rate ≥ 88% — compounding ${pctLabel(stdPct)} unit`
+        : `Rolling 30-bet win rate 82–88% — compounding ${pctLabel(stdPct)} unit, watch level`) + tierNote,
   };
 }
 
