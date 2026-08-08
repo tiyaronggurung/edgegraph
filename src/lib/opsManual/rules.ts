@@ -320,7 +320,7 @@ export function computeStakingMode(inp: StakingInput): StakingResult {
 
   if (inp.status === "risk_reduced") {
     const settled = inp.betsSettledSinceRiskReduced ?? 0;
-    const reducedPct = round4(stdPct * R.RISK_REDUCED_MULTIPLIER);
+    const reducedPct = Math.round(stdPct * R.RISK_REDUCED_MULTIPLIER * 10000) / 10000;
     return {
       mode: "risk_reduced",
       unitPct: reducedPct,
