@@ -122,7 +122,7 @@ export function OpsStakingPanel({ dash, onRefresh }: { dash: OpsDashboard; onRef
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
         <Stat label="Morning bankroll" value={usd(dash.morningBankroll)} />
-        <Stat label="Active unit" value={`${(dash.staking.unitPct * 100).toFixed(0)}%`} />
+        <Stat label="Active unit" value={`${(dash.staking.unitPct * 100).toFixed(1)}%`} />
         <Stat label="Stake per trade" value={usd(dash.staking.unitUsd)} />
         <Stat label="Bets remaining" value={String(dash.stops.betsRemaining)} />
         <Stat
