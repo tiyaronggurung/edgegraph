@@ -5,7 +5,8 @@
 
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
 const STAKE_CENTS = 1000;
-const MAX_ASK_CENTS = 89; // fire only if ask <= 89¢ (i.e. < 90¢)
+const MAX_ASK_CENTS = 70; // hard cap: the 70-85c band lost money over 45 days
+const MAX_LOCK_AGE_SEC = 60; // fire AT the T7 lock, never chase it 90s later
 const MIN_SECONDS_TO_CLOSE = 60;
 
 export type FireResult =
@@ -81,7 +82,7 @@ export async function fireStudyAutoLiveForUser(
   // 2) Lock + window state
   const { data: pred } = await supabaseAdmin
     .from("btc_model_predictions")
-    .select("ticker, close_time, strike, study_locked_side, study_lock_kalshi_price_cents, study_auto_live_fired_at")
+    .select("ticker, close_time, strike, study_locked_side, study_lock_kalshi_price_cents, study_auto_live_fired_at, study_locked_at")
     .eq("ticker", ticker)
     .maybeSingle();
   if (!pred?.study_locked_side || !pred.close_time || !pred.strike) {
@@ -94,6 +95,14 @@ export async function fireStudyAutoLiveForUser(
   if (secondsToClose <= MIN_SECONDS_TO_CLOSE) {
     await logSkip(supabaseAdmin, userId, ticker, pred.close_time, pred.strike, pred.study_locked_side, null, secondsToClose, "retry_window_expired");
     return { ok: true, fired: false, reason: "retry_window_expired", secondsToClose };
+  }
+
+  // 2b) Fire-at-lock: skip windows whose lock is already stale.
+  const lockedAtMs = (pred as any).study_locked_at ? Date.parse(String((pred as any).study_locked_at)) : NaN;
+  const lockAgeSec = Number.isFinite(lockedAtMs) ? Math.round((Date.now() - lockedAtMs) / 1000) : null;
+  if (lockAgeSec != null && lockAgeSec > MAX_LOCK_AGE_SEC) {
+    await logSkip(supabaseAdmin, userId, ticker, pred.close_time, pred.strike, pred.study_locked_side, null, secondsToClose, `lock_stale_${lockAgeSec}s`);
+    return { ok: true, fired: false, reason: "lock_stale", secondsToClose };
   }
 
   // 3) Idempotency — per (user, ticker) via crypto_trades marker
@@ -116,8 +125,8 @@ export async function fireStudyAutoLiveForUser(
     return { ok: true, fired: false, reason: "no_kalshi_ask", askCents: null, secondsToClose };
   }
   if (askCents > MAX_ASK_CENTS) {
-    await logSkip(supabaseAdmin, userId, ticker, pred.close_time, pred.strike, side, askCents, secondsToClose, "ask_ge_90c");
-    return { ok: true, fired: false, reason: "ask_ge_90c", askCents, secondsToClose };
+    await logSkip(supabaseAdmin, userId, ticker, pred.close_time, pred.strike, side, askCents, secondsToClose, `ask_above_${MAX_ASK_CENTS}c`);
+    return { ok: true, fired: false, reason: "ask_above_cap", askCents, secondsToClose };
   }
 
   // 5) Fire — stake is per-user (default $10, max $100)
