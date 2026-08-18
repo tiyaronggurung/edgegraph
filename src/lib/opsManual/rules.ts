@@ -108,6 +108,8 @@ export function evaluateQualification(inp: QualificationInput): QualificationRes
   const ask = num(inp.askCents);
   const secs = num(inp.secondsLeft);
   const hour = num(inp.utcHour);
+  const lockAge = num(inp.lockAgeSeconds);
+  const ourP = num(inp.ourOddsProbForSide);
 
   const agrees =
     !!inp.modelSide && !!inp.studySide &&
