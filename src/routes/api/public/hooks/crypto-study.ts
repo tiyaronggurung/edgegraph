@@ -340,7 +340,21 @@ export const Route = createFileRoute("/api/public/hooks/crypto-study")({
           return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
         }
 
+        // AI study is on-demand only — background/cron calls are refused so
+        // Gemini is never invoked without an explicit user action.
+        let body: any = null;
+        try { body = await request.clone().json(); } catch { body = null; }
+        const onDemand = body?.ondemand === true || body?.ai === true
+          || request.headers.get("x-ai-ondemand") === "1";
+        if (!onDemand) {
+          return new Response(
+            JSON.stringify({ skipped: true, reason: "ai_on_demand_only" }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
 
         // Find users with settled trades in the last 7 days.
         const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
