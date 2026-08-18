@@ -24,6 +24,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 //   - respects global KALSHI_LIVE_ENABLED env flag (if 'false', logs a skip)
 // ============================================================================
 
+/** Hard kill: cheap-flip hunter never fires live money again. */
+const CHEAP_FLIP_LIVE_DISABLED = true;
+
 const TRIGGER_KIND = "cheap_flip_15c" as const;
 const MAX_ASK_CENTS = 15;
 const MIN_MODEL_SIDE_CONF = 0.70;
