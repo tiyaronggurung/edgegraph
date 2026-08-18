@@ -27,12 +27,19 @@ interface AiOutput {
   keyFactors: string[];
 }
 
+// On-demand AI gate: Gemini is only called when a user action explicitly
+// requests it (body { ai: true } or header x-ai-ondemand: 1). Cron/background
+// ticks run the stats model only — no AI spend.
+let aiAllowedForRequest = false;
+
 async function callAi(
   snap: LiveMatchSnapshot,
   stats: StatsModelResult,
 ): Promise<AiOutput | null> {
+  if (!aiAllowedForRequest) return null;
   const key = process.env.LOVABLE_API_KEY;
   if (!key) return null;
+
   try {
     const totalSoT = (snap.home.shotsOnTarget ?? 0) + (snap.away.shotsOnTarget ?? 0);
     const recent = snap.events
