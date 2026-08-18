@@ -72,6 +72,36 @@ async function fetchAskCents(ticker: string, side: "YES" | "NO"): Promise<number
   }
 }
 
+/**
+ * Our-odds implied probability for one side, from the most recent trendline
+ * snapshot for this ticker (only trusted if it is fresh — a stale reading is
+ * treated as "no snapshot" and does not confirm).
+ */
+async function ourOddsProbForSide(
+  db: SB,
+  ticker: string,
+  side: "YES" | "NO",
+): Promise<number | null> {
+  try {
+    const { data } = await db
+      .from("btc_kalshi_odds_snapshots")
+      .select("our_up_ask, snapped_at")
+      .eq("ticker", ticker)
+      .order("snapped_at", { ascending: false })
+      .limit(1);
+    const row = data?.[0];
+    if (!row || row.our_up_ask == null) return null;
+    const ageMs = Date.now() - Date.parse(String(row.snapped_at));
+    if (!(ageMs >= 0) || ageMs > 90_000) return null;
+    const up = Number(row.our_up_ask);
+    if (!Number.isFinite(up)) return null;
+    const p = up > 1 ? up / 100 : up; // tolerate cents or probability
+    return side === "YES" ? p : 1 - p;
+  } catch {
+    return null;
+  }
+}
+
 async function latestSpot(db: SB): Promise<number | null> {
   const { data } = await db
     .from("btc_spot_ticks")
