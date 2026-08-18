@@ -12,14 +12,24 @@
 export const OPS_RULES = {
   MIN_STUDY_CONF_PCT: 90,
   MIN_CUSHION_USD: 40,
-  MAX_ASK_CENTS: 80,
+  // Hard price cap. 45 days of settled fills: 70–85¢ band = −13% ROI even at
+  // 72.7% WR, sub-40¢ = +129% ROI. Above 70¢ we do not trade, ever.
+  MAX_ASK_CENTS: 70,
   MIN_SECONDS_LEFT: 120,
   T7_LOCK_REQUIRED: true,
+  // Fire AT the T7 lock. The measured 94-second delay dragged average entries
+  // from ~40¢ to ~80¢ and is the single biggest EV leak in the book.
+  MAX_LOCK_AGE_SECONDS: 45,
+  // Our-odds confirmation at T7: implied prob >= 83.3% (−500) on the study
+  // side. 273 windows that held that level and never flipped were right 94.1%.
+  OUR_ODDS_CONFIRM_PROB: 0.833,
   EXCLUDED_UTC_HOURS: [1, 4, 11, 18] as const,
   PREFERRED_UTC_HOURS: [22, 0, 5, 6, 8, 13, 14] as const,
 
   MAX_BETS_PER_DAY: 4,
-  MAX_CONSECUTIVE_LOSSES: 2,
+  // One loss ends the day. At a 5% unit two losses is −10% and erases a good
+  // day; every account death in this system came from trading past the first.
+  MAX_CONSECUTIVE_LOSSES: 1,
   DAILY_PROFIT_STOP_PCT: 0.20,
   DAILY_LOSS_STOP_PCT: 0.20,
 
