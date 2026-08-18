@@ -180,6 +180,14 @@ export async function runBigFlipForUser(
     modelSideConf: null as number | null,
   };
 
+  // --- Gate 0: RETIRED ---------------------------------------------------
+  // Cheap-Flip Hunter is permanently disabled for live money. Over 45 days it
+  // returned -$66.33 on a 0% win rate and ate a third of the study-auto
+  // profit. Signals are still logged (below returns a skip) but nothing fires.
+  if (CHEAP_FLIP_LIVE_DISABLED) {
+    return { ...base, rejectReason: "retired: cheap_flip_hunter disabled (0% WR, -$66 over 45d)" };
+  }
+
   // --- Gate 1: time window (T-9m to T-3m) --------------------------------
   if (stc > ARM_MAX_SECONDS) return { ...base, rejectReason: `too early (${stc}s left, arm at ${ARM_MAX_SECONDS}s)` };
   if (stc < ARM_MIN_SECONDS) return { ...base, rejectReason: `too late (${stc}s left, disarm at ${ARM_MIN_SECONDS}s)` };
