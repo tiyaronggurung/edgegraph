@@ -93,6 +93,16 @@ export async function getRegime(inputs: RegimeInputs): Promise<RegimeState> {
     return { ..._cache.state, source: "cache" };
   }
 
+  // Not armed by a user action → never call the AI gateway. Reuse the last
+  // known state if we have one, else stay neutral.
+  if (!_armed) {
+    if (_cache) return { ..._cache.state, source: "cache" };
+    return neutralFallback("AI regime is on-demand only (not armed)");
+  }
+  _armed = false;
+
+
+
   const key = process.env.LOVABLE_API_KEY;
   if (!key) {
     const state = neutralFallback("LOVABLE_API_KEY missing");
