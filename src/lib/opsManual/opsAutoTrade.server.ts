@@ -278,6 +278,13 @@ export async function runOpsAutoTradeForUser(
 
     const askCents = studySide === "YES" || studySide === "NO" ? await fetchAskCents(ticker, studySide) : null;
 
+    const lockedAtMs = p.study_locked_at != null ? Date.parse(String(p.study_locked_at)) : NaN;
+    const lockAgeSeconds = Number.isFinite(lockedAtMs) ? Math.round((Date.now() - lockedAtMs) / 1000) : null;
+    const ourP =
+      studySide === "YES" || studySide === "NO"
+        ? await ourOddsProbForSide(db, ticker, studySide)
+        : null;
+
     const q = evaluateQualification({
       hasT7Lock: !!studySide,
       studyConfPct: studyConf,
@@ -287,6 +294,8 @@ export async function runOpsAutoTradeForUser(
       studySide,
       secondsLeft,
       utcHour: new Date().getUTCHours(),
+      lockAgeSeconds,
+      ourOddsProbForSide: ourP,
     });
 
     if (!q.qualified) {
