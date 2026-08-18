@@ -37,6 +37,14 @@ export interface RegimeInputs {
 const CACHE_TTL_MS = 5 * 60_000;
 let _cache: { at: number; state: RegimeState } | null = null;
 
+// On-demand only: the AI call fires exactly once after a user action arms it.
+// Background ticks reuse the last known state (or a neutral fallback).
+let _armed = false;
+export function armRegimeRefresh() {
+  _armed = true;
+}
+
+
 function neutralFallback(reason: string): RegimeState {
   return {
     asOf: new Date().toISOString(),
@@ -84,6 +92,16 @@ export async function getRegime(inputs: RegimeInputs): Promise<RegimeState> {
   if (_cache && Date.now() - _cache.at < CACHE_TTL_MS) {
     return { ..._cache.state, source: "cache" };
   }
+
+  // Not armed by a user action → never call the AI gateway. Reuse the last
+  // known state if we have one, else stay neutral.
+  if (!_armed) {
+    if (_cache) return { ..._cache.state, source: "cache" };
+    return neutralFallback("AI regime is on-demand only (not armed)");
+  }
+  _armed = false;
+
+
 
   const key = process.env.LOVABLE_API_KEY;
   if (!key) {
