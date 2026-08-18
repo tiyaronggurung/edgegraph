@@ -63,7 +63,9 @@ export type FilterCode =
   | "ask_price"
   | "model_agreement"
   | "time_left"
-  | "hour_allowed";
+  | "hour_allowed"
+  | "lock_fresh"
+  | "our_odds_confirm";
 
 export interface FilterResult {
   code: FilterCode;
