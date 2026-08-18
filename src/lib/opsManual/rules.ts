@@ -412,7 +412,7 @@ export function evaluateDailyStops(inp: DailyStopInput): DailyStopResult {
   else if (inp.feedOutage) reason = "Feed outage or stale market data";
   else if (inp.ruleViolationToday) reason = "A rule violation occurred today";
   else if (inp.betsPlaced >= R.MAX_BETS_PER_DAY) reason = `Daily limit of ${R.MAX_BETS_PER_DAY} bets reached`;
-  else if (inp.consecutiveLosses >= R.MAX_CONSECUTIVE_LOSSES) reason = "Two consecutive losses";
+  else if (inp.consecutiveLosses >= R.MAX_CONSECUTIVE_LOSSES) reason = "Loss taken today — one loss ends the session";
   else if (inp.dailyPnl >= profitStop && profitStop > 0) reason = "Daily +20% profit stop reached";
   else if (inp.dailyPnl <= lossStop && lossStop < 0) reason = "Daily −20% loss stop reached";
 

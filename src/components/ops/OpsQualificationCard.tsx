@@ -56,7 +56,7 @@ export function OpsQualificationCard({ dash }: { dash: OpsDashboard }) {
         <div>
           <div className="text-xs font-bold uppercase tracking-widest mb-2">Stop</div>
           <ul className="space-y-1 text-xs text-muted-foreground">
-            <li>Two consecutive losses</li>
+            <li>First loss of the day</li>
             <li>+20% daily return</li>
             <li>−20% daily return</li>
             <li>Four bets</li>

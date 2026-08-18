@@ -8,10 +8,11 @@
 // Order of gates (a failure at any step logs a skip and returns):
 //   1. user toggle + Kalshi keys
 //   2. trading day opened (morning bankroll fixed)  -> ops_daily_snapshots
-//   3. session stops: Sunday, 4 bets, 2 consecutive losses, ±20% day
+//   3. session stops: Sunday, 4 bets, FIRST loss of the day, ±20% day
 //   4. staking mode is not "disabled" (kill switch / violations / status)
 //   5. per-window qualification: T7 lock, conf ≥ 90%, cushion ≥ $40,
-//      ask ≤ 80¢, model agrees with study, ≥ 2m left, hour allowed
+//      ask ≤ 70¢, model agrees with study, ≥ 2m left, hour allowed,
+//      lock ≤ 45s old (fire at the lock), our-odds ≥ 83.3% on the study side
 //   6. idempotency: no existing ops_trades row for (user, ticker)
 //
 // Every fired order is written to ops_trades with source='ops_auto' so the

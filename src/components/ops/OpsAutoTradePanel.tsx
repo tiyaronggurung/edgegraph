@@ -112,7 +112,7 @@ export function OpsAutoTradePanel() {
         </ul>
         <p className="text-xs text-muted-foreground mt-2">
           Then, every 30 seconds, each open 15-minute window is checked against the qualification card:
-          T7 study lock, study confidence ≥ 90%, cushion ≥ $40, ask ≤ 80¢, model agrees with study,
+          T7 study lock (fired within 45s of the lock), study confidence ≥ 90%, cushion ≥ $40, ask ≤ 70¢, our odds ≥ 83.3% on the study side, model agrees with study,
           at least two minutes left, and an allowed UTC hour. The first window that passes all seven gets
           one immediate-or-cancel buy at the ask, sized to the fixed unit. Nothing else fires that tick.
         </p>
