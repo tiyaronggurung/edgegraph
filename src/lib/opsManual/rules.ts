@@ -63,7 +63,9 @@ export type FilterCode =
   | "ask_price"
   | "model_agreement"
   | "time_left"
-  | "hour_allowed";
+  | "hour_allowed"
+  | "lock_fresh"
+  | "our_odds_confirm";
 
 export interface FilterResult {
   code: FilterCode;
@@ -82,6 +84,10 @@ export interface QualificationInput {
   studySide: string | null;      // "YES" | "NO"
   secondsLeft: number | null;
   utcHour: number | null;
+  /** Seconds elapsed since the T7 study lock was written. */
+  lockAgeSeconds?: number | null;
+  /** Our-odds implied probability (0..1) for the STUDY side, at/after T7. */
+  ourOddsProbForSide?: number | null;
 }
 
 export interface QualificationResult {
@@ -102,6 +108,8 @@ export function evaluateQualification(inp: QualificationInput): QualificationRes
   const ask = num(inp.askCents);
   const secs = num(inp.secondsLeft);
   const hour = num(inp.utcHour);
+  const lockAge = num(inp.lockAgeSeconds);
+  const ourP = num(inp.ourOddsProbForSide);
 
   const agrees =
     !!inp.modelSide && !!inp.studySide &&
@@ -156,6 +164,22 @@ export function evaluateQualification(inp: QualificationInput): QualificationRes
       pass: hour != null && !(R.EXCLUDED_UTC_HOURS as readonly number[]).includes(hour),
       actual: hour != null ? `${String(hour).padStart(2, "0")}h` : "—",
       required: "allowed hour",
+    },
+    {
+      code: "lock_fresh",
+      label: `Fire at the lock (≤ ${R.MAX_LOCK_AGE_SECONDS}s old)`,
+      pass: lockAge != null && lockAge <= R.MAX_LOCK_AGE_SECONDS,
+      actual: lockAge != null ? `${lockAge}s since lock` : "—",
+      required: `≤ ${R.MAX_LOCK_AGE_SECONDS}s`,
+    },
+    {
+      code: "our_odds_confirm",
+      // Unknown (no snapshot) does not veto — only a contradicting/weak
+      // our-odds reading does.
+      label: `Our odds ≥ ${(R.OUR_ODDS_CONFIRM_PROB * 100).toFixed(1)}% (−500) on study side`,
+      pass: ourP == null || ourP >= R.OUR_ODDS_CONFIRM_PROB,
+      actual: ourP != null ? `${(ourP * 100).toFixed(1)}%` : "no snapshot",
+      required: `≥ ${(R.OUR_ODDS_CONFIRM_PROB * 100).toFixed(1)}%`,
     },
   ];
 
@@ -388,7 +412,7 @@ export function evaluateDailyStops(inp: DailyStopInput): DailyStopResult {
   else if (inp.feedOutage) reason = "Feed outage or stale market data";
   else if (inp.ruleViolationToday) reason = "A rule violation occurred today";
   else if (inp.betsPlaced >= R.MAX_BETS_PER_DAY) reason = `Daily limit of ${R.MAX_BETS_PER_DAY} bets reached`;
-  else if (inp.consecutiveLosses >= R.MAX_CONSECUTIVE_LOSSES) reason = "Two consecutive losses";
+  else if (inp.consecutiveLosses >= R.MAX_CONSECUTIVE_LOSSES) reason = "Loss taken today — one loss ends the session";
   else if (inp.dailyPnl >= profitStop && profitStop > 0) reason = "Daily +20% profit stop reached";
   else if (inp.dailyPnl <= lossStop && lossStop < 0) reason = "Daily −20% loss stop reached";
 
@@ -438,6 +462,8 @@ export const DISCIPLINE_RULES = [
   { code: "model_agreement", label: "Model agreement requirement", penalty: 15 },
   { code: "time_left", label: "Time-left requirement", penalty: 10 },
   { code: "hour_allowed", label: "Hour restriction", penalty: 5 },
+  { code: "lock_fresh", label: "Fire-at-lock requirement", penalty: 20 },
+  { code: "our_odds_confirm", label: "Our-odds −500 confirmation", penalty: 10 },
   { code: "daily_limit", label: "Daily bet limit", penalty: 20 },
   { code: "daily_stop", label: "Daily stop rules", penalty: 25 },
   { code: "staking", label: "Staking rule", penalty: 20 },

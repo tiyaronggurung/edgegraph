@@ -24,6 +24,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 //   - respects global KALSHI_LIVE_ENABLED env flag (if 'false', logs a skip)
 // ============================================================================
 
+/** Hard kill: cheap-flip hunter never fires live money again. */
+const CHEAP_FLIP_LIVE_DISABLED = true;
+
 const TRIGGER_KIND = "cheap_flip_15c" as const;
 const MAX_ASK_CENTS = 15;
 const MIN_MODEL_SIDE_CONF = 0.70;
@@ -179,6 +182,14 @@ export async function runBigFlipForUser(
     minAskCents: Math.min(yesAsk, noAsk),
     modelSideConf: null as number | null,
   };
+
+  // --- Gate 0: RETIRED ---------------------------------------------------
+  // Cheap-Flip Hunter is permanently disabled for live money. Over 45 days it
+  // returned -$66.33 on a 0% win rate and ate a third of the study-auto
+  // profit. Signals are still logged (below returns a skip) but nothing fires.
+  if (CHEAP_FLIP_LIVE_DISABLED) {
+    return { ...base, rejectReason: "retired: cheap_flip_hunter disabled (0% WR, -$66 over 45d)" };
+  }
 
   // --- Gate 1: time window (T-9m to T-3m) --------------------------------
   if (stc > ARM_MAX_SECONDS) return { ...base, rejectReason: `too early (${stc}s left, arm at ${ARM_MAX_SECONDS}s)` };

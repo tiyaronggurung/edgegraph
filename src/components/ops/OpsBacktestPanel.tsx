@@ -17,10 +17,12 @@ const FAIL_LABEL: Record<string, string> = {
   t7_lock: "No T7 study lock",
   study_conf: "Confidence below 90%",
   cushion: "Cushion below $40",
-  ask_price: "Ask above 80¢",
+  ask_price: "Ask above 70¢",
   model_agreement: "Model disagreed with study",
   time_left: "Under two minutes left",
   hour_allowed: "Excluded UTC hour",
+  lock_fresh: "Fired too long after the lock",
+  our_odds_confirm: "Our odds below 83.3% on the study side",
 };
 
 function BucketTable({ title, rows }: { title: string; rows: BucketStat[] }) {

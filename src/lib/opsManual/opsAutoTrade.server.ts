@@ -8,10 +8,11 @@
 // Order of gates (a failure at any step logs a skip and returns):
 //   1. user toggle + Kalshi keys
 //   2. trading day opened (morning bankroll fixed)  -> ops_daily_snapshots
-//   3. session stops: Sunday, 4 bets, 2 consecutive losses, ±20% day
+//   3. session stops: Sunday, 4 bets, FIRST loss of the day, ±20% day
 //   4. staking mode is not "disabled" (kill switch / violations / status)
 //   5. per-window qualification: T7 lock, conf ≥ 90%, cushion ≥ $40,
-//      ask ≤ 80¢, model agrees with study, ≥ 2m left, hour allowed
+//      ask ≤ 70¢, model agrees with study, ≥ 2m left, hour allowed,
+//      lock ≤ 45s old (fire at the lock), our-odds ≥ 83.3% on the study side
 //   6. idempotency: no existing ops_trades row for (user, ticker)
 //
 // Every fired order is written to ops_trades with source='ops_auto' so the
@@ -67,6 +68,36 @@ async function fetchAskCents(ticker: string, side: "YES" | "NO"): Promise<number
     if (!Number.isFinite(yesBid) || !Number.isFinite(yesAsk)) return null;
     const cents = side === "YES" ? yesAsk : 100 - yesBid;
     return Math.max(1, Math.min(99, Math.round(cents)));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Our-odds implied probability for one side, from the most recent trendline
+ * snapshot for this ticker (only trusted if it is fresh — a stale reading is
+ * treated as "no snapshot" and does not confirm).
+ */
+async function ourOddsProbForSide(
+  db: SB,
+  ticker: string,
+  side: "YES" | "NO",
+): Promise<number | null> {
+  try {
+    const { data } = await db
+      .from("btc_kalshi_odds_snapshots")
+      .select("our_up_ask, snapped_at")
+      .eq("ticker", ticker)
+      .order("snapped_at", { ascending: false })
+      .limit(1);
+    const row = data?.[0];
+    if (!row || row.our_up_ask == null) return null;
+    const ageMs = Date.now() - Date.parse(String(row.snapped_at));
+    if (!(ageMs >= 0) || ageMs > 90_000) return null;
+    const up = Number(row.our_up_ask);
+    if (!Number.isFinite(up)) return null;
+    const p = up > 1 ? up / 100 : up; // tolerate cents or probability
+    return side === "YES" ? p : 1 - p;
   } catch {
     return null;
   }
@@ -248,6 +279,13 @@ export async function runOpsAutoTradeForUser(
 
     const askCents = studySide === "YES" || studySide === "NO" ? await fetchAskCents(ticker, studySide) : null;
 
+    const lockedAtMs = p.study_locked_at != null ? Date.parse(String(p.study_locked_at)) : NaN;
+    const lockAgeSeconds = Number.isFinite(lockedAtMs) ? Math.round((Date.now() - lockedAtMs) / 1000) : null;
+    const ourP =
+      studySide === "YES" || studySide === "NO"
+        ? await ourOddsProbForSide(db, ticker, studySide)
+        : null;
+
     const q = evaluateQualification({
       hasT7Lock: !!studySide,
       studyConfPct: studyConf,
@@ -257,6 +295,8 @@ export async function runOpsAutoTradeForUser(
       studySide,
       secondsLeft,
       utcHour: new Date().getUTCHours(),
+      lockAgeSeconds,
+      ourOddsProbForSide: ourP,
     });
 
     if (!q.qualified) {

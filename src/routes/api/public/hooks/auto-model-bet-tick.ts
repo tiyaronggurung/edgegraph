@@ -50,11 +50,15 @@ export const Route = createFileRoute("/api/public/hooks/auto-model-bet-tick")({
         const nowIso = new Date().toISOString();
         const { data: preds } = await supabaseAdmin
           .from("btc_model_predictions")
-          .select("ticker, side, close_time, model_prob")
+          .select("ticker, side, close_time, model_prob, study_locked_side")
           .gt("close_time", nowIso)
           .order("close_time", { ascending: true })
           .limit(10);
-        const openPreds = (preds ?? []) as Array<{ ticker: string; side: "YES" | "NO"; close_time: string; model_prob: number | null }>;
+        const openPreds = ((preds ?? []) as Array<{ ticker: string; side: "YES" | "NO"; close_time: string; model_prob: number | null; study_locked_side: string | null }>)
+          // Study-override rule: never bet the raw model side. A T7 study lock
+          // must exist AND agree. Model-only entries before T+7m were coin
+          // flips bought at a premium (Study won 80.4% of 209 disagreements).
+          .filter((p) => (p.study_locked_side ?? "").toUpperCase() === String(p.side).toUpperCase());
 
         const results: Array<{ userId: string; placed: number; skipped: number; ticker?: string; error?: string; priceCents?: number; stakeUsd?: number }> = [];
 
