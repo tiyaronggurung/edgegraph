@@ -163,6 +163,22 @@ export function evaluateQualification(inp: QualificationInput): QualificationRes
       actual: hour != null ? `${String(hour).padStart(2, "0")}h` : "—",
       required: "allowed hour",
     },
+    {
+      code: "lock_fresh",
+      label: `Fire at the lock (≤ ${R.MAX_LOCK_AGE_SECONDS}s old)`,
+      pass: lockAge != null && lockAge <= R.MAX_LOCK_AGE_SECONDS,
+      actual: lockAge != null ? `${lockAge}s since lock` : "—",
+      required: `≤ ${R.MAX_LOCK_AGE_SECONDS}s`,
+    },
+    {
+      code: "our_odds_confirm",
+      // Unknown (no snapshot) does not veto — only a contradicting/weak
+      // our-odds reading does.
+      label: `Our odds ≥ ${(R.OUR_ODDS_CONFIRM_PROB * 100).toFixed(1)}% (−500) on study side`,
+      pass: ourP == null || ourP >= R.OUR_ODDS_CONFIRM_PROB,
+      actual: ourP != null ? `${(ourP * 100).toFixed(1)}%` : "no snapshot",
+      required: `≥ ${(R.OUR_ODDS_CONFIRM_PROB * 100).toFixed(1)}%`,
+    },
   ];
 
   const failReasons = filters.filter(f => !f.pass).map(f => f.code);
