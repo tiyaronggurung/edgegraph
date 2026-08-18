@@ -321,11 +321,18 @@ export const Route = createFileRoute("/api/public/hooks/recompute-predictions")(
           return new Response("Unauthorized", { status: 401 });
         }
 
+        // Only user-triggered calls may spend AI credits.
+        let body: any = null;
+        try { body = await request.clone().json(); } catch { body = null; }
+        aiAllowedForRequest =
+          body?.ai === true || request.headers.get("x-ai-ondemand") === "1";
+
         const url = process.env.SUPABASE_URL;
         const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
         if (!url || !serviceKey) {
           return new Response("Server not configured", { status: 500 });
         }
+
         const admin = createClient(url, serviceKey, {
           auth: { persistSession: false, autoRefreshToken: false },
         });
