@@ -84,6 +84,10 @@ export interface QualificationInput {
   studySide: string | null;      // "YES" | "NO"
   secondsLeft: number | null;
   utcHour: number | null;
+  /** Seconds elapsed since the T7 study lock was written. */
+  lockAgeSeconds?: number | null;
+  /** Our-odds implied probability (0..1) for the STUDY side, at/after T7. */
+  ourOddsProbForSide?: number | null;
 }
 
 export interface QualificationResult {
