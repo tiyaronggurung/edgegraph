@@ -37,6 +37,14 @@ export interface RegimeInputs {
 const CACHE_TTL_MS = 5 * 60_000;
 let _cache: { at: number; state: RegimeState } | null = null;
 
+// On-demand only: the AI call fires exactly once after a user action arms it.
+// Background ticks reuse the last known state (or a neutral fallback).
+let _armed = false;
+export function armRegimeRefresh() {
+  _armed = true;
+}
+
+
 function neutralFallback(reason: string): RegimeState {
   return {
     asOf: new Date().toISOString(),
