@@ -462,6 +462,8 @@ export const DISCIPLINE_RULES = [
   { code: "model_agreement", label: "Model agreement requirement", penalty: 15 },
   { code: "time_left", label: "Time-left requirement", penalty: 10 },
   { code: "hour_allowed", label: "Hour restriction", penalty: 5 },
+  { code: "lock_fresh", label: "Fire-at-lock requirement", penalty: 20 },
+  { code: "our_odds_confirm", label: "Our-odds −500 confirmation", penalty: 10 },
   { code: "daily_limit", label: "Daily bet limit", penalty: 20 },
   { code: "daily_stop", label: "Daily stop rules", penalty: 25 },
   { code: "staking", label: "Staking rule", penalty: 20 },
