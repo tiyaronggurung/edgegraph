@@ -35,6 +35,8 @@ export function OpsQualificationCard({ dash }: { dash: OpsDashboard }) {
           <Row ok={null}>Cushion ≥ ${R.MIN_CUSHION_USD}</Row>
           <Row ok={null}>Ask ≤ {R.MAX_ASK_CENTS}¢</Row>
           <Row ok={null}>Model agrees with Study</Row>
+          <Row ok={null}>Fired within {R.MAX_LOCK_AGE_SECONDS}s of the T7 lock</Row>
+          <Row ok={null}>Our odds ≥ {(R.OUR_ODDS_CONFIRM_PROB * 100).toFixed(1)}% on the study side</Row>
           <Row ok={null}>At least two minutes remain</Row>
           <Row ok={hourAllowed}>
             UTC hour is not 01, 04, 11 or 18 — now {String(utcHour).padStart(2, "0")}h
