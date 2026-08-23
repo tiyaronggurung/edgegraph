@@ -64,8 +64,8 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
   const [open, setOpen] = useState(true);
   const [tf, setTf] = useState<CandleTf>("1m");
   const [fibOn, setFibOn] = useState(true);
-  const evalFn = useServerFn(embed ? (getPublicTrendlineSnapshot as typeof evalTrendlineShadow) : evalTrendlineShadow);
-  const candlesFn = useServerFn(embed ? (getPublicBtcCandles as typeof getBtcCandles) : getBtcCandles);
+  const evalFn = useServerFn(embed ? (getPublicTrendlineSnapshot as unknown as typeof evalTrendlineShadow) : evalTrendlineShadow);
+  const candlesFn = useServerFn(embed ? (getPublicBtcCandles as unknown as typeof getBtcCandles) : getBtcCandles);
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
   const compositeFn = useServerFn(getCompositeSpot);
   const spotVolFn = useServerFn(getBtcSpotVolume);
