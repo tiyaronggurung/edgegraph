@@ -8,6 +8,7 @@ import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
 import { getCompositeSpot } from "@/lib/compositeSpot.functions";
 import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
 import { getBtcCandles, TF_LIST, type CandleTf } from "@/lib/btcCandles.functions";
+import { getPublicBtcCandles, getPublicTrendlineSnapshot } from "@/lib/publicChart.functions";
 import { detectSpike, detectTrendlines, type TCandle } from "@/lib/ta/trendlines";
 import { emaSeries, rsi, macd, bollinger, sessionVwap } from "@/lib/ta/taEngine";
 import { fibLevels, FIB_COLORS } from "@/lib/ta/fib";
@@ -55,18 +56,23 @@ const TF_REFETCH_MS: Record<CandleTf, number> = {
   "1m": 5_000, "5m": 30_000, "15m": 60_000, "1h": 5 * 60_000, "1d": 30 * 60_000,
 };
 
-export function TrendlineChartPanel() {
+/**
+ * @param embed  Read-only public mode used by /embed/trendline (iframe).
+ *               Uses unauthenticated data sources and performs no DB writes.
+ */
+export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {}) {
   const [open, setOpen] = useState(true);
   const [tf, setTf] = useState<CandleTf>("1m");
   const [fibOn, setFibOn] = useState(true);
-  const evalFn = useServerFn(evalTrendlineShadow);
-  const candlesFn = useServerFn(getBtcCandles);
+  const evalFn = useServerFn(embed ? (getPublicTrendlineSnapshot as unknown as typeof evalTrendlineShadow) : evalTrendlineShadow);
+  const candlesFn = useServerFn(embed ? (getPublicBtcCandles as unknown as typeof getBtcCandles) : getBtcCandles);
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
   const compositeFn = useServerFn(getCompositeSpot);
   const spotVolFn = useServerFn(getBtcSpotVolume);
 
   // Records 1 snapshot/sec of Kalshi odds + our odds into btc_kalshi_odds_snapshots.
-  useKalshiOddsRecorder([]);
+  // Disabled in embed mode — the public viewer must not write.
+  useKalshiOddsRecorder([], !embed);
 
   // Retained last-good UP/DN quote for the pulse-dot pills — prevents blink
   // when sigma / candles / kalshi momentarily go null between frames.
@@ -286,7 +292,7 @@ export function TrendlineChartPanel() {
     // EARLY arm: ≥75% inside 7-min mark.
     if (recLive.side !== "WAIT" && recLive.confidencePct >= 75 && inEarlyWindow) {
       setRecoLock({ strike: currentStrike, side: recLive.side, lockedAt: Date.now(), lockedConf: recLive.confidencePct });
-      if (chipPickWrittenRef.current !== currentTicker) {
+      if (!embed && chipPickWrittenRef.current !== currentTicker) {
         chipPickWrittenRef.current = currentTicker;
         import("@/lib/chipStudyPick.functions").then(({ recordChipStudyPick }) =>
           recordChipStudyPick({
@@ -310,7 +316,7 @@ export function TrendlineChartPanel() {
         lateCandRef.current = { ticker: currentTicker, side: recLive.side as "UP" | "DOWN", since: now };
       } else if (now - cand.since >= LATE_HOLD_MS) {
         setRecoLock({ strike: currentStrike, side: recLive.side, lockedAt: now, lockedConf: recLive.confidencePct });
-        if (chipPickWrittenRef.current !== currentTicker) {
+        if (!embed && chipPickWrittenRef.current !== currentTicker) {
           chipPickWrittenRef.current = currentTicker;
           import("@/lib/chipStudyPick.functions").then(({ recordChipStudyPick }) =>
             recordChipStudyPick({
@@ -337,7 +343,7 @@ export function TrendlineChartPanel() {
   // We just poll every 10s once a chip lock exists for this ticker.
   const autoLiveFiredRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!recoLock || !currentTicker) return;
+    if (embed || !recoLock || !currentTicker) return;
     if (autoLiveFiredRef.current === currentTicker) return;
     let cancelled = false;
     const tick = async () => {
@@ -371,7 +377,7 @@ export function TrendlineChartPanel() {
   // ---- ~10s side-tick recorder (feeds btc_side_ticks for backfill/analysis)
   const lastTickAtRef = useRef<number>(0);
   useEffect(() => {
-    if (!currentTicker || secondsToCloseForLock == null) return;
+    if (embed || !currentTicker || secondsToCloseForLock == null) return;
     if (!recLive) return;
     const now = Date.now();
     if (now - lastTickAtRef.current < 9500) return;

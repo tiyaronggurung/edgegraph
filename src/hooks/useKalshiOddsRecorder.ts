@@ -55,7 +55,7 @@ interface QueuedRow {
  * Continuously logs Kalshi BTC 15m odds vs our computed odds, 1 sample/sec.
  * @param closes1m Optional 1m closes for σ fallback while tape is cold.
  */
-export function useKalshiOddsRecorder(closes1m: number[] = []): void {
+export function useKalshiOddsRecorder(closes1m: number[] = [], enabled = true): void {
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
   const spotVolFn = useServerFn(getBtcSpotVolume);
   const insertFn = useServerFn(insertKalshiOddsSnapshotBatch);
@@ -65,6 +65,7 @@ export function useKalshiOddsRecorder(closes1m: number[] = []): void {
   const { data: kalshi } = useQuery({
     queryKey: ["kalshi-implied-spot-recorder"],
     queryFn: () => kalshiFn(),
+    enabled,
     refetchInterval: 1_000,
     staleTime: 500,
     placeholderData: keepPreviousData,
@@ -76,6 +77,7 @@ export function useKalshiOddsRecorder(closes1m: number[] = []): void {
   const { data: spotVol } = useQuery({
     queryKey: ["btc-spot-volume-recorder"],
     queryFn: () => spotVolFn(),
+    enabled,
     refetchInterval: 10_000,
     staleTime: 5_000,
     placeholderData: keepPreviousData,
@@ -109,8 +111,12 @@ export function useKalshiOddsRecorder(closes1m: number[] = []): void {
 
   // Sample every second — bucket by (ticker, wall-second) so overlapping
   // browser tabs still produce exactly one row per second.
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+
   useEffect(() => {
     const id = setInterval(() => {
+      if (!enabledRef.current) return;
       const k = kalshiRef.current;
       if (!k?.ok || !k.ticker || k.strike == null || k.secondsToClose == null) return;
       const bucket = Math.floor(Date.now() / 1000);
@@ -189,6 +195,7 @@ export function useKalshiOddsRecorder(closes1m: number[] = []): void {
     let cancelled = false;
     const flush = async () => {
       if (cancelled) return;
+      if (!enabledRef.current) return;
       const q = queueRef.current;
       if (q.length === 0) return;
       const batch = q.splice(0, MAX_BATCH);

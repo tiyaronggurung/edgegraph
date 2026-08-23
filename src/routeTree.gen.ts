@@ -32,6 +32,7 @@ import { Route as AuthenticatedPatternsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedStrategiesRouteImport } from './routes/_authenticated/strategies'
 import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
+import { Route as EmbedTrendlineRouteImport } from './routes/embed.trendline'
 import { Route as AuthenticatedAnalysisIdRouteImport } from './routes/_authenticated/analysis.$id'
 import { Route as ApiHealthKalshiRouteImport } from './routes/api/health/kalshi'
 import { Route as ApiPublicSendDailyDigestsRouteImport } from './routes/api/public/send-daily-digests'
@@ -182,6 +183,11 @@ const AuthenticatedStrategiesRoute = AuthenticatedStrategiesRouteImport.update({
 const EmailUnsubscribeRoute = EmailUnsubscribeRouteImport.update({
   id: '/email/unsubscribe',
   path: '/email/unsubscribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmbedTrendlineRoute = EmbedTrendlineRouteImport.update({
+  id: '/embed/trendline',
+  path: '/embed/trendline',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAnalysisIdRoute = AuthenticatedAnalysisIdRouteImport.update({
@@ -401,6 +407,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/strategies': typeof AuthenticatedStrategiesRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
+  '/embed/trendline': typeof EmbedTrendlineRoute
   '/analysis/$id': typeof AuthenticatedAnalysisIdRoute
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
@@ -458,6 +465,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/strategies': typeof AuthenticatedStrategiesRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
+  '/embed/trendline': typeof EmbedTrendlineRoute
   '/analysis/$id': typeof AuthenticatedAnalysisIdRoute
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
@@ -517,6 +525,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/strategies': typeof AuthenticatedStrategiesRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
+  '/embed/trendline': typeof EmbedTrendlineRoute
   '/_authenticated/analysis/$id': typeof AuthenticatedAnalysisIdRoute
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
@@ -576,6 +585,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/strategies'
     | '/email/unsubscribe'
+    | '/embed/trendline'
     | '/analysis/$id'
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
@@ -633,6 +643,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/strategies'
     | '/email/unsubscribe'
+    | '/embed/trendline'
     | '/analysis/$id'
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
@@ -691,6 +702,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/strategies'
     | '/email/unsubscribe'
+    | '/embed/trendline'
     | '/_authenticated/analysis/$id'
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
@@ -734,6 +746,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   UnsubscribeRoute: typeof UnsubscribeRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
+  EmbedTrendlineRoute: typeof EmbedTrendlineRoute
   ApiHealthKalshiRoute: typeof ApiHealthKalshiRoute
   ApiPublicSendDailyDigestsRoute: typeof ApiPublicSendDailyDigestsRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
@@ -929,6 +942,13 @@ declare module '@tanstack/react-router' {
       path: '/email/unsubscribe'
       fullPath: '/email/unsubscribe'
       preLoaderRoute: typeof EmailUnsubscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/embed/trendline': {
+      id: '/embed/trendline'
+      path: '/embed/trendline'
+      fullPath: '/embed/trendline'
+      preLoaderRoute: typeof EmbedTrendlineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/analysis/$id': {
@@ -1217,6 +1237,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   UnsubscribeRoute: UnsubscribeRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
+  EmbedTrendlineRoute: EmbedTrendlineRoute,
   ApiHealthKalshiRoute: ApiHealthKalshiRoute,
   ApiPublicSendDailyDigestsRoute: ApiPublicSendDailyDigestsRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
