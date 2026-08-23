@@ -8,6 +8,7 @@ import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
 import { getCompositeSpot } from "@/lib/compositeSpot.functions";
 import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
 import { getBtcCandles, TF_LIST, type CandleTf } from "@/lib/btcCandles.functions";
+import { getPublicBtcCandles, getPublicTrendlineSnapshot } from "@/lib/publicChart.functions";
 import { detectSpike, detectTrendlines, type TCandle } from "@/lib/ta/trendlines";
 import { emaSeries, rsi, macd, bollinger, sessionVwap } from "@/lib/ta/taEngine";
 import { fibLevels, FIB_COLORS } from "@/lib/ta/fib";
@@ -291,7 +292,7 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
     // EARLY arm: ≥75% inside 7-min mark.
     if (recLive.side !== "WAIT" && recLive.confidencePct >= 75 && inEarlyWindow) {
       setRecoLock({ strike: currentStrike, side: recLive.side, lockedAt: Date.now(), lockedConf: recLive.confidencePct });
-      if (chipPickWrittenRef.current !== currentTicker) {
+      if (!embed && chipPickWrittenRef.current !== currentTicker) {
         chipPickWrittenRef.current = currentTicker;
         import("@/lib/chipStudyPick.functions").then(({ recordChipStudyPick }) =>
           recordChipStudyPick({
@@ -315,7 +316,7 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
         lateCandRef.current = { ticker: currentTicker, side: recLive.side as "UP" | "DOWN", since: now };
       } else if (now - cand.since >= LATE_HOLD_MS) {
         setRecoLock({ strike: currentStrike, side: recLive.side, lockedAt: now, lockedConf: recLive.confidencePct });
-        if (chipPickWrittenRef.current !== currentTicker) {
+        if (!embed && chipPickWrittenRef.current !== currentTicker) {
           chipPickWrittenRef.current = currentTicker;
           import("@/lib/chipStudyPick.functions").then(({ recordChipStudyPick }) =>
             recordChipStudyPick({
@@ -342,7 +343,7 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
   // We just poll every 10s once a chip lock exists for this ticker.
   const autoLiveFiredRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!recoLock || !currentTicker) return;
+    if (embed || !recoLock || !currentTicker) return;
     if (autoLiveFiredRef.current === currentTicker) return;
     let cancelled = false;
     const tick = async () => {
@@ -376,7 +377,7 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
   // ---- ~10s side-tick recorder (feeds btc_side_ticks for backfill/analysis)
   const lastTickAtRef = useRef<number>(0);
   useEffect(() => {
-    if (!currentTicker || secondsToCloseForLock == null) return;
+    if (embed || !currentTicker || secondsToCloseForLock == null) return;
     if (!recLive) return;
     const now = Date.now();
     if (now - lastTickAtRef.current < 9500) return;
