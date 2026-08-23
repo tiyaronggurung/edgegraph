@@ -55,18 +55,23 @@ const TF_REFETCH_MS: Record<CandleTf, number> = {
   "1m": 5_000, "5m": 30_000, "15m": 60_000, "1h": 5 * 60_000, "1d": 30 * 60_000,
 };
 
-export function TrendlineChartPanel() {
+/**
+ * @param embed  Read-only public mode used by /embed/trendline (iframe).
+ *               Uses unauthenticated data sources and performs no DB writes.
+ */
+export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {}) {
   const [open, setOpen] = useState(true);
   const [tf, setTf] = useState<CandleTf>("1m");
   const [fibOn, setFibOn] = useState(true);
-  const evalFn = useServerFn(evalTrendlineShadow);
-  const candlesFn = useServerFn(getBtcCandles);
+  const evalFn = useServerFn(embed ? (getPublicTrendlineSnapshot as typeof evalTrendlineShadow) : evalTrendlineShadow);
+  const candlesFn = useServerFn(embed ? (getPublicBtcCandles as typeof getBtcCandles) : getBtcCandles);
   const kalshiFn = useServerFn(getKalshiImpliedSpot);
   const compositeFn = useServerFn(getCompositeSpot);
   const spotVolFn = useServerFn(getBtcSpotVolume);
 
   // Records 1 snapshot/sec of Kalshi odds + our odds into btc_kalshi_odds_snapshots.
-  useKalshiOddsRecorder([]);
+  // Disabled in embed mode — the public viewer must not write.
+  useKalshiOddsRecorder([], !embed);
 
   // Retained last-good UP/DN quote for the pulse-dot pills — prevents blink
   // when sigma / candles / kalshi momentarily go null between frames.
