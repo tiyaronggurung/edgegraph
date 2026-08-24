@@ -159,6 +159,12 @@ export type KalshiAccountSnapshot = {
   fetchedAt: string;
 };
 
+/** Real all-time net loss carried in on 2026-08-24 21:54 UTC. */
+export const BASELINE_START = -9054;
+export const BASELINE_STARTED_AT = "2026-08-24T21:54:00.000Z";
+const BASELINE_STARTED_MS = Date.parse(BASELINE_STARTED_AT);
+
+
 type RawSettlement = {
   ticker?: string;
   market_result?: string;
