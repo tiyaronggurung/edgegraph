@@ -55,18 +55,6 @@ export function OpsAutoTradePanel() {
           >
             {dry.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Dry run"}
           </button>
-          <button
-            onClick={() => toggle.mutate(!armed)}
-            disabled={toggle.isPending || !d?.hasKeys}
-            className={cn(
-              "text-xs uppercase tracking-wider px-3 py-1.5 rounded border",
-              armed
-                ? "border-red-500/50 bg-red-500/10 text-red-300"
-                : "border-emerald-500/50 bg-emerald-500/10 text-emerald-300",
-            )}
-          >
-            {armed ? "Disarm" : "Arm auto-trade"}
-          </button>
         </div>
       </div>
 
