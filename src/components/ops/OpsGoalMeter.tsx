@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils";
 
 const GOAL = 100_000;
 const HORIZON_DAYS = 100;
-const KEY = "ops-100k-goal-v1";
+const DEFAULT_START_DATE = "2026-08-21";
+const KEY = "ops-100k-goal-v2";
 
 const usd = (n: number | null | undefined) =>
   n == null || !Number.isFinite(n) ? "—" : `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
