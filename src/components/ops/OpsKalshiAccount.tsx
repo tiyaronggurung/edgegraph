@@ -61,6 +61,10 @@ export function OpsKalshiAccount({ onBankroll }: { onBankroll?: (v: number) => v
             <Stat label="Cash Balance" value={usd(a.balance)} tone="text-[color:var(--color-primary)]" />
             <Stat label="Portfolio Value" value={usd(a.payout ?? a.openExposure)} />
             <Stat label="Total P/L (all-time)" value={usd(a.allTime.pnl)} tone={tone(a.allTime.pnl)} />
+            <Stat label="Total Loss (all-time)" value={usd(a.allTime.grossLoss)} tone="text-red-400" />
+            <Stat label="Total Profit (all-time)" value={usd(a.allTime.grossProfit)} tone="text-emerald-400" />
+            <Stat label="Volume (all-time)" value={usd(a.allTime.volume)} />
+            <Stat label="Settled (all-time)" value={`${a.allTime.n} · ${a.allTime.wins}W / ${a.allTime.losses}L`} />
             <Stat label="Realized P/L (30d)" value={usd(a.totals.pnl)} tone={tone(a.totals.pnl)} />
             <Stat label="Today P/L" value={usd(a.today.pnl)} tone={tone(a.today.pnl)} />
             <Stat label="Settled (30d)" value={`${a.totals.n} · ${a.totals.wins}W / ${a.totals.losses}L`} />
