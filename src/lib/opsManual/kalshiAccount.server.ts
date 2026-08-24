@@ -106,6 +106,16 @@ export type KalshiAccountSnapshot = {
     pnl: number;
     roi: number | null;
   };
+  allTime: {
+    n: number;
+    wins: number;
+    losses: number;
+    winRate: number | null;
+    cost: number;
+    revenue: number;
+    pnl: number;
+    roi: number | null;
+  };
   today: {
     n: number;
     wins: number;
