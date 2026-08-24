@@ -170,23 +170,27 @@ type RawPosition = {
   resting_orders_count?: number;
 };
 
-/** Pages through settlements (newest pages first) up to ~1000 rows. */
+/** Pages through EVERY settlement (no truncation) so all-time totals are exact. */
 async function fetchAllSettlements(
   keyId: string,
   pem: string,
 ): Promise<{ settlements: RawSettlement[] }> {
   const out: RawSettlement[] = [];
   let cursor = "";
-  for (let page = 0; page < 5; page++) {
+  const seen = new Set<string>();
+  for (let page = 0; page < 100; page++) {
     const q = `/portfolio/settlements?limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
     const res = await kalshiGet<{ settlements?: RawSettlement[]; cursor?: string }>(q, keyId, pem);
     const rows = res.settlements ?? [];
     out.push(...rows);
-    cursor = res.cursor ?? "";
-    if (!cursor || rows.length === 0) break;
+    const next = res.cursor ?? "";
+    if (!next || rows.length === 0 || seen.has(next)) break;
+    seen.add(next);
+    cursor = next;
   }
   return { settlements: out };
 }
+
 
 export async function loadKalshiAccount(
   supabase: {
