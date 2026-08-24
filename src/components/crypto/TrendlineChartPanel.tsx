@@ -154,6 +154,11 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
   const fmtMMSS = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 
+  // Live Kalshi strike is authoritative. The shadow snapshot derives its
+  // strike from the last btc_odds_tape row, which can lag a window or two and
+  // made the chart's strike line drift above/below the running price.
+  const liveStrike = kalshiRaw?.strike ?? null;
+
   // Strike / wedge / spike metadata — only meaningful on 1m; keep the existing shadow query.
   const { data: shadow, isFetching: shadowFetching, refetch: refetchShadow } = useQuery<TrendlineSnapshot>({
     queryKey: ["trendline-shadow"],
@@ -165,6 +170,13 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
+
+  // Strike-corrected snapshot used for ALL display + chart overlays.
+  const shadowLive = useMemo<TrendlineSnapshot | undefined>(() => {
+    if (!shadow) return shadow;
+    const strike = liveStrike ?? shadowLive.strike ?? null;
+    return strike === shadowLive.strike ? shadow : { ...shadow, strike };
+  }, [shadow, liveStrike]);
 
   // Candles per-tf. keepPreviousData → switching tf keeps old chart visible
   // until new candles arrive, so the chart never blanks out.
@@ -241,7 +253,7 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
 
   const ourQuote = useOurQuote({
     spot: displaySpot,
-    strike: kalshi?.strike ?? null,
+    strike: liveStrike ?? shadowLive?.strike ?? null,
     secondsToClose: kalshiRemainingSec,
     closes1m: closes1mForOdds,
     midPrice: midPriceNow,
@@ -265,7 +277,7 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
   const lateCandRef = useRef<{ ticker: string; side: "UP" | "DOWN"; since: number } | null>(null);
   useEffect(() => { if (displaySpot != null) lastSpotRef.current = displaySpot; }, [displaySpot]);
 
-  const currentStrike = shadow?.strike ?? null;
+  const currentStrike = shadowLive?.strike ?? null;
   const currentTicker = shadow?.ticker ?? null;
   const recLive = ourQuote?.recommendation ?? null;
   const secondsToCloseForLock = kalshiRemainingSec ?? null;
@@ -541,10 +553,10 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
             )}
           </div>
 
-          <Legend visible={visible} setVisible={setVisible} strike={shadow?.strike ?? null} />
+          <Legend visible={visible} setVisible={setVisible} strike={shadowLive?.strike ?? null} />
           {/* Live-price row — static block above the chart so it never covers the flow strip */}
             {displaySpot != null && (() => {
-              const strike = shadow?.strike ?? null;
+              const strike = shadowLive?.strike ?? null;
               const diff = strike != null ? displaySpot - strike : null;
               const up = diff != null ? diff >= 0 : true;
               const border = diff == null
@@ -632,7 +644,7 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
             <div className="relative">
             <TaChart
               candles={candles}
-              shadow={shadow ?? null}
+              shadow={shadowLive ?? null}
               tf={tf}
               visible={visible}
               fibOn={fibOn}
@@ -671,17 +683,17 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
             <Stat label="Spot (live)"   value={displaySpot != null ? `$${displaySpot.toFixed(2)}` : "—"} />
-            <Stat label="Strike"        value={shadow?.strike != null ? `$${shadow.strike.toFixed(2)}` : "—"} />
+            <Stat label="Strike"        value={shadowLive?.strike != null ? `$${shadowLive.strike.toFixed(2)}` : "—"} />
             <Stat
               label="Δ Strike"
               value={
-                displaySpot != null && shadow?.strike != null
-                  ? `${(displaySpot - shadow.strike) >= 0 ? "+" : ""}$${(displaySpot - shadow.strike).toFixed(2)} ${displaySpot >= shadow.strike ? "above" : "below"}`
+                displaySpot != null && shadowLive?.strike != null
+                  ? `${(displaySpot - shadowLive.strike) >= 0 ? "+" : ""}$${(displaySpot - shadowLive.strike).toFixed(2)} ${displaySpot >= shadowLive.strike ? "above" : "below"}`
                   : "—"
               }
               icon={
-                displaySpot != null && shadow?.strike != null ? (
-                  displaySpot >= shadow.strike
+                displaySpot != null && shadowLive?.strike != null ? (
+                  displaySpot >= shadowLive.strike
                     ? <TrendingUp className="h-3 w-3 text-emerald-400" />
                     : <TrendingDown className="h-3 w-3 text-rose-400" />
                 ) : undefined
