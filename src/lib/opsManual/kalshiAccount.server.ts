@@ -122,6 +122,26 @@ export type KalshiAccountSnapshot = {
     /** Total traded turnover: cost paid + payouts received. */
     volume: number;
   };
+  /** Running book anchored to the real all-time net loss on 2026-08-24. */
+  baseline: {
+    /** Anchor net P/L (negative = net loss carried in). */
+    start: number;
+    /** ISO timestamp the anchor was taken. */
+    startedAt: string;
+    /** Profit booked on settlements after the anchor. */
+    profitSince: number;
+    /** Loss booked on settlements after the anchor (negative). */
+    lossSince: number;
+    /** Net P/L since the anchor. */
+    netSince: number;
+    /** start + netSince — the number to watch back to zero. */
+    current: number;
+    n: number;
+  };
+
+
+
+
   today: {
     n: number;
     wins: number;
@@ -138,6 +158,12 @@ export type KalshiAccountSnapshot = {
   };
   fetchedAt: string;
 };
+
+/** Real all-time net loss carried in on 2026-08-24 21:54 UTC. */
+export const BASELINE_START = -9054;
+export const BASELINE_STARTED_AT = "2026-08-24T21:54:00.000Z";
+const BASELINE_STARTED_MS = Date.parse(BASELINE_STARTED_AT);
+
 
 type RawSettlement = {
   ticker?: string;
@@ -207,6 +233,16 @@ export async function loadKalshiAccount(
   opts?: { days?: number },
 ): Promise<KalshiAccountSnapshot> {
   const empty: KalshiAccountSnapshot = {
+    baseline: {
+      start: BASELINE_START,
+      startedAt: BASELINE_STARTED_AT,
+      profitSince: 0,
+      lossSince: 0,
+      netSince: 0,
+      current: BASELINE_START,
+      n: 0,
+    },
+
     connected: false,
     balance: null,
     payout: null,
@@ -324,7 +360,6 @@ export async function loadKalshiAccount(
       };
     };
 
-
     const rowsW = windowed;
     const todayKey = new Date().toISOString().slice(0, 10);
     const todayRows = rowsW.filter((r) => (r.settledAt ?? "").slice(0, 10) === todayKey);
@@ -334,7 +369,24 @@ export async function loadKalshiAccount(
     const tb = agg(btcRows);
     const td = agg(todayRows);
 
+    const sinceRows = rows.filter(
+      (r) => r.settledAt && new Date(r.settledAt).getTime() >= BASELINE_STARTED_MS,
+    );
+    const sa = agg(sinceRows);
+    const netSince = sa.pnl;
+    const baseline = {
+      start: BASELINE_START,
+      startedAt: BASELINE_STARTED_AT,
+      profitSince: sa.grossProfit,
+      lossSince: sa.grossLoss,
+      netSince,
+      current: Math.round((BASELINE_START + netSince) * 100) / 100,
+      n: sa.n,
+    };
+
     return {
+      baseline,
+
       connected: true,
       balance:
         bal.balance_dollars != null && Number.isFinite(Number(bal.balance_dollars))
