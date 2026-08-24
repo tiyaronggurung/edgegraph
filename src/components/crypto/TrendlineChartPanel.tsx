@@ -426,7 +426,18 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
           </span>
           {(() => {
             const ours = displaySpot;
-            const k = kalshi?.impliedSpot ?? null;
+            // Kalshi "implied spot" is inverted from the YES probability via Φ⁻¹.
+            // That inversion blows up when the market is pinned (prob near 0/1) or
+            // when time-to-close is tiny (σ√t → 0), producing nonsense gaps of
+            // hundreds of dollars. Only trust it inside a sane band.
+            const yesMid = kalshi?.yesMid ?? null;
+            const secs = kalshi?.secondsToClose ?? null;
+            const reliable =
+              !!kalshi?.ok &&
+              yesMid != null && yesMid > 0.06 && yesMid < 0.94 &&
+              secs != null && secs >= 90;
+            const rawK = kalshi?.impliedSpot ?? null;
+            const k = reliable ? rawK : null;
             const diff = ours != null && k != null ? ours - k : null;
             const diffCls =
               diff == null ? "text-white/40" :
@@ -437,27 +448,28 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
                 className="text-[10px] px-1.5 py-0.5 rounded border border-cyan-500/40 bg-cyan-500/10 text-cyan-200 font-mono flex items-center gap-1.5"
                 title={
                   kalshi?.ok
-                    ? `Kalshi ${kalshi.ticker} · YES mid ${((kalshi.yesMid ?? 0) * 100).toFixed(1)}¢ · strike $${kalshi.strike?.toFixed(0)} · ${kalshi.secondsToClose}s to close · implied spot inverted from YES prob via Φ⁻¹ · live ${live.sources ? `${live.sources}v` : "off"}`
+                    ? `Kalshi ${kalshi.ticker} · YES mid ${((yesMid ?? 0) * 100).toFixed(1)}¢ · strike $${kalshi.strike?.toFixed(0)} · ${secs}s to close · implied spot inverted from YES prob via Φ⁻¹${reliable ? "" : " — suppressed: market pinned or too close to expiry, inversion is unreliable"} · live ${live.sources ? `${live.sources}v` : "off"}`
                     : `Kalshi implied spot unavailable${kalshi?.error ? ` — ${kalshi.error}` : ""}`
                 }
               >
                 <span className="text-white/50">Kalshi</span>
                 <span className="tabular-nums">
-                  {k != null ? `$${k.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+                  {k != null ? `$${k.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "pinned"}
                 </span>
                 <span className="text-white/40">vs ours</span>
                 <span className="tabular-nums">
-                  {ours != null ? `$${ours.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "—"}
+                  {ours != null ? `$${ours.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
                 </span>
                 {diff != null && (
                   <span className={`tabular-nums ${diffCls}`}>
-                    {diff >= 0 ? "+" : ""}${diff.toFixed(1)}
+                    {diff >= 0 ? "+" : ""}${diff.toFixed(0)}
                   </span>
                 )}
                 <span className={`ml-1 h-1.5 w-1.5 rounded-full ${live.connected ? "bg-emerald-400 animate-pulse" : "bg-white/20"}`} />
               </span>
             );
           })()}
+
 
           {kalshiRemainingSec != null && (() => {
             const s = kalshiRemainingSec;
