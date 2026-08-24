@@ -122,6 +122,23 @@ export type KalshiAccountSnapshot = {
     /** Total traded turnover: cost paid + payouts received. */
     volume: number;
   };
+  /** Running book anchored to the real all-time net loss on 2026-08-24. */
+  baseline: {
+    /** Anchor net P/L (negative = net loss carried in). */
+    start: number;
+    /** ISO timestamp the anchor was taken. */
+    startedAt: string;
+    /** Profit booked on settlements after the anchor. */
+    profitSince: number;
+    /** Loss booked on settlements after the anchor (negative). */
+    lossSince: number;
+    /** Net P/L since the anchor. */
+    netSince: number;
+    /** start + netSince — the number to watch back to zero. */
+    current: number;
+    n: number;
+  };
+
   today: {
     n: number;
     wins: number;
