@@ -309,6 +309,7 @@ export async function loadKalshiAccount(
     const todayRows = rowsW.filter((r) => (r.settledAt ?? "").slice(0, 10) === todayKey);
     const btcRows = rowsW.filter((r) => r.ticker.startsWith("KXBTC"));
     const t = agg(rowsW);
+    const ta = agg(rows); // all-time, across every fetched settlement
     const tb = agg(btcRows);
     const td = agg(todayRows);
 
