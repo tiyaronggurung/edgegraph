@@ -224,6 +224,16 @@ export async function loadKalshiAccount(
   opts?: { days?: number },
 ): Promise<KalshiAccountSnapshot> {
   const empty: KalshiAccountSnapshot = {
+    baseline: {
+      start: BASELINE_START,
+      startedAt: BASELINE_STARTED_AT,
+      profitSince: 0,
+      lossSince: 0,
+      netSince: 0,
+      current: BASELINE_START,
+      n: 0,
+    },
+
     connected: false,
     balance: null,
     payout: null,
