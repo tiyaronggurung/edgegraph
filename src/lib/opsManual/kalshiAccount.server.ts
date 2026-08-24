@@ -115,6 +115,12 @@ export type KalshiAccountSnapshot = {
     revenue: number;
     pnl: number;
     roi: number | null;
+    /** Sum of P/L on losing settlements only (negative number). */
+    grossLoss: number;
+    /** Sum of P/L on winning settlements only (positive number). */
+    grossProfit: number;
+    /** Total traded turnover: cost paid + payouts received. */
+    volume: number;
   };
   today: {
     n: number;
@@ -204,7 +210,7 @@ export async function loadKalshiAccount(
     openExposure: 0,
     settlements: [],
     totals: { n: 0, wins: 0, losses: 0, winRate: null, cost: 0, revenue: 0, pnl: 0, roi: null },
-    allTime: { n: 0, wins: 0, losses: 0, winRate: null, cost: 0, revenue: 0, pnl: 0, roi: null },
+    allTime: { n: 0, wins: 0, losses: 0, winRate: null, cost: 0, revenue: 0, pnl: 0, roi: null, grossLoss: 0, grossProfit: 0, volume: 0 },
     today: { n: 0, wins: 0, losses: 0, pnl: 0, cost: 0 },
     btcOnly: { n: 0, wins: 0, losses: 0, winRate: null, pnl: 0 },
     fetchedAt: new Date().toISOString(),
@@ -292,7 +298,14 @@ export async function loadKalshiAccount(
       const cost = Math.round(list.reduce((a, r) => a + r.cost, 0) * 100) / 100;
       const revenue = Math.round(list.reduce((a, r) => a + r.revenue, 0) * 100) / 100;
       const pnl = Math.round((revenue - cost) * 100) / 100;
+      const grossLoss =
+        Math.round(list.filter((r) => r.pnl < 0).reduce((a, r) => a + r.pnl, 0) * 100) / 100;
+      const grossProfit =
+        Math.round(list.filter((r) => r.pnl > 0).reduce((a, r) => a + r.pnl, 0) * 100) / 100;
       return {
+        grossLoss,
+        grossProfit,
+        volume: Math.round((cost + revenue) * 100) / 100,
         n: list.length,
         wins,
         losses,
@@ -324,7 +337,19 @@ export async function loadKalshiAccount(
       openExposure: Math.round(openPositions.reduce((a, p) => a + p.exposure, 0) * 100) / 100,
       settlements: rowsW.slice(0, 100),
       totals: t,
-      allTime: { n: ta.n, wins: ta.wins, losses: ta.losses, winRate: ta.winRate, cost: ta.cost, revenue: ta.revenue, pnl: ta.pnl, roi: ta.roi },
+      allTime: {
+        n: ta.n,
+        wins: ta.wins,
+        losses: ta.losses,
+        winRate: ta.winRate,
+        cost: ta.cost,
+        revenue: ta.revenue,
+        pnl: ta.pnl,
+        roi: ta.roi,
+        grossLoss: ta.grossLoss,
+        grossProfit: ta.grossProfit,
+        volume: ta.volume,
+      },
       today: { n: td.n, wins: td.wins, losses: td.losses, pnl: td.pnl, cost: td.cost },
       btcOnly: { n: tb.n, wins: tb.wins, losses: tb.losses, winRate: tb.winRate, pnl: tb.pnl },
       fetchedAt: new Date().toISOString(),
