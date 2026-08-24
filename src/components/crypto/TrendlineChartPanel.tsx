@@ -174,8 +174,8 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
   // Strike-corrected snapshot used for ALL display + chart overlays.
   const shadowLive = useMemo<TrendlineSnapshot | undefined>(() => {
     if (!shadow) return shadow;
-    const strike = liveStrike ?? shadowLive.strike ?? null;
-    return strike === shadowLive.strike ? shadow : { ...shadow, strike };
+    const strike = liveStrike ?? shadow.strike ?? null;
+    return strike === shadow.strike ? shadow : { ...shadow, strike };
   }, [shadow, liveStrike]);
 
   // Candles per-tf. keepPreviousData → switching tf keeps old chart visible
