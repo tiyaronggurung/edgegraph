@@ -41,7 +41,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     } catch {
       /* ignore */
     }
-    setCfg({ startDate: todayISO(), startBankroll: Number(balance) || 1000 });
+    setCfg({ startDate: DEFAULT_START_DATE, startBankroll: Number(balance) || 1000 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
