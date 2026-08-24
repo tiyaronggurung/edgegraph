@@ -341,7 +341,6 @@ export async function loadKalshiAccount(
       };
     };
 
-
     const rowsW = windowed;
     const todayKey = new Date().toISOString().slice(0, 10);
     const todayRows = rowsW.filter((r) => (r.settledAt ?? "").slice(0, 10) === todayKey);
@@ -351,7 +350,24 @@ export async function loadKalshiAccount(
     const tb = agg(btcRows);
     const td = agg(todayRows);
 
+    const sinceRows = rows.filter(
+      (r) => r.settledAt && new Date(r.settledAt).getTime() >= BASELINE_STARTED_MS,
+    );
+    const sa = agg(sinceRows);
+    const netSince = sa.pnl;
+    const baseline = {
+      start: BASELINE_START,
+      startedAt: BASELINE_STARTED_AT,
+      profitSince: sa.grossProfit,
+      lossSince: sa.grossLoss,
+      netSince,
+      current: Math.round((BASELINE_START + netSince) * 100) / 100,
+      n: sa.n,
+    };
+
     return {
+      baseline,
+
       connected: true,
       balance:
         bal.balance_dollars != null && Number.isFinite(Number(bal.balance_dollars))
