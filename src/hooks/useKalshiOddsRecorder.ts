@@ -61,9 +61,11 @@ export function useKalshiOddsRecorder(closes1m: number[] = [], enabled = true): 
   const insertFn = useServerFn(insertKalshiOddsSnapshotBatch);
   const live = useLiveCompositeSpot();
 
-  // Fast 1s Kalshi poll dedicated to the recorder.
+  // Share the SAME query key as the trendline panel so both consumers dedupe
+  // onto one 1s Kalshi poll. Two independent paginated pulls per second was
+  // tripping Kalshi rate limits, which blanked the flow/cost strip and odds.
   const { data: kalshi } = useQuery({
-    queryKey: ["kalshi-implied-spot-recorder"],
+    queryKey: ["kalshi-implied-spot"],
     queryFn: () => kalshiFn(),
     enabled,
     refetchInterval: 1_000,

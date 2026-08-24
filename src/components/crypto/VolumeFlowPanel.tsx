@@ -46,9 +46,12 @@ export function VolumeFlowPanel() {
     placeholderData: keepPreviousData,
   });
   const { data: k } = useQuery({
-    queryKey: ["kalshi-implied-spot-volpanel"],
+    // Shared key with the trendline panel/recorder: one Kalshi poll feeds all
+    // consumers instead of three parallel paginated pulls (429s blanked flow).
+    queryKey: ["kalshi-implied-spot"],
     queryFn: () => kalshiFn(),
     refetchInterval: 5_000,
+    staleTime: 800,
     placeholderData: keepPreviousData,
   });
   const { data: pv } = useQuery({
