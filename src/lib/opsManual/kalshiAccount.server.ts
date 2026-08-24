@@ -297,11 +297,13 @@ export async function loadKalshiAccount(
     windowed.sort((a, b) => (b.settledAt ?? "").localeCompare(a.settledAt ?? ""));
 
     const agg = (list: KalshiSettlementRow[]) => {
-      const wins = list.filter((r) => r.result === "win").length;
-      const losses = list.length - wins;
+      const wins = list.filter((r) => r.pnl > 0).length;
+      const losses = list.filter((r) => r.pnl < 0).length;
+      const decided = wins + losses;
       const cost = Math.round(list.reduce((a, r) => a + r.cost, 0) * 100) / 100;
       const revenue = Math.round(list.reduce((a, r) => a + r.revenue, 0) * 100) / 100;
-      const pnl = Math.round((revenue - cost) * 100) / 100;
+      // P/L is summed per settlement so rounding matches the row list exactly.
+      const pnl = Math.round(list.reduce((a, r) => a + r.pnl, 0) * 100) / 100;
       const grossLoss =
         Math.round(list.filter((r) => r.pnl < 0).reduce((a, r) => a + r.pnl, 0) * 100) / 100;
       const grossProfit =
@@ -309,17 +311,19 @@ export async function loadKalshiAccount(
       return {
         grossLoss,
         grossProfit,
-        volume: Math.round((cost + revenue) * 100) / 100,
+        // Turnover = capital actually deployed (cost basis incl. fees).
+        volume: cost,
         n: list.length,
         wins,
         losses,
-        winRate: list.length ? wins / list.length : null,
+        winRate: decided ? wins / decided : null,
         cost,
         revenue,
         pnl,
         roi: cost > 0 ? pnl / cost : null,
       };
     };
+
 
     const rowsW = windowed;
     const todayKey = new Date().toISOString().slice(0, 10);
