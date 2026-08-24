@@ -204,6 +204,7 @@ export async function loadKalshiAccount(
     openExposure: 0,
     settlements: [],
     totals: { n: 0, wins: 0, losses: 0, winRate: null, cost: 0, revenue: 0, pnl: 0, roi: null },
+    allTime: { n: 0, wins: 0, losses: 0, winRate: null, cost: 0, revenue: 0, pnl: 0, roi: null },
     today: { n: 0, wins: 0, losses: 0, pnl: 0, cost: 0 },
     btcOnly: { n: 0, wins: 0, losses: 0, winRate: null, pnl: 0 },
     fetchedAt: new Date().toISOString(),
