@@ -324,6 +324,7 @@ export async function loadKalshiAccount(
       openExposure: Math.round(openPositions.reduce((a, p) => a + p.exposure, 0) * 100) / 100,
       settlements: rowsW.slice(0, 100),
       totals: t,
+      allTime: { n: ta.n, wins: ta.wins, losses: ta.losses, winRate: ta.winRate, cost: ta.cost, revenue: ta.revenue, pnl: ta.pnl, roi: ta.roi },
       today: { n: td.n, wins: td.wins, losses: td.losses, pnl: td.pnl, cost: td.cost },
       btcOnly: { n: tb.n, wins: tb.wins, losses: tb.losses, winRate: tb.winRate, pnl: tb.pnl },
       fetchedAt: new Date().toISOString(),
