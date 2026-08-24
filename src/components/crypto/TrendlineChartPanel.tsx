@@ -157,7 +157,7 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
   // Live Kalshi strike is authoritative. The shadow snapshot derives its
   // strike from the last btc_odds_tape row, which can lag a window or two and
   // made the chart's strike line drift above/below the running price.
-  const liveStrike = kalshiRaw?.strike ?? null;
+  const liveStrike = kalshi?.strike ?? null;
 
   // Strike / wedge / spike metadata — only meaningful on 1m; keep the existing shadow query.
   const { data: shadow, isFetching: shadowFetching, refetch: refetchShadow } = useQuery<TrendlineSnapshot>({
