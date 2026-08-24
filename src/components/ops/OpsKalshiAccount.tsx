@@ -70,6 +70,9 @@ export function OpsKalshiAccount({ onBankroll }: { onBankroll?: (v: number) => v
             />
           </div>
 
+          <OpsGoalMeter balance={a.balance} />
+
+
           {onBankroll && a.balance != null && (
             <button
               onClick={() => onBankroll(a.balance as number)}
