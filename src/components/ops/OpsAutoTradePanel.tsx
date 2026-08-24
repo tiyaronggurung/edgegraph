@@ -4,7 +4,6 @@ import { Bot, Check, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   opsAutoGetStatus,
-  opsAutoSetEnabled,
   opsAutoPreview,
 } from "@/lib/opsManual/opsAutoTrade.functions";
 import { cn } from "@/lib/utils";
@@ -13,25 +12,13 @@ const money = (n: number | null | undefined) =>
   n == null ? "—" : `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`;
 
 export function OpsAutoTradePanel() {
-  const qc = useQueryClient();
   const getStatus = useServerFn(opsAutoGetStatus);
-  const setEnabled = useServerFn(opsAutoSetEnabled);
   const preview = useServerFn(opsAutoPreview);
 
   const q = useQuery({
     queryKey: ["ops-auto-status"],
     queryFn: () => getStatus({}),
     refetchInterval: 20_000,
-  });
-
-  const toggle = useMutation({
-    mutationFn: (enabled: boolean) => setEnabled({ data: { enabled } }),
-    onSuccess: (r) => {
-      if (r.ok) toast.success(r.enabled ? "Ops auto-trade ARMED — real money" : "Ops auto-trade disarmed");
-      else toast.error(r.error);
-      qc.invalidateQueries({ queryKey: ["ops-auto-status"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
   });
 
   const dry = useMutation({
