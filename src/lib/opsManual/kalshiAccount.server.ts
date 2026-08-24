@@ -106,6 +106,16 @@ export type KalshiAccountSnapshot = {
     pnl: number;
     roi: number | null;
   };
+  allTime: {
+    n: number;
+    wins: number;
+    losses: number;
+    winRate: number | null;
+    cost: number;
+    revenue: number;
+    pnl: number;
+    roi: number | null;
+  };
   today: {
     n: number;
     wins: number;
@@ -194,6 +204,7 @@ export async function loadKalshiAccount(
     openExposure: 0,
     settlements: [],
     totals: { n: 0, wins: 0, losses: 0, winRate: null, cost: 0, revenue: 0, pnl: 0, roi: null },
+    allTime: { n: 0, wins: 0, losses: 0, winRate: null, cost: 0, revenue: 0, pnl: 0, roi: null },
     today: { n: 0, wins: 0, losses: 0, pnl: 0, cost: 0 },
     btcOnly: { n: 0, wins: 0, losses: 0, winRate: null, pnl: 0 },
     fetchedAt: new Date().toISOString(),
@@ -298,6 +309,7 @@ export async function loadKalshiAccount(
     const todayRows = rowsW.filter((r) => (r.settledAt ?? "").slice(0, 10) === todayKey);
     const btcRows = rowsW.filter((r) => r.ticker.startsWith("KXBTC"));
     const t = agg(rowsW);
+    const ta = agg(rows); // all-time, across every fetched settlement
     const tb = agg(btcRows);
     const td = agg(todayRows);
 
@@ -312,6 +324,7 @@ export async function loadKalshiAccount(
       openExposure: Math.round(openPositions.reduce((a, p) => a + p.exposure, 0) * 100) / 100,
       settlements: rowsW.slice(0, 100),
       totals: t,
+      allTime: { n: ta.n, wins: ta.wins, losses: ta.losses, winRate: ta.winRate, cost: ta.cost, revenue: ta.revenue, pnl: ta.pnl, roi: ta.roi },
       today: { n: td.n, wins: td.wins, losses: td.losses, pnl: td.pnl, cost: td.cost },
       btcOnly: { n: tb.n, wins: tb.wins, losses: tb.losses, winRate: tb.winRate, pnl: tb.pnl },
       fetchedAt: new Date().toISOString(),

@@ -60,6 +60,7 @@ export function OpsKalshiAccount({ onBankroll }: { onBankroll?: (v: number) => v
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <Stat label="Cash Balance" value={usd(a.balance)} tone="text-[color:var(--color-primary)]" />
             <Stat label="Portfolio Value" value={usd(a.payout ?? a.openExposure)} />
+            <Stat label="Total P/L (all-time)" value={usd(a.allTime.pnl)} tone={tone(a.allTime.pnl)} />
             <Stat label="Realized P/L (30d)" value={usd(a.totals.pnl)} tone={tone(a.totals.pnl)} />
             <Stat label="Today P/L" value={usd(a.today.pnl)} tone={tone(a.today.pnl)} />
             <Stat label="Settled (30d)" value={`${a.totals.n} · ${a.totals.wins}W / ${a.totals.losses}L`} />
