@@ -3440,6 +3440,8 @@ export type Database = {
           created_at: string
           cushion_usd: number | null
           id: string
+          kalshi_snapshot_at: string | null
+          kalshi_snapshot_source: string | null
           model_confidence: number | null
           model_side: string | null
           no_ask_cents: number | null
@@ -3468,6 +3470,8 @@ export type Database = {
           created_at?: string
           cushion_usd?: number | null
           id?: string
+          kalshi_snapshot_at?: string | null
+          kalshi_snapshot_source?: string | null
           model_confidence?: number | null
           model_side?: string | null
           no_ask_cents?: number | null
@@ -3496,6 +3500,8 @@ export type Database = {
           created_at?: string
           cushion_usd?: number | null
           id?: string
+          kalshi_snapshot_at?: string | null
+          kalshi_snapshot_source?: string | null
           model_confidence?: number | null
           model_side?: string | null
           no_ask_cents?: number | null
