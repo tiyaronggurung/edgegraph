@@ -140,7 +140,36 @@ export async function getBtcConsensusHistory(opts: {
     // Prefer the row that actually carries the T7 study lock.
     if (!prev || (!prev["study_locked_side"] && r["study_locked_side"])) byTicker.set(t, r);
   }
-  const tickers = [...byTicker.keys()];
+  // Dense 30s capture (btc_window_snapshots) is the preferred replay source: it
+  // records every window in-band regardless of study lock, so it has none of the
+  // sparse-observation bias of the legacy tables. Windows present only in the
+  // dense table (no prediction row) are still replayed.
+  const { data: denseRows } = await supabaseAdmin
+    .from("btc_window_snapshots")
+    .select(
+      "ticker, close_time, seconds_to_close, strike_usd, spot_usd, cushion_usd, yes_ask_cents, yes_bid_cents, trendline_buy, trendline_mid, trendline_sell, trendline_position, model_side, model_confidence, study_side, study_confidence, study_locked, outcome",
+    )
+    .gte("close_time", from.toISOString())
+    .lte("close_time", to.toISOString())
+    .gte("seconds_to_close", CONSENSUS_RULES.minSecondsToClose)
+    .lte("seconds_to_close", CONSENSUS_RULES.maxSecondsToClose)
+    .limit(50000);
+
+  type DenseRow = {
+    ticker: string; close_time: string; seconds_to_close: number | null;
+    strike_usd: number | null; spot_usd: number | null; cushion_usd: number | null;
+    yes_ask_cents: number | null; yes_bid_cents: number | null;
+    trendline_buy: number | null; trendline_mid: number | null; trendline_sell: number | null;
+    trendline_position: string | null;
+    model_side: string | null; model_confidence: number | null;
+    study_side: string | null; study_confidence: number | null; study_locked: boolean | null;
+    outcome: string | null;
+  };
+  const denseAll = ((denseRows ?? []) as unknown[]) as DenseRow[];
+
+  const tickerSet = new Set(byTicker.keys());
+  for (const d of denseAll) if (d.outcome) tickerSet.add(d.ticker);
+  const tickers = [...tickerSet];
   if (tickers.length === 0) return { ...base, ok: true };
 
   const [snapRes, trendRes] = await Promise.all([
@@ -174,21 +203,28 @@ export async function getBtcConsensusHistory(opts: {
 
   const snaps = pickNearest(((snapRes.data ?? []) as unknown[]) as { ticker: string; seconds_to_close: number | null; kalshi_yes_ask: number | null; kalshi_yes_mid: number | null; spot_composite: number | null; strike: number }[]);
   const trends = pickNearest(((trendRes.data ?? []) as unknown[]) as { ticker: string; seconds_to_close: number | null; upper_price_now: number | null; lower_price_now: number | null; spot: number }[]);
+  const dense = pickNearest(denseAll);
 
   const windows: HistoryWindow[] = [];
 
   for (const ticker of tickers) {
-    const row = byTicker.get(ticker)!;
+    const d = dense.get(ticker) ?? null;
+    const row = byTicker.get(ticker) ?? ({} as Record<string, unknown>);
     const snap = snaps.get(ticker) ?? null;
     const tl = trends.get(ticker) ?? null;
 
-    const strike = Number(row["strike"]);
-    const closeTime = String(row["close_time"]);
-    const outcome = asSide(row["outcome"]);
-    const spot = snap?.spot_composite ?? tl?.spot ?? null;
-    const cushionUsd = spot != null ? Number((spot - strike).toFixed(2)) : null;
+    const strike = Number(row["strike"] ?? d?.strike_usd ?? NaN);
+    const closeTime = String(row["close_time"] ?? d?.close_time ?? "");
+    const outcome = asSide(row["outcome"]) ?? asSide(d?.outcome);
+    const spot = d?.spot_usd ?? snap?.spot_composite ?? tl?.spot ?? null;
+    const cushionUsd =
+      d?.cushion_usd != null
+        ? Number(Number(d.cushion_usd).toFixed(2))
+        : spot != null && Number.isFinite(strike)
+          ? Number((spot - strike).toFixed(2))
+          : null;
 
-    const askRaw = snap?.kalshi_yes_ask ?? snap?.kalshi_yes_mid ?? null;
+    const askRaw = d?.yes_ask_cents ?? snap?.kalshi_yes_ask ?? snap?.kalshi_yes_mid ?? null;
     const askCents = askRaw == null ? null : Math.round(askRaw > 1 ? askRaw : askRaw * 100);
 
     const modelSide = asSide(row["model_side_pre_study"]) ?? asSide(row["side"]);
