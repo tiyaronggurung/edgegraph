@@ -1,5 +1,5 @@
 // Cron-driven dense shadow capture: writes a full btc_window_snapshots row
-// twice per minute (t=0s and t=~30s) so every live 15m window ends up with a
+// every 30 seconds so every live 15m window ends up with a
 // ~30s cadence of observations from T-8m to close, whether or not a study
 // lock fired. Read-only w.r.t. trading — places no orders.
 import { createFileRoute } from "@tanstack/react-router";
@@ -44,9 +44,7 @@ export const Route = createFileRoute("/api/public/hooks/window-snapshot-tick")({
 
         const { captureWindowSnapshot } = await import("@/lib/windowSnapshotCapture.server");
 
-        const first = await captureWindowSnapshot();
-        await new Promise((r) => setTimeout(r, 30_000));
-        const second = await captureWindowSnapshot();
+        const capture = await captureWindowSnapshot();
 
         let backfilled = 0;
         try {
@@ -55,7 +53,7 @@ export const Route = createFileRoute("/api/public/hooks/window-snapshot-tick")({
           /* non-fatal */
         }
 
-        return new Response(JSON.stringify({ ok: true, first, second, backfilled }), {
+        return new Response(JSON.stringify({ ok: true, capture, backfilled }), {
           headers: { "Content-Type": "application/json" },
         });
       },
