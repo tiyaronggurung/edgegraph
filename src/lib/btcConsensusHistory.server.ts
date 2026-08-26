@@ -227,19 +227,23 @@ export async function getBtcConsensusHistory(opts: {
     const askRaw = d?.yes_ask_cents ?? snap?.kalshi_yes_ask ?? snap?.kalshi_yes_mid ?? null;
     const askCents = askRaw == null ? null : Math.round(askRaw > 1 ? askRaw : askRaw * 100);
 
-    const modelSide = asSide(row["model_side_pre_study"]) ?? asSide(row["side"]);
-    const modelProb = row["model_prob"] == null ? null : Number(row["model_prob"]);
+    const modelSide = asSide(row["model_side_pre_study"]) ?? asSide(row["side"]) ?? asSide(d?.model_side);
+    const modelProbRaw = row["model_prob"] ?? d?.model_confidence ?? null;
+    const modelProb = modelProbRaw == null ? null : Number(modelProbRaw);
     const modelConf =
       modelProb == null || !Number.isFinite(modelProb) ? null : modelSide === "NO" ? 1 - modelProb : modelProb;
 
-    const studySide = asSide(row["study_locked_side"]);
-    const scRaw = row["study_lock_confidence"] == null ? null : Number(row["study_lock_confidence"]);
+    const studySide =
+      asSide(row["study_locked_side"]) ?? (d?.study_locked ? asSide(d?.study_side) : null);
+    const scRaw0 = row["study_lock_confidence"] ?? d?.study_confidence ?? null;
+    const scRaw = scRaw0 == null ? null : Number(scRaw0);
     const studyConf = scRaw == null || !Number.isFinite(scRaw) ? null : scRaw > 1 ? scRaw / 100 : scRaw;
 
-    // --- trendline reconstruction ---
-    const sell = tl?.upper_price_now ?? null;
-    const buy = tl?.lower_price_now ?? null;
-    const mid = sell != null && buy != null ? (sell + buy) / 2 : null;
+    // --- trendline reconstruction (dense capture first, shadow table as fallback) ---
+    const denseTl = d?.trendline_mid != null;
+    const sell = (denseTl ? d?.trendline_sell : tl?.upper_price_now) ?? null;
+    const buy = (denseTl ? d?.trendline_buy : tl?.lower_price_now) ?? null;
+    const mid = (denseTl ? d?.trendline_mid : sell != null && buy != null ? (sell + buy) / 2 : null) ?? null;
     let position = "unknown";
     let trendSide: Side | null = null;
     let distToMidUsd: number | null = null;
