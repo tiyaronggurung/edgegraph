@@ -271,7 +271,7 @@ export async function getBtcConsensusHistory(opts: {
     if (!pick) {
       skip(row["skip_guard_reason"] ? `no T7 study lock (${String(row["skip_guard_reason"])})` : "no T7 study lock");
     }
-    if (snap == null) skip("no recorded price snapshot inside the decision band");
+    if (snap == null && d == null) skip("no recorded price snapshot inside the decision band");
     if (studyConf != null && studyConf < CONSENSUS_RULES.minStudyConf) {
       skip(`study confidence ${(studyConf * 100).toFixed(0)}% below ${CONSENSUS_RULES.minStudyConf * 100}%`);
     }
