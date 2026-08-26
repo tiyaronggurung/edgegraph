@@ -64,6 +64,7 @@ import { Route as ApiPublicHooksSettleBtcPredictionsRouteImport } from './routes
 import { Route as ApiPublicHooksStudyAutoLiveTickRouteImport } from './routes/api/public/hooks/study-auto-live-tick'
 import { Route as ApiPublicHooksStudyLockTickRouteImport } from './routes/api/public/hooks/study-lock-tick'
 import { Route as ApiPublicHooksTripleWindowTickRouteImport } from './routes/api/public/hooks/triple-window-tick'
+import { Route as ApiPublicHooksWindowSnapshotTickRouteImport } from './routes/api/public/hooks/window-snapshot-tick'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
@@ -372,6 +373,12 @@ const ApiPublicHooksTripleWindowTickRoute =
     path: '/api/public/hooks/triple-window-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksWindowSnapshotTickRoute =
+  ApiPublicHooksWindowSnapshotTickRouteImport.update({
+    id: '/api/public/hooks/window-snapshot-tick',
+    path: '/api/public/hooks/window-snapshot-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const LovableEmailQueueProcessRoute =
   LovableEmailQueueProcessRouteImport.update({
     id: '/lovable/email/queue/process',
@@ -452,6 +459,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
   '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
+  '/api/public/hooks/window-snapshot-tick': typeof ApiPublicHooksWindowSnapshotTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
@@ -512,6 +520,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
   '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
+  '/api/public/hooks/window-snapshot-tick': typeof ApiPublicHooksWindowSnapshotTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
@@ -574,6 +583,7 @@ export interface FileRoutesById {
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
   '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
+  '/api/public/hooks/window-snapshot-tick': typeof ApiPublicHooksWindowSnapshotTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
@@ -636,6 +646,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/study-auto-live-tick'
     | '/api/public/hooks/study-lock-tick'
     | '/api/public/hooks/triple-window-tick'
+    | '/api/public/hooks/window-snapshot-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
@@ -696,6 +707,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/study-auto-live-tick'
     | '/api/public/hooks/study-lock-tick'
     | '/api/public/hooks/triple-window-tick'
+    | '/api/public/hooks/window-snapshot-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
@@ -757,6 +769,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/study-auto-live-tick'
     | '/api/public/hooks/study-lock-tick'
     | '/api/public/hooks/triple-window-tick'
+    | '/api/public/hooks/window-snapshot-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
@@ -802,6 +815,7 @@ export interface RootRouteChildren {
   ApiPublicHooksStudyAutoLiveTickRoute: typeof ApiPublicHooksStudyAutoLiveTickRoute
   ApiPublicHooksStudyLockTickRoute: typeof ApiPublicHooksStudyLockTickRoute
   ApiPublicHooksTripleWindowTickRoute: typeof ApiPublicHooksTripleWindowTickRoute
+  ApiPublicHooksWindowSnapshotTickRoute: typeof ApiPublicHooksWindowSnapshotTickRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
   LovableEmailTransactionalSendRoute: typeof LovableEmailTransactionalSendRoute
@@ -1194,6 +1208,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksTripleWindowTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/window-snapshot-tick': {
+      id: '/api/public/hooks/window-snapshot-tick'
+      path: '/api/public/hooks/window-snapshot-tick'
+      fullPath: '/api/public/hooks/window-snapshot-tick'
+      preLoaderRoute: typeof ApiPublicHooksWindowSnapshotTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lovable/email/queue/process': {
       id: '/lovable/email/queue/process'
       path: '/lovable/email/queue/process'
@@ -1324,6 +1345,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksStudyAutoLiveTickRoute: ApiPublicHooksStudyAutoLiveTickRoute,
   ApiPublicHooksStudyLockTickRoute: ApiPublicHooksStudyLockTickRoute,
   ApiPublicHooksTripleWindowTickRoute: ApiPublicHooksTripleWindowTickRoute,
+  ApiPublicHooksWindowSnapshotTickRoute: ApiPublicHooksWindowSnapshotTickRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
   LovableEmailTransactionalSendRoute: LovableEmailTransactionalSendRoute,
