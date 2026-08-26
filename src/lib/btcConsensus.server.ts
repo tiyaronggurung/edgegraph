@@ -126,16 +126,12 @@ export async function getBtcConsensus(): Promise<ConsensusResponse> {
         : null;
 
   // --- Model + study picks --------------------------------------------------
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: pred } = await supabaseAdmin
-    .from("btc_model_predictions")
-    .select(
-      "side, model_prob, model_side_pre_study, study_locked_side, study_lock_confidence, study_locked_at, skip_guard_reason",
-    )
-    .eq("ticker", flow.ticker)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Use the speculative row when it already belongs to the live ticker,
+  // otherwise pay for one targeted query.
+  const pred =
+    speculativePred && speculativePred["ticker"] === flow.ticker
+      ? speculativePred
+      : await fetchLatestPrediction(flow.ticker);
 
   const row = (pred ?? {}) as Record<string, unknown>;
   const modelSide = asSide(row["model_side_pre_study"]) ?? asSide(row["side"]);
