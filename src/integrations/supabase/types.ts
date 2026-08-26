@@ -3433,6 +3433,93 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_window_snapshots: {
+        Row: {
+          captured_at: string
+          close_time: string
+          created_at: string
+          cushion_usd: number | null
+          id: string
+          model_confidence: number | null
+          model_side: string | null
+          no_ask_cents: number | null
+          no_bid_cents: number | null
+          open_interest: number | null
+          outcome: string | null
+          seconds_to_close: number
+          source: string
+          spot_usd: number | null
+          strike_usd: number | null
+          study_confidence: number | null
+          study_locked: boolean
+          study_side: string | null
+          ticker: string
+          trendline_buy: number | null
+          trendline_mid: number | null
+          trendline_position: string | null
+          trendline_sell: number | null
+          volume: number | null
+          yes_ask_cents: number | null
+          yes_bid_cents: number | null
+        }
+        Insert: {
+          captured_at?: string
+          close_time: string
+          created_at?: string
+          cushion_usd?: number | null
+          id?: string
+          model_confidence?: number | null
+          model_side?: string | null
+          no_ask_cents?: number | null
+          no_bid_cents?: number | null
+          open_interest?: number | null
+          outcome?: string | null
+          seconds_to_close: number
+          source?: string
+          spot_usd?: number | null
+          strike_usd?: number | null
+          study_confidence?: number | null
+          study_locked?: boolean
+          study_side?: string | null
+          ticker: string
+          trendline_buy?: number | null
+          trendline_mid?: number | null
+          trendline_position?: string | null
+          trendline_sell?: number | null
+          volume?: number | null
+          yes_ask_cents?: number | null
+          yes_bid_cents?: number | null
+        }
+        Update: {
+          captured_at?: string
+          close_time?: string
+          created_at?: string
+          cushion_usd?: number | null
+          id?: string
+          model_confidence?: number | null
+          model_side?: string | null
+          no_ask_cents?: number | null
+          no_bid_cents?: number | null
+          open_interest?: number | null
+          outcome?: string | null
+          seconds_to_close?: number
+          source?: string
+          spot_usd?: number | null
+          strike_usd?: number | null
+          study_confidence?: number | null
+          study_locked?: boolean
+          study_side?: string | null
+          ticker?: string
+          trendline_buy?: number | null
+          trendline_mid?: number | null
+          trendline_position?: string | null
+          trendline_sell?: number | null
+          volume?: number | null
+          yes_ask_cents?: number | null
+          yes_bid_cents?: number | null
+        }
+        Relationships: []
+      }
       crypto_gate_shadow_sim: {
         Row: {
           created_at: string
