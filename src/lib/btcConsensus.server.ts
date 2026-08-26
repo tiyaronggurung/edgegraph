@@ -82,13 +82,18 @@ export async function getBtcConsensus(): Promise<ConsensusResponse> {
     error: null,
   };
 
-  const [levelsRes, flowRes] = await Promise.allSettled([
-    getBtcLevels({ limit: 300 }),
+  // All three upstreams fire together. The prediction row is fetched
+  // speculatively (latest row, no ticker filter) so it does not wait on the
+  // Kalshi round-trip; if the ticker turns out to be stale we re-query.
+  const [levelsRes, flowRes, predRes] = await Promise.allSettled([
+    getBtcLevels({ limit: 120 }),
     getKalshiImpliedSpot(),
+    fetchLatestPrediction(null),
   ]);
 
   const levels = levelsRes.status === "fulfilled" ? levelsRes.value : null;
   const flow = flowRes.status === "fulfilled" ? flowRes.value : null;
+  const speculativePred = predRes.status === "fulfilled" ? predRes.value : null;
 
   if (!flow?.ok || !flow.ticker || flow.strike == null) {
     return { ...base, reasons: ["no live kalshi 15m market"], error: flow?.error ?? "kalshi unavailable" };
