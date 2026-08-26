@@ -37,6 +37,7 @@ import { Route as AuthenticatedAnalysisIdRouteImport } from './routes/_authentic
 import { Route as ApiHealthKalshiRouteImport } from './routes/api/health/kalshi'
 import { Route as ApiPublicSendDailyDigestsRouteImport } from './routes/api/public/send-daily-digests'
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
+import { Route as ApiPublicBtcConsensusRouteImport } from './routes/api/public/btc/consensus'
 import { Route as ApiPublicBtcLevelsRouteImport } from './routes/api/public/btc/levels'
 import { Route as ApiPublicHooksAutoModelBetTickRouteImport } from './routes/api/public/hooks/auto-model-bet-tick'
 import { Route as ApiPublicHooksAutoOddsTickRouteImport } from './routes/api/public/hooks/auto-odds-tick'
@@ -209,6 +210,11 @@ const ApiPublicSendDailyDigestsRoute =
 const LovableEmailSuppressionRoute = LovableEmailSuppressionRouteImport.update({
   id: '/lovable/email/suppression',
   path: '/lovable/email/suppression',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBtcConsensusRoute = ApiPublicBtcConsensusRouteImport.update({
+  id: '/api/public/btc/consensus',
+  path: '/api/public/btc/consensus',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicBtcLevelsRoute = ApiPublicBtcLevelsRouteImport.update({
@@ -412,6 +418,7 @@ export interface FileRoutesByFullPath {
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/btc/consensus': typeof ApiPublicBtcConsensusRoute
   '/api/public/btc/levels': typeof ApiPublicBtcLevelsRoute
   '/api/public/hooks/auto-model-bet-tick': typeof ApiPublicHooksAutoModelBetTickRoute
   '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
@@ -470,6 +477,7 @@ export interface FileRoutesByTo {
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/btc/consensus': typeof ApiPublicBtcConsensusRoute
   '/api/public/btc/levels': typeof ApiPublicBtcLevelsRoute
   '/api/public/hooks/auto-model-bet-tick': typeof ApiPublicHooksAutoModelBetTickRoute
   '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
@@ -530,6 +538,7 @@ export interface FileRoutesById {
   '/api/health/kalshi': typeof ApiHealthKalshiRoute
   '/api/public/send-daily-digests': typeof ApiPublicSendDailyDigestsRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/public/btc/consensus': typeof ApiPublicBtcConsensusRoute
   '/api/public/btc/levels': typeof ApiPublicBtcLevelsRoute
   '/api/public/hooks/auto-model-bet-tick': typeof ApiPublicHooksAutoModelBetTickRoute
   '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
@@ -590,6 +599,7 @@ export interface FileRouteTypes {
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/btc/consensus'
     | '/api/public/btc/levels'
     | '/api/public/hooks/auto-model-bet-tick'
     | '/api/public/hooks/auto-odds-tick'
@@ -648,6 +658,7 @@ export interface FileRouteTypes {
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/btc/consensus'
     | '/api/public/btc/levels'
     | '/api/public/hooks/auto-model-bet-tick'
     | '/api/public/hooks/auto-odds-tick'
@@ -707,6 +718,7 @@ export interface FileRouteTypes {
     | '/api/health/kalshi'
     | '/api/public/send-daily-digests'
     | '/lovable/email/suppression'
+    | '/api/public/btc/consensus'
     | '/api/public/btc/levels'
     | '/api/public/hooks/auto-model-bet-tick'
     | '/api/public/hooks/auto-odds-tick'
@@ -750,6 +762,7 @@ export interface RootRouteChildren {
   ApiHealthKalshiRoute: typeof ApiHealthKalshiRoute
   ApiPublicSendDailyDigestsRoute: typeof ApiPublicSendDailyDigestsRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
+  ApiPublicBtcConsensusRoute: typeof ApiPublicBtcConsensusRoute
   ApiPublicBtcLevelsRoute: typeof ApiPublicBtcLevelsRoute
   ApiPublicHooksAutoModelBetTickRoute: typeof ApiPublicHooksAutoModelBetTickRoute
   ApiPublicHooksAutoOddsTickRoute: typeof ApiPublicHooksAutoOddsTickRoute
@@ -977,6 +990,13 @@ declare module '@tanstack/react-router' {
       path: '/lovable/email/suppression'
       fullPath: '/lovable/email/suppression'
       preLoaderRoute: typeof LovableEmailSuppressionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/btc/consensus': {
+      id: '/api/public/btc/consensus'
+      path: '/api/public/btc/consensus'
+      fullPath: '/api/public/btc/consensus'
+      preLoaderRoute: typeof ApiPublicBtcConsensusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/btc/levels': {
@@ -1241,6 +1261,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthKalshiRoute: ApiHealthKalshiRoute,
   ApiPublicSendDailyDigestsRoute: ApiPublicSendDailyDigestsRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
+  ApiPublicBtcConsensusRoute: ApiPublicBtcConsensusRoute,
   ApiPublicBtcLevelsRoute: ApiPublicBtcLevelsRoute,
   ApiPublicHooksAutoModelBetTickRoute: ApiPublicHooksAutoModelBetTickRoute,
   ApiPublicHooksAutoOddsTickRoute: ApiPublicHooksAutoOddsTickRoute,
