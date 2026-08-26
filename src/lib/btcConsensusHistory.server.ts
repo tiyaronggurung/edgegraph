@@ -39,7 +39,7 @@ export interface HistoryWindow {
   modelConfidence: number | null;
 
   trendline: {
-    source: "shadow_snapshot" | null;
+    source: "dense_snapshot" | "shadow_snapshot" | null;
     buy: number | null;
     mid: number | null;
     sell: number | null;
