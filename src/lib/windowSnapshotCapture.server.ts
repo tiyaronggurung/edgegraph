@@ -11,11 +11,11 @@
 // changes no live path. It only INSERTs into btc_window_snapshots.
 
 import { getBtcLevels } from "@/lib/btcLevels.server";
-import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
 
 /** Only capture inside the window that matters for entry decisions. */
 export const CAPTURE_MAX_SECONDS_TO_CLOSE = 8 * 60; // T-8m
 export const CAPTURE_MIN_SECONDS_TO_CLOSE = 0;
+export const MAX_KALSHI_SNAPSHOT_AGE_MS = 30_000;
 
 const asSide = (v: unknown): "YES" | "NO" | null => (v === "YES" || v === "NO" ? v : null);
 
@@ -32,30 +32,51 @@ export interface CaptureResult {
 }
 
 export async function captureWindowSnapshot(): Promise<CaptureResult> {
-  const [flowRes, levelsRes] = await Promise.allSettled([
-    getKalshiImpliedSpot(),
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const [snapshotRes, levelsRes] = await Promise.allSettled([
+    supabaseAdmin
+      .from("btc_kalshi_odds_snapshots")
+      .select("ticker, strike, snapped_at, seconds_to_close, kalshi_yes_bid, kalshi_yes_ask, spot_composite, kalshi_volume, kalshi_open_interest")
+      .order("snapped_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     getBtcLevels({ limit: 120 }),
   ]);
 
-  const flow = flowRes.status === "fulfilled" ? flowRes.value : null;
+  const snapshotResult = snapshotRes.status === "fulfilled" ? snapshotRes.value : null;
+  const flow = snapshotResult?.data ?? null;
   const levels = levelsRes.status === "fulfilled" ? levelsRes.value : null;
 
-  if (!flow?.ok || !flow.ticker || flow.strike == null || flow.secondsToClose == null) {
+  if (snapshotResult?.error) {
     return {
       ok: false,
       captured: false,
-      ticker: flow?.ticker ?? null,
-      secondsToClose: flow?.secondsToClose ?? null,
-      error: flow?.error ?? "kalshi unavailable",
+      ticker: null,
+      secondsToClose: null,
+      error: `stored Kalshi snapshot unavailable: ${snapshotResult.error.message}`,
     };
   }
 
-  const stc = flow.secondsToClose;
+  if (!flow?.ticker || flow.strike == null || flow.seconds_to_close == null) {
+    return { ok: true, captured: false, ticker: flow?.ticker ?? null, secondsToClose: null, reason: "no stored Kalshi snapshot" };
+  }
+
+  const snapshotAtMs = Date.parse(flow.snapped_at);
+  const snapshotAgeMs = Date.now() - snapshotAtMs;
+  if (!Number.isFinite(snapshotAtMs) || snapshotAgeMs < -5_000 || snapshotAgeMs > MAX_KALSHI_SNAPSHOT_AGE_MS) {
+    return {
+      ok: true,
+      captured: false,
+      ticker: flow.ticker,
+      secondsToClose: flow.seconds_to_close,
+      reason: "stored Kalshi snapshot stale",
+    };
+  }
+
+  const stc = Math.max(0, flow.seconds_to_close - snapshotAgeMs / 1000);
   if (stc > CAPTURE_MAX_SECONDS_TO_CLOSE || stc < CAPTURE_MIN_SECONDS_TO_CLOSE) {
     return { ok: true, captured: false, ticker: flow.ticker, secondsToClose: stc, reason: "outside T-8m..close" };
   }
-
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
   const { data: predRow } = await supabaseAdmin
     .from("btc_model_predictions")
@@ -84,10 +105,11 @@ export async function captureWindowSnapshot(): Promise<CaptureResult> {
         ? studyConfRaw / 100
         : studyConfRaw;
 
-  const spot = levels?.ok ? levels.spot : null;
+  const storedSpot = flow.spot_composite == null ? null : Number(flow.spot_composite);
+  const spot = levels?.ok ? levels.spot : storedSpot;
   const cents = (v: number | null | undefined) => (v == null ? null : Math.round(v * 100));
-  const yesAskC = cents(flow.yesAsk);
-  const yesBidC = cents(flow.yesBid);
+  const yesAskC = cents(flow.kalshi_yes_ask);
+  const yesBidC = cents(flow.kalshi_yes_bid);
 
   const insert = {
     ticker: flow.ticker,
@@ -101,8 +123,8 @@ export async function captureWindowSnapshot(): Promise<CaptureResult> {
     // Kalshi's NO book is the complement of the YES book.
     no_bid_cents: yesAskC == null ? null : 100 - yesAskC,
     no_ask_cents: yesBidC == null ? null : 100 - yesBidC,
-    volume: flow.volume,
-    open_interest: flow.openInterest,
+    volume: flow.kalshi_volume,
+    open_interest: flow.kalshi_open_interest,
     trendline_buy: levels?.ok ? levels.buy : null,
     trendline_mid: levels?.ok ? levels.mid : null,
     trendline_sell: levels?.ok ? levels.sell : null,
@@ -113,6 +135,8 @@ export async function captureWindowSnapshot(): Promise<CaptureResult> {
     study_confidence: studyConf,
     study_locked: Boolean(row["study_locked_at"]) || studySide != null,
     source: "cron_30s",
+    kalshi_snapshot_at: flow.snapped_at,
+    kalshi_snapshot_source: "btc_kalshi_odds_snapshots",
   };
 
   const { error } = await supabaseAdmin.from("btc_window_snapshots").insert(insert);
