@@ -223,9 +223,9 @@ export async function getBtcConsensusHistory(opts: {
 
     // --- same rule stack as the live verdict ---
     const reasons: string[] = [];
-    let verdict: Verdict = "ALLOW";
-    const skip = (r: string) => { reasons.push(r); verdict = "SKIP"; };
-    const caution = (r: string) => { reasons.push(r); if (verdict !== "SKIP") verdict = "CAUTION"; };
+    const state: { verdict: Verdict } = { verdict: "ALLOW" };
+    const skip = (r: string) => { reasons.push(r); state.verdict = "SKIP"; };
+    const caution = (r: string) => { reasons.push(r); if (state.verdict !== "SKIP") state.verdict = "CAUTION"; };
 
     const pick = studySide;
     if (!pick) {
@@ -254,6 +254,7 @@ export async function getBtcConsensusHistory(opts: {
     }
     if (pick && modelSide && modelSide !== pick) caution(`model disagrees (${modelSide})`);
 
+    const verdict = state.verdict;
     const side = verdict === "SKIP" ? null : pick;
 
     windows.push({
