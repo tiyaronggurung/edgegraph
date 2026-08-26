@@ -165,9 +165,9 @@ export async function getBtcConsensus(): Promise<ConsensusResponse> {
   // confirmation only. Without a study lock we never return ALLOW.
   const reasons: string[] = [];
   const pick: Side | null = studySide ?? null;
-  let verdict: Verdict = "ALLOW";
-  const skip = (r: string) => { reasons.push(r); verdict = "SKIP"; };
-  const caution = (r: string) => { reasons.push(r); if (verdict !== "SKIP") verdict = "CAUTION"; };
+  const state: { verdict: Verdict } = { verdict: "ALLOW" };
+  const skip = (r: string) => { reasons.push(r); state.verdict = "SKIP"; };
+  const caution = (r: string) => { reasons.push(r); if (state.verdict !== "SKIP") state.verdict = "CAUTION"; };
 
   if (!pick) {
     skip(
@@ -215,7 +215,7 @@ export async function getBtcConsensus(): Promise<ConsensusResponse> {
   }
   if (broke == null) caution("inside channel (no BUY/SELL break)");
 
-  if (verdict === "ALLOW") reasons.push(`study ${pick} confirmed by trendline ${levels.position} and $${Math.abs(cushionUsd ?? 0).toFixed(0)} cushion`);
+  if (state.verdict === "ALLOW") reasons.push(`study ${pick} confirmed by trendline ${levels.position} and $${Math.abs(cushionUsd ?? 0).toFixed(0)} cushion`);
 
   return {
     ok: true,
@@ -243,9 +243,9 @@ export async function getBtcConsensus(): Promise<ConsensusResponse> {
       broke,
     },
     agreement,
-    verdict,
-    side: verdict === "SKIP" ? null : pick,
-    confidence: verdict === "SKIP" ? null : (studyConf ?? null),
+    verdict: state.verdict,
+    side: state.verdict === "SKIP" ? null : pick,
+    confidence: state.verdict === "SKIP" ? null : (studyConf ?? null),
     reasons,
     rules: CONSENSUS_RULES,
     error: null,
