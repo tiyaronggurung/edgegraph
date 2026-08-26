@@ -64,7 +64,41 @@ export interface ConsensusResponse {
 
 const asSide = (v: unknown): Side | null => (v === "YES" || v === "NO" ? v : null);
 
+const PRED_COLS =
+  "ticker, side, model_prob, model_side_pre_study, study_locked_side, study_lock_confidence, study_locked_at, skip_guard_reason";
+
+async function fetchLatestPrediction(ticker: string | null): Promise<Record<string, unknown> | null> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  let q = supabaseAdmin.from("btc_model_predictions").select(PRED_COLS);
+  if (ticker) q = q.eq("ticker", ticker);
+  const { data } = await q.order("created_at", { ascending: false }).limit(1).maybeSingle();
+  return (data ?? null) as Record<string, unknown> | null;
+}
+
+// Sub-second micro-cache: a 15m contract does not move meaningfully inside
+// 1s, so pollers hitting us every second get an in-memory hit (~1ms) instead
+// of three upstream round-trips.
+const MICRO_CACHE_MS = 1_000;
+let microCache: { at: number; value: ConsensusResponse } | null = null;
+let inFlight: Promise<ConsensusResponse> | null = null;
+
 export async function getBtcConsensus(): Promise<ConsensusResponse> {
+  const now = Date.now();
+  if (microCache && now - microCache.at < MICRO_CACHE_MS) return microCache.value;
+  // Coalesce concurrent callers onto one upstream fetch.
+  if (inFlight) return inFlight;
+  inFlight = computeBtcConsensus()
+    .then((v) => {
+      microCache = { at: Date.now(), value: v };
+      return v;
+    })
+    .finally(() => {
+      inFlight = null;
+    });
+  return inFlight;
+}
+
+async function computeBtcConsensus(): Promise<ConsensusResponse> {
   const asOf = new Date().toISOString();
   const base: ConsensusResponse = {
     ok: false,
