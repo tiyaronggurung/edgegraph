@@ -33,7 +33,7 @@ export const Route = createFileRoute("/api/public/btc/consensus")({
           const data = await getBtcConsensus();
           return Response.json(data, {
             status: data.ok ? 200 : 502,
-            headers: { ...CORS, "Cache-Control": "public, max-age=3" },
+            headers: { ...CORS, "Cache-Control": "public, max-age=1" },
           });
         } catch (e) {
           return Response.json(
