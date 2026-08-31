@@ -13,6 +13,7 @@ import { OpsBacktestPanel } from "@/components/ops/OpsBacktestPanel";
 import { OpsAlertsPanel } from "@/components/ops/OpsAlertsPanel";
 import { OpsKalshiAccount } from "@/components/ops/OpsKalshiAccount";
 import { OpsAutoTradePanel } from "@/components/ops/OpsAutoTradePanel";
+import { OpsHedgePanel } from "@/components/ops/OpsHedgePanel";
 
 export const Route = createFileRoute("/_authenticated/ops-manual")({
   head: () => ({
