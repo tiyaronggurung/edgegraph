@@ -69,6 +69,7 @@ function OpsManualPage() {
           <OpsAutoTradePanel />
           <OpsQualificationCard dash={q.data} />
           <OpsStakingPanel dash={q.data} onRefresh={() => q.refetch()} />
+          <OpsHedgePanel />
           <OpsPnlDashboard dash={q.data} />
           <OpsBacktestPanel dash={q.data} />
           <OpsAlertsPanel dash={q.data} onRefresh={() => q.refetch()} />
