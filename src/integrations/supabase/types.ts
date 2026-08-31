@@ -1874,6 +1874,125 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_cross_exit_shadow: {
+        Row: {
+          close_time: string
+          combined_pnl_cents: number | null
+          created_at: string
+          cross_cushion_usd: number | null
+          cross_detected: boolean
+          cross_seconds_to_close: number | null
+          cross_spot: number | null
+          cross_time: string | null
+          entry_bid_cents: number | null
+          entry_price_cents: number
+          entry_seconds_to_close: number | null
+          entry_side: string
+          entry_spot: number | null
+          entry_time: string
+          exit_bid_cents: number | null
+          exit_pnl_cents: number | null
+          exit_reason: string | null
+          flip_ask_cents: number | null
+          flip_pnl_cents: number | null
+          flip_reason: string | null
+          flip_side: string | null
+          flip_time_cutoff_seconds: number
+          hold_pnl_cents: number | null
+          id: string
+          max_flip_ask_cents: number
+          outcome: string | null
+          settled: boolean
+          source: string
+          strike: number
+          ticker: string
+          trade_id: string | null
+          updated_at: string
+          would_exit: boolean
+          would_flip: boolean
+        }
+        Insert: {
+          close_time: string
+          combined_pnl_cents?: number | null
+          created_at?: string
+          cross_cushion_usd?: number | null
+          cross_detected?: boolean
+          cross_seconds_to_close?: number | null
+          cross_spot?: number | null
+          cross_time?: string | null
+          entry_bid_cents?: number | null
+          entry_price_cents: number
+          entry_seconds_to_close?: number | null
+          entry_side: string
+          entry_spot?: number | null
+          entry_time: string
+          exit_bid_cents?: number | null
+          exit_pnl_cents?: number | null
+          exit_reason?: string | null
+          flip_ask_cents?: number | null
+          flip_pnl_cents?: number | null
+          flip_reason?: string | null
+          flip_side?: string | null
+          flip_time_cutoff_seconds?: number
+          hold_pnl_cents?: number | null
+          id?: string
+          max_flip_ask_cents?: number
+          outcome?: string | null
+          settled?: boolean
+          source?: string
+          strike: number
+          ticker: string
+          trade_id?: string | null
+          updated_at?: string
+          would_exit?: boolean
+          would_flip?: boolean
+        }
+        Update: {
+          close_time?: string
+          combined_pnl_cents?: number | null
+          created_at?: string
+          cross_cushion_usd?: number | null
+          cross_detected?: boolean
+          cross_seconds_to_close?: number | null
+          cross_spot?: number | null
+          cross_time?: string | null
+          entry_bid_cents?: number | null
+          entry_price_cents?: number
+          entry_seconds_to_close?: number | null
+          entry_side?: string
+          entry_spot?: number | null
+          entry_time?: string
+          exit_bid_cents?: number | null
+          exit_pnl_cents?: number | null
+          exit_reason?: string | null
+          flip_ask_cents?: number | null
+          flip_pnl_cents?: number | null
+          flip_reason?: string | null
+          flip_side?: string | null
+          flip_time_cutoff_seconds?: number
+          hold_pnl_cents?: number | null
+          id?: string
+          max_flip_ask_cents?: number
+          outcome?: string | null
+          settled?: boolean
+          source?: string
+          strike?: number
+          ticker?: string
+          trade_id?: string | null
+          updated_at?: string
+          would_exit?: boolean
+          would_flip?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "btc_cross_exit_shadow_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "ops_trades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       btc_gate_config: {
         Row: {
           btc_entry_gate_enabled: boolean
