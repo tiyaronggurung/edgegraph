@@ -214,7 +214,8 @@ export function evaluateHedgeExit(inp: HedgeExitInput): HedgeExitPlan {
   const pot = inp.nakedPotentialProfitUsd ?? null;
   const now = inp.nakedUnrealisedProfitUsd ?? null;
   const ratio = pot != null && pot > 0 && now != null ? now / pot : null;
-  const exitNaked = nakedShares > 0 && ratio != null && ratio >= R.NAKED_EXIT_UPSIDE_RATIO;
+  // 1e-9 tolerance so an exact 92.0% capture is not lost to float error.
+  const exitNaked = nakedShares > 0 && ratio != null && ratio >= R.NAKED_EXIT_UPSIDE_RATIO - 1e-9;
 
   const parts: string[] = [];
   if (matchedPairs > 0) {
