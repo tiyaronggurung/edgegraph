@@ -370,7 +370,7 @@ export async function backfillWindowCrossExit(
     if (error) throw error;
     if (!rows || rows.length === 0) return { ok: true, entryCreated: false, crossDetected: false };
 
-    const snapshots = rows.map(rowToSnapshot);
+    const snapshots: CrossExitSnapshot[] = rows.map(rowToSnapshot);
 
     // Build T-5m entry from the snapshot closest to 300s remaining.
     let entry: CrossExitEntry | null = null;
@@ -499,7 +499,7 @@ export async function logCrossExitForSnapshot(
         .eq("ticker", ticker)
         .eq("close_time", closeTime)
         .order("captured_at", { ascending: true });
-      const snapshots = (rows ?? []).map(rowToSnapshot);
+      const snapshots: CrossExitSnapshot[] = (rows ?? []).map(rowToSnapshot);
       const t5 = snapshots.reduce(
         (best, s) => {
           const d = Math.abs(s.secondsToClose - CROSS_EXIT_RULES.T5_SECONDS_TO_CLOSE);
@@ -536,7 +536,7 @@ export async function gradeSettledCrossExitShadow(db: SB): Promise<{ graded: num
     .eq("settled", false);
   if (error) throw new Error(`failed to list pending shadow rows: ${error.message}`);
 
-  const tickers = [...new Set((pending ?? []).map((r) => r.ticker as string))];
+  const tickers = [...new Set((pending ?? []).map((r: Record<string, unknown>) => r.ticker as string))];
   if (tickers.length === 0) return { graded: 0, errors: [] };
 
   const { data: outcomes, error: outErr } = await db
