@@ -157,11 +157,16 @@ export function OpsPaperTradePanel() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
         <Stat label="Ticker" value={w?.ticker ?? "—"} mono />
         <Stat label="Strike" value={w?.strike != null ? `$${w.strike.toLocaleString()}` : "—"} />
-        <Stat label={w?.spotSource === "own_composite" ? "Spot (our feed)" : "Spot"} value={w?.spot != null ? `$${w.spot.toLocaleString()}` : "—"} />
+        <Stat
+          label={liveSpot != null ? "Spot (live)" : w?.spotSource === "own_composite" ? "Spot (our feed)" : "Spot"}
+          value={displaySpot != null
+            ? `$${displaySpot.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : "—"}
+        />
         <Stat
           label="Cushion"
-          value={w?.cushionUsd != null ? `${w.cushionUsd >= 0 ? "+" : ""}$${w.cushionUsd.toFixed(0)}` : "—"}
-          tone={w?.cushionUsd == null ? undefined : Math.abs(w.cushionUsd) >= 40 ? "good" : "warn"}
+          value={displayCushion != null ? `${displayCushion >= 0 ? "+" : ""}$${displayCushion.toFixed(0)}` : "—"}
+          tone={displayCushion == null ? undefined : Math.abs(displayCushion) >= 40 ? "good" : "warn"}
         />
         <Stat label="Time left" value={clock(secondsLeft)} tone={secondsLeft != null && secondsLeft < 300 ? "warn" : undefined} />
       </div>
