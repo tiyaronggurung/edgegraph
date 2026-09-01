@@ -83,7 +83,18 @@ export interface OwnSignals {
   /** Study side came from the CVV shadow lock, not a real T7 lock. */
   studyIsFallback?: boolean;
   verdict: "ALLOW" | "CAUTION" | "SKIP" | null;
+  /** Consensus side when it is not SKIP. */
+  verdictSide?: OwnSide | null;
+  /** Raw consensus reasons — used to veto only on DIRECTIONAL contradictions. */
+  verdictReasons?: string[];
 }
+
+/**
+ * The copy-trader consensus SKIPs for many reasons the Own Engine already
+ * governs itself (time band, cushion size, ask cap, MID distance). Only a
+ * reason that says the direction is wrong should veto an entry.
+ */
+const DIRECTIONAL_SKIP = /contradicts|side of strike/i;
 
 /**
  * Blend the diffusion probability with the Study pick so the Own Engine
@@ -107,8 +118,12 @@ export function signalGate(
   s: OwnSignals | null,
   rules: OwnRules,
 ): { code: SkipCode; reason: string } | null {
-  if (rules.verdictVeto && s?.verdict === "SKIP") {
-    return { code: "VERDICT_SKIP", reason: "consensus verdict = SKIP" };
+  if (rules.verdictVeto && s) {
+    if (s.verdict !== "SKIP" && s.verdictSide && s.verdictSide !== side) {
+      return { code: "VERDICT_SKIP", reason: `consensus side ${s.verdictSide} vs own ${side}` };
+    }
+    const bad = (s.verdictReasons ?? []).find((r) => DIRECTIONAL_SKIP.test(r));
+    if (bad) return { code: "VERDICT_SKIP", reason: `consensus: ${bad}` };
   }
   if (!rules.requireSignalAgreement) return null;
   if (!s || (!s.studySide && !s.modelSide)) {
