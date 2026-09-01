@@ -236,3 +236,88 @@ function Cell({ label, v, tone }: { label: string; v: string; tone?: "good" | "b
     </div>
   );
 }
+
+type EngineOrderRow = {
+  id: string; ticker: string; side: "YES" | "NO"; contracts: number; price_cents: number;
+  status: string; paper: boolean; created_at: string;
+};
+type EngineSkipRow = { id: string; ticker: string | null };
+
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString("en-US", { hour12: true, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+/** Aggregated open-position trading log: contracts, avg cost, fills, mark-to-market. */
+function PositionLog({
+  orders, skips, ticker, up, down,
+}: {
+  orders: EngineOrderRow[];
+  skips: EngineSkipRow[];
+  ticker: string | null;
+  up: { bidCents: number | null; askCents: number | null } | null;
+  down: { bidCents: number | null; askCents: number | null } | null;
+}) {
+  const positions = Object.values(
+    orders.filter((o) => o.status === "open").reduce<Record<string, {
+      ticker: string; side: "YES" | "NO"; contracts: number; costCents: number;
+      fills: number; first: string; last: string; paper: boolean;
+    }>>((acc, o) => {
+      const key = `${o.ticker}:${o.side}`;
+      const p = (acc[key] ??= {
+        ticker: o.ticker, side: o.side, contracts: 0, costCents: 0,
+        fills: 0, first: o.created_at, last: o.created_at, paper: o.paper,
+      });
+      p.contracts += o.contracts;
+      p.costCents += o.contracts * o.price_cents;
+      p.fills += 1;
+      if (o.created_at < p.first) p.first = o.created_at;
+      if (o.created_at > p.last) p.last = o.created_at;
+      return acc;
+    }, {}),
+  );
+
+  const skippedFor = (t: string) => skips.filter((k) => k.ticker === t).length;
+
+  return (
+    <div className="border border-border rounded p-3 text-xs space-y-2">
+      <div className="uppercase tracking-widest text-[10px] text-muted-foreground">Trading log (orders)</div>
+      {positions.length === 0 && (
+        <div className="text-muted-foreground">
+          No open engine positions.{skips.length > 0 ? ` ${skips.length} refusals logged (see Skips tab).` : ""}
+        </div>
+      )}
+      {positions.map((p) => {
+        const sideLabel = p.side === "YES" ? "Up" : "Down";
+        const avg = p.costCents / p.contracts;
+        const book = p.side === "YES" ? up : down;
+        const mark = p.ticker === ticker ? (book?.bidCents ?? book?.askCents ?? null) : null;
+        const valueCents = mark != null ? p.contracts * mark : null;
+        const pnlCents = valueCents != null ? valueCents - p.costCents : null;
+        const skipped = skippedFor(p.ticker);
+        return (
+          <div key={`${p.ticker}:${p.side}`} className="border-t border-border/50 pt-2 space-y-0.5">
+            <div>
+              <span className="font-bold">{p.contracts} contracts · {money(p.costCents)}</span>
+              <span className="text-muted-foreground"> · Kalshi {sideLabel} avg {avg.toFixed(1)}¢ · one side · </span>
+              <span className={p.paper ? "text-sky-400" : "text-red-400"}>{p.paper ? "paper" : "live"}</span>
+              {pnlCents != null && (
+                <span className={cn("font-bold", pnlCents >= 0 ? "text-emerald-400" : "text-red-400")}> {money(pnlCents)}</span>
+              )}
+              {skipped > 0 && <span className="text-amber-400"> +{skipped} skipped</span>}
+            </div>
+            <div className="text-muted-foreground">
+              {sideLabel} {p.contracts} ct @ {avg.toFixed(1)}¢ = {money(p.costCents)} · held {p.contracts} ct
+              {mark != null ? ` · now ${mark.toFixed(1)}¢` : " · now —"}
+              {" "}· {p.fills} fill{p.fills === 1 ? "" : "s"} · {fmtTime(p.first)}–{fmtTime(p.last)}
+            </div>
+            {pnlCents != null && valueCents != null && (
+              <div className="text-muted-foreground">
+                mark-to-market: open value {money(valueCents)} − cost {money(p.costCents)} ={" "}
+                <span className={cn("font-bold", pnlCents >= 0 ? "text-emerald-400" : "text-red-400")}>{money(pnlCents)}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
