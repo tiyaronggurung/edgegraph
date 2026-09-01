@@ -20,6 +20,9 @@ import { runOpsBacktest, summarizeLedger, type LedgerTrade } from "./opsManual.s
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SB = any;
 
+// Every signed-in user now keeps their own operating book: all ops_* rows are
+// user-scoped by RLS, so no admin gate is needed for personal reads/writes.
+// Only globally-shared threshold changes stay admin-only (assertAdmin below).
 async function assertAdmin(supabase: SB, userId: string): Promise<void> {
   const { data, error } = await supabase.rpc("is_ops_admin", { _user_id: userId });
   if (error) throw new Error(`admin check failed: ${error.message}`);
@@ -33,7 +36,6 @@ function todayUtc(): string {
 const SEED_BANKROLL = 1000;
 
 export async function loadOpsDashboard(supabase: SB, userId: string) {
-  await assertAdmin(supabase, userId);
   const session_date = todayUtc();
 
   const [tradesRes, snapRes, alertsRes, wdRes, modeRes, thrRes, btRes, violRes] = await Promise.all([
@@ -131,7 +133,6 @@ export async function loadOpsDashboard(supabase: SB, userId: string) {
 }
 
 export async function runAndStoreBacktest(supabase: SB, userId: string) {
-  await assertAdmin(supabase, userId);
   const out = await runOpsBacktest(supabase);
   const { error } = await supabase.from("ops_backtest_runs").insert({
     user_id: userId,
@@ -147,7 +148,6 @@ export async function runAndStoreBacktest(supabase: SB, userId: string) {
 }
 
 export async function openTradingDay(supabase: SB, userId: string, morningBankroll: number) {
-  await assertAdmin(supabase, userId);
   const dash = await loadOpsDashboard(supabase, userId);
   const staking = computeStakingMode({
     morningBankroll,
@@ -190,7 +190,6 @@ export interface LogTradeInput {
 }
 
 export async function logOpsTrade(supabase: SB, userId: string, input: LogTradeInput) {
-  await assertAdmin(supabase, userId);
   const dash = await loadOpsDashboard(supabase, userId);
   const utcHour = new Date().getUTCHours();
 
@@ -274,7 +273,6 @@ export async function settleOpsTrade(
   userId: string,
   input: { id: string; result: "win" | "loss" | "void"; realizedPnl: number },
 ) {
-  await assertAdmin(supabase, userId);
   const { data: existing, error: readErr } = await supabase
     .from("ops_trades")
     .select("id, result")
@@ -347,7 +345,6 @@ async function maybeRaiseAlerts(supabase: SB, userId: string) {
 }
 
 export async function acknowledgeAlert(supabase: SB, userId: string, id: string) {
-  await assertAdmin(supabase, userId);
   // Acknowledging never restores trading — resolved_at stays untouched.
   const { error } = await supabase
     .from("ops_alerts")
@@ -364,7 +361,6 @@ export async function recordWithdrawal(
   milestoneTo: number,
   amount: number,
 ) {
-  await assertAdmin(supabase, userId);
   const m = WITHDRAWAL_MILESTONES.find((x) => x.to === milestoneTo);
   if (!m) return { ok: false as const, error: "Unknown milestone" };
   const { error } = await supabase.from("ops_withdrawals").upsert(

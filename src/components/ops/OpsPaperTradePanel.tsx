@@ -1,0 +1,351 @@
+// Paper-money Kalshi 15m trader: live strike, UP/DOWN prices, countdown,
+// entry, hedge (two-sided engine), exit and flip-side detection.
+// Everything here is simulated — no real order ever leaves this panel.
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { FlaskConical, TrendingUp, TrendingDown, Shield, LogOut, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import {
+  getPaperKalshiWindow,
+  listPaperKalshiPositions,
+  paperKalshiEnter,
+  paperKalshiExit,
+  paperKalshiHedge,
+  paperKalshiFlipWatch,
+  settlePaperKalshiPositions,
+  type PaperKalshiPosition,
+} from "@/lib/paperKalshi.functions";
+import { cn } from "@/lib/utils";
+
+const money = (cents: number | null | undefined) =>
+  cents == null ? "—" : `${cents < 0 ? "-" : "+"}$${Math.abs(cents / 100).toFixed(2)}`;
+
+const clock = (s: number | null) => {
+  if (s == null || s < 0) return "--:--";
+  const m = Math.floor(s / 60);
+  return `${String(m).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+};
+
+export function OpsPaperTradePanel() {
+  const qc = useQueryClient();
+  const getWindow = useServerFn(getPaperKalshiWindow);
+  const listFn = useServerFn(listPaperKalshiPositions);
+  const enterFn = useServerFn(paperKalshiEnter);
+  const hedgeFn = useServerFn(paperKalshiHedge);
+  const exitFn = useServerFn(paperKalshiExit);
+  const flipFn = useServerFn(paperKalshiFlipWatch);
+  const settleFn = useServerFn(settlePaperKalshiPositions);
+
+  const [contracts, setContracts] = useState("10");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+
+  const win = useQuery({
+    queryKey: ["paper-kalshi-window"],
+    queryFn: () => getWindow(),
+    refetchInterval: 3_000,
+  });
+
+  const positions = useQuery({
+    queryKey: ["paper-kalshi-positions"],
+    queryFn: () => listFn({ data: { limit: 50 } }),
+    refetchInterval: 15_000,
+  });
+
+  // Local 1s countdown between 3s server refreshes.
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Flip watch + settlement sweep, every 20s.
+  useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      try {
+        await flipFn({});
+        await settleFn({});
+        if (alive) qc.invalidateQueries({ queryKey: ["paper-kalshi-positions"] });
+      } catch { /* best effort */ }
+    };
+    void run();
+    const t = setInterval(run, 20_000);
+    return () => { alive = false; clearInterval(t); };
+  }, [flipFn, settleFn, qc]);
+
+  const w = win.data;
+  const secondsLeft = useMemo(() => {
+    if (!w?.closeTime) return null;
+    return Math.max(0, Math.round((Date.parse(w.closeTime) - Date.now()) / 1000));
+  }, [w?.closeTime, tick]);
+
+  const refreshAll = () => {
+    void win.refetch();
+    void positions.refetch();
+  };
+
+  const act = async (label: string, fn: () => Promise<unknown>) => {
+    setBusy(label);
+    try {
+      const r = (await fn()) as { ok?: boolean; error?: string; evaluation?: { message?: string } };
+      if (r?.ok === false) toast.error(r.error ?? "failed");
+      else if (r?.evaluation?.message) toast.message(r.evaluation.message);
+      else toast.success(`${label} done`);
+      refreshAll();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const n = Math.max(1, Math.min(1000, Number(contracts) || 1));
+  const live = (positions.data ?? []).filter((p) => p.status === "open" || p.status === "hedged");
+  const done = (positions.data ?? []).filter((p) => p.status === "closed" || p.status === "settled");
+  const totalPnl = (positions.data ?? []).reduce((s, p) => s + (p.pnl_cents ?? 0), 0);
+
+  return (
+    <section className="border border-border rounded-lg p-4 space-y-4 font-mono">
+      <header className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <FlaskConical className="h-4 w-4 text-[color:var(--color-primary)]" />
+          <h2 className="text-sm font-bold uppercase tracking-widest">
+            // Paper trade — Kalshi BTC 15m
+          </h2>
+        </div>
+        <button
+          onClick={refreshAll}
+          className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground flex items-center gap-1"
+        >
+          <RefreshCw className="h-3 w-3" /> Refresh
+        </button>
+      </header>
+
+      {/* ---------------- live window strip ---------------- */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
+        <Stat label="Ticker" value={w?.ticker ?? "—"} mono />
+        <Stat label="Strike" value={w?.strike != null ? `$${w.strike.toLocaleString()}` : "—"} />
+        <Stat label="Spot" value={w?.spot != null ? `$${w.spot.toLocaleString()}` : "—"} />
+        <Stat
+          label="Cushion"
+          value={w?.cushionUsd != null ? `${w.cushionUsd >= 0 ? "+" : ""}$${w.cushionUsd.toFixed(0)}` : "—"}
+          tone={w?.cushionUsd == null ? undefined : Math.abs(w.cushionUsd) >= 40 ? "good" : "warn"}
+        />
+        <Stat label="Time left" value={clock(secondsLeft)} tone={secondsLeft != null && secondsLeft < 300 ? "warn" : undefined} />
+      </div>
+
+      {w && !w.ok && (
+        <div className="text-xs text-red-400">No live window: {w.error ?? "unavailable"}</div>
+      )}
+
+      {/* ---------------- UP / DOWN books ---------------- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <SideCard
+          label="UP (YES — closes above strike)"
+          icon={<TrendingUp className="h-4 w-4" />}
+          bid={w?.up.bidCents ?? null}
+          ask={w?.up.askCents ?? null}
+          highlighted={w?.spotSide === "YES"}
+          disabled={!w?.ok || busy != null}
+          onBuy={() => act("Buy UP", () => enterFn({ data: { side: "YES", contracts: n, reason: "manual_paper" } }))}
+        />
+        <SideCard
+          label="DOWN (NO — closes below strike)"
+          icon={<TrendingDown className="h-4 w-4" />}
+          bid={w?.down.bidCents ?? null}
+          ask={w?.down.askCents ?? null}
+          highlighted={w?.spotSide === "NO"}
+          disabled={!w?.ok || busy != null}
+          onBuy={() => act("Buy DOWN", () => enterFn({ data: { side: "NO", contracts: n, reason: "manual_paper" } }))}
+        />
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3 text-xs">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Contracts</span>
+          <input
+            value={contracts}
+            onChange={(e) => setContracts(e.target.value)}
+            inputMode="numeric"
+            className="w-24 bg-background border border-border rounded px-2 py-1"
+          />
+        </label>
+        <div className="text-muted-foreground">
+          Model <b className="text-foreground">{w?.model.side ?? "—"}</b>
+          {w?.model.confidence != null && ` ${(w.model.confidence * 100).toFixed(0)}%`}
+          {"  ·  "}Study <b className="text-foreground">{w?.study.side ?? "—"}</b>
+          {w?.study.confidence != null && ` ${(w.study.confidence * 100).toFixed(0)}%`}
+          {"  ·  "}Verdict <b className="text-foreground">{w?.verdict ?? "—"}</b>
+        </div>
+      </div>
+
+      {/* ---------------- live positions ---------------- */}
+      <div className="space-y-2">
+        <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          Live paper positions ({live.length})
+        </h3>
+        {live.length === 0 && <p className="text-xs text-muted-foreground">No open paper positions.</p>}
+        {live.map((p) => (
+          <LivePositionRow
+            key={p.id}
+            p={p}
+            busy={busy != null}
+            onHedge={() => act("Hedge", () => hedgeFn({ data: { id: p.id, execute: true } }))}
+            onCheckHedge={() => act("Hedge check", () => hedgeFn({ data: { id: p.id, execute: false } }))}
+            onExit={(reason) => act("Exit", () => exitFn({ data: { id: p.id, reason } }))}
+          />
+        ))}
+      </div>
+
+      {/* ---------------- results ---------------- */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            Closed / settled ({done.length})
+          </h3>
+          <span className={cn("text-xs font-bold", totalPnl >= 0 ? "text-emerald-400" : "text-red-400")}>
+            Paper P/L {money(totalPnl)}
+          </span>
+        </div>
+        <div className="max-h-64 overflow-auto">
+          <table className="w-full text-[11px]">
+            <thead className="text-muted-foreground uppercase tracking-widest">
+              <tr className="text-left">
+                <th className="py-1">Window</th>
+                <th>Side</th>
+                <th>Qty</th>
+                <th>Entry</th>
+                <th>Hedge</th>
+                <th>Exit</th>
+                <th>Flip</th>
+                <th>Result</th>
+                <th className="text-right">P/L</th>
+              </tr>
+            </thead>
+            <tbody>
+              {done.map((p) => (
+                <tr key={p.id} className="border-t border-border/50">
+                  <td className="py-1">{new Date(p.close_time).toISOString().slice(11, 16)}Z</td>
+                  <td>{p.entry_side === "YES" ? "UP" : "DOWN"}</td>
+                  <td>{p.entry_contracts}</td>
+                  <td>{p.entry_price_cents}¢</td>
+                  <td>{p.hedge_price_cents != null ? `${p.hedge_side === "YES" ? "UP" : "DOWN"} ${p.hedge_price_cents}¢` : "—"}</td>
+                  <td>{p.exit_price_cents != null ? `${p.exit_price_cents}¢` : "—"}</td>
+                  <td className={p.crossed_strike ? "text-amber-400" : "text-muted-foreground"}>
+                    {p.crossed_strike ? "YES" : "—"}
+                  </td>
+                  <td>{p.outcome ? (p.outcome === "YES" ? "UP" : "DOWN") : p.status}</td>
+                  <td className={cn("text-right", (p.pnl_cents ?? 0) >= 0 ? "text-emerald-400" : "text-red-400")}>
+                    {money(p.pnl_cents)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p className="text-[10px] text-muted-foreground">
+        Simulated fills at the live Kalshi bid/ask. Hedge legs run through the two-sided engine
+        (matched pairs ≤96¢, blocked ≥70¢ dominance, no new legs inside T−5m). Flip = spot has
+        crossed the strike against your side — exit, or exit and buy the cheap other side.
+      </p>
+    </section>
+  );
+}
+
+function Stat({ label, value, tone, mono }: { label: string; value: string; tone?: "good" | "warn"; mono?: boolean }) {
+  return (
+    <div className="border border-border/60 rounded px-2 py-1">
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</div>
+      <div
+        className={cn(
+          "text-sm font-bold truncate",
+          mono && "text-[11px]",
+          tone === "good" && "text-emerald-400",
+          tone === "warn" && "text-amber-400",
+        )}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function SideCard({
+  label, icon, bid, ask, highlighted, disabled, onBuy,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  bid: number | null;
+  ask: number | null;
+  highlighted?: boolean;
+  disabled?: boolean;
+  onBuy: () => void;
+}) {
+  return (
+    <div className={cn("border rounded-lg p-3 space-y-2", highlighted ? "border-[color:var(--color-primary)]" : "border-border")}>
+      <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
+        {icon} {label}
+      </div>
+      <div className="flex items-baseline gap-4">
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Buy (ask)</div>
+          <div className="text-2xl font-bold">{ask != null ? `${ask}¢` : "—"}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Sell (bid)</div>
+          <div className="text-lg">{bid != null ? `${bid}¢` : "—"}</div>
+        </div>
+      </div>
+      <button
+        onClick={onBuy}
+        disabled={disabled || ask == null}
+        className="w-full text-xs uppercase tracking-widest border border-border rounded py-1 hover:bg-muted disabled:opacity-40"
+      >
+        Paper buy
+      </button>
+    </div>
+  );
+}
+
+function LivePositionRow({
+  p, busy, onHedge, onCheckHedge, onExit,
+}: {
+  p: PaperKalshiPosition;
+  busy: boolean;
+  onHedge: () => void;
+  onCheckHedge: () => void;
+  onExit: (reason: string) => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "border rounded p-2 flex flex-wrap items-center gap-3 text-xs",
+        p.crossed_strike ? "border-amber-500/70" : "border-border",
+      )}
+    >
+      <span className="font-bold">{p.entry_side === "YES" ? "UP" : "DOWN"}</span>
+      <span>{p.entry_contracts} @ {p.entry_price_cents}¢</span>
+      {p.hedge_side && <span className="text-muted-foreground">hedge {p.hedge_side === "YES" ? "UP" : "DOWN"} {p.hedge_contracts} @ {p.hedge_price_cents}¢</span>}
+      <span className="text-muted-foreground">{new Date(p.close_time).toISOString().slice(11, 16)}Z</span>
+      {p.crossed_strike && <span className="text-amber-400 font-bold">FLIP — spot crossed strike</span>}
+      <div className="ml-auto flex gap-2">
+        <button onClick={onCheckHedge} disabled={busy} className="border border-border rounded px-2 py-1 hover:bg-muted disabled:opacity-40">
+          Check hedge
+        </button>
+        <button onClick={onHedge} disabled={busy} className="border border-border rounded px-2 py-1 hover:bg-muted disabled:opacity-40 flex items-center gap-1">
+          <Shield className="h-3 w-3" /> Hedge
+        </button>
+        <button
+          onClick={() => onExit(p.crossed_strike ? "flip_exit" : "manual_exit")}
+          disabled={busy}
+          className="border border-border rounded px-2 py-1 hover:bg-muted disabled:opacity-40 flex items-center gap-1"
+        >
+          <LogOut className="h-3 w-3" /> Exit
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -1,9 +1,7 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect } from "react";
 import { Target } from "lucide-react";
-import { usePlan } from "@/hooks/usePlan";
 import { opsGetDashboard } from "@/lib/opsManual/opsManual.functions";
 import { OpsStatusBanner } from "@/components/ops/OpsStatusBanner";
 import { OpsQualificationCard } from "@/components/ops/OpsQualificationCard";
@@ -15,38 +13,28 @@ import { OpsKalshiAccount } from "@/components/ops/OpsKalshiAccount";
 import { OpsAutoTradePanel } from "@/components/ops/OpsAutoTradePanel";
 import { OpsHedgePanel } from "@/components/ops/OpsHedgePanel";
 import { OpsCrossExitShadowPanel } from "@/components/ops/OpsCrossExitShadowPanel";
+import { OpsPaperTradePanel } from "@/components/ops/OpsPaperTradePanel";
 
 export const Route = createFileRoute("/_authenticated/ops-manual")({
   head: () => ({
     meta: [
       { title: "BTC 15m Operating Manual — EdgeGraph AI" },
-      { name: "description", content: "Admin control layer for the BTC 15-minute operating manual: qualification, staking, P/L and kill switches." },
+      { name: "description", content: "Live control layer for the BTC 15-minute operating manual: qualification, staking, P/L and kill switches." },
       { property: "og:title", content: "BTC 15m Operating Manual — EdgeGraph AI" },
-      { property: "og:description", content: "Admin control layer for the BTC 15-minute operating manual." },
+      { property: "og:description", content: "Live control layer for the BTC 15-minute operating manual." },
     ],
   }),
   component: OpsManualPage,
 });
 
 function OpsManualPage() {
-  const { isAdmin, loading } = usePlan();
-  const nav = useNavigate();
   const getDash = useServerFn(opsGetDashboard);
-
-  useEffect(() => {
-    if (!loading && !isAdmin) nav({ to: "/dashboard" });
-  }, [loading, isAdmin, nav]);
 
   const q = useQuery({
     queryKey: ["ops-manual-dashboard"],
     queryFn: () => getDash({}),
-    enabled: !loading && isAdmin,
     refetchInterval: 60_000,
   });
-
-  if (loading || !isAdmin) {
-    return <div className="text-xs text-muted-foreground uppercase tracking-widest">Loading…</div>;
-  }
 
   return (
     <div className="space-y-6 font-mono">
@@ -57,9 +45,12 @@ function OpsManualPage() {
         </h1>
       </div>
       <p className="text-xs text-muted-foreground max-w-3xl">
-        Admin-only control layer. Nothing here places orders automatically — it qualifies windows,
-        fixes the stake, records every bet, and shuts the session down the moment a rule is hit.
+        Your own operating book. Nothing here places real orders automatically — it qualifies
+        windows, fixes the stake, records every bet, and shuts the session down the moment a rule
+        is hit. Paper trading below is fully simulated.
       </p>
+
+      <OpsPaperTradePanel />
 
       {q.isLoading && <div className="text-xs text-muted-foreground">Loading operating data…</div>}
       {q.error && <div className="text-xs text-red-400">{(q.error as Error).message}</div>}
@@ -73,6 +64,7 @@ function OpsManualPage() {
           <OpsStakingPanel dash={q.data} onRefresh={() => q.refetch()} />
           <OpsHedgePanel />
           <OpsCrossExitShadowPanel />
+
           <OpsPnlDashboard dash={q.data} />
           <OpsBacktestPanel dash={q.data} />
           <OpsAlertsPanel dash={q.data} onRefresh={() => q.refetch()} />

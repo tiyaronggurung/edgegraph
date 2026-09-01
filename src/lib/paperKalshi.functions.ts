@@ -1,0 +1,354 @@
+// Paper (fake-money) Kalshi 15m trading — entry, hedge, exit, flip detection.
+// Read-only against Kalshi: never places or cancels a real order. All writes
+// land in public.paper_kalshi_positions, scoped to the calling user by RLS.
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { z } from "zod";
+import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
+import { evaluateSecondLeg, feeCents, HEDGE_RULES } from "@/lib/opsManual/hedgeEngine";
+
+export type PaperSide = "YES" | "NO";
+
+export interface PaperKalshiWindow {
+  ok: boolean;
+  asOf: string;
+  ticker: string | null;
+  strike: number | null;
+  closeTime: string | null;
+  secondsToClose: number | null;
+  spot: number | null;
+  cushionUsd: number | null;
+  /** Side the spot currently favours (YES = above strike). */
+  spotSide: PaperSide | null;
+  up: { bidCents: number | null; askCents: number | null };
+  down: { bidCents: number | null; askCents: number | null };
+  model: { side: PaperSide | null; confidence: number | null };
+  study: { side: PaperSide | null; confidence: number | null };
+  verdict: string | null;
+  reasons: string[];
+  error: string | null;
+}
+
+export interface PaperKalshiPosition {
+  id: string;
+  ticker: string;
+  close_time: string;
+  strike: number | null;
+  entry_side: PaperSide;
+  entry_contracts: number;
+  entry_price_cents: number;
+  entry_spot: number | null;
+  entry_seconds_left: number | null;
+  entry_reason: string | null;
+  hedge_side: PaperSide | null;
+  hedge_contracts: number | null;
+  hedge_price_cents: number | null;
+  hedged_at: string | null;
+  exit_price_cents: number | null;
+  exit_contracts: number | null;
+  exited_at: string | null;
+  exit_reason: string | null;
+  crossed_strike: boolean;
+  crossed_at: string | null;
+  status: "open" | "hedged" | "closed" | "settled" | "void";
+  outcome: PaperSide | null;
+  pnl_cents: number | null;
+  settled_at: string | null;
+  created_at: string;
+}
+
+const c = (dollars: number | null | undefined): number | null =>
+  dollars == null || !Number.isFinite(dollars) ? null : Math.round(dollars * 100);
+
+const flip = (s: PaperSide): PaperSide => (s === "YES" ? "NO" : "YES");
+
+async function loadWindow(): Promise<PaperKalshiWindow> {
+    const asOf = new Date().toISOString();
+    const base: PaperKalshiWindow = {
+      ok: false, asOf, ticker: null, strike: null, closeTime: null, secondsToClose: null,
+      spot: null, cushionUsd: null, spotSide: null,
+      up: { bidCents: null, askCents: null },
+      down: { bidCents: null, askCents: null },
+      model: { side: null, confidence: null },
+      study: { side: null, confidence: null },
+      verdict: null, reasons: [], error: null,
+    };
+
+    const { getBtcConsensus } = await import("@/lib/btcConsensus.server");
+    const [kRes, cRes] = await Promise.allSettled([getKalshiImpliedSpot(), getBtcConsensus()]);
+    const k = kRes.status === "fulfilled" ? kRes.value : null;
+    const con = cRes.status === "fulfilled" ? cRes.value : null;
+
+    if (!k?.ok || !k.ticker || k.strike == null) {
+      return { ...base, error: k?.error ?? "no live kalshi 15m market" };
+    }
+
+    const yesBid = c(k.yesBid);
+    const yesAsk = c(k.yesAsk);
+    const stc = k.secondsToClose ?? null;
+    const closeTime = stc != null ? new Date(Date.now() + stc * 1000).toISOString() : null;
+    const spot = con?.spot ?? null;
+    const cushion = spot != null && k.strike != null ? Number((spot - k.strike).toFixed(2)) : null;
+
+    return {
+      ...base,
+      ok: true,
+      ticker: k.ticker,
+      strike: k.strike,
+      closeTime,
+      secondsToClose: stc,
+      spot,
+      cushionUsd: cushion,
+      spotSide: cushion == null ? null : cushion >= 0 ? "YES" : "NO",
+      up: { bidCents: yesBid, askCents: yesAsk },
+      down: {
+        bidCents: yesAsk == null ? null : 100 - yesAsk,
+        askCents: yesBid == null ? null : 100 - yesBid,
+      },
+      model: { side: (con?.model.side ?? null) as PaperSide | null, confidence: con?.model.confidence ?? null },
+      study: { side: (con?.study.side ?? null) as PaperSide | null, confidence: con?.study.confidence ?? null },
+      verdict: con?.verdict ?? null,
+      reasons: con?.reasons ?? [],
+    };
+}
+
+/** Live Kalshi quote + model/study signal for the current 15m window. */
+export const getPaperKalshiWindow = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async (): Promise<PaperKalshiWindow> => loadWindow());
+
+export const listPaperKalshiPositions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { limit?: number } | undefined) => d ?? {})
+  .handler(async ({ context, data }): Promise<PaperKalshiPosition[]> => {
+    const limit = Math.min(Math.max(data.limit ?? 50, 1), 200);
+    const { data: rows } = await context.supabase
+      .from("paper_kalshi_positions")
+      .select("*")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    return (rows ?? []) as PaperKalshiPosition[];
+  });
+
+/** Open a paper position at the live ask of the chosen side. */
+export const paperKalshiEnter = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      side: z.enum(["YES", "NO"]),
+      contracts: z.number().int().min(1).max(1000),
+      reason: z.string().max(200).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const w = await loadWindow();
+    if (!w.ok || !w.ticker || !w.closeTime) return { ok: false as const, error: w.error ?? "no live market" };
+    const ask = data.side === "YES" ? w.up.askCents : w.down.askCents;
+    if (ask == null || ask < 1 || ask > 99) return { ok: false as const, error: `no tradeable ask (${ask}¢)` };
+
+    const { data: row, error } = await context.supabase
+      .from("paper_kalshi_positions")
+      .insert({
+        user_id: context.userId,
+        ticker: w.ticker,
+        close_time: w.closeTime,
+        strike: w.strike,
+        entry_side: data.side,
+        entry_contracts: data.contracts,
+        entry_price_cents: ask,
+        entry_spot: w.spot,
+        entry_seconds_left: w.secondsToClose,
+        entry_reason: data.reason ?? null,
+        status: "open",
+      })
+      .select("id")
+      .single();
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const, id: row.id as string, side: data.side, priceCents: ask, contracts: data.contracts };
+  });
+
+/** Evaluate (and optionally take) the opposite leg using the hedge engine. */
+export const paperKalshiHedge = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ id: z.string().uuid(), execute: z.boolean().default(false) }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: pos } = await context.supabase
+      .from("paper_kalshi_positions")
+      .select("*")
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (!pos) return { ok: false as const, error: "position not found" };
+    if (pos.status !== "open" && pos.status !== "hedged") {
+      return { ok: false as const, error: `position is ${pos.status}` };
+    }
+
+    const w = await loadWindow();
+    if (!w.ok) return { ok: false as const, error: w.error ?? "no live market" };
+    const oppSide = flip(pos.entry_side as PaperSide);
+    const oppAsk = oppSide === "YES" ? w.up.askCents : w.down.askCents;
+    const domPrice = Math.max(w.up.bidCents ?? 0, w.down.bidCents ?? 0);
+    if (oppAsk == null) return { ok: false as const, error: "no opposite ask" };
+
+    const entryCost = pos.entry_price_cents + feeCents(pos.entry_price_cents);
+    const evaluation = evaluateSecondLeg(
+      {
+        sideA: pos.entry_side,
+        sharesA: pos.entry_contracts,
+        avgCostA: entryCost,
+        sharesB: pos.hedge_contracts ?? 0,
+        dominantSidePrice: domPrice,
+        sideSpendUsd: ((pos.hedge_contracts ?? 0) * (pos.hedge_price_cents ?? 0)) / 100,
+        windowSpendUsd: (pos.entry_contracts * pos.entry_price_cents) / 100,
+      },
+      { oppAskCents: oppAsk, secondsLeft: w.secondsToClose ?? 0 },
+    );
+
+    if (!data.execute || evaluation.decision !== "BUY") {
+      return { ok: true as const, executed: false, evaluation, rules: HEDGE_RULES };
+    }
+
+    const { error } = await context.supabase
+      .from("paper_kalshi_positions")
+      .update({
+        hedge_side: oppSide,
+        hedge_contracts: (pos.hedge_contracts ?? 0) + evaluation.shares,
+        hedge_price_cents: evaluation.limitPriceCents,
+        hedged_at: new Date().toISOString(),
+        status: "hedged",
+      })
+      .eq("id", pos.id)
+      .eq("user_id", context.userId);
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const, executed: true, evaluation, rules: HEDGE_RULES };
+  });
+
+/** Sell out of a paper position at the live bid(s). */
+export const paperKalshiExit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ id: z.string().uuid(), reason: z.string().max(200).optional() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: pos } = await context.supabase
+      .from("paper_kalshi_positions")
+      .select("*")
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (!pos) return { ok: false as const, error: "position not found" };
+    if (pos.status !== "open" && pos.status !== "hedged") {
+      return { ok: false as const, error: `position is ${pos.status}` };
+    }
+
+    const w = await loadWindow();
+    if (!w.ok) return { ok: false as const, error: w.error ?? "no live market" };
+    const bidFor = (s: PaperSide) => (s === "YES" ? w.up.bidCents : w.down.bidCents);
+    const entryBid = bidFor(pos.entry_side as PaperSide);
+    if (entryBid == null) return { ok: false as const, error: "no bid to sell into" };
+
+    let pnl = (entryBid - pos.entry_price_cents) * pos.entry_contracts;
+    if (pos.hedge_side && pos.hedge_contracts) {
+      const hb = bidFor(pos.hedge_side as PaperSide);
+      if (hb != null) pnl += (hb - (pos.hedge_price_cents ?? 0)) * pos.hedge_contracts;
+    }
+
+    const { error } = await context.supabase
+      .from("paper_kalshi_positions")
+      .update({
+        exit_price_cents: entryBid,
+        exit_contracts: pos.entry_contracts,
+        exited_at: new Date().toISOString(),
+        exit_reason: data.reason ?? "manual_exit",
+        pnl_cents: Math.round(pnl),
+        status: "closed",
+      })
+      .eq("id", pos.id)
+      .eq("user_id", context.userId);
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const, exitCents: entryBid, pnlCents: Math.round(pnl) };
+  });
+
+/**
+ * Flip watch: mark any live position whose spot has crossed back over the
+ * strike against the held side. Pure bookkeeping — the panel decides what to
+ * do with the flag (exit, or exit + buy the cheap other side).
+ */
+export const paperKalshiFlipWatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const w = await loadWindow();
+    if (!w.ok || !w.ticker || w.spotSide == null) return { ok: false as const, error: w.error ?? "no live market" };
+
+    const { data: rows } = await context.supabase
+      .from("paper_kalshi_positions")
+      .select("id, entry_side, crossed_strike")
+      .eq("user_id", context.userId)
+      .eq("ticker", w.ticker)
+      .in("status", ["open", "hedged"]);
+
+    const flipped: string[] = [];
+    for (const r of (rows ?? []) as Array<{ id: string; entry_side: PaperSide; crossed_strike: boolean }>) {
+      if (r.crossed_strike || r.entry_side === w.spotSide) continue;
+      await context.supabase
+        .from("paper_kalshi_positions")
+        .update({ crossed_strike: true, crossed_at: new Date().toISOString() })
+        .eq("id", r.id)
+        .eq("user_id", context.userId);
+      flipped.push(r.id);
+    }
+    return {
+      ok: true as const,
+      spotSide: w.spotSide,
+      cushionUsd: w.cushionUsd,
+      secondsToClose: w.secondsToClose,
+      flipped,
+    };
+  });
+
+/** Settle any due paper positions from Kalshi's official result. */
+export const settlePaperKalshiPositions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ settled: number }> => {
+    const { data: due } = await context.supabase
+      .from("paper_kalshi_positions")
+      .select("id, ticker, entry_side, entry_contracts, entry_price_cents, hedge_side, hedge_contracts, hedge_price_cents")
+      .eq("user_id", context.userId)
+      .in("status", ["open", "hedged"])
+      .lt("close_time", new Date().toISOString())
+      .limit(50);
+    const pending = (due ?? []) as Array<Record<string, any>>;
+    if (!pending.length) return { settled: 0 };
+
+    const { fetchKalshiSettlement } = await import("@/lib/kalshiSettle");
+    let settled = 0;
+    for (const p of pending) {
+      const k = await fetchKalshiSettlement(p.ticker).catch(() => null);
+      if (!k?.finalized || !k.result) continue;
+      const outcome: PaperSide = k.result === "yes" ? "YES" : "NO";
+
+      const legPnl = (side: PaperSide | null, n: number | null, price: number | null) => {
+        if (!side || !n || price == null) return 0;
+        return (side === outcome ? 100 - price : -price) * n;
+      };
+      const pnl =
+        legPnl(p.entry_side as PaperSide, p.entry_contracts, p.entry_price_cents) +
+        legPnl(p.hedge_side as PaperSide | null, p.hedge_contracts, p.hedge_price_cents);
+
+      const { error } = await context.supabase
+        .from("paper_kalshi_positions")
+        .update({
+          status: "settled",
+          outcome,
+          pnl_cents: Math.round(pnl),
+          settled_at: new Date().toISOString(),
+        })
+        .eq("id", p.id)
+        .eq("user_id", context.userId);
+      if (!error) settled++;
+    }
+    return { settled };
+  });

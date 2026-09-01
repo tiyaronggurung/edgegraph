@@ -5042,6 +5042,96 @@ export type Database = {
         }
         Relationships: []
       }
+      paper_kalshi_positions: {
+        Row: {
+          close_time: string
+          created_at: string
+          crossed_at: string | null
+          crossed_strike: boolean
+          entry_contracts: number
+          entry_price_cents: number
+          entry_reason: string | null
+          entry_seconds_left: number | null
+          entry_side: string
+          entry_spot: number | null
+          exit_contracts: number | null
+          exit_price_cents: number | null
+          exit_reason: string | null
+          exited_at: string | null
+          hedge_contracts: number | null
+          hedge_price_cents: number | null
+          hedge_side: string | null
+          hedged_at: string | null
+          id: string
+          outcome: string | null
+          pnl_cents: number | null
+          settled_at: string | null
+          status: string
+          strike: number | null
+          ticker: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          close_time: string
+          created_at?: string
+          crossed_at?: string | null
+          crossed_strike?: boolean
+          entry_contracts: number
+          entry_price_cents: number
+          entry_reason?: string | null
+          entry_seconds_left?: number | null
+          entry_side: string
+          entry_spot?: number | null
+          exit_contracts?: number | null
+          exit_price_cents?: number | null
+          exit_reason?: string | null
+          exited_at?: string | null
+          hedge_contracts?: number | null
+          hedge_price_cents?: number | null
+          hedge_side?: string | null
+          hedged_at?: string | null
+          id?: string
+          outcome?: string | null
+          pnl_cents?: number | null
+          settled_at?: string | null
+          status?: string
+          strike?: number | null
+          ticker: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          close_time?: string
+          created_at?: string
+          crossed_at?: string | null
+          crossed_strike?: boolean
+          entry_contracts?: number
+          entry_price_cents?: number
+          entry_reason?: string | null
+          entry_seconds_left?: number | null
+          entry_side?: string
+          entry_spot?: number | null
+          exit_contracts?: number | null
+          exit_price_cents?: number | null
+          exit_reason?: string | null
+          exited_at?: string | null
+          hedge_contracts?: number | null
+          hedge_price_cents?: number | null
+          hedge_side?: string | null
+          hedged_at?: string | null
+          id?: string
+          outcome?: string | null
+          pnl_cents?: number | null
+          settled_at?: string | null
+          status?: string
+          strike?: number | null
+          ticker?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       patterns: {
         Row: {
           best_use: string | null
