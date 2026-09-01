@@ -118,7 +118,7 @@ export async function getBtcLevels(opts?: { limit?: number; includeCandles?: boo
     ok: false,
     asOf: new Date().toISOString(),
     source: "none",
-    spot: null, buy: null, mid: null, sell: null,
+    spot: null, spotSource: "none", buy: null, mid: null, sell: null,
     channelWidthPct: null, distToBuyPct: null, distToSellPct: null, distToMidUsd: null,
     position: "unknown",
     bias: "neutral",
