@@ -100,6 +100,8 @@ const rowToSettings = (r: any): OwnEngineSettings => ({
   blendStudy: r.blend_study !== false,
   studyWeight: Number(r.study_weight ?? OWN_RULES.studyWeight),
   minStudyConf: Number(r.min_study_conf ?? OWN_RULES.minStudyConf),
+  highCushionUsd: Number(r.high_cushion_usd ?? OWN_RULES.highCushionUsd),
+  highCushionMaxPriceCents: Number(r.high_cushion_max_price_cents ?? OWN_RULES.highCushionMaxPriceCents),
 });
 
 async function loadSettings(supabase: any, userId: string): Promise<OwnEngineSettings> {
