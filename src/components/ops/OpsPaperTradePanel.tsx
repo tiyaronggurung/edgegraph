@@ -17,9 +17,11 @@ import {
   paperKalshiSetAutoHedge,
   listPaperKalshiEvents,
   settlePaperKalshiPositions,
+  paperKalshiAutoBuyTick,
   type PaperKalshiPosition,
   type PaperKalshiEvent,
 } from "@/lib/paperKalshi.functions";
+import { OpsPaperPnlChart } from "@/components/ops/OpsPaperPnlChart";
 import { cn } from "@/lib/utils";
 
 const money = (cents: number | null | undefined) =>
@@ -43,12 +45,14 @@ export function OpsPaperTradePanel() {
   const autoHedgeTick = useServerFn(paperKalshiAutoHedgeTick);
   const setAutoHedgeFn = useServerFn(paperKalshiSetAutoHedge);
   const eventsFn = useServerFn(listPaperKalshiEvents);
+  const autoBuyTick = useServerFn(paperKalshiAutoBuyTick);
 
   const [contracts, setContracts] = useState("10");
   const [busy, setBusy] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [autoHedge, setAutoHedge] = useState(true);
   const [tab, setTab] = useState<"holdings" | "activity" | "transactions">("holdings");
+  const [autoBuyStatus, setAutoBuyStatus] = useState<string | null>(null);
 
   const win = useQuery({
     queryKey: ["paper-kalshi-window"],
@@ -161,6 +165,8 @@ export function OpsPaperTradePanel() {
         />
         <Stat label="Time left" value={clock(secondsLeft)} tone={secondsLeft != null && secondsLeft < 300 ? "warn" : undefined} />
       </div>
+
+      <OpsPaperPnlChart autoBuyStatus={autoBuyStatus} />
 
       {w && !w.ok && (
         <div className="text-xs text-red-400">No live window: {w.error ?? "unavailable"}</div>
