@@ -80,6 +80,8 @@ export interface OwnSignals {
   modelConf: number | null;
   studySide: OwnSide | null;
   studyConf: number | null;
+  /** Study side came from the CVV shadow lock, not a real T7 lock. */
+  studyIsFallback?: boolean;
   verdict: "ALLOW" | "CAUTION" | "SKIP" | null;
 }
 

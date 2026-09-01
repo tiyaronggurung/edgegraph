@@ -129,8 +129,28 @@ interface Quote {
   signals: OwnSignals;
 }
 
+/**
+ * Signal layer. When the CVV gate blocked the T7 lock — and that missing lock
+ * is the ONLY thing making the consensus verdict SKIP — fall back to the CVV
+ * shadow side so the engine can still evaluate the window.
+ */
+function buildSignals(con: any): OwnSignals {
+  const studySide = (con?.study?.side ?? null) as OwnSide | null;
+  const studyConf = (con?.study?.confidence ?? null) as number | null;
+  const fallbackSide = (con?.study?.fallbackSide ?? null) as OwnSide | null;
+  const useFallback = !studySide && !!fallbackSide && con?.studyLockOnlyBlock === true;
+  return {
+    modelSide: (con?.model?.side ?? null) as OwnSide | null,
+    modelConf: con?.model?.confidence ?? null,
+    studySide: useFallback ? fallbackSide : studySide,
+    studyConf: useFallback ? ((con?.study?.fallbackConfidence ?? null) as number | null) : studyConf,
+    studyIsFallback: useFallback,
+    verdict: useFallback ? "CAUTION" : ((con?.verdict ?? null) as OwnSignals["verdict"]),
+  };
+}
+
 const EMPTY_SIGNALS: OwnSignals = {
-  modelSide: null, modelConf: null, studySide: null, studyConf: null, verdict: null,
+  modelSide: null, modelConf: null, studySide: null, studyConf: null, studyIsFallback: false, verdict: null,
 };
 
 async function loadQuote(): Promise<Quote> {
@@ -163,13 +183,7 @@ async function loadQuote(): Promise<Quote> {
     cushionUsd: spot != null ? Number((spot - k.strike).toFixed(2)) : null,
     up: { bidCents: yesBid, askCents: yesAsk },
     down: { bidCents: yesAsk == null ? null : 100 - yesAsk, askCents: yesBid == null ? null : 100 - yesBid },
-    signals: {
-      modelSide: (con?.model.side ?? null) as OwnSide | null,
-      modelConf: con?.model.confidence ?? null,
-      studySide: (con?.study.side ?? null) as OwnSide | null,
-      studyConf: con?.study.confidence ?? null,
-      verdict: (con?.verdict ?? null) as OwnSignals["verdict"],
-    },
+    signals: buildSignals(con),
   };
 }
 
