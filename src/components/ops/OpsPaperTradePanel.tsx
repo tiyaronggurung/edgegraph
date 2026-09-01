@@ -219,11 +219,11 @@ export function OpsPaperTradePanel() {
         </label>
         <div className="text-muted-foreground">
           Model <b className="text-foreground">{w?.model.side ?? "—"}</b>
-          {w?.model.confidence != null && ` ${(w.model.confidence * 100).toFixed(0)}%`}
           {"  ·  "}Study <b className="text-foreground">{w?.study.side ?? "—"}</b>
           {w?.study.confidence != null && ` ${(w.study.confidence * 100).toFixed(0)}%`}
           {"  ·  "}Verdict <b className="text-foreground">{w?.verdict ?? "—"}</b>
         </div>
+
       </div>
 
       {/* ---------------- auto-hedge switch ---------------- */}
