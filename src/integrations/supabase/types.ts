@@ -5042,6 +5042,45 @@ export type Database = {
         }
         Relationships: []
       }
+      paper_kalshi_account: {
+        Row: {
+          auto_buy: boolean
+          auto_buy_contracts: number
+          auto_buy_max_ask_cents: number
+          auto_buy_min_conf: number
+          auto_buy_min_cushion_usd: number
+          cash_cents: number
+          created_at: string
+          starting_cents: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_buy?: boolean
+          auto_buy_contracts?: number
+          auto_buy_max_ask_cents?: number
+          auto_buy_min_conf?: number
+          auto_buy_min_cushion_usd?: number
+          cash_cents?: number
+          created_at?: string
+          starting_cents?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_buy?: boolean
+          auto_buy_contracts?: number
+          auto_buy_max_ask_cents?: number
+          auto_buy_min_conf?: number
+          auto_buy_min_cushion_usd?: number
+          cash_cents?: number
+          created_at?: string
+          starting_cents?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       paper_kalshi_events: {
         Row: {
           auto: boolean

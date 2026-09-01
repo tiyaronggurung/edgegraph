@@ -17,9 +17,11 @@ import {
   paperKalshiSetAutoHedge,
   listPaperKalshiEvents,
   settlePaperKalshiPositions,
+  paperKalshiAutoBuyTick,
   type PaperKalshiPosition,
   type PaperKalshiEvent,
 } from "@/lib/paperKalshi.functions";
+import { OpsPaperPnlChart } from "@/components/ops/OpsPaperPnlChart";
 import { cn } from "@/lib/utils";
 
 const money = (cents: number | null | undefined) =>
@@ -43,12 +45,14 @@ export function OpsPaperTradePanel() {
   const autoHedgeTick = useServerFn(paperKalshiAutoHedgeTick);
   const setAutoHedgeFn = useServerFn(paperKalshiSetAutoHedge);
   const eventsFn = useServerFn(listPaperKalshiEvents);
+  const autoBuyTick = useServerFn(paperKalshiAutoBuyTick);
 
   const [contracts, setContracts] = useState("10");
   const [busy, setBusy] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [autoHedge, setAutoHedge] = useState(true);
   const [tab, setTab] = useState<"holdings" | "activity" | "transactions">("holdings");
+  const [autoBuyStatus, setAutoBuyStatus] = useState<string | null>(null);
 
   const win = useQuery({
     queryKey: ["paper-kalshi-window"],
@@ -81,17 +85,24 @@ export function OpsPaperTradePanel() {
       try {
         await flipFn({});
         if (autoHedge) await autoHedgeTick({});
+        try {
+          const r = await autoBuyTick({});
+          if (alive) setAutoBuyStatus(r.fired ? `FILLED ${r.side} @ ${r.askCents}¢` : r.reason);
+          if (r.fired) toast.success(`Auto-buy ${r.side} @ ${r.askCents}¢ × ${r.contracts}`);
+        } catch { /* auto-buy is best effort */ }
         await settleFn({});
         if (alive) {
           qc.invalidateQueries({ queryKey: ["paper-kalshi-positions"] });
           qc.invalidateQueries({ queryKey: ["paper-kalshi-events"] });
+          qc.invalidateQueries({ queryKey: ["paper-kalshi-equity"] });
         }
       } catch { /* best effort */ }
     };
     void run();
     const t = setInterval(run, 20_000);
     return () => { alive = false; clearInterval(t); };
-  }, [flipFn, settleFn, autoHedgeTick, autoHedge, qc]);
+  }, [flipFn, settleFn, autoHedgeTick, autoBuyTick, autoHedge, qc]);
+
 
   const w = win.data;
   const secondsLeft = useMemo(() => {
@@ -154,6 +165,8 @@ export function OpsPaperTradePanel() {
         />
         <Stat label="Time left" value={clock(secondsLeft)} tone={secondsLeft != null && secondsLeft < 300 ? "warn" : undefined} />
       </div>
+
+      <OpsPaperPnlChart autoBuyStatus={autoBuyStatus} />
 
       {w && !w.ok && (
         <div className="text-xs text-red-400">No live window: {w.error ?? "unavailable"}</div>
