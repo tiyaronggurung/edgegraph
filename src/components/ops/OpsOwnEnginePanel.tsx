@@ -154,6 +154,15 @@ export function OpsOwnEnginePanel() {
         </div>
       </div>
 
+      {/* position trading log — aggregated fills, mark-to-market */}
+      <PositionLog
+        orders={orders.data ?? []}
+        skips={skips.data ?? []}
+        ticker={s?.ticker ?? null}
+        up={s?.up ?? null}
+        down={s?.down ?? null}
+      />
+
       {/* feeds */}
       <div className="flex gap-1 border-b border-border">
         {([["orders", `Orders (${orders.data?.length ?? 0})`], ["skips", `Skips (${skips.data?.length ?? 0})`]] as const).map(([k, l]) => (
