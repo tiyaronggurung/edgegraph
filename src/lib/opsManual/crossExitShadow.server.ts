@@ -325,10 +325,20 @@ function entryToInsert(entry: CrossExitEntry, cross: CrossEvalResult, pnl?: PnlG
 /** Upsert a shadow row for a given entry. */
 export async function upsertCrossExitShadow(db: SB, entry: CrossExitEntry, cross: CrossEvalResult, pnl?: PnlGrading) {
   const payload = entryToInsert(entry, cross, pnl);
-  const { error } = await db.from("btc_cross_exit_shadow").upsert(payload, {
-    onConflict: "ticker,close_time,source,trade_id",
-    ignoreDuplicates: false,
-  });
+  // The unique index includes trade_id, which is NULL for simulated rows — and
+  // NULLs never collide in Postgres — so do an explicit find-then-write.
+  let q = db
+    .from("btc_cross_exit_shadow")
+    .select("id")
+    .eq("ticker", entry.ticker)
+    .eq("close_time", entry.closeTime)
+    .eq("source", entry.source);
+  q = entry.tradeId ? q.eq("trade_id", entry.tradeId) : q.is("trade_id", null);
+  const { data: existing } = await q.maybeSingle();
+
+  const { error } = existing?.id
+    ? await db.from("btc_cross_exit_shadow").update(payload).eq("id", existing.id)
+    : await db.from("btc_cross_exit_shadow").insert(payload);
   if (error) throw new Error(`btc_cross_exit_shadow upsert failed: ${error.message}`);
 }
 
@@ -412,7 +422,7 @@ export async function backfillCrossExitShadowRange(
 
   const { data: windows, error } = await db
     .from("btc_window_snapshots")
-    .select("ticker, close_time, strike, outcome")
+    .select("ticker, close_time, strike_usd, outcome")
     .gte("close_time", startTs)
     .lte("close_time", endTs)
     .not("outcome", "is", null)
@@ -427,7 +437,7 @@ export async function backfillCrossExitShadowRange(
       unique.set(key, {
         ticker: r.ticker as string,
         close_time: r.close_time as string,
-        strike: Number(r.strike),
+        strike: Number(r.strike_usd),
         outcome: String(r.outcome) as "YES" | "NO",
       });
     }
