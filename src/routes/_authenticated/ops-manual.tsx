@@ -1,9 +1,7 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect } from "react";
 import { Target } from "lucide-react";
-import { usePlan } from "@/hooks/usePlan";
 import { opsGetDashboard } from "@/lib/opsManual/opsManual.functions";
 import { OpsStatusBanner } from "@/components/ops/OpsStatusBanner";
 import { OpsQualificationCard } from "@/components/ops/OpsQualificationCard";
@@ -15,14 +13,15 @@ import { OpsKalshiAccount } from "@/components/ops/OpsKalshiAccount";
 import { OpsAutoTradePanel } from "@/components/ops/OpsAutoTradePanel";
 import { OpsHedgePanel } from "@/components/ops/OpsHedgePanel";
 import { OpsCrossExitShadowPanel } from "@/components/ops/OpsCrossExitShadowPanel";
+import { OpsPaperTradePanel } from "@/components/ops/OpsPaperTradePanel";
 
 export const Route = createFileRoute("/_authenticated/ops-manual")({
   head: () => ({
     meta: [
       { title: "BTC 15m Operating Manual — EdgeGraph AI" },
-      { name: "description", content: "Admin control layer for the BTC 15-minute operating manual: qualification, staking, P/L and kill switches." },
+      { name: "description", content: "Live control layer for the BTC 15-minute operating manual: qualification, staking, P/L and kill switches." },
       { property: "og:title", content: "BTC 15m Operating Manual — EdgeGraph AI" },
-      { property: "og:description", content: "Admin control layer for the BTC 15-minute operating manual." },
+      { property: "og:description", content: "Live control layer for the BTC 15-minute operating manual." },
     ],
   }),
   component: OpsManualPage,
