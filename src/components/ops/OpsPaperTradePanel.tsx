@@ -1,6 +1,7 @@
 // Paper-money Kalshi 15m trader: live strike, UP/DOWN prices, countdown,
 // entry, hedge (two-sided engine), exit and flip-side detection.
 // Everything here is simulated — no real order ever leaves this panel.
+import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -105,6 +106,13 @@ export function OpsPaperTradePanel() {
 
 
   const w = win.data;
+  // Same live composite feed the trendline chart uses — ticks at ~60fps.
+  const liveFeed = useLiveCompositeSpot();
+  const liveSpot = liveFeed.spot;
+  const displaySpot = liveSpot ?? w?.spot ?? null;
+  const displayCushion = displaySpot != null && w?.strike != null
+    ? displaySpot - w.strike
+    : w?.cushionUsd ?? null;
   const secondsLeft = useMemo(() => {
     if (!w?.closeTime) return null;
     return Math.max(0, Math.round((Date.parse(w.closeTime) - Date.now()) / 1000));
@@ -157,11 +165,16 @@ export function OpsPaperTradePanel() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
         <Stat label="Ticker" value={w?.ticker ?? "—"} mono />
         <Stat label="Strike" value={w?.strike != null ? `$${w.strike.toLocaleString()}` : "—"} />
-        <Stat label={w?.spotSource === "own_composite" ? "Spot (our feed)" : "Spot"} value={w?.spot != null ? `$${w.spot.toLocaleString()}` : "—"} />
+        <Stat
+          label={liveSpot != null ? "Spot (live)" : w?.spotSource === "own_composite" ? "Spot (our feed)" : "Spot"}
+          value={displaySpot != null
+            ? `$${displaySpot.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : "—"}
+        />
         <Stat
           label="Cushion"
-          value={w?.cushionUsd != null ? `${w.cushionUsd >= 0 ? "+" : ""}$${w.cushionUsd.toFixed(0)}` : "—"}
-          tone={w?.cushionUsd == null ? undefined : Math.abs(w.cushionUsd) >= 40 ? "good" : "warn"}
+          value={displayCushion != null ? `${displayCushion >= 0 ? "+" : ""}$${displayCushion.toFixed(0)}` : "—"}
+          tone={displayCushion == null ? undefined : Math.abs(displayCushion) >= 40 ? "good" : "warn"}
         />
         <Stat label="Time left" value={clock(secondsLeft)} tone={secondsLeft != null && secondsLeft < 300 ? "warn" : undefined} />
       </div>
