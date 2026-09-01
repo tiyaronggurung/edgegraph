@@ -129,7 +129,7 @@ async function loadWindow(): Promise<PaperKalshiWindow> {
     const asOf = new Date().toISOString();
     const base: PaperKalshiWindow = {
       ok: false, asOf, ticker: null, strike: null, closeTime: null, secondsToClose: null,
-      spot: null, cushionUsd: null, spotSide: null,
+      spot: null, spotSource: "none", cushionUsd: null, spotSide: null,
       up: { bidCents: null, askCents: null },
       down: { bidCents: null, askCents: null },
       model: { side: null, confidence: null },
@@ -161,6 +161,7 @@ async function loadWindow(): Promise<PaperKalshiWindow> {
       closeTime,
       secondsToClose: stc,
       spot,
+      spotSource: (con?.spotSource ?? "none") as PaperWindow["spotSource"],
       cushionUsd: cushion,
       spotSide: cushion == null ? null : cushion >= 0 ? "YES" : "NO",
       up: { bidCents: yesBid, askCents: yesAsk },
