@@ -27,6 +27,9 @@ export interface OwnRules {
   blendStudy: boolean;
   studyWeight: number;
   minStudyConf: number;
+  /* --- high-cushion price exception (C) --- */
+  highCushionUsd: number;
+  highCushionMaxPriceCents: number;
 }
 
 export const OWN_RULES: OwnRules = {
