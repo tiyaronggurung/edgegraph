@@ -10,6 +10,7 @@ import {
   listOwnEngineOrders, listOwnEngineSkips,
 } from "@/lib/ownModel/ownEngine.functions";
 import { cn } from "@/lib/utils";
+import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 
 const money = (c: number | null | undefined) =>
   c == null ? "—" : `${c < 0 ? "-" : ""}$${Math.abs(c / 100).toFixed(2)}`;
@@ -56,6 +57,12 @@ export function OpsOwnEnginePanel() {
   }, [tickFn, qc]);
 
   const s = st.data;
+  // Same live composite feed the trendline chart uses — ~60fps ticks.
+  const liveFeed = useLiveCompositeSpot();
+  const displaySpot = liveFeed.spot ?? s?.spot ?? null;
+  const displayCushion = displaySpot != null && s?.strike != null
+    ? displaySpot - s.strike
+    : s?.cushionUsd ?? null;
   const set = s?.settings;
   const d = s?.decision;
 
@@ -152,8 +159,11 @@ export function OpsOwnEnginePanel() {
       {/* live window */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-xs">
         <Cell label="Strike" v={s?.strike != null ? `$${s.strike.toLocaleString()}` : "—"} />
-        <Cell label={s?.spotSource === "own_composite" ? "Spot (our feed)" : "Spot"} v={s?.spot != null ? `$${s.spot.toLocaleString()}` : "—"} />
-        <Cell label="Cushion" v={s?.cushionUsd != null ? `${s.cushionUsd >= 0 ? "+" : ""}$${s.cushionUsd.toFixed(0)}` : "—"} />
+        <Cell
+          label={liveFeed.spot != null ? "Spot (live)" : s?.spotSource === "own_composite" ? "Spot (our feed)" : "Spot"}
+          v={displaySpot != null ? `$${displaySpot.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+        />
+        <Cell label="Cushion" v={displayCushion != null ? `${displayCushion >= 0 ? "+" : ""}$${displayCushion.toFixed(0)}` : "—"} />
         <Cell label="Time left" v={clock(s?.secondsLeft)} />
         <Cell label="P(up)" v={s?.probUp != null ? `${(s.probUp * 100).toFixed(1)}%` : "—"} />
         <Cell label="Exp. move" v={s?.expectedMoveUsd != null ? `$${s.expectedMoveUsd.toFixed(0)}` : "—"} />
