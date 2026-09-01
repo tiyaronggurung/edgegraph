@@ -146,11 +146,14 @@ function buildSignals(con: any): OwnSignals {
     studyConf: useFallback ? ((con?.study?.fallbackConfidence ?? null) as number | null) : studyConf,
     studyIsFallback: useFallback,
     verdict: useFallback ? "CAUTION" : ((con?.verdict ?? null) as OwnSignals["verdict"]),
+    verdictSide: (con?.side ?? null) as OwnSide | null,
+    verdictReasons: Array.isArray(con?.reasons) ? (con.reasons as string[]) : [],
   };
 }
 
 const EMPTY_SIGNALS: OwnSignals = {
   modelSide: null, modelConf: null, studySide: null, studyConf: null, studyIsFallback: false, verdict: null,
+  verdictSide: null, verdictReasons: [],
 };
 
 async function loadQuote(): Promise<Quote> {
