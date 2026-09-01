@@ -54,6 +54,8 @@ function OpsManualPage() {
         is hit. Paper trading below is fully simulated.
       </p>
 
+      <OpsOwnEnginePanel />
+
       <OpsPaperTradePanel />
 
       {q.isLoading && <div className="text-xs text-muted-foreground">Loading operating data…</div>}
