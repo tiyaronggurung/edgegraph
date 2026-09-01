@@ -11,6 +11,7 @@ import { OpsBacktestPanel } from "@/components/ops/OpsBacktestPanel";
 import { OpsAlertsPanel } from "@/components/ops/OpsAlertsPanel";
 import { OpsKalshiAccount } from "@/components/ops/OpsKalshiAccount";
 import { OpsAutoTradePanel } from "@/components/ops/OpsAutoTradePanel";
+import { usePlan } from "@/hooks/usePlan";
 import { OpsHedgePanel } from "@/components/ops/OpsHedgePanel";
 import { OpsCrossExitShadowPanel } from "@/components/ops/OpsCrossExitShadowPanel";
 import { OpsPaperTradePanel } from "@/components/ops/OpsPaperTradePanel";
@@ -28,6 +29,8 @@ export const Route = createFileRoute("/_authenticated/ops-manual")({
 });
 
 function OpsManualPage() {
+  // Live auto-trade wiring stays admin-only; everything else is per-user.
+  const { isAdmin } = usePlan();
   const getDash = useServerFn(opsGetDashboard);
 
   const q = useQuery({
@@ -59,7 +62,7 @@ function OpsManualPage() {
         <>
           <OpsStatusBanner dash={q.data} onRefresh={() => q.refetch()} />
           <OpsKalshiAccount />
-          <OpsAutoTradePanel />
+          {isAdmin && <OpsAutoTradePanel />}
           <OpsQualificationCard dash={q.data} />
           <OpsStakingPanel dash={q.data} onRefresh={() => q.refetch()} />
           <OpsHedgePanel />
