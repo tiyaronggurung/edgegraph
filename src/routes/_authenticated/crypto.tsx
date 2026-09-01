@@ -2343,12 +2343,13 @@ function BigFlipMonitor() {
   // Realtime: catch flips fired by the server cron while the page is idle.
   useEffect(() => {
     let active = true;
+    let channelRef: ReturnType<typeof supabase.channel> | null = null;
     (async () => {
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user?.id;
       if (!uid || !active) return;
       const channel = supabase
-        .channel(`big-flip-signals-${uid}`)
+        .channel(`big-flip-signals-${uid}-${Math.random().toString(36).slice(2)}`)
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "big_flip_signals", filter: `user_id=eq.${uid}` },
@@ -2367,9 +2368,13 @@ function BigFlipMonitor() {
           },
         )
         .subscribe();
-      return () => { supabase.removeChannel(channel); };
+      channelRef = channel;
+      if (!active) { supabase.removeChannel(channel); channelRef = null; }
     })();
-    return () => { active = false; };
+    return () => {
+      active = false;
+      if (channelRef) supabase.removeChannel(channelRef);
+    };
   }, []);
 
   // Killswitch state (auto-halt after too many losing 15-min windows).
