@@ -13,8 +13,12 @@ import {
   paperKalshiExit,
   paperKalshiHedge,
   paperKalshiFlipWatch,
+  paperKalshiAutoHedgeTick,
+  paperKalshiSetAutoHedge,
+  listPaperKalshiEvents,
   settlePaperKalshiPositions,
   type PaperKalshiPosition,
+  type PaperKalshiEvent,
 } from "@/lib/paperKalshi.functions";
 import { cn } from "@/lib/utils";
 
@@ -36,10 +40,15 @@ export function OpsPaperTradePanel() {
   const exitFn = useServerFn(paperKalshiExit);
   const flipFn = useServerFn(paperKalshiFlipWatch);
   const settleFn = useServerFn(settlePaperKalshiPositions);
+  const autoHedgeTick = useServerFn(paperKalshiAutoHedgeTick);
+  const setAutoHedgeFn = useServerFn(paperKalshiSetAutoHedge);
+  const eventsFn = useServerFn(listPaperKalshiEvents);
 
   const [contracts, setContracts] = useState("10");
   const [busy, setBusy] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [autoHedge, setAutoHedge] = useState(true);
+  const [tab, setTab] = useState<"holdings" | "activity" | "transactions">("holdings");
 
   const win = useQuery({
     queryKey: ["paper-kalshi-window"],
@@ -59,20 +68,30 @@ export function OpsPaperTradePanel() {
     return () => clearInterval(t);
   }, []);
 
-  // Flip watch + settlement sweep, every 20s.
+  const events = useQuery({
+    queryKey: ["paper-kalshi-events"],
+    queryFn: () => eventsFn({ data: { limit: 200 } }),
+    refetchInterval: 15_000,
+  });
+
+  // Flip watch + auto-hedge + settlement sweep, every 20s.
   useEffect(() => {
     let alive = true;
     const run = async () => {
       try {
         await flipFn({});
+        if (autoHedge) await autoHedgeTick({});
         await settleFn({});
-        if (alive) qc.invalidateQueries({ queryKey: ["paper-kalshi-positions"] });
+        if (alive) {
+          qc.invalidateQueries({ queryKey: ["paper-kalshi-positions"] });
+          qc.invalidateQueries({ queryKey: ["paper-kalshi-events"] });
+        }
       } catch { /* best effort */ }
     };
     void run();
     const t = setInterval(run, 20_000);
     return () => { alive = false; clearInterval(t); };
-  }, [flipFn, settleFn, qc]);
+  }, [flipFn, settleFn, autoHedgeTick, autoHedge, qc]);
 
   const w = win.data;
   const secondsLeft = useMemo(() => {
@@ -83,6 +102,7 @@ export function OpsPaperTradePanel() {
   const refreshAll = () => {
     void win.refetch();
     void positions.refetch();
+    void events.refetch();
   };
 
   const act = async (label: string, fn: () => Promise<unknown>) => {
