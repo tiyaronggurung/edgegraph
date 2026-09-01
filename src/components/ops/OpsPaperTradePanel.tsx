@@ -81,17 +81,24 @@ export function OpsPaperTradePanel() {
       try {
         await flipFn({});
         if (autoHedge) await autoHedgeTick({});
+        try {
+          const r = await autoBuyTick({});
+          if (alive) setAutoBuyStatus(r.fired ? `FILLED ${r.side} @ ${r.askCents}¢` : r.reason);
+          if (r.fired) toast.success(`Auto-buy ${r.side} @ ${r.askCents}¢ × ${r.contracts}`);
+        } catch { /* auto-buy is best effort */ }
         await settleFn({});
         if (alive) {
           qc.invalidateQueries({ queryKey: ["paper-kalshi-positions"] });
           qc.invalidateQueries({ queryKey: ["paper-kalshi-events"] });
+          qc.invalidateQueries({ queryKey: ["paper-kalshi-equity"] });
         }
       } catch { /* best effort */ }
     };
     void run();
     const t = setInterval(run, 20_000);
     return () => { alive = false; clearInterval(t); };
-  }, [flipFn, settleFn, autoHedgeTick, autoHedge, qc]);
+  }, [flipFn, settleFn, autoHedgeTick, autoBuyTick, autoHedge, qc]);
+
 
   const w = win.data;
   const secondsLeft = useMemo(() => {
