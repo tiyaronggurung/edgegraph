@@ -666,7 +666,7 @@ export const updatePaperKalshiAccount = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<PaperAccount> => {
     await readAccount(context.supabase, context.userId); // ensure row exists
-    const patch: Record<string, unknown> = {};
+    const patch: Record<string, any> = {};
     if (data.autoBuy !== undefined) patch.auto_buy = data.autoBuy;
     if (data.autoBuyContracts !== undefined) patch.auto_buy_contracts = data.autoBuyContracts;
     if (data.maxAskCents !== undefined) patch.auto_buy_max_ask_cents = data.maxAskCents;
@@ -675,7 +675,7 @@ export const updatePaperKalshiAccount = createServerFn({ method: "POST" })
     if (Object.keys(patch).length) {
       await context.supabase
         .from("paper_kalshi_account")
-        .update(patch)
+        .update(patch as never)
         .eq("user_id", context.userId);
     }
     if (data.reset) {

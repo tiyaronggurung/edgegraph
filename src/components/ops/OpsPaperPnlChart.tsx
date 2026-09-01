@@ -41,7 +41,17 @@ export function OpsPaperPnlChart({ autoBuyStatus }: { autoBuyStatus?: string | n
   const pnl = acct ? acct.equityCents - acct.startingCents : 0;
   const up = pnl >= 0;
 
-  const patch = async (data: Parameters<typeof updateFn>[0]["data"], label: string) => {
+  const patch = async (
+    data: {
+      autoBuy?: boolean;
+      autoBuyContracts?: number;
+      maxAskCents?: number;
+      minConf?: number;
+      minCushionUsd?: number;
+      reset?: boolean;
+    },
+    label: string,
+  ) => {
     setBusy(true);
     try {
       await updateFn({ data });
