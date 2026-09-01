@@ -253,13 +253,16 @@ export function sizeContracts(
 
 export function decideEntry(
   m: MarketSnapshot,
-  prob: ProbResult,
+  probRaw: ProbResult,
   book: BookState,
   rules: OwnRules,
   bankrollCents: number,
   cashCents: number,
+  signals: OwnSignals | null = null,
 ): EntryDecision {
+  const prob = blendWithSignals(probRaw, signals, rules);
   const base = { modelProbUp: prob.probUp, z: prob.z };
+
   const fee = m.feeCentsPerContract;
 
   if (m.askUpCents == null || m.askDownCents == null) {
