@@ -62,10 +62,7 @@ const c = (dollars: number | null | undefined): number | null =>
 
 const flip = (s: PaperSide): PaperSide => (s === "YES" ? "NO" : "YES");
 
-/** Live Kalshi quote + model/study signal for the current 15m window. */
-export const getPaperKalshiWindow = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<PaperKalshiWindow> => {
+async function loadWindow(): Promise<PaperKalshiWindow> {
     const asOf = new Date().toISOString();
     const base: PaperKalshiWindow = {
       ok: false, asOf, ticker: null, strike: null, closeTime: null, secondsToClose: null,
@@ -113,7 +110,12 @@ export const getPaperKalshiWindow = createServerFn({ method: "GET" })
       verdict: con?.verdict ?? null,
       reasons: con?.reasons ?? [],
     };
-  });
+}
+
+/** Live Kalshi quote + model/study signal for the current 15m window. */
+export const getPaperKalshiWindow = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async (): Promise<PaperKalshiWindow> => loadWindow());
 
 export const listPaperKalshiPositions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -140,7 +142,7 @@ export const paperKalshiEnter = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const w = await getPaperKalshiWindow();
+    const w = await loadWindow();
     if (!w.ok || !w.ticker || !w.closeTime) return { ok: false as const, error: w.error ?? "no live market" };
     const ask = data.side === "YES" ? w.up.askCents : w.down.askCents;
     if (ask == null || ask < 1 || ask > 99) return { ok: false as const, error: `no tradeable ask (${ask}¢)` };
@@ -184,7 +186,7 @@ export const paperKalshiHedge = createServerFn({ method: "POST" })
       return { ok: false as const, error: `position is ${pos.status}` };
     }
 
-    const w = await getPaperKalshiWindow();
+    const w = await loadWindow();
     if (!w.ok) return { ok: false as const, error: w.error ?? "no live market" };
     const oppSide = flip(pos.entry_side as PaperSide);
     const oppAsk = oppSide === "YES" ? w.up.askCents : w.down.askCents;
@@ -242,7 +244,7 @@ export const paperKalshiExit = createServerFn({ method: "POST" })
       return { ok: false as const, error: `position is ${pos.status}` };
     }
 
-    const w = await getPaperKalshiWindow();
+    const w = await loadWindow();
     if (!w.ok) return { ok: false as const, error: w.error ?? "no live market" };
     const bidFor = (s: PaperSide) => (s === "YES" ? w.up.bidCents : w.down.bidCents);
     const entryBid = bidFor(pos.entry_side as PaperSide);
@@ -278,7 +280,7 @@ export const paperKalshiExit = createServerFn({ method: "POST" })
 export const paperKalshiFlipWatch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const w = await getPaperKalshiWindow();
+    const w = await loadWindow();
     if (!w.ok || !w.ticker || w.spotSide == null) return { ok: false as const, error: w.error ?? "no live market" };
 
     const { data: rows } = await context.supabase
