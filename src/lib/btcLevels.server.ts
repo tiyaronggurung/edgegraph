@@ -15,6 +15,8 @@ export interface BtcLevels {
   asOf: string;              // ISO timestamp of computation
   source: string;            // candle source used
   spot: number | null;
+  /** Where `spot` came from: our own multi-venue composite, or a 1m candle close. */
+  spotSource: "own_composite" | "candle_close" | "none";
   buy: number | null;        // lower trendline @ now
   mid: number | null;
   sell: number | null;       // upper trendline @ now
