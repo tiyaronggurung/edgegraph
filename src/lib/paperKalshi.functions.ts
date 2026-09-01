@@ -563,3 +563,283 @@ export const settlePaperKalshiPositions = createServerFn({ method: "POST" })
     }
     return { settled };
   });
+
+/* ────────────────────────────────────────────────────────────────────────
+   Paper cash account ($10,000 start), equity curve and auto-buy engine.
+   Cash is derived from position history so it can never drift:
+     realized  = Σ pnl of closed/settled positions
+     exposure  = Σ cost of open/hedged positions
+     cash      = starting + realized − exposure
+     equity    = starting + realized
+   ──────────────────────────────────────────────────────────────────────── */
+
+export const PAPER_STARTING_CENTS = 1_000_000; // $10,000
+
+export interface PaperAccount {
+  startingCents: number;
+  cashCents: number;
+  equityCents: number;
+  realizedCents: number;
+  exposureCents: number;
+  openPositions: number;
+  autoBuy: boolean;
+  autoBuyContracts: number;
+  maxAskCents: number;
+  minConf: number;
+  minCushionUsd: number;
+}
+
+const posCost = (p: any) =>
+  p.entry_price_cents * p.entry_contracts +
+  (p.hedge_price_cents ?? 0) * (p.hedge_contracts ?? 0);
+
+async function readAccount(supabase: any, userId: string): Promise<PaperAccount> {
+  let { data: acct } = await supabase
+    .from("paper_kalshi_account")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!acct) {
+    const ins = await supabase
+      .from("paper_kalshi_account")
+      .insert({ user_id: userId })
+      .select("*")
+      .maybeSingle();
+    acct = ins.data ?? {
+      starting_cents: PAPER_STARTING_CENTS,
+      auto_buy: false,
+      auto_buy_contracts: 10,
+      auto_buy_max_ask_cents: 70,
+      auto_buy_min_conf: 0.75,
+      auto_buy_min_cushion_usd: 40,
+    };
+  }
+
+  const { data: rows } = await supabase
+    .from("paper_kalshi_positions")
+    .select("status, pnl_cents, entry_price_cents, entry_contracts, hedge_price_cents, hedge_contracts")
+    .eq("user_id", userId)
+    .limit(1000);
+
+  let realized = 0;
+  let exposure = 0;
+  let open = 0;
+  for (const p of (rows ?? []) as any[]) {
+    if (p.status === "closed" || p.status === "settled") realized += p.pnl_cents ?? 0;
+    else if (p.status === "open" || p.status === "hedged") { exposure += posCost(p); open++; }
+  }
+
+  const starting = Number(acct.starting_cents ?? PAPER_STARTING_CENTS);
+  return {
+    startingCents: starting,
+    realizedCents: Math.round(realized),
+    exposureCents: Math.round(exposure),
+    cashCents: Math.round(starting + realized - exposure),
+    equityCents: Math.round(starting + realized),
+    openPositions: open,
+    autoBuy: !!acct.auto_buy,
+    autoBuyContracts: Number(acct.auto_buy_contracts ?? 10),
+    maxAskCents: Number(acct.auto_buy_max_ask_cents ?? 70),
+    minConf: Number(acct.auto_buy_min_conf ?? 0.75),
+    minCushionUsd: Number(acct.auto_buy_min_cushion_usd ?? 40),
+  };
+}
+
+export const getPaperKalshiAccount = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<PaperAccount> =>
+    readAccount(context.supabase, context.userId),
+  );
+
+export const updatePaperKalshiAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      autoBuy: z.boolean().optional(),
+      autoBuyContracts: z.number().int().min(1).max(500).optional(),
+      maxAskCents: z.number().int().min(5).max(95).optional(),
+      minConf: z.number().min(0.5).max(0.99).optional(),
+      minCushionUsd: z.number().min(0).max(500).optional(),
+      reset: z.boolean().optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }): Promise<PaperAccount> => {
+    await readAccount(context.supabase, context.userId); // ensure row exists
+    const patch: Record<string, unknown> = {};
+    if (data.autoBuy !== undefined) patch.auto_buy = data.autoBuy;
+    if (data.autoBuyContracts !== undefined) patch.auto_buy_contracts = data.autoBuyContracts;
+    if (data.maxAskCents !== undefined) patch.auto_buy_max_ask_cents = data.maxAskCents;
+    if (data.minConf !== undefined) patch.auto_buy_min_conf = data.minConf;
+    if (data.minCushionUsd !== undefined) patch.auto_buy_min_cushion_usd = data.minCushionUsd;
+    if (Object.keys(patch).length) {
+      await context.supabase
+        .from("paper_kalshi_account")
+        .update(patch)
+        .eq("user_id", context.userId);
+    }
+    if (data.reset) {
+      // Wipe the paper book and start again from $10,000.
+      await context.supabase.from("paper_kalshi_events").delete().eq("user_id", context.userId);
+      await context.supabase.from("paper_kalshi_positions").delete().eq("user_id", context.userId);
+      await context.supabase
+        .from("paper_kalshi_account")
+        .update({ starting_cents: PAPER_STARTING_CENTS, cash_cents: PAPER_STARTING_CENTS })
+        .eq("user_id", context.userId);
+    }
+    return readAccount(context.supabase, context.userId);
+  });
+
+export interface PaperEquityPoint {
+  t: string;
+  equityCents: number;
+  pnlCents: number;
+  label: string;
+}
+
+/** Polymarket-style equity curve: $10,000 start + cumulative realized P/L. */
+export const getPaperKalshiEquityCurve = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { limit?: number } | undefined) => d ?? {})
+  .handler(async ({ context, data }): Promise<{ points: PaperEquityPoint[]; account: PaperAccount }> => {
+    const limit = Math.min(Math.max(data.limit ?? 300, 10), 1000);
+    const account = await readAccount(context.supabase, context.userId);
+
+    const { data: rows } = await context.supabase
+      .from("paper_kalshi_positions")
+      .select("ticker, pnl_cents, settled_at, exited_at, created_at, status")
+      .eq("user_id", context.userId)
+      .in("status", ["closed", "settled"])
+      .order("created_at", { ascending: true })
+      .limit(limit);
+
+    const closed = ((rows ?? []) as any[])
+      .map((r) => ({
+        t: r.settled_at ?? r.exited_at ?? r.created_at,
+        pnl: r.pnl_cents ?? 0,
+        ticker: r.ticker as string,
+      }))
+      .sort((a, b) => new Date(a.t).getTime() - new Date(b.t).getTime());
+
+    const points: PaperEquityPoint[] = [
+      { t: closed[0]?.t ?? new Date().toISOString(), equityCents: account.startingCents, pnlCents: 0, label: "start" },
+    ];
+    let run = account.startingCents;
+    for (const cl of closed) {
+      run += cl.pnl;
+      points.push({ t: cl.t, equityCents: Math.round(run), pnlCents: cl.pnl, label: cl.ticker });
+    }
+    return { points, account };
+  });
+
+export interface PaperAutoBuyResult {
+  ok: boolean;
+  fired: boolean;
+  reason: string;
+  ticker: string | null;
+  side: PaperSide | null;
+  askCents: number | null;
+  contracts: number | null;
+}
+
+/**
+ * Auto-buy: fires ONE paper entry per window when every requirement is met.
+ *   • auto-buy enabled on the paper account
+ *   • T−8m … T−2m (no late chases, no pre-study entries)
+ *   • model and study agree on a side
+ *   • study confidence ≥ minConf
+ *   • |cushion| ≥ minCushionUsd and cushion favours the picked side
+ *   • ask ≤ maxAskCents and enough paper cash
+ *   • no existing position on this ticker
+ */
+export const paperKalshiAutoBuyTick = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<PaperAutoBuyResult> => {
+    const none = (reason: string, extra: Partial<PaperAutoBuyResult> = {}): PaperAutoBuyResult => ({
+      ok: true, fired: false, reason, ticker: null, side: null, askCents: null, contracts: null, ...extra,
+    });
+
+    const account = await readAccount(context.supabase, context.userId);
+    if (!account.autoBuy) return none("auto-buy off");
+
+    const w = await loadWindow();
+    if (!w.ok || !w.ticker || !w.closeTime) return none(w.error ?? "no live market");
+
+    const stc = w.secondsToClose ?? 0;
+    if (stc > 480) return none(`waiting for study window (T−${Math.round(stc / 60)}m)`, { ticker: w.ticker });
+    if (stc < 120) return none("too late in window (<T−2m)", { ticker: w.ticker });
+
+    const side = w.study.side ?? w.model.side;
+    if (!side) return none("no signal side", { ticker: w.ticker });
+    if (w.model.side && w.study.side && w.model.side !== w.study.side) {
+      return none("model/study disagree", { ticker: w.ticker });
+    }
+
+    const conf = w.study.confidence ?? w.model.confidence ?? 0;
+    if (conf < account.minConf) {
+      return none(`confidence ${(conf * 100).toFixed(0)}% < ${(account.minConf * 100).toFixed(0)}%`, { ticker: w.ticker, side });
+    }
+
+    const cushion = w.cushionUsd;
+    if (cushion == null || Math.abs(cushion) < account.minCushionUsd) {
+      return none(`cushion $${cushion == null ? "—" : Math.abs(cushion).toFixed(0)} < $${account.minCushionUsd}`, { ticker: w.ticker, side });
+    }
+    if (w.spotSide !== side) return none("cushion is against the pick", { ticker: w.ticker, side });
+
+    const ask = side === "YES" ? w.up.askCents : w.down.askCents;
+    if (ask == null || ask < 1 || ask > 99) return none("no tradeable ask", { ticker: w.ticker, side });
+    if (ask > account.maxAskCents) {
+      return none(`ask ${ask}¢ > cap ${account.maxAskCents}¢`, { ticker: w.ticker, side, askCents: ask });
+    }
+
+    const { data: existing } = await context.supabase
+      .from("paper_kalshi_positions")
+      .select("id")
+      .eq("user_id", context.userId)
+      .eq("ticker", w.ticker)
+      .limit(1);
+    if ((existing ?? []).length) return none("already traded this window", { ticker: w.ticker, side });
+
+    const contracts = account.autoBuyContracts;
+    const cost = ask * contracts;
+    if (cost > account.cashCents) {
+      return none(`not enough paper cash ($${(account.cashCents / 100).toFixed(2)})`, { ticker: w.ticker, side, askCents: ask });
+    }
+
+    const { data: row, error } = await context.supabase
+      .from("paper_kalshi_positions")
+      .insert({
+        user_id: context.userId,
+        ticker: w.ticker,
+        close_time: w.closeTime,
+        strike: w.strike,
+        entry_side: side,
+        entry_contracts: contracts,
+        entry_price_cents: ask,
+        entry_spot: w.spot,
+        entry_seconds_left: w.secondsToClose,
+        entry_reason: `auto-buy conf ${(conf * 100).toFixed(0)}% cushion $${cushion.toFixed(0)}`,
+        auto_hedge: true,
+        status: "open",
+      })
+      .select("id")
+      .single();
+    if (error) return { ...none(error.message), ok: false };
+
+    await logEvent(context.supabase, context.userId, {
+      positionId: row.id as string,
+      ticker: w.ticker,
+      kind: "entry",
+      side,
+      contracts,
+      priceCents: ask,
+      cashCents: -cost,
+      spot: w.spot,
+      strike: w.strike,
+      secondsLeft: w.secondsToClose,
+      note: `AUTO-BUY ${side} @ ${ask}¢ · conf ${(conf * 100).toFixed(0)}% · cushion $${cushion.toFixed(0)}`,
+      auto: true,
+    });
+
+    return { ok: true, fired: true, reason: "auto-buy filled", ticker: w.ticker, side, askCents: ask, contracts };
+  });
