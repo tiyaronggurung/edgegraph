@@ -157,7 +157,7 @@ export function OpsPaperTradePanel() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
         <Stat label="Ticker" value={w?.ticker ?? "—"} mono />
         <Stat label="Strike" value={w?.strike != null ? `$${w.strike.toLocaleString()}` : "—"} />
-        <Stat label="Spot" value={w?.spot != null ? `$${w.spot.toLocaleString()}` : "—"} />
+        <Stat label={w?.spotSource === "own_composite" ? "Spot (our feed)" : "Spot"} value={w?.spot != null ? `$${w.spot.toLocaleString()}` : "—"} />
         <Stat
           label="Cushion"
           value={w?.cushionUsd != null ? `${w.cushionUsd >= 0 ? "+" : ""}$${w.cushionUsd.toFixed(0)}` : "—"}
