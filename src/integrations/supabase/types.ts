@@ -5042,8 +5042,74 @@ export type Database = {
         }
         Relationships: []
       }
+      paper_kalshi_events: {
+        Row: {
+          auto: boolean
+          cash_cents: number | null
+          contracts: number | null
+          created_at: string
+          id: string
+          kind: string
+          note: string | null
+          pnl_cents: number | null
+          position_id: string | null
+          price_cents: number | null
+          seconds_left: number | null
+          side: string | null
+          spot: number | null
+          strike: number | null
+          ticker: string
+          user_id: string
+        }
+        Insert: {
+          auto?: boolean
+          cash_cents?: number | null
+          contracts?: number | null
+          created_at?: string
+          id?: string
+          kind: string
+          note?: string | null
+          pnl_cents?: number | null
+          position_id?: string | null
+          price_cents?: number | null
+          seconds_left?: number | null
+          side?: string | null
+          spot?: number | null
+          strike?: number | null
+          ticker: string
+          user_id: string
+        }
+        Update: {
+          auto?: boolean
+          cash_cents?: number | null
+          contracts?: number | null
+          created_at?: string
+          id?: string
+          kind?: string
+          note?: string | null
+          pnl_cents?: number | null
+          position_id?: string | null
+          price_cents?: number | null
+          seconds_left?: number | null
+          side?: string | null
+          spot?: number | null
+          strike?: number | null
+          ticker?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_kalshi_events_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "paper_kalshi_positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       paper_kalshi_positions: {
         Row: {
+          auto_hedge: boolean
           close_time: string
           created_at: string
           crossed_at: string | null
@@ -5073,6 +5139,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          auto_hedge?: boolean
           close_time: string
           created_at?: string
           crossed_at?: string | null
@@ -5102,6 +5169,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          auto_hedge?: boolean
           close_time?: string
           created_at?: string
           crossed_at?: string | null

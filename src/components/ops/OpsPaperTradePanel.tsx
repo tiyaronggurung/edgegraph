@@ -13,8 +13,12 @@ import {
   paperKalshiExit,
   paperKalshiHedge,
   paperKalshiFlipWatch,
+  paperKalshiAutoHedgeTick,
+  paperKalshiSetAutoHedge,
+  listPaperKalshiEvents,
   settlePaperKalshiPositions,
   type PaperKalshiPosition,
+  type PaperKalshiEvent,
 } from "@/lib/paperKalshi.functions";
 import { cn } from "@/lib/utils";
 
@@ -36,10 +40,15 @@ export function OpsPaperTradePanel() {
   const exitFn = useServerFn(paperKalshiExit);
   const flipFn = useServerFn(paperKalshiFlipWatch);
   const settleFn = useServerFn(settlePaperKalshiPositions);
+  const autoHedgeTick = useServerFn(paperKalshiAutoHedgeTick);
+  const setAutoHedgeFn = useServerFn(paperKalshiSetAutoHedge);
+  const eventsFn = useServerFn(listPaperKalshiEvents);
 
   const [contracts, setContracts] = useState("10");
   const [busy, setBusy] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [autoHedge, setAutoHedge] = useState(true);
+  const [tab, setTab] = useState<"holdings" | "activity" | "transactions">("holdings");
 
   const win = useQuery({
     queryKey: ["paper-kalshi-window"],
@@ -59,20 +68,30 @@ export function OpsPaperTradePanel() {
     return () => clearInterval(t);
   }, []);
 
-  // Flip watch + settlement sweep, every 20s.
+  const events = useQuery({
+    queryKey: ["paper-kalshi-events"],
+    queryFn: () => eventsFn({ data: { limit: 200 } }),
+    refetchInterval: 15_000,
+  });
+
+  // Flip watch + auto-hedge + settlement sweep, every 20s.
   useEffect(() => {
     let alive = true;
     const run = async () => {
       try {
         await flipFn({});
+        if (autoHedge) await autoHedgeTick({});
         await settleFn({});
-        if (alive) qc.invalidateQueries({ queryKey: ["paper-kalshi-positions"] });
+        if (alive) {
+          qc.invalidateQueries({ queryKey: ["paper-kalshi-positions"] });
+          qc.invalidateQueries({ queryKey: ["paper-kalshi-events"] });
+        }
       } catch { /* best effort */ }
     };
     void run();
     const t = setInterval(run, 20_000);
     return () => { alive = false; clearInterval(t); };
-  }, [flipFn, settleFn, qc]);
+  }, [flipFn, settleFn, autoHedgeTick, autoHedge, qc]);
 
   const w = win.data;
   const secondsLeft = useMemo(() => {
@@ -83,6 +102,7 @@ export function OpsPaperTradePanel() {
   const refreshAll = () => {
     void win.refetch();
     void positions.refetch();
+    void events.refetch();
   };
 
   const act = async (label: string, fn: () => Promise<unknown>) => {
@@ -180,35 +200,103 @@ export function OpsPaperTradePanel() {
         </div>
       </div>
 
-      {/* ---------------- live positions ---------------- */}
-      <div className="space-y-2">
-        <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground">
-          Live paper positions ({live.length})
-        </h3>
-        {live.length === 0 && <p className="text-xs text-muted-foreground">No open paper positions.</p>}
-        {live.map((p) => (
-          <LivePositionRow
-            key={p.id}
-            p={p}
-            busy={busy != null}
-            onHedge={() => act("Hedge", () => hedgeFn({ data: { id: p.id, execute: true } }))}
-            onCheckHedge={() => act("Hedge check", () => hedgeFn({ data: { id: p.id, execute: false } }))}
-            onExit={(reason) => act("Exit", () => exitFn({ data: { id: p.id, reason } }))}
-          />
+      {/* ---------------- auto-hedge switch ---------------- */}
+      <label className="flex items-center gap-2 text-xs">
+        <input
+          type="checkbox"
+          checked={autoHedge}
+          onChange={(e) => setAutoHedge(e.target.checked)}
+          className="accent-[color:var(--color-primary)]"
+        />
+        <span className="uppercase tracking-widest">Auto-hedge</span>
+        <span className="text-muted-foreground">
+          every 20s, takes the opposite leg the instant the pair prices ≤96¢ (blocked at ≥70¢ dominance, none inside T−5m)
+        </span>
+      </label>
+
+      {/* ---------------- tabs ---------------- */}
+      <div className="flex gap-1 border-b border-border">
+        {([
+          ["holdings", `Holdings (${live.length})`],
+          ["activity", `Activity (${(events.data ?? []).length})`],
+          ["transactions", `Transactions (${done.length})`],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={cn(
+              "px-3 py-1.5 text-[10px] uppercase tracking-widest border-b-2 -mb-px",
+              tab === key
+                ? "border-[color:var(--color-primary)] text-[color:var(--color-primary)]"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {label}
+          </button>
         ))}
+        <span className={cn("ml-auto self-center text-xs font-bold", totalPnl >= 0 ? "text-emerald-400" : "text-red-400")}>
+          Paper P/L {money(totalPnl)}
+        </span>
       </div>
 
-      {/* ---------------- results ---------------- */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Closed / settled ({done.length})
-          </h3>
-          <span className={cn("text-xs font-bold", totalPnl >= 0 ? "text-emerald-400" : "text-red-400")}>
-            Paper P/L {money(totalPnl)}
-          </span>
+      {/* ---------------- holdings ---------------- */}
+      {tab === "holdings" && (
+        <div className="space-y-2">
+          {live.length === 0 && <p className="text-xs text-muted-foreground">No open paper positions.</p>}
+          {live.map((p) => (
+            <LivePositionRow
+              key={p.id}
+              p={p}
+              busy={busy != null}
+              onHedge={() => act("Hedge", () => hedgeFn({ data: { id: p.id, execute: true } }))}
+              onCheckHedge={() => act("Hedge check", () => hedgeFn({ data: { id: p.id, execute: false } }))}
+              onToggleAuto={() =>
+                act("Auto-hedge", () => setAutoHedgeFn({ data: { id: p.id, enabled: !p.auto_hedge } }))
+              }
+              onExit={(reason) => act("Exit", () => exitFn({ data: { id: p.id, reason } }))}
+            />
+          ))}
         </div>
-        <div className="max-h-64 overflow-auto">
+      )}
+
+      {/* ---------------- activity ---------------- */}
+      {tab === "activity" && (
+        <div className="max-h-72 overflow-auto">
+          {(events.data ?? []).length === 0 && (
+            <p className="text-xs text-muted-foreground">No activity yet.</p>
+          )}
+          <table className="w-full text-[11px]">
+            <thead className="text-muted-foreground uppercase tracking-widest">
+              <tr className="text-left">
+                <th className="py-1">Time</th>
+                <th>Action</th>
+                <th>Side</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Left</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(events.data ?? []).map((e) => (
+                <tr key={e.id} className="border-t border-border/50 align-top">
+                  <td className="py-1 whitespace-nowrap">{new Date(e.created_at).toISOString().slice(11, 19)}Z</td>
+                  <td><EventBadge kind={e.kind} auto={e.auto} /></td>
+                  <td>{e.side ? (e.side === "YES" ? "UP" : "DOWN") : "—"}</td>
+                  <td>{e.contracts ?? "—"}</td>
+                  <td>{e.price_cents != null ? `${e.price_cents}¢` : "—"}</td>
+                  <td>{e.seconds_left != null ? clock(e.seconds_left) : "—"}</td>
+                  <td className="text-muted-foreground max-w-[22rem] truncate">{e.note ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ---------------- transactions ---------------- */}
+      {tab === "transactions" && (
+        <div className="max-h-72 overflow-auto">
           <table className="w-full text-[11px]">
             <thead className="text-muted-foreground uppercase tracking-widest">
               <tr className="text-left">
@@ -224,6 +312,9 @@ export function OpsPaperTradePanel() {
               </tr>
             </thead>
             <tbody>
+              {done.length === 0 && (
+                <tr><td colSpan={9} className="py-2 text-muted-foreground">No closed paper trades yet.</td></tr>
+              )}
               {done.map((p) => (
                 <tr key={p.id} className="border-t border-border/50">
                   <td className="py-1">{new Date(p.close_time).toISOString().slice(11, 16)}Z</td>
@@ -244,7 +335,8 @@ export function OpsPaperTradePanel() {
             </tbody>
           </table>
         </div>
-      </div>
+      )}
+
 
       <p className="text-[10px] text-muted-foreground">
         Simulated fills at the live Kalshi bid/ask. Hedge legs run through the two-sided engine
@@ -310,13 +402,32 @@ function SideCard({
   );
 }
 
+const EVENT_TONE: Record<string, string> = {
+  entry: "text-sky-400",
+  hedge: "text-violet-400",
+  exit: "text-orange-400",
+  flip: "text-amber-400",
+  settle: "text-emerald-400",
+  skip: "text-muted-foreground",
+};
+
+function EventBadge({ kind, auto }: { kind: PaperKalshiEvent["kind"]; auto: boolean }) {
+  return (
+    <span className={cn("uppercase tracking-widest font-bold", EVENT_TONE[kind] ?? "text-foreground")}>
+      {kind}
+      {auto && <span className="ml-1 text-[9px] text-muted-foreground">auto</span>}
+    </span>
+  );
+}
+
 function LivePositionRow({
-  p, busy, onHedge, onCheckHedge, onExit,
+  p, busy, onHedge, onCheckHedge, onToggleAuto, onExit,
 }: {
   p: PaperKalshiPosition;
   busy: boolean;
   onHedge: () => void;
   onCheckHedge: () => void;
+  onToggleAuto: () => void;
   onExit: (reason: string) => void;
 }) {
   return (
@@ -332,6 +443,9 @@ function LivePositionRow({
       <span className="text-muted-foreground">{new Date(p.close_time).toISOString().slice(11, 16)}Z</span>
       {p.crossed_strike && <span className="text-amber-400 font-bold">FLIP — spot crossed strike</span>}
       <div className="ml-auto flex gap-2">
+        <button onClick={onToggleAuto} disabled={busy} className={cn("border rounded px-2 py-1 disabled:opacity-40", p.auto_hedge ? "border-[color:var(--color-primary)] text-[color:var(--color-primary)]" : "border-border text-muted-foreground")}>
+          Auto {p.auto_hedge ? "on" : "off"}
+        </button>
         <button onClick={onCheckHedge} disabled={busy} className="border border-border rounded px-2 py-1 hover:bg-muted disabled:opacity-40">
           Check hedge
         </button>

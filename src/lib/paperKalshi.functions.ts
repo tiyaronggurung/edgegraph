@@ -50,6 +50,7 @@ export interface PaperKalshiPosition {
   exit_reason: string | null;
   crossed_strike: boolean;
   crossed_at: string | null;
+  auto_hedge: boolean;
   status: "open" | "hedged" | "closed" | "settled" | "void";
   outcome: PaperSide | null;
   pnl_cents: number | null;
@@ -61,6 +62,68 @@ const c = (dollars: number | null | undefined): number | null =>
   dollars == null || !Number.isFinite(dollars) ? null : Math.round(dollars * 100);
 
 const flip = (s: PaperSide): PaperSide => (s === "YES" ? "NO" : "YES");
+
+export type PaperEventKind =
+  | "entry" | "hedge" | "exit" | "flip" | "settle" | "skip";
+
+export interface PaperKalshiEvent {
+  id: string;
+  position_id: string | null;
+  ticker: string;
+  kind: PaperEventKind;
+  side: PaperSide | null;
+  contracts: number | null;
+  price_cents: number | null;
+  /** Negative = cash out (buy), positive = cash in (sell / settle). */
+  cash_cents: number | null;
+  pnl_cents: number | null;
+  spot: number | null;
+  strike: number | null;
+  seconds_left: number | null;
+  note: string | null;
+  auto: boolean;
+  created_at: string;
+}
+
+/** Append one row to the activity/transaction log. Never throws. */
+async function logEvent(
+  supabase: any,
+  userId: string,
+  e: {
+    positionId?: string | null;
+    ticker: string;
+    kind: PaperEventKind;
+    side?: PaperSide | null;
+    contracts?: number | null;
+    priceCents?: number | null;
+    cashCents?: number | null;
+    pnlCents?: number | null;
+    spot?: number | null;
+    strike?: number | null;
+    secondsLeft?: number | null;
+    note?: string | null;
+    auto?: boolean;
+  },
+): Promise<void> {
+  try {
+    await supabase.from("paper_kalshi_events").insert({
+      user_id: userId,
+      position_id: e.positionId ?? null,
+      ticker: e.ticker,
+      kind: e.kind,
+      side: e.side ?? null,
+      contracts: e.contracts ?? null,
+      price_cents: e.priceCents ?? null,
+      cash_cents: e.cashCents ?? null,
+      pnl_cents: e.pnlCents ?? null,
+      spot: e.spot ?? null,
+      strike: e.strike ?? null,
+      seconds_left: e.secondsLeft ?? null,
+      note: e.note ?? null,
+      auto: e.auto ?? false,
+    });
+  } catch { /* logging must never break a trade */ }
+}
 
 async function loadWindow(): Promise<PaperKalshiWindow> {
     const asOf = new Date().toISOString();
@@ -165,8 +228,94 @@ export const paperKalshiEnter = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) return { ok: false as const, error: error.message };
+    await logEvent(context.supabase, context.userId, {
+      positionId: row.id as string,
+      ticker: w.ticker,
+      kind: "entry",
+      side: data.side,
+      contracts: data.contracts,
+      priceCents: ask,
+      cashCents: -(ask * data.contracts),
+      spot: w.spot,
+      strike: w.strike,
+      secondsLeft: w.secondsToClose,
+      note: data.reason ?? "manual entry",
+      auto: data.reason === "auto",
+    });
     return { ok: true as const, id: row.id as string, side: data.side, priceCents: ask, contracts: data.contracts };
   });
+
+/** Core hedge evaluation/execution shared by the manual button and auto-hedge. */
+async function hedgeOne(
+  supabase: any,
+  userId: string,
+  pos: any,
+  w: PaperKalshiWindow,
+  execute: boolean,
+  auto: boolean,
+) {
+  const oppSide = flip(pos.entry_side as PaperSide);
+  const oppAsk = oppSide === "YES" ? w.up.askCents : w.down.askCents;
+  const domPrice = Math.max(w.up.bidCents ?? 0, w.down.bidCents ?? 0);
+  if (oppAsk == null) return { ok: false as const, error: "no opposite ask" };
+
+  const entryCost = pos.entry_price_cents + feeCents(pos.entry_price_cents);
+  const evaluation = evaluateSecondLeg(
+    {
+      sideA: pos.entry_side,
+      sharesA: pos.entry_contracts,
+      avgCostA: entryCost,
+      sharesB: pos.hedge_contracts ?? 0,
+      dominantSidePrice: domPrice,
+      sideSpendUsd: ((pos.hedge_contracts ?? 0) * (pos.hedge_price_cents ?? 0)) / 100,
+      windowSpendUsd: (pos.entry_contracts * pos.entry_price_cents) / 100,
+    },
+    { oppAskCents: oppAsk, secondsLeft: w.secondsToClose ?? 0 },
+  );
+
+  if (!execute || evaluation.decision !== "BUY") {
+    if (auto) {
+      // Only log auto skips that were a real near-miss, not every quiet tick.
+      if (evaluation.decision === "BLOCK") {
+        await logEvent(supabase, userId, {
+          positionId: pos.id, ticker: pos.ticker, kind: "skip", side: oppSide,
+          priceCents: oppAsk, spot: w.spot, strike: w.strike,
+          secondsLeft: w.secondsToClose, note: evaluation.message, auto: true,
+        });
+      }
+    }
+    return { ok: true as const, executed: false, evaluation, rules: HEDGE_RULES };
+  }
+
+  const { error } = await supabase
+    .from("paper_kalshi_positions")
+    .update({
+      hedge_side: oppSide,
+      hedge_contracts: (pos.hedge_contracts ?? 0) + evaluation.shares,
+      hedge_price_cents: evaluation.limitPriceCents,
+      hedged_at: new Date().toISOString(),
+      status: "hedged",
+    })
+    .eq("id", pos.id)
+    .eq("user_id", userId);
+  if (error) return { ok: false as const, error: error.message };
+
+  await logEvent(supabase, userId, {
+    positionId: pos.id,
+    ticker: pos.ticker,
+    kind: "hedge",
+    side: oppSide,
+    contracts: evaluation.shares,
+    priceCents: evaluation.limitPriceCents,
+    cashCents: -((evaluation.limitPriceCents ?? 0) * evaluation.shares),
+    spot: w.spot,
+    strike: w.strike,
+    secondsLeft: w.secondsToClose,
+    note: evaluation.message,
+    auto,
+  });
+  return { ok: true as const, executed: true, evaluation, rules: HEDGE_RULES };
+}
 
 /** Evaluate (and optionally take) the opposite leg using the hedge engine. */
 export const paperKalshiHedge = createServerFn({ method: "POST" })
@@ -185,45 +334,71 @@ export const paperKalshiHedge = createServerFn({ method: "POST" })
     if (pos.status !== "open" && pos.status !== "hedged") {
       return { ok: false as const, error: `position is ${pos.status}` };
     }
-
     const w = await loadWindow();
     if (!w.ok) return { ok: false as const, error: w.error ?? "no live market" };
-    const oppSide = flip(pos.entry_side as PaperSide);
-    const oppAsk = oppSide === "YES" ? w.up.askCents : w.down.askCents;
-    const domPrice = Math.max(w.up.bidCents ?? 0, w.down.bidCents ?? 0);
-    if (oppAsk == null) return { ok: false as const, error: "no opposite ask" };
+    return hedgeOne(context.supabase, context.userId, pos, w, data.execute, false);
+  });
 
-    const entryCost = pos.entry_price_cents + feeCents(pos.entry_price_cents);
-    const evaluation = evaluateSecondLeg(
-      {
-        sideA: pos.entry_side,
-        sharesA: pos.entry_contracts,
-        avgCostA: entryCost,
-        sharesB: pos.hedge_contracts ?? 0,
-        dominantSidePrice: domPrice,
-        sideSpendUsd: ((pos.hedge_contracts ?? 0) * (pos.hedge_price_cents ?? 0)) / 100,
-        windowSpendUsd: (pos.entry_contracts * pos.entry_price_cents) / 100,
-      },
-      { oppAskCents: oppAsk, secondsLeft: w.secondsToClose ?? 0 },
-    );
+/**
+ * Auto-hedge sweep: for every live position with auto_hedge on, run the
+ * two-sided engine and take the opposite leg the moment it qualifies
+ * (matched pair ≤96¢, no ≥70¢ dominance, no new legs inside T−5m).
+ */
+export const paperKalshiAutoHedgeTick = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const w = await loadWindow();
+    if (!w.ok) return { ok: false as const, error: w.error ?? "no live market", hedged: 0 };
 
-    if (!data.execute || evaluation.decision !== "BUY") {
-      return { ok: true as const, executed: false, evaluation, rules: HEDGE_RULES };
+    const { data: rows } = await context.supabase
+      .from("paper_kalshi_positions")
+      .select("*")
+      .eq("user_id", context.userId)
+      .eq("auto_hedge", true)
+      .in("status", ["open", "hedged"])
+      .limit(25);
+
+    let hedged = 0;
+    const messages: string[] = [];
+    for (const pos of (rows ?? []) as any[]) {
+      const r = await hedgeOne(context.supabase, context.userId, pos, w, true, true);
+      if ("executed" in r && r.executed) {
+        hedged++;
+        messages.push(`${pos.ticker}: ${r.evaluation.message}`);
+      }
     }
+    return { ok: true as const, hedged, messages };
+  });
 
+/** Toggle auto-hedge for one position. */
+export const paperKalshiSetAutoHedge = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ id: z.string().uuid(), enabled: z.boolean() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("paper_kalshi_positions")
-      .update({
-        hedge_side: oppSide,
-        hedge_contracts: (pos.hedge_contracts ?? 0) + evaluation.shares,
-        hedge_price_cents: evaluation.limitPriceCents,
-        hedged_at: new Date().toISOString(),
-        status: "hedged",
-      })
-      .eq("id", pos.id)
+      .update({ auto_hedge: data.enabled })
+      .eq("id", data.id)
       .eq("user_id", context.userId);
     if (error) return { ok: false as const, error: error.message };
-    return { ok: true as const, executed: true, evaluation, rules: HEDGE_RULES };
+    return { ok: true as const };
+  });
+
+/** Activity + transaction log for the paper book. */
+export const listPaperKalshiEvents = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { limit?: number } | undefined) => d ?? {})
+  .handler(async ({ context, data }): Promise<PaperKalshiEvent[]> => {
+    const limit = Math.min(Math.max(data.limit ?? 100, 1), 500);
+    const { data: rows } = await context.supabase
+      .from("paper_kalshi_events")
+      .select("*")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    return (rows ?? []) as PaperKalshiEvent[];
   });
 
 /** Sell out of a paper position at the live bid(s). */
@@ -269,6 +444,20 @@ export const paperKalshiExit = createServerFn({ method: "POST" })
       .eq("id", pos.id)
       .eq("user_id", context.userId);
     if (error) return { ok: false as const, error: error.message };
+    await logEvent(context.supabase, context.userId, {
+      positionId: pos.id,
+      ticker: pos.ticker,
+      kind: "exit",
+      side: pos.entry_side as PaperSide,
+      contracts: pos.entry_contracts,
+      priceCents: entryBid,
+      cashCents: entryBid * pos.entry_contracts,
+      pnlCents: Math.round(pnl),
+      spot: w.spot,
+      strike: w.strike,
+      secondsLeft: w.secondsToClose,
+      note: data.reason ?? "manual_exit",
+    });
     return { ok: true as const, exitCents: entryBid, pnlCents: Math.round(pnl) };
   });
 
@@ -298,6 +487,17 @@ export const paperKalshiFlipWatch = createServerFn({ method: "POST" })
         .update({ crossed_strike: true, crossed_at: new Date().toISOString() })
         .eq("id", r.id)
         .eq("user_id", context.userId);
+      await logEvent(context.supabase, context.userId, {
+        positionId: r.id,
+        ticker: w.ticker,
+        kind: "flip",
+        side: r.entry_side,
+        spot: w.spot,
+        strike: w.strike,
+        secondsLeft: w.secondsToClose,
+        note: `spot crossed strike against ${r.entry_side} (cushion ${w.cushionUsd})`,
+        auto: true,
+      });
       flipped.push(r.id);
     }
     return {
@@ -348,7 +548,18 @@ export const settlePaperKalshiPositions = createServerFn({ method: "POST" })
         })
         .eq("id", p.id)
         .eq("user_id", context.userId);
-      if (!error) settled++;
+      if (!error) {
+        settled++;
+        await logEvent(context.supabase, context.userId, {
+          positionId: p.id,
+          ticker: p.ticker,
+          kind: "settle",
+          side: outcome,
+          pnlCents: Math.round(pnl),
+          note: `settled ${outcome}`,
+          auto: true,
+        });
+      }
     }
     return { settled };
   });
