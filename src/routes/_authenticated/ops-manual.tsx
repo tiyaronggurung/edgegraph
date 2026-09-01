@@ -15,6 +15,7 @@ import { usePlan } from "@/hooks/usePlan";
 import { OpsHedgePanel } from "@/components/ops/OpsHedgePanel";
 import { OpsCrossExitShadowPanel } from "@/components/ops/OpsCrossExitShadowPanel";
 import { OpsPaperTradePanel } from "@/components/ops/OpsPaperTradePanel";
+import { OpsOwnEnginePanel } from "@/components/ops/OpsOwnEnginePanel";
 
 export const Route = createFileRoute("/_authenticated/ops-manual")({
   head: () => ({
@@ -52,6 +53,8 @@ function OpsManualPage() {
         windows, fixes the stake, records every bet, and shuts the session down the moment a rule
         is hit. Paper trading below is fully simulated.
       </p>
+
+      <OpsOwnEnginePanel />
 
       <OpsPaperTradePanel />
 

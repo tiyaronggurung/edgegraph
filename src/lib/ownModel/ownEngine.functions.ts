@@ -46,7 +46,6 @@ export interface OwnEngineSkip {
   ticker: string | null;
   code: string;
   reason: string | null;
-  snapshot: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -302,7 +301,7 @@ export const saveOwnEngineSettings = createServerFn({ method: "POST" })
     if (data.exitCapturePct !== undefined) patch.exit_capture_pct = data.exitCapturePct;
     const { error } = await context.supabase
       .from("own_engine_settings")
-      .upsert(patch, { onConflict: "user_id" });
+      .upsert(patch as never, { onConflict: "user_id" });
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const };
   });
@@ -386,7 +385,7 @@ export const ownEngineTick = createServerFn({ method: "POST" })
     const insert = async (side: OwnSide, contracts: number, priceCents: number, phase: string, edge: number | null) => {
       const { error } = await supabase.from("own_engine_orders").insert({
         user_id: userId,
-        ticker: q.ticker,
+        ticker: q.ticker as string,
         close_time: q.closeTime,
         strike: q.strike,
         side, contracts, price_cents: priceCents, phase,
@@ -470,7 +469,7 @@ export const listOwnEngineSkips = createServerFn({ method: "GET" })
   .inputValidator((d: { limit?: number } | undefined) => d ?? {})
   .handler(async ({ context, data }): Promise<OwnEngineSkip[]> => {
     const { data: rows } = await context.supabase
-      .from("own_engine_skips").select("*")
+      .from("own_engine_skips").select("id, ticker, code, reason, created_at")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false })
       .limit(Math.min(Math.max(data.limit ?? 50, 1), 200));
