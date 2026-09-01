@@ -15,6 +15,7 @@ import { usePlan } from "@/hooks/usePlan";
 import { OpsHedgePanel } from "@/components/ops/OpsHedgePanel";
 import { OpsCrossExitShadowPanel } from "@/components/ops/OpsCrossExitShadowPanel";
 import { OpsPaperTradePanel } from "@/components/ops/OpsPaperTradePanel";
+import { OpsOwnEnginePanel } from "@/components/ops/OpsOwnEnginePanel";
 
 export const Route = createFileRoute("/_authenticated/ops-manual")({
   head: () => ({
