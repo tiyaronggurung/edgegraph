@@ -128,6 +128,7 @@ export async function getBtcLevels(opts?: { limit?: number; includeCandles?: boo
 
   let candles: TCandle[] = [];
   let source = "none";
+  const ownSpotPromise = fetchOwnCompositeSpot();
   try {
     const r = await fetch1m(limit);
     candles = r.candles;
@@ -140,7 +141,10 @@ export async function getBtcLevels(opts?: { limit?: number; includeCandles?: boo
 
   const trend = detectTrendlines(candles);
   const spike = detectSpike(candles, trend);
-  const spot = candles[candles.length - 1].c;
+  const own = await ownSpotPromise;
+  const spot = own?.spot ?? candles[candles.length - 1].c;
+  const spotSource: BtcLevels["spotSource"] = own ? "own_composite" : "candle_close";
+
   const sell = trend.upperAtNow;
   const buy = trend.lowerAtNow;
   const mid = sell != null && buy != null ? (sell + buy) / 2 : null;
