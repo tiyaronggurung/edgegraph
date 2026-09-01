@@ -43,7 +43,15 @@ export interface ConsensusResponse {
   cushionUsd: number | null;
 
   model: { side: Side | null; confidence: number | null };
-  study: { side: Side | null; confidence: number | null; lockedAt: string | null; skipReason: string | null };
+  study: {
+    side: Side | null;
+    confidence: number | null;
+    lockedAt: string | null;
+    skipReason: string | null;
+    /** Shadow lock the CVV gate blocked — usable as a fallback by the Own Engine. */
+    fallbackSide: Side | null;
+    fallbackConfidence: number | null;
+  };
   trendline: {
     side: Side | null;
     buy: number | null;
@@ -59,6 +67,8 @@ export interface ConsensusResponse {
   side: Side | null;
   confidence: number | null;
   reasons: string[];
+  /** True when the ONLY thing blocking ALLOW is the missing T7 study lock. */
+  studyLockOnlyBlock: boolean;
   rules: typeof CONSENSUS_RULES;
   error: string | null;
 }
@@ -66,7 +76,7 @@ export interface ConsensusResponse {
 const asSide = (v: unknown): Side | null => (v === "YES" || v === "NO" ? v : null);
 
 const PRED_COLS =
-  "ticker, side, model_prob, model_side_pre_study, study_locked_side, study_lock_confidence, study_locked_at, skip_guard_reason";
+  "ticker, side, model_prob, model_side_pre_study, study_locked_side, study_lock_confidence, study_locked_at, skip_guard_reason, cvv_would_lock_side, cvv_would_lock_conf";
 
 async function fetchLatestPrediction(ticker: string | null): Promise<Record<string, unknown> | null> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -106,13 +116,14 @@ async function computeBtcConsensus(): Promise<ConsensusResponse> {
     asOf,
     ticker: null, strike: null, spot: null, spotSource: "none", secondsToClose: null, askCents: null, cushionUsd: null,
     model: { side: null, confidence: null },
-    study: { side: null, confidence: null, lockedAt: null, skipReason: null },
+    study: { side: null, confidence: null, lockedAt: null, skipReason: null, fallbackSide: null, fallbackConfidence: null },
     trendline: { side: null, buy: null, mid: null, sell: null, position: "unknown", distToMidUsd: null, broke: null },
     agreement: "unknown",
     verdict: "SKIP",
     side: null,
     confidence: null,
     reasons: [],
+    studyLockOnlyBlock: false,
     rules: CONSENSUS_RULES,
     error: null,
   };
@@ -169,8 +180,18 @@ async function computeBtcConsensus(): Promise<ConsensusResponse> {
       : await fetchLatestPrediction(flow.ticker);
 
   const row = (pred ?? {}) as Record<string, unknown>;
-  const modelSide = asSide(row["model_side_pre_study"]) ?? asSide(row["side"]);
+  const storedModelSide = asSide(row["model_side_pre_study"]) ?? asSide(row["side"]);
   const modelProbRaw = row["model_prob"] == null ? null : Number(row["model_prob"]);
+  // model_prob is P(YES). Some rows were persisted with a stale side that
+  // contradicts their own probability — trust the probability, not the label.
+  const probSide: Side | null =
+    modelProbRaw == null || !Number.isFinite(modelProbRaw)
+      ? null
+      : modelProbRaw >= 0.5
+        ? "YES"
+        : "NO";
+  const modelSide =
+    probSide && storedModelSide && probSide !== storedModelSide ? probSide : (storedModelSide ?? probSide);
   // model_prob is P(YES); express it as confidence in the model's own side.
   const modelConf =
     modelProbRaw == null || !Number.isFinite(modelProbRaw)
@@ -202,7 +223,8 @@ async function computeBtcConsensus(): Promise<ConsensusResponse> {
   const reasons: string[] = [];
   const pick: Side | null = studySide ?? null;
   const state: { verdict: Verdict } = { verdict: "ALLOW" };
-  const skip = (r: string) => { reasons.push(r); state.verdict = "SKIP"; };
+  const skipReasons: string[] = [];
+  const skip = (r: string) => { reasons.push(r); skipReasons.push(r); state.verdict = "SKIP"; };
   const caution = (r: string) => { reasons.push(r); if (state.verdict !== "SKIP") state.verdict = "CAUTION"; };
 
   if (!pick) {
@@ -253,6 +275,11 @@ async function computeBtcConsensus(): Promise<ConsensusResponse> {
 
   if (state.verdict === "ALLOW") reasons.push(`study ${pick} confirmed by trendline ${levels.position} and $${Math.abs(cushionUsd ?? 0).toFixed(0)} cushion`);
 
+  const studyLockOnlyBlock =
+    state.verdict === "SKIP" &&
+    skipReasons.length > 0 &&
+    skipReasons.every((r) => r.startsWith("no T7 study lock"));
+
   return {
     ok: true,
     asOf,
@@ -269,6 +296,12 @@ async function computeBtcConsensus(): Promise<ConsensusResponse> {
       confidence: studyConf == null ? null : Number(studyConf.toFixed(4)),
       lockedAt: (row["study_locked_at"] as string | null) ?? null,
       skipReason: (row["skip_guard_reason"] as string | null) ?? null,
+      fallbackSide: asSide(row["cvv_would_lock_side"]),
+      fallbackConfidence: (() => {
+        const c = row["cvv_would_lock_conf"] == null ? null : Number(row["cvv_would_lock_conf"]);
+        if (c == null || !Number.isFinite(c)) return null;
+        return Number((c > 1 ? c / 100 : c).toFixed(4));
+      })(),
     },
     trendline: {
       side: trendSide,
@@ -284,6 +317,7 @@ async function computeBtcConsensus(): Promise<ConsensusResponse> {
     side: state.verdict === "SKIP" ? null : pick,
     confidence: state.verdict === "SKIP" ? null : (studyConf ?? null),
     reasons,
+    studyLockOnlyBlock,
     rules: CONSENSUS_RULES,
     error: null,
   };
