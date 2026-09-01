@@ -113,7 +113,8 @@ export async function captureWindowSnapshot(): Promise<CaptureResult> {
 
   const insert = {
     ticker: flow.ticker,
-    close_time: new Date(Date.now() + stc * 1000).toISOString(),
+    // Round to the 15m boundary so every row of one window shares a close_time.
+    close_time: new Date(Math.round((Date.now() + stc * 1000) / 900_000) * 900_000).toISOString(),
     seconds_to_close: Math.round(stc),
     strike_usd: flow.strike,
     spot_usd: spot,
