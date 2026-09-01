@@ -165,6 +165,7 @@ export async function getBtcLevels(opts?: { limit?: number; includeCandles?: boo
     asOf: new Date().toISOString(),
     source,
     spot,
+    spotSource,
     buy: buy != null ? Number(buy.toFixed(2)) : null,
     mid: mid != null ? Number(mid.toFixed(2)) : null,
     sell: sell != null ? Number(sell.toFixed(2)) : null,
