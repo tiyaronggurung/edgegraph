@@ -182,23 +182,26 @@ async function computeBtcConsensus(): Promise<ConsensusResponse> {
   const row = (pred ?? {}) as Record<string, unknown>;
   const storedModelSide = asSide(row["model_side_pre_study"]) ?? asSide(row["side"]);
   const modelProbRaw = row["model_prob"] == null ? null : Number(row["model_prob"]);
-  // model_prob is P(YES). Some rows were persisted with a stale side that
-  // contradicts their own probability — trust the probability, not the label.
   const probSide: Side | null =
     modelProbRaw == null || !Number.isFinite(modelProbRaw)
       ? null
       : modelProbRaw >= 0.5
         ? "YES"
         : "NO";
-  const modelSide =
-    probSide && storedModelSide && probSide !== storedModelSide ? probSide : (storedModelSide ?? probSide);
+  // Model pick = the FROZEN log pick shown in the crypto Recent-predictions
+  // table (model_side_pre_study, never overwritten by study/fight). The live
+  // re-scored probability is not allowed to flip it mid-window; probSide is
+  // only a fallback when the log has no side yet.
+  const modelSide = storedModelSide ?? probSide;
   // model_prob is P(YES); express it as confidence in the model's own side.
+  // This number is live (it re-scores each tick) — Ops shows the side only.
   const modelConf =
     modelProbRaw == null || !Number.isFinite(modelProbRaw)
       ? null
       : modelSide === "NO"
         ? 1 - modelProbRaw
         : modelProbRaw;
+
 
   const studySide = asSide(row["study_locked_side"]);
   const studyConfRaw = row["study_lock_confidence"] == null ? null : Number(row["study_lock_confidence"]);
