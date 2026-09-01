@@ -5040,6 +5040,7 @@ export type Database = {
         Row: {
           armed: boolean
           bankroll_cents: number
+          blend_study: boolean
           created_at: string
           dominance_block_cents: number
           exit_capture_pct: number
@@ -5049,19 +5050,24 @@ export type Database = {
           max_price_cents: number
           min_edge_cents: number
           min_price_cents: number
+          min_study_conf: number
           paper: boolean
           per_side_window_cap_usd: number
           per_window_cap_usd: number
+          require_signal_agreement: boolean
           risk_per_trade_pct: number
           stack_fraction: number
           stack_gain_cents: number
           stop_loss_fraction: number
+          study_weight: number
           updated_at: string
           user_id: string
+          verdict_veto: boolean
         }
         Insert: {
           armed?: boolean
           bankroll_cents?: number
+          blend_study?: boolean
           created_at?: string
           dominance_block_cents?: number
           exit_capture_pct?: number
@@ -5071,19 +5077,24 @@ export type Database = {
           max_price_cents?: number
           min_edge_cents?: number
           min_price_cents?: number
+          min_study_conf?: number
           paper?: boolean
           per_side_window_cap_usd?: number
           per_window_cap_usd?: number
+          require_signal_agreement?: boolean
           risk_per_trade_pct?: number
           stack_fraction?: number
           stack_gain_cents?: number
           stop_loss_fraction?: number
+          study_weight?: number
           updated_at?: string
           user_id: string
+          verdict_veto?: boolean
         }
         Update: {
           armed?: boolean
           bankroll_cents?: number
+          blend_study?: boolean
           created_at?: string
           dominance_block_cents?: number
           exit_capture_pct?: number
@@ -5093,15 +5104,19 @@ export type Database = {
           max_price_cents?: number
           min_edge_cents?: number
           min_price_cents?: number
+          min_study_conf?: number
           paper?: boolean
           per_side_window_cap_usd?: number
           per_window_cap_usd?: number
+          require_signal_agreement?: boolean
           risk_per_trade_pct?: number
           stack_fraction?: number
           stack_gain_cents?: number
           stop_loss_fraction?: number
+          study_weight?: number
           updated_at?: string
           user_id?: string
+          verdict_veto?: boolean
         }
         Relationships: []
       }
