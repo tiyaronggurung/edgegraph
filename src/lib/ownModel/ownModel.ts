@@ -302,12 +302,21 @@ export function decideEntry(
     }
   }
 
-  /* pick the model side */
-  const side: OwnSide = prob.probUp >= 0.5 ? "YES" : "NO";
+  /* pick the side — Study pick leads when present, else our diffusion side */
+  const ownSide: OwnSide = prob.probUp >= 0.5 ? "YES" : "NO";
+  const side: OwnSide =
+    rules.requireSignalAgreement && signals?.studySide ? signals.studySide : ownSide;
   const ask = side === "YES" ? m.askUpCents : m.askDownCents;
   const bid = side === "YES" ? m.bidUpCents : m.bidDownCents;
   const modelSideProbCents = (side === "YES" ? prob.probUp : 1 - prob.probUp) * 100;
   const edge = modelSideProbCents - ask;
+
+  /* signal gate — Model pick / Study pick / Verdict */
+  const gate = signalGate(side, signals, rules);
+  if (gate) {
+    return { action: "SKIP", code: gate.code, reason: gate.reason, edgeCents: edge, ...base };
+  }
+
 
   /* dominance block — held side ≥70¢ never buys the other side */
   const dom = book.heldSideBestBidCents;
