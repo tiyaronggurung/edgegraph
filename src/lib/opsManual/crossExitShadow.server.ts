@@ -21,6 +21,16 @@ export const CROSS_EXIT_RULES = {
   MAX_FLIP_ASK_CENTS: 40,
 } as const;
 
+/** Dense snapshot rows stamp close_time as now+seconds_to_close, which drifts a
+ *  few seconds per row. Round to the nearest 15m boundary so every row of one
+ *  window shares a single canonical close time. */
+export function canonicalCloseTime(ts: string): string {
+  const ms = Date.parse(ts);
+  if (!Number.isFinite(ms)) return ts;
+  const q = 15 * 60 * 1000;
+  return new Date(Math.round(ms / q) * q).toISOString();
+}
+
 export type CrossExitSource = "simulated_t5" | "ops_trade";
 
 export interface CrossExitEntry {
@@ -348,8 +358,10 @@ export async function backfillWindowCrossExit(
   ticker: string,
   closeTime: string,
   strike: number,
-  outcome: "YES" | "NO" | null,
+  outcomeRaw: "YES" | "NO" | null,
 ): Promise<{ ok: boolean; entryCreated: boolean; crossDetected: boolean; error?: string }> {
+  const outcome = outcomeRaw;
+  closeTime = canonicalCloseTime(closeTime);
   try {
     // Look for an existing row first.
     const { data: existing } = await db
@@ -365,7 +377,6 @@ export async function backfillWindowCrossExit(
       .from("btc_window_snapshots")
       .select("captured_at,seconds_to_close,spot_usd,yes_bid_cents,yes_ask_cents")
       .eq("ticker", ticker)
-      .eq("close_time", closeTime)
       .order("captured_at", { ascending: true });
     if (error) throw error;
     if (!rows || rows.length === 0) return { ok: true, entryCreated: false, crossDetected: false };
@@ -432,11 +443,11 @@ export async function backfillCrossExitShadowRange(
 
   const unique = new Map<string, { ticker: string; close_time: string; strike: number; outcome: "YES" | "NO" }>();
   for (const r of windows ?? []) {
-    const key = `${r.ticker}|${r.close_time}`;
+    const key = String(r.ticker);
     if (!unique.has(key) && r.outcome != null) {
       unique.set(key, {
         ticker: r.ticker as string,
-        close_time: r.close_time as string,
+        close_time: canonicalCloseTime(r.close_time as string),
         strike: Number(r.strike_usd),
         outcome: String(r.outcome) as "YES" | "NO",
       });
@@ -463,6 +474,7 @@ export async function logCrossExitForSnapshot(
   strike: number,
   currentSnapshot: CrossExitSnapshot,
 ): Promise<{ ok: boolean; entryCreated: boolean; crossDetected: boolean; error?: string }> {
+  closeTime = canonicalCloseTime(closeTime);
   try {
     // Fetch or create the simulated T-5m entry for this window.
     const { data: existing } = await db
@@ -497,7 +509,6 @@ export async function logCrossExitForSnapshot(
         .from("btc_window_snapshots")
         .select("captured_at,seconds_to_close,spot_usd,yes_bid_cents,yes_ask_cents")
         .eq("ticker", ticker)
-        .eq("close_time", closeTime)
         .order("captured_at", { ascending: true });
       const snapshots: CrossExitSnapshot[] = (rows ?? []).map(rowToSnapshot);
       const t5 = snapshots.reduce(
