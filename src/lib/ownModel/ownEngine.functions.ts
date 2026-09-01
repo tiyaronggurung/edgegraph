@@ -303,6 +303,11 @@ const settingsSchema = z.object({
   perSideWindowCapUsd: z.number().min(10).max(100_000).optional(),
   perWindowCapUsd: z.number().min(10).max(500_000).optional(),
   exitCapturePct: z.number().int().min(50).max(100).optional(),
+  requireSignalAgreement: z.boolean().optional(),
+  verdictVeto: z.boolean().optional(),
+  blendStudy: z.boolean().optional(),
+  studyWeight: z.number().min(0).max(1).optional(),
+  minStudyConf: z.number().min(0).max(1).optional(),
 });
 
 export const saveOwnEngineSettings = createServerFn({ method: "POST" })
@@ -320,6 +325,11 @@ export const saveOwnEngineSettings = createServerFn({ method: "POST" })
     if (data.perSideWindowCapUsd !== undefined) patch.per_side_window_cap_usd = data.perSideWindowCapUsd;
     if (data.perWindowCapUsd !== undefined) patch.per_window_cap_usd = data.perWindowCapUsd;
     if (data.exitCapturePct !== undefined) patch.exit_capture_pct = data.exitCapturePct;
+    if (data.requireSignalAgreement !== undefined) patch.require_signal_agreement = data.requireSignalAgreement;
+    if (data.verdictVeto !== undefined) patch.verdict_veto = data.verdictVeto;
+    if (data.blendStudy !== undefined) patch.blend_study = data.blendStudy;
+    if (data.studyWeight !== undefined) patch.study_weight = data.studyWeight;
+    if (data.minStudyConf !== undefined) patch.min_study_conf = data.minStudyConf;
     const { error } = await context.supabase
       .from("own_engine_settings")
       .upsert(patch as never, { onConflict: "user_id" });
@@ -356,6 +366,8 @@ export const ownEngineTick = createServerFn({ method: "POST" })
     if (!prob) return { ok: false as const, error: "no spot", settled, exits: 0, fills: [] as string[] };
 
     const { book, open } = await loadBook(supabase, userId, q.ticker, q);
+    // exits also respect the blended (model + study) probability
+    const probBlended = blendWithSignals(prob, q.signals, settings);
 
     /* ---- exits ---- */
     let exits = 0;
@@ -364,7 +376,7 @@ export const ownEngineTick = createServerFn({ method: "POST" })
       const d = decideExit(
         { side: o.side, avgCostCents: o.price_cents, phase: o.phase },
         { bidCents: bid },
-        prob, settings,
+        probBlended, settings,
       );
       if (!d.exit || bid == null) continue;
       const pnl = Math.round((bid - o.price_cents) * o.contracts);
