@@ -17,6 +17,7 @@ export interface PaperKalshiWindow {
   closeTime: string | null;
   secondsToClose: number | null;
   spot: number | null;
+  spotSource: "own_composite" | "candle_close" | "none";
   cushionUsd: number | null;
   /** Side the spot currently favours (YES = above strike). */
   spotSide: PaperSide | null;
@@ -161,7 +162,7 @@ async function loadWindow(): Promise<PaperKalshiWindow> {
       closeTime,
       secondsToClose: stc,
       spot,
-      spotSource: (con?.spotSource ?? "none") as PaperWindow["spotSource"],
+      spotSource: (con?.spotSource ?? "none") as PaperKalshiWindow["spotSource"],
       cushionUsd: cushion,
       spotSide: cushion == null ? null : cushion >= 0 ? "YES" : "NO",
       up: { bidCents: yesBid, askCents: yesAsk },
