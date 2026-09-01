@@ -1,6 +1,7 @@
 // Paper-money Kalshi 15m trader: live strike, UP/DOWN prices, countdown,
 // entry, hedge (two-sided engine), exit and flip-side detection.
 // Everything here is simulated — no real order ever leaves this panel.
+import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -106,8 +107,8 @@ export function OpsPaperTradePanel() {
 
   const w = win.data;
   // Same live composite feed the trendline chart uses — ticks at ~60fps.
-  const live = useLiveCompositeSpot();
-  const liveSpot = live.spot;
+  const liveFeed = useLiveCompositeSpot();
+  const liveSpot = liveFeed.spot;
   const displaySpot = liveSpot ?? w?.spot ?? null;
   const displayCushion = displaySpot != null && w?.strike != null
     ? displaySpot - w.strike
