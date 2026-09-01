@@ -46,7 +46,7 @@ export interface OwnEngineSkip {
   ticker: string | null;
   code: string;
   reason: string | null;
-  snapshot: Record<string, unknown> | null;
+  snapshot: unknown;
   created_at: string;
 }
 
@@ -302,7 +302,7 @@ export const saveOwnEngineSettings = createServerFn({ method: "POST" })
     if (data.exitCapturePct !== undefined) patch.exit_capture_pct = data.exitCapturePct;
     const { error } = await context.supabase
       .from("own_engine_settings")
-      .upsert(patch, { onConflict: "user_id" });
+      .upsert(patch as never, { onConflict: "user_id" });
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const };
   });
@@ -386,7 +386,7 @@ export const ownEngineTick = createServerFn({ method: "POST" })
     const insert = async (side: OwnSide, contracts: number, priceCents: number, phase: string, edge: number | null) => {
       const { error } = await supabase.from("own_engine_orders").insert({
         user_id: userId,
-        ticker: q.ticker,
+        ticker: q.ticker as string,
         close_time: q.closeTime,
         strike: q.strike,
         side, contracts, price_cents: priceCents, phase,
