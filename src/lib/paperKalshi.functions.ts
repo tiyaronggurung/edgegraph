@@ -62,6 +62,68 @@ const c = (dollars: number | null | undefined): number | null =>
 
 const flip = (s: PaperSide): PaperSide => (s === "YES" ? "NO" : "YES");
 
+export type PaperEventKind =
+  | "entry" | "hedge" | "exit" | "flip" | "settle" | "skip";
+
+export interface PaperKalshiEvent {
+  id: string;
+  position_id: string | null;
+  ticker: string;
+  kind: PaperEventKind;
+  side: PaperSide | null;
+  contracts: number | null;
+  price_cents: number | null;
+  /** Negative = cash out (buy), positive = cash in (sell / settle). */
+  cash_cents: number | null;
+  pnl_cents: number | null;
+  spot: number | null;
+  strike: number | null;
+  seconds_left: number | null;
+  note: string | null;
+  auto: boolean;
+  created_at: string;
+}
+
+/** Append one row to the activity/transaction log. Never throws. */
+async function logEvent(
+  supabase: any,
+  userId: string,
+  e: {
+    positionId?: string | null;
+    ticker: string;
+    kind: PaperEventKind;
+    side?: PaperSide | null;
+    contracts?: number | null;
+    priceCents?: number | null;
+    cashCents?: number | null;
+    pnlCents?: number | null;
+    spot?: number | null;
+    strike?: number | null;
+    secondsLeft?: number | null;
+    note?: string | null;
+    auto?: boolean;
+  },
+): Promise<void> {
+  try {
+    await supabase.from("paper_kalshi_events").insert({
+      user_id: userId,
+      position_id: e.positionId ?? null,
+      ticker: e.ticker,
+      kind: e.kind,
+      side: e.side ?? null,
+      contracts: e.contracts ?? null,
+      price_cents: e.priceCents ?? null,
+      cash_cents: e.cashCents ?? null,
+      pnl_cents: e.pnlCents ?? null,
+      spot: e.spot ?? null,
+      strike: e.strike ?? null,
+      seconds_left: e.secondsLeft ?? null,
+      note: e.note ?? null,
+      auto: e.auto ?? false,
+    });
+  } catch { /* logging must never break a trade */ }
+}
+
 async function loadWindow(): Promise<PaperKalshiWindow> {
     const asOf = new Date().toISOString();
     const base: PaperKalshiWindow = {
@@ -165,6 +227,20 @@ export const paperKalshiEnter = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) return { ok: false as const, error: error.message };
+    await logEvent(context.supabase, context.userId, {
+      positionId: row.id as string,
+      ticker: w.ticker,
+      kind: "entry",
+      side: data.side,
+      contracts: data.contracts,
+      priceCents: ask,
+      cashCents: -(ask * data.contracts),
+      spot: w.spot,
+      strike: w.strike,
+      secondsLeft: w.secondsToClose,
+      note: data.reason ?? "manual entry",
+      auto: data.reason === "auto",
+    });
     return { ok: true as const, id: row.id as string, side: data.side, priceCents: ask, contracts: data.contracts };
   });
 
