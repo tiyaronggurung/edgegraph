@@ -59,7 +59,7 @@ export function OpsOwnEnginePanel() {
   const set = s?.settings;
   const d = s?.decision;
 
-  const patch = async (p: Parameters<typeof saveFn>[0]["data"]) => {
+  const patch = async (p: { armed?: boolean; paper?: boolean; bankrollCents?: number }) => {
     const r = await saveFn({ data: p });
     if (!r.ok) toast.error(r.error);
     else { toast.success("saved"); void st.refetch(); }

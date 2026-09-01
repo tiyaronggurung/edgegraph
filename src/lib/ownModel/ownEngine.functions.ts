@@ -46,7 +46,6 @@ export interface OwnEngineSkip {
   ticker: string | null;
   code: string;
   reason: string | null;
-  snapshot: unknown;
   created_at: string;
 }
 
@@ -470,7 +469,7 @@ export const listOwnEngineSkips = createServerFn({ method: "GET" })
   .inputValidator((d: { limit?: number } | undefined) => d ?? {})
   .handler(async ({ context, data }): Promise<OwnEngineSkip[]> => {
     const { data: rows } = await context.supabase
-      .from("own_engine_skips").select("*")
+      .from("own_engine_skips").select("id, ticker, code, reason, created_at")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false })
       .limit(Math.min(Math.max(data.limit ?? 50, 1), 200));
