@@ -75,6 +75,33 @@ async function fetch1m(limit: number): Promise<{ candles: TCandle[]; source: str
 const CACHE_MS = 3_000;
 let cache: { at: number; limit: number; value: BtcLevels } | null = null;
 
+// Our own trendline composite spot (the value the crypto page shows): the
+// client records the consolidated multi-venue tick into btc_spot_ticks every
+// ~1-2s. That's faster than Kalshi's own reference re-quote and faster than a
+// 1m candle close, so every consumer of getBtcLevels() keys off it.
+const OWN_SPOT_MAX_AGE_MS = 25_000;
+
+async function fetchOwnCompositeSpot(): Promise<{ spot: number; ageMs: number } | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("btc_spot_ticks")
+      .select("spot,observed_at")
+      .eq("source", "consolidated")
+      .order("observed_at", { ascending: false })
+      .limit(1);
+    const row = data?.[0] as { spot: number | string; observed_at: string } | undefined;
+    if (!row) return null;
+    const spot = Number(row.spot);
+    const ageMs = Date.now() - new Date(row.observed_at).getTime();
+    if (!Number.isFinite(spot) || spot <= 0 || ageMs > OWN_SPOT_MAX_AGE_MS) return null;
+    return { spot: Number(spot.toFixed(2)), ageMs };
+  } catch {
+    return null;
+  }
+}
+
+
 export async function getBtcLevels(opts?: { limit?: number; includeCandles?: boolean }): Promise<BtcLevels> {
   const limit = Math.max(30, Math.min(500, opts?.limit ?? 300));
   const includeCandles = opts?.includeCandles === true;
