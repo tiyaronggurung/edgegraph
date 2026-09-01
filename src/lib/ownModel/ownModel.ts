@@ -27,6 +27,9 @@ export interface OwnRules {
   blendStudy: boolean;
   studyWeight: number;
   minStudyConf: number;
+  /* --- high-cushion price exception (C) --- */
+  highCushionUsd: number;
+  highCushionMaxPriceCents: number;
 }
 
 export const OWN_RULES: OwnRules = {
@@ -49,6 +52,8 @@ export const OWN_RULES: OwnRules = {
   blendStudy: true,
   studyWeight: 0.4,
   minStudyConf: 0.7,
+  highCushionUsd: 60,
+  highCushionMaxPriceCents: 85,
 };
 
 export type SkipCode =
@@ -75,6 +80,8 @@ export interface OwnSignals {
   modelConf: number | null;
   studySide: OwnSide | null;
   studyConf: number | null;
+  /** Study side came from the CVV shadow lock, not a real T7 lock. */
+  studyIsFallback?: boolean;
   verdict: "ALLOW" | "CAUTION" | "SKIP" | null;
 }
 
@@ -359,8 +366,15 @@ export function decideEntry(
   if (edge < rules.minEdgeCents) {
     return { action: "SKIP", code: "EDGE_TOO_SMALL", reason: `edge ${edge.toFixed(1)}¢ < ${rules.minEdgeCents}¢`, edgeCents: edge, ...base };
   }
-  if (ask < rules.minPriceCents || ask > rules.maxPriceCents) {
-    return { action: "SKIP", code: "PRICE_OUT_OF_BAND", reason: `ask ${ask}¢ outside ${rules.minPriceCents}–${rules.maxPriceCents}¢`, edgeCents: edge, ...base };
+  // High-cushion exception (C): when spot is far on our side of the strike the
+  // hard 70¢ ceiling lifts to highCushionMaxPriceCents.
+  const cushionForSide = side === "YES" ? m.cushionUsd : -m.cushionUsd;
+  const ceiling =
+    cushionForSide >= rules.highCushionUsd
+      ? Math.max(rules.maxPriceCents, rules.highCushionMaxPriceCents)
+      : rules.maxPriceCents;
+  if (ask < rules.minPriceCents || ask > ceiling) {
+    return { action: "SKIP", code: "PRICE_OUT_OF_BAND", reason: `ask ${ask}¢ outside ${rules.minPriceCents}–${ceiling}¢ (cushion $${cushionForSide.toFixed(0)})`, edgeCents: edge, ...base };
   }
   const cushionFavours =
     (side === "YES" && m.cushionUsd >= rules.lateCushionUsd) ||
