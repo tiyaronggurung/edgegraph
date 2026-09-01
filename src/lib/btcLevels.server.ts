@@ -15,6 +15,8 @@ export interface BtcLevels {
   asOf: string;              // ISO timestamp of computation
   source: string;            // candle source used
   spot: number | null;
+  /** Where `spot` came from: our own multi-venue composite, or a 1m candle close. */
+  spotSource: "own_composite" | "candle_close" | "none";
   buy: number | null;        // lower trendline @ now
   mid: number | null;
   sell: number | null;       // upper trendline @ now
@@ -75,6 +77,33 @@ async function fetch1m(limit: number): Promise<{ candles: TCandle[]; source: str
 const CACHE_MS = 3_000;
 let cache: { at: number; limit: number; value: BtcLevels } | null = null;
 
+// Our own trendline composite spot (the value the crypto page shows): the
+// client records the consolidated multi-venue tick into btc_spot_ticks every
+// ~1-2s. That's faster than Kalshi's own reference re-quote and faster than a
+// 1m candle close, so every consumer of getBtcLevels() keys off it.
+const OWN_SPOT_MAX_AGE_MS = 25_000;
+
+async function fetchOwnCompositeSpot(): Promise<{ spot: number; ageMs: number } | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("btc_spot_ticks")
+      .select("spot,observed_at")
+      .eq("source", "consolidated")
+      .order("observed_at", { ascending: false })
+      .limit(1);
+    const row = data?.[0] as { spot: number | string; observed_at: string } | undefined;
+    if (!row) return null;
+    const spot = Number(row.spot);
+    const ageMs = Date.now() - new Date(row.observed_at).getTime();
+    if (!Number.isFinite(spot) || spot <= 0 || ageMs > OWN_SPOT_MAX_AGE_MS) return null;
+    return { spot: Number(spot.toFixed(2)), ageMs };
+  } catch {
+    return null;
+  }
+}
+
+
 export async function getBtcLevels(opts?: { limit?: number; includeCandles?: boolean }): Promise<BtcLevels> {
   const limit = Math.max(30, Math.min(500, opts?.limit ?? 300));
   const includeCandles = opts?.includeCandles === true;
@@ -89,7 +118,7 @@ export async function getBtcLevels(opts?: { limit?: number; includeCandles?: boo
     ok: false,
     asOf: new Date().toISOString(),
     source: "none",
-    spot: null, buy: null, mid: null, sell: null,
+    spot: null, spotSource: "none", buy: null, mid: null, sell: null,
     channelWidthPct: null, distToBuyPct: null, distToSellPct: null, distToMidUsd: null,
     position: "unknown",
     bias: "neutral",
@@ -101,6 +130,7 @@ export async function getBtcLevels(opts?: { limit?: number; includeCandles?: boo
 
   let candles: TCandle[] = [];
   let source = "none";
+  const ownSpotPromise = fetchOwnCompositeSpot();
   try {
     const r = await fetch1m(limit);
     candles = r.candles;
@@ -113,7 +143,10 @@ export async function getBtcLevels(opts?: { limit?: number; includeCandles?: boo
 
   const trend = detectTrendlines(candles);
   const spike = detectSpike(candles, trend);
-  const spot = candles[candles.length - 1].c;
+  const own = await ownSpotPromise;
+  const spot = own?.spot ?? candles[candles.length - 1].c;
+  const spotSource: BtcLevels["spotSource"] = own ? "own_composite" : "candle_close";
+
   const sell = trend.upperAtNow;
   const buy = trend.lowerAtNow;
   const mid = sell != null && buy != null ? (sell + buy) / 2 : null;
@@ -132,6 +165,7 @@ export async function getBtcLevels(opts?: { limit?: number; includeCandles?: boo
     asOf: new Date().toISOString(),
     source,
     spot,
+    spotSource,
     buy: buy != null ? Number(buy.toFixed(2)) : null,
     mid: mid != null ? Number(mid.toFixed(2)) : null,
     sell: sell != null ? Number(sell.toFixed(2)) : null,

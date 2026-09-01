@@ -152,7 +152,7 @@ export function OpsOwnEnginePanel() {
       {/* live window */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-xs">
         <Cell label="Strike" v={s?.strike != null ? `$${s.strike.toLocaleString()}` : "—"} />
-        <Cell label="Spot" v={s?.spot != null ? `$${s.spot.toLocaleString()}` : "—"} />
+        <Cell label={s?.spotSource === "own_composite" ? "Spot (our feed)" : "Spot"} v={s?.spot != null ? `$${s.spot.toLocaleString()}` : "—"} />
         <Cell label="Cushion" v={s?.cushionUsd != null ? `${s.cushionUsd >= 0 ? "+" : ""}$${s.cushionUsd.toFixed(0)}` : "—"} />
         <Cell label="Time left" v={clock(s?.secondsLeft)} />
         <Cell label="P(up)" v={s?.probUp != null ? `${(s.probUp * 100).toFixed(1)}%` : "—"} />

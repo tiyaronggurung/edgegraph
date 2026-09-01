@@ -37,6 +37,7 @@ export interface ConsensusResponse {
   ticker: string | null;
   strike: number | null;
   spot: number | null;
+  spotSource: BtcLevels["spotSource"];
   secondsToClose: number | null;
   askCents: number | null;
   cushionUsd: number | null;
@@ -103,7 +104,7 @@ async function computeBtcConsensus(): Promise<ConsensusResponse> {
   const base: ConsensusResponse = {
     ok: false,
     asOf,
-    ticker: null, strike: null, spot: null, secondsToClose: null, askCents: null, cushionUsd: null,
+    ticker: null, strike: null, spot: null, spotSource: "none", secondsToClose: null, askCents: null, cushionUsd: null,
     model: { side: null, confidence: null },
     study: { side: null, confidence: null, lockedAt: null, skipReason: null },
     trendline: { side: null, buy: null, mid: null, sell: null, position: "unknown", distToMidUsd: null, broke: null },
@@ -258,6 +259,7 @@ async function computeBtcConsensus(): Promise<ConsensusResponse> {
     ticker: flow.ticker,
     strike,
     spot,
+    spotSource: levels.spotSource,
     secondsToClose: stc,
     askCents,
     cushionUsd,

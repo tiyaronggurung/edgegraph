@@ -58,6 +58,7 @@ export interface OwnEngineState {
   ticker: string | null;
   strike: number | null;
   spot: number | null;
+  spotSource: "own_composite" | "candle_close" | "none";
   cushionUsd: number | null;
   secondsLeft: number | null;
   up: { bidCents: number | null; askCents: number | null };
@@ -119,6 +120,7 @@ interface Quote {
   closeTime: string | null;
   secondsLeft: number | null;
   spot: number | null;
+  spotSource: "own_composite" | "candle_close" | "none";
   cushionUsd: number | null;
   up: { bidCents: number | null; askCents: number | null };
   down: { bidCents: number | null; askCents: number | null };
@@ -132,7 +134,7 @@ const EMPTY_SIGNALS: OwnSignals = {
 async function loadQuote(): Promise<Quote> {
   const empty: Quote = {
     ok: false, error: null, ticker: null, strike: null, closeTime: null, secondsLeft: null,
-    spot: null, cushionUsd: null,
+    spot: null, spotSource: "none", cushionUsd: null,
     up: { bidCents: null, askCents: null }, down: { bidCents: null, askCents: null },
     signals: EMPTY_SIGNALS,
   };
@@ -155,6 +157,7 @@ async function loadQuote(): Promise<Quote> {
     closeTime: stc != null ? new Date(Date.now() + stc * 1000).toISOString() : null,
     secondsLeft: stc,
     spot,
+    spotSource: (con?.spotSource ?? "none") as Quote["spotSource"],
     cushionUsd: spot != null ? Number((spot - k.strike).toFixed(2)) : null,
     up: { bidCents: yesBid, askCents: yesAsk },
     down: { bidCents: yesAsk == null ? null : 100 - yesAsk, askCents: yesBid == null ? null : 100 - yesBid },
@@ -276,6 +279,7 @@ export const getOwnEngineState = createServerFn({ method: "GET" })
       ticker: q.ticker,
       strike: q.strike,
       spot: q.spot,
+      spotSource: q.spotSource,
       cushionUsd: q.cushionUsd,
       secondsLeft: q.secondsLeft,
       up: q.up,
