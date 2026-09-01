@@ -50,6 +50,7 @@ export interface PaperKalshiPosition {
   exit_reason: string | null;
   crossed_strike: boolean;
   crossed_at: string | null;
+  auto_hedge: boolean;
   status: "open" | "hedged" | "closed" | "settled" | "void";
   outcome: PaperSide | null;
   pnl_cents: number | null;

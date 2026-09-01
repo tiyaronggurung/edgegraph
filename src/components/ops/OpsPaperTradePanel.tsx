@@ -402,13 +402,32 @@ function SideCard({
   );
 }
 
+const EVENT_TONE: Record<string, string> = {
+  entry: "text-sky-400",
+  hedge: "text-violet-400",
+  exit: "text-orange-400",
+  flip: "text-amber-400",
+  settle: "text-emerald-400",
+  skip: "text-muted-foreground",
+};
+
+function EventBadge({ kind, auto }: { kind: PaperKalshiEvent["kind"]; auto: boolean }) {
+  return (
+    <span className={cn("uppercase tracking-widest font-bold", EVENT_TONE[kind] ?? "text-foreground")}>
+      {kind}
+      {auto && <span className="ml-1 text-[9px] text-muted-foreground">auto</span>}
+    </span>
+  );
+}
+
 function LivePositionRow({
-  p, busy, onHedge, onCheckHedge, onExit,
+  p, busy, onHedge, onCheckHedge, onToggleAuto, onExit,
 }: {
   p: PaperKalshiPosition;
   busy: boolean;
   onHedge: () => void;
   onCheckHedge: () => void;
+  onToggleAuto: () => void;
   onExit: (reason: string) => void;
 }) {
   return (
@@ -424,6 +443,9 @@ function LivePositionRow({
       <span className="text-muted-foreground">{new Date(p.close_time).toISOString().slice(11, 16)}Z</span>
       {p.crossed_strike && <span className="text-amber-400 font-bold">FLIP — spot crossed strike</span>}
       <div className="ml-auto flex gap-2">
+        <button onClick={onToggleAuto} disabled={busy} className={cn("border rounded px-2 py-1 disabled:opacity-40", p.auto_hedge ? "border-[color:var(--color-primary)] text-[color:var(--color-primary)]" : "border-border text-muted-foreground")}>
+          Auto {p.auto_hedge ? "on" : "off"}
+        </button>
         <button onClick={onCheckHedge} disabled={busy} className="border border-border rounded px-2 py-1 hover:bg-muted disabled:opacity-40">
           Check hedge
         </button>
