@@ -29,24 +29,13 @@ export const Route = createFileRoute("/_authenticated/ops-manual")({
 });
 
 function OpsManualPage() {
-  const { isAdmin, loading } = usePlan();
-  const nav = useNavigate();
   const getDash = useServerFn(opsGetDashboard);
-
-  useEffect(() => {
-    if (!loading && !isAdmin) nav({ to: "/dashboard" });
-  }, [loading, isAdmin, nav]);
 
   const q = useQuery({
     queryKey: ["ops-manual-dashboard"],
     queryFn: () => getDash({}),
-    enabled: !loading && isAdmin,
     refetchInterval: 60_000,
   });
-
-  if (loading || !isAdmin) {
-    return <div className="text-xs text-muted-foreground uppercase tracking-widest">Loading…</div>;
-  }
 
   return (
     <div className="space-y-6 font-mono">
@@ -57,9 +46,12 @@ function OpsManualPage() {
         </h1>
       </div>
       <p className="text-xs text-muted-foreground max-w-3xl">
-        Admin-only control layer. Nothing here places orders automatically — it qualifies windows,
-        fixes the stake, records every bet, and shuts the session down the moment a rule is hit.
+        Your own operating book. Nothing here places real orders automatically — it qualifies
+        windows, fixes the stake, records every bet, and shuts the session down the moment a rule
+        is hit. Paper trading below is fully simulated.
       </p>
+
+      <OpsPaperTradePanel />
 
       {q.isLoading && <div className="text-xs text-muted-foreground">Loading operating data…</div>}
       {q.error && <div className="text-xs text-red-400">{(q.error as Error).message}</div>}
@@ -73,6 +65,7 @@ function OpsManualPage() {
           <OpsStakingPanel dash={q.data} onRefresh={() => q.refetch()} />
           <OpsHedgePanel />
           <OpsCrossExitShadowPanel />
+
           <OpsPnlDashboard dash={q.data} />
           <OpsBacktestPanel dash={q.data} />
           <OpsAlertsPanel dash={q.data} onRefresh={() => q.refetch()} />
