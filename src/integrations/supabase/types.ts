@@ -4958,6 +4958,183 @@ export type Database = {
         }
         Relationships: []
       }
+      own_engine_orders: {
+        Row: {
+          close_time: string | null
+          closed_at: string | null
+          contracts: number
+          created_at: string
+          cushion_usd: number | null
+          edge_cents: number | null
+          exit_price_cents: number | null
+          exit_reason: string | null
+          id: string
+          model_prob: number | null
+          outcome: string | null
+          paper: boolean
+          phase: string
+          pnl_cents: number | null
+          price_cents: number
+          seconds_left: number | null
+          side: string
+          spot: number | null
+          status: string
+          strike: number | null
+          ticker: string
+          user_id: string
+          z_score: number | null
+        }
+        Insert: {
+          close_time?: string | null
+          closed_at?: string | null
+          contracts: number
+          created_at?: string
+          cushion_usd?: number | null
+          edge_cents?: number | null
+          exit_price_cents?: number | null
+          exit_reason?: string | null
+          id?: string
+          model_prob?: number | null
+          outcome?: string | null
+          paper?: boolean
+          phase: string
+          pnl_cents?: number | null
+          price_cents: number
+          seconds_left?: number | null
+          side: string
+          spot?: number | null
+          status?: string
+          strike?: number | null
+          ticker: string
+          user_id: string
+          z_score?: number | null
+        }
+        Update: {
+          close_time?: string | null
+          closed_at?: string | null
+          contracts?: number
+          created_at?: string
+          cushion_usd?: number | null
+          edge_cents?: number | null
+          exit_price_cents?: number | null
+          exit_reason?: string | null
+          id?: string
+          model_prob?: number | null
+          outcome?: string | null
+          paper?: boolean
+          phase?: string
+          pnl_cents?: number | null
+          price_cents?: number
+          seconds_left?: number | null
+          side?: string
+          spot?: number | null
+          status?: string
+          strike?: number | null
+          ticker?: string
+          user_id?: string
+          z_score?: number | null
+        }
+        Relationships: []
+      }
+      own_engine_settings: {
+        Row: {
+          armed: boolean
+          bankroll_cents: number
+          created_at: string
+          dominance_block_cents: number
+          exit_capture_pct: number
+          late_block_seconds: number
+          late_cushion_usd: number
+          max_pair_cost_cents: number
+          max_price_cents: number
+          min_edge_cents: number
+          min_price_cents: number
+          paper: boolean
+          per_side_window_cap_usd: number
+          per_window_cap_usd: number
+          risk_per_trade_pct: number
+          stack_fraction: number
+          stack_gain_cents: number
+          stop_loss_fraction: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          armed?: boolean
+          bankroll_cents?: number
+          created_at?: string
+          dominance_block_cents?: number
+          exit_capture_pct?: number
+          late_block_seconds?: number
+          late_cushion_usd?: number
+          max_pair_cost_cents?: number
+          max_price_cents?: number
+          min_edge_cents?: number
+          min_price_cents?: number
+          paper?: boolean
+          per_side_window_cap_usd?: number
+          per_window_cap_usd?: number
+          risk_per_trade_pct?: number
+          stack_fraction?: number
+          stack_gain_cents?: number
+          stop_loss_fraction?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          armed?: boolean
+          bankroll_cents?: number
+          created_at?: string
+          dominance_block_cents?: number
+          exit_capture_pct?: number
+          late_block_seconds?: number
+          late_cushion_usd?: number
+          max_pair_cost_cents?: number
+          max_price_cents?: number
+          min_edge_cents?: number
+          min_price_cents?: number
+          paper?: boolean
+          per_side_window_cap_usd?: number
+          per_window_cap_usd?: number
+          risk_per_trade_pct?: number
+          stack_fraction?: number
+          stack_gain_cents?: number
+          stop_loss_fraction?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      own_engine_skips: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          reason: string | null
+          snapshot: Json | null
+          ticker: string | null
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          snapshot?: Json | null
+          ticker?: string | null
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          snapshot?: Json | null
+          ticker?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       paper_balances: {
         Row: {
           balance_cents: number
