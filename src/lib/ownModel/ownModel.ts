@@ -21,6 +21,12 @@ export interface OwnRules {
   stackGainCents: number;
   exitCapturePct: number;
   stopLossFraction: number;
+  /* --- signal layer: Model pick / Study pick / Verdict --- */
+  requireSignalAgreement: boolean;
+  verdictVeto: boolean;
+  blendStudy: boolean;
+  studyWeight: number;
+  minStudyConf: number;
 }
 
 export const OWN_RULES: OwnRules = {
@@ -38,6 +44,11 @@ export const OWN_RULES: OwnRules = {
   stackGainCents: 9,
   exitCapturePct: 92,
   stopLossFraction: 0.5,
+  requireSignalAgreement: true,
+  verdictVeto: true,
+  blendStudy: true,
+  studyWeight: 0.4,
+  minStudyConf: 0.7,
 };
 
 export type SkipCode =
@@ -50,7 +61,67 @@ export type SkipCode =
   | "INSUFFICIENT_FUNDS"
   | "NO_MARKET"
   | "ALREADY_STACKED"
-  | "NO_SIGNAL";
+  | "NO_SIGNAL"
+  | "VERDICT_SKIP"
+  | "SIGNAL_DISAGREE"
+  | "SIGNAL_MISSING"
+  | "LOW_STUDY_CONF";
+
+/* ----------------------------------------------------- signal layer types */
+
+/** Live Model pick / Study pick / consensus Verdict for this window. */
+export interface OwnSignals {
+  modelSide: OwnSide | null;
+  modelConf: number | null;
+  studySide: OwnSide | null;
+  studyConf: number | null;
+  verdict: "ALLOW" | "CAUTION" | "SKIP" | null;
+}
+
+/**
+ * Blend the diffusion probability with the Study pick so the Own Engine
+ * trades OUR signals, not just its own math.
+ */
+export function blendWithSignals(
+  prob: ProbResult,
+  s: OwnSignals | null,
+  rules: OwnRules,
+): ProbResult {
+  if (!s || !rules.blendStudy || !s.studySide || s.studyConf == null) return prob;
+  const w = clamp(rules.studyWeight, 0, 1);
+  const studyProbUp = s.studySide === "YES" ? s.studyConf : 1 - s.studyConf;
+  const blended = clamp(prob.probUp * (1 - w) + studyProbUp * w, 0.015, 0.985);
+  return { ...prob, probUp: blended };
+}
+
+/** Hard signal gate; null = pass. */
+export function signalGate(
+  side: OwnSide,
+  s: OwnSignals | null,
+  rules: OwnRules,
+): { code: SkipCode; reason: string } | null {
+  if (rules.verdictVeto && s?.verdict === "SKIP") {
+    return { code: "VERDICT_SKIP", reason: "consensus verdict = SKIP" };
+  }
+  if (!rules.requireSignalAgreement) return null;
+  if (!s || (!s.studySide && !s.modelSide)) {
+    return { code: "SIGNAL_MISSING", reason: "no model/study pick for this window yet" };
+  }
+  if (s.studySide && s.studySide !== side) {
+    return { code: "SIGNAL_DISAGREE", reason: `study pick ${s.studySide} vs own ${side}` };
+  }
+  if (s.modelSide && s.modelSide !== side) {
+    return { code: "SIGNAL_DISAGREE", reason: `model pick ${s.modelSide} vs own ${side}` };
+  }
+  if (s.studySide && s.studyConf != null && s.studyConf < rules.minStudyConf) {
+    return {
+      code: "LOW_STUDY_CONF",
+      reason: `study conf ${(s.studyConf * 100).toFixed(0)}% < ${(rules.minStudyConf * 100).toFixed(0)}%`,
+    };
+  }
+  return null;
+}
+
 
 /* ------------------------------------------------------------------ model */
 
@@ -182,13 +253,16 @@ export function sizeContracts(
 
 export function decideEntry(
   m: MarketSnapshot,
-  prob: ProbResult,
+  probRaw: ProbResult,
   book: BookState,
   rules: OwnRules,
   bankrollCents: number,
   cashCents: number,
+  signals: OwnSignals | null = null,
 ): EntryDecision {
+  const prob = blendWithSignals(probRaw, signals, rules);
   const base = { modelProbUp: prob.probUp, z: prob.z };
+
   const fee = m.feeCentsPerContract;
 
   if (m.askUpCents == null || m.askDownCents == null) {
@@ -228,12 +302,21 @@ export function decideEntry(
     }
   }
 
-  /* pick the model side */
-  const side: OwnSide = prob.probUp >= 0.5 ? "YES" : "NO";
+  /* pick the side — Study pick leads when present, else our diffusion side */
+  const ownSide: OwnSide = prob.probUp >= 0.5 ? "YES" : "NO";
+  const side: OwnSide =
+    rules.requireSignalAgreement && signals?.studySide ? signals.studySide : ownSide;
   const ask = side === "YES" ? m.askUpCents : m.askDownCents;
   const bid = side === "YES" ? m.bidUpCents : m.bidDownCents;
   const modelSideProbCents = (side === "YES" ? prob.probUp : 1 - prob.probUp) * 100;
   const edge = modelSideProbCents - ask;
+
+  /* signal gate — Model pick / Study pick / Verdict */
+  const gate = signalGate(side, signals, rules);
+  if (gate) {
+    return { action: "SKIP", code: gate.code, reason: gate.reason, edgeCents: edge, ...base };
+  }
+
 
   /* dominance block — held side ≥70¢ never buys the other side */
   const dom = book.heldSideBestBidCents;

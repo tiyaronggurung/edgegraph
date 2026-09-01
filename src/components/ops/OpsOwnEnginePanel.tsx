@@ -59,7 +59,12 @@ export function OpsOwnEnginePanel() {
   const set = s?.settings;
   const d = s?.decision;
 
-  const patch = async (p: { armed?: boolean; paper?: boolean; bankrollCents?: number }) => {
+  const sig = s?.signals;
+
+  const patch = async (p: {
+    armed?: boolean; paper?: boolean; bankrollCents?: number;
+    requireSignalAgreement?: boolean; verdictVeto?: boolean; blendStudy?: boolean;
+  }) => {
     const r = await saveFn({ data: p });
     if (!r.ok) toast.error(r.error);
     else { toast.success("saved"); void st.refetch(); }
@@ -105,6 +110,42 @@ export function OpsOwnEnginePanel() {
         </label>
         <span className="text-muted-foreground">
           Risk {set?.riskPerTradePct ?? 1}% · band {set?.minPriceCents}–{set?.maxPriceCents}¢ · edge ≥{set?.minEdgeCents}¢
+        </span>
+      </div>
+
+      {/* our signals: model pick / study pick / verdict */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <Cell
+          label="Model pick"
+          v={sig?.modelSide ? `${sig.modelSide}${sig.modelConf != null ? ` ${(sig.modelConf * 100).toFixed(0)}%` : ""}` : "—"}
+        />
+        <Cell
+          label="Study pick"
+          v={sig?.studySide ? `${sig.studySide}${sig.studyConf != null ? ` ${(sig.studyConf * 100).toFixed(0)}%` : ""}` : "—"}
+        />
+        <Cell
+          label="Verdict"
+          v={sig?.verdict ?? "—"}
+          tone={sig?.verdict === "ALLOW" ? "good" : sig?.verdict === "SKIP" ? "bad" : undefined}
+        />
+        <Cell
+          label="Blended P(side)"
+          v={s?.probUp != null ? `${(s.probUp * 100).toFixed(1)}% up` : "—"}
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-widest">
+        <Toggle on={!!set?.requireSignalAgreement} onClick={() => patch({ requireSignalAgreement: !set?.requireSignalAgreement })}>
+          Model+Study gate
+        </Toggle>
+        <Toggle on={!!set?.verdictVeto} onClick={() => patch({ verdictVeto: !set?.verdictVeto })}>
+          Verdict veto
+        </Toggle>
+        <Toggle on={!!set?.blendStudy} onClick={() => patch({ blendStudy: !set?.blendStudy })}>
+          Study blend {set ? `${Math.round((set.studyWeight ?? 0.4) * 100)}%` : ""}
+        </Toggle>
+        <span className="text-muted-foreground normal-case">
+          study conf ≥ {set ? Math.round((set.minStudyConf ?? 0.7) * 100) : 70}%
         </span>
       </div>
 
@@ -225,6 +266,18 @@ export function OpsOwnEnginePanel() {
         Exits bank at {set?.exitCapturePct ?? 92}% capture or stop out at half cost once the model flips. Paper mode never sends a real order.
       </p>
     </section>
+  );
+}
+
+function Toggle({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn("border rounded px-2 py-1 tracking-widest",
+        on ? "border-emerald-500 text-emerald-400" : "border-border text-muted-foreground")}
+    >
+      {children} {on ? "ON" : "OFF"}
+    </button>
   );
 }
 

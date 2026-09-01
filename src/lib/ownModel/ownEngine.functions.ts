@@ -9,7 +9,8 @@ import { feeCents } from "@/lib/opsManual/hedgeEngine";
 import {
   OWN_RULES, OWN_MODEL_VERSION, probUp, realizedVol1m, driftUsdPerMin,
   decideEntry, decideExit, sizeContracts,
-  type OwnRules, type OwnSide, type BookState, type EntryDecision, type ProbResult,
+  blendWithSignals,
+  type OwnRules, type OwnSide, type OwnSignals, type BookState, type EntryDecision, type ProbResult,
 } from "@/lib/ownModel/ownModel";
 
 export interface OwnEngineSettings extends OwnRules {
@@ -68,6 +69,7 @@ export interface OwnEngineState {
   z: number | null;
   /** What the engine would do right now, and the contract count. */
   decision: EntryDecision | null;
+  signals: OwnSignals;
   settings: OwnEngineSettings;
   equity: { bankrollCents: number; realizedCents: number; exposureCents: number; cashCents: number };
 }
@@ -92,6 +94,11 @@ const rowToSettings = (r: any): OwnEngineSettings => ({
   stackGainCents: Number(r.stack_gain_cents ?? OWN_RULES.stackGainCents),
   exitCapturePct: Number(r.exit_capture_pct ?? OWN_RULES.exitCapturePct),
   stopLossFraction: Number(r.stop_loss_fraction ?? OWN_RULES.stopLossFraction),
+  requireSignalAgreement: r.require_signal_agreement !== false,
+  verdictVeto: r.verdict_veto !== false,
+  blendStudy: r.blend_study !== false,
+  studyWeight: Number(r.study_weight ?? OWN_RULES.studyWeight),
+  minStudyConf: Number(r.min_study_conf ?? OWN_RULES.minStudyConf),
 });
 
 async function loadSettings(supabase: any, userId: string): Promise<OwnEngineSettings> {
@@ -115,13 +122,19 @@ interface Quote {
   cushionUsd: number | null;
   up: { bidCents: number | null; askCents: number | null };
   down: { bidCents: number | null; askCents: number | null };
+  signals: OwnSignals;
 }
+
+const EMPTY_SIGNALS: OwnSignals = {
+  modelSide: null, modelConf: null, studySide: null, studyConf: null, verdict: null,
+};
 
 async function loadQuote(): Promise<Quote> {
   const empty: Quote = {
     ok: false, error: null, ticker: null, strike: null, closeTime: null, secondsLeft: null,
     spot: null, cushionUsd: null,
     up: { bidCents: null, askCents: null }, down: { bidCents: null, askCents: null },
+    signals: EMPTY_SIGNALS,
   };
   const { getBtcConsensus } = await import("@/lib/btcConsensus.server");
   const [kRes, cRes] = await Promise.allSettled([getKalshiImpliedSpot(), getBtcConsensus()]);
@@ -145,6 +158,13 @@ async function loadQuote(): Promise<Quote> {
     cushionUsd: spot != null ? Number((spot - k.strike).toFixed(2)) : null,
     up: { bidCents: yesBid, askCents: yesAsk },
     down: { bidCents: yesAsk == null ? null : 100 - yesAsk, askCents: yesBid == null ? null : 100 - yesBid },
+    signals: {
+      modelSide: (con?.model.side ?? null) as OwnSide | null,
+      modelConf: con?.model.confidence ?? null,
+      studySide: (con?.study.side ?? null) as OwnSide | null,
+      studyConf: con?.study.confidence ?? null,
+      verdict: (con?.verdict ?? null) as OwnSignals["verdict"],
+    },
   };
 }
 
@@ -244,7 +264,7 @@ export const getOwnEngineState = createServerFn({ method: "GET" })
           cushionUsd: q.cushionUsd ?? 0,
           feeCentsPerContract: feeCents(q.up.askCents ?? 50),
         },
-        prob, book, settings, settings.bankrollCents, Math.max(0, equity.cashCents),
+        prob, book, settings, settings.bankrollCents, Math.max(0, equity.cashCents), q.signals,
       );
     }
 
@@ -266,6 +286,7 @@ export const getOwnEngineState = createServerFn({ method: "GET" })
       probUp: prob?.probUp ?? null,
       z: prob?.z ?? null,
       decision,
+      signals: q.signals,
       settings,
       equity,
     };
@@ -282,6 +303,11 @@ const settingsSchema = z.object({
   perSideWindowCapUsd: z.number().min(10).max(100_000).optional(),
   perWindowCapUsd: z.number().min(10).max(500_000).optional(),
   exitCapturePct: z.number().int().min(50).max(100).optional(),
+  requireSignalAgreement: z.boolean().optional(),
+  verdictVeto: z.boolean().optional(),
+  blendStudy: z.boolean().optional(),
+  studyWeight: z.number().min(0).max(1).optional(),
+  minStudyConf: z.number().min(0).max(1).optional(),
 });
 
 export const saveOwnEngineSettings = createServerFn({ method: "POST" })
@@ -299,6 +325,11 @@ export const saveOwnEngineSettings = createServerFn({ method: "POST" })
     if (data.perSideWindowCapUsd !== undefined) patch.per_side_window_cap_usd = data.perSideWindowCapUsd;
     if (data.perWindowCapUsd !== undefined) patch.per_window_cap_usd = data.perWindowCapUsd;
     if (data.exitCapturePct !== undefined) patch.exit_capture_pct = data.exitCapturePct;
+    if (data.requireSignalAgreement !== undefined) patch.require_signal_agreement = data.requireSignalAgreement;
+    if (data.verdictVeto !== undefined) patch.verdict_veto = data.verdictVeto;
+    if (data.blendStudy !== undefined) patch.blend_study = data.blendStudy;
+    if (data.studyWeight !== undefined) patch.study_weight = data.studyWeight;
+    if (data.minStudyConf !== undefined) patch.min_study_conf = data.minStudyConf;
     const { error } = await context.supabase
       .from("own_engine_settings")
       .upsert(patch as never, { onConflict: "user_id" });
@@ -335,6 +366,8 @@ export const ownEngineTick = createServerFn({ method: "POST" })
     if (!prob) return { ok: false as const, error: "no spot", settled, exits: 0, fills: [] as string[] };
 
     const { book, open } = await loadBook(supabase, userId, q.ticker, q);
+    // exits also respect the blended (model + study) probability
+    const probBlended = blendWithSignals(prob, q.signals, settings);
 
     /* ---- exits ---- */
     let exits = 0;
@@ -343,7 +376,7 @@ export const ownEngineTick = createServerFn({ method: "POST" })
       const d = decideExit(
         { side: o.side, avgCostCents: o.price_cents, phase: o.phase },
         { bidCents: bid },
-        prob, settings,
+        probBlended, settings,
       );
       if (!d.exit || bid == null) continue;
       const pnl = Math.round((bid - o.price_cents) * o.contracts);
@@ -366,11 +399,11 @@ export const ownEngineTick = createServerFn({ method: "POST" })
       cushionUsd: q.cushionUsd ?? 0,
       feeCentsPerContract: feeCents(q.up.askCents ?? 50),
     };
-    const decision = decideEntry(market, prob, book, settings, settings.bankrollCents, Math.max(0, equity.cashCents));
+    const decision = decideEntry(market, prob, book, settings, settings.bankrollCents, Math.max(0, equity.cashCents), q.signals);
     const snapshot = {
       ticker: q.ticker, strike: q.strike, spot: q.spot, cushionUsd: q.cushionUsd,
       secondsLeft: q.secondsLeft, up: q.up, down: q.down,
-      probUp: prob.probUp, z: prob.z, vol1m: v.vol1m, drift: v.drift, version: OWN_MODEL_VERSION,
+      probUp: prob.probUp, z: prob.z, signals: q.signals, vol1m: v.vol1m, drift: v.drift, version: OWN_MODEL_VERSION,
     };
 
     const fills: string[] = [];
