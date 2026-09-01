@@ -105,6 +105,13 @@ export function OpsPaperTradePanel() {
 
 
   const w = win.data;
+  // Same live composite feed the trendline chart uses — ticks at ~60fps.
+  const live = useLiveCompositeSpot();
+  const liveSpot = live.spot;
+  const displaySpot = liveSpot ?? w?.spot ?? null;
+  const displayCushion = displaySpot != null && w?.strike != null
+    ? displaySpot - w.strike
+    : w?.cushionUsd ?? null;
   const secondsLeft = useMemo(() => {
     if (!w?.closeTime) return null;
     return Math.max(0, Math.round((Date.parse(w.closeTime) - Date.now()) / 1000));
