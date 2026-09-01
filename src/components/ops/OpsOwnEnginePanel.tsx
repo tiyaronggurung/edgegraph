@@ -123,13 +123,14 @@ export function OpsOwnEnginePanel() {
       {/* our signals: model pick / study pick / verdict */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
         <Cell
-          label="Model pick"
-          v={sig?.modelSide ? `${sig.modelSide}${sig.modelConf != null ? ` ${(sig.modelConf * 100).toFixed(0)}%` : ""}` : "—"}
+          label="Model pick (log)"
+          v={sig?.modelSide ?? "—"}
         />
         <Cell
-          label="Study pick"
+          label="Study pick (locked)"
           v={sig?.studySide ? `${sig.studySide}${sig.studyConf != null ? ` ${(sig.studyConf * 100).toFixed(0)}%` : ""}` : "—"}
         />
+
         <Cell
           label="Verdict"
           v={sig?.verdict ?? "—"}
