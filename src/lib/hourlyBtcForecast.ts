@@ -1,6 +1,7 @@
 import { normCdf, realizedVol1m } from "@/lib/ownModel/ownModel";
 import { detectTrendlines, type TCandle } from "@/lib/ta/trendlines";
 import { emaSeries, sessionVwap, structure } from "@/lib/ta/taEngine";
+import type { Candle } from "@/lib/ta/chartSignals";
 
 export const HOURLY_MODEL_VERSION = "h1-diffusion-v1";
 export const HOURLY_STUDY_LOCK_MINUTE = 15;
@@ -54,6 +55,10 @@ const HOUR_MS = 3_600_000;
 const MINUTE_MS = 60_000;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+function indicatorCandles(candles: TCandle[]): Candle[] {
+  return candles.map((candle) => ({ ...candle, v: candle.v ?? 0 }));
+}
+
 function lastCloseAt(candles: TCandle[], cutoff: number): number | null {
   const eligible = candles.filter((candle) => candle.t <= cutoff);
   return eligible.length ? eligible[eligible.length - 1].c : null;
@@ -66,7 +71,7 @@ function trendVote(candles: TCandle[], cutoff: number): number {
   const fast = emaSeries(closes, 9);
   const slow = emaSeries(closes, 21);
   const emaVote = fast[fast.length - 1] >= slow[slow.length - 1] ? 1 : -1;
-  const shape = structure(eligible, 5);
+  const shape = structure(indicatorCandles(eligible), 5);
   return emaVote + (shape === "up" ? 1 : shape === "down" ? -1 : 0);
 }
 
@@ -140,7 +145,7 @@ export function buildHourlyForecast(input: HourlyForecastInput): HourlyForecast 
   const buy = trend.lowerAtNow;
   const sell = trend.upperAtNow;
   const mid = buy != null && sell != null ? (buy + sell) / 2 : null;
-  const vwap = sessionVwap(closed5m);
+  const vwap = sessionVwap(indicatorCandles(closed5m));
   const closes1m = input.candles1m.filter((candle) => candle.t <= input.nowMs).slice(-120).map((candle) => candle.c);
   const volatility = realizedVol1m(closes1m);
   const expectedMoveUsd = Math.max(input.spot * volatility * Math.sqrt(secondsLeft / 60), 1);
