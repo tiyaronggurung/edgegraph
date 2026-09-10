@@ -143,6 +143,12 @@ export function HourlyBtcForecastPanel() {
   const verdictClass = forecast.verdict === "AGREE"
     ? "text-success"
     : forecast.verdict === "DISAGREE" ? "text-destructive" : "text-warning";
+  const strongestAbove = forecast.ladder.reduce((best, row) => (
+    row.aboveProbability > best.aboveProbability ? row : best
+  ));
+  const trendlineSupportsUp = forecast.mid != null && spot >= forecast.mid;
+  const picksSupportUp = forecast.model?.side === "UP" && forecast.study?.side === "UP";
+  const aboveConfirmed = strongestAbove.aboveProbability >= 0.75 && trendlineSupportsUp && picksSupportUp;
 
   return (
     <section className="border border-border bg-card" aria-labelledby="hourly-btc-title">
@@ -169,6 +175,23 @@ export function HourlyBtcForecastPanel() {
             <div className="text-[10px] uppercase text-muted-foreground">Confirmation</div>
             <div className={`mt-2 text-xl font-bold ${verdictClass}`}>{forecast.verdict.replace("_", " ")}</div>
             <div className="mt-1 text-[10px] text-muted-foreground">No order execution</div>
+          </div>
+        </div>
+
+        <div className={`mt-3 border p-4 ${aboveConfirmed ? "border-success/45 bg-success/10" : "border-warning/45 bg-warning/10"}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-[10px] uppercase text-muted-foreground">Most likely price or above</div>
+              <div className="mt-1 text-lg font-bold tabular-nums text-foreground">
+                BTC {money(strongestAbove.target)} or above · BUY YES
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Our probability {percent(strongestAbove.aboveProbability)} · Model, Study, and MID confirmation required
+              </div>
+            </div>
+            <div className={`text-sm font-bold ${aboveConfirmed ? "text-success" : "text-warning"}`}>
+              {aboveConfirmed ? "CONFIRMED" : "WAIT — NOT CONFIRMED"}
+            </div>
           </div>
         </div>
       </header>
