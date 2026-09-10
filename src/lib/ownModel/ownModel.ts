@@ -35,7 +35,9 @@ export interface OwnRules {
 export const OWN_RULES: OwnRules = {
   minEdgeCents: 8,
   minPriceCents: 50,
-  maxPriceCents: 70,
+  /* Data-validated cap (45d backtest): locked Study at 61–85¢ = +$648 over
+   * 54 trades; 86¢+ = 90% wins but −$318 (price eats the edge). Hard block 86¢+. */
+  maxPriceCents: 85,
   lateBlockSeconds: 300,
   lateCushionUsd: 60,
   maxPairCostCents: 96,
@@ -382,7 +384,7 @@ export function decideEntry(
     return { action: "SKIP", code: "EDGE_TOO_SMALL", reason: `edge ${edge.toFixed(1)}¢ < ${rules.minEdgeCents}¢`, edgeCents: edge, ...base };
   }
   // High-cushion exception (C): when spot is far on our side of the strike the
-  // hard 70¢ ceiling lifts to highCushionMaxPriceCents.
+  // ceiling lifts to highCushionMaxPriceCents.
   const cushionForSide = side === "YES" ? m.cushionUsd : -m.cushionUsd;
   const ceiling =
     cushionForSide >= rules.highCushionUsd
