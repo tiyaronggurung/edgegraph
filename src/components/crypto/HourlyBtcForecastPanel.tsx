@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQueries } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Activity, ArrowDown, ArrowUp, Clock3, LockKeyhole } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -57,14 +57,16 @@ export function HourlyBtcForecastPanel() {
     return () => window.clearInterval(timer);
   }, []);
 
-  const queries = TIMEFRAMES.map(({ tf, limit }) => useQuery({
-    queryKey: ["btc-hourly-forecast-candles", tf],
-    queryFn: () => candlesFn({ data: { tf, limit } }),
-    staleTime: tf === "1m" ? 10_000 : 60_000,
-    refetchInterval: tf === "1m" ? 10_000 : 60_000,
-    placeholderData: keepPreviousData,
-    refetchOnWindowFocus: false,
-  }));
+  const queries = useQueries({
+    queries: TIMEFRAMES.map(({ tf, limit }) => ({
+      queryKey: ["btc-hourly-forecast-candles", tf],
+      queryFn: () => candlesFn({ data: { tf, limit } }),
+      staleTime: tf === "1m" ? 10_000 : 60_000,
+      refetchInterval: tf === "1m" ? 10_000 : 60_000,
+      placeholderData: keepPreviousData,
+      refetchOnWindowFocus: false,
+    })),
+  });
 
   const dataByTf = Object.fromEntries(TIMEFRAMES.map(({ tf }, index) => [tf, queries[index].data?.candles ?? []]));
   const fallbackSpot = dataByTf["1m"][dataByTf["1m"].length - 1]?.c ?? null;
