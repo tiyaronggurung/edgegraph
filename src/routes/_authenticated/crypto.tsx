@@ -24,6 +24,7 @@ import { useBtcVelocity } from "@/hooks/useBtcVelocity";
 import { ChartVerdictBadge } from "@/components/crypto/ChartVerdictBadge";
 import { MultiTfShadowPanel } from "@/components/MultiTfShadowPanel";
 const TrendlineChartPanel = lazy(() => import("@/components/crypto/TrendlineChartPanel").then(m => ({ default: m.TrendlineChartPanel })));
+const HourlyBtcForecastPanel = lazy(() => import("@/components/crypto/HourlyBtcForecastPanel").then(m => ({ default: m.HourlyBtcForecastPanel })));
 import { KalshiSentimentBadge } from "@/components/crypto/KalshiSentimentBadge";
 import { NextStakeBanner } from "@/components/crypto/NextStakeBanner";
 import { useChartVerdict } from "@/hooks/useChartVerdict";
@@ -4053,6 +4054,11 @@ function CryptoPage() {
 
       {/* Multi-TF shadow (pure logging, no live impact) */}
       <MultiTfShadowPanel />
+
+      {/* Isolated one-hour model/study ladder — read-only, no 15m execution impact */}
+      <LazyOnVisible minHeight={620} rootMargin="200px">
+        <HourlyBtcForecastPanel />
+      </LazyOnVisible>
 
       {/* Trendline + spike detector (shadow only) — lazy-mounted to speed up initial page load */}
       <LazyOnVisible minHeight={520} rootMargin="200px" fallback={
