@@ -9,6 +9,7 @@ const ladderSchema = z.array(z.object({
   aboveProbability: z.number().min(0).max(1),
   belowProbability: z.number().min(0).max(1),
   distanceUsd: z.number(),
+  barrierAdjustment: z.number().optional(),
 })).min(1).max(20);
 
 const captureSchema = z.object({
@@ -130,7 +131,7 @@ export const getHourlyForecastScorecard = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<HourlyScorecard> => {
     const { data, error } = await context.supabase
       .from("btc_hourly_forecast_snapshots")
-      .select("window_start,checkpoint,spot,hourly_open,model_side,study_side,model_confidence,study_confidence,mid_level,trendline_mid_side,verdict,ladder,close_spot,volatility_regime,settled_at")
+      .select("window_start,checkpoint,spot,hourly_open,model_side,study_side,model_confidence,study_confidence,mid_level,trendline_mid_side,verdict,ladder,close_spot,volatility_regime,model_version,settled_at")
       .not("settled_at", "is", null)
       .order("settled_at", { ascending: false })
       .limit(5000);
@@ -157,6 +158,7 @@ export const getHourlyForecastScorecard = createServerFn({ method: "GET" })
       score("Model + Study agree", (row) => row.verdict === "AGREE", (row) => row.study_side as "UP" | "DOWN" | null),
       score("Study + MID", (row) => row.study_side != null && row.study_side === row.trendline_mid_side, (row) => row.study_side as "UP" | "DOWN" | null),
       score("Full agreement", (row) => row.verdict === "AGREE" && row.study_side === row.trendline_mid_side, (row) => row.study_side as "UP" | "DOWN" | null),
+      score("v2 confirmed", (row) => row.model_version === "h1-confluence-v2" && row.verdict === "AGREE" && row.study_side === row.trendline_mid_side, (row) => row.study_side as "UP" | "DOWN" | null),
     ];
 
     const ladderRows = rows.flatMap((row) => {
