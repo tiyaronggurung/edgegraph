@@ -143,12 +143,16 @@ export function HourlyBtcForecastPanel() {
   const verdictClass = forecast.verdict === "AGREE"
     ? "text-success"
     : forecast.verdict === "DISAGREE" ? "text-destructive" : "text-warning";
-  const strongestAbove = forecast.ladder.reduce((best, row) => (
-    row.aboveProbability > best.aboveProbability ? row : best
-  ));
+  const strongestAbove = [...forecast.ladder].reverse().find((row) => row.aboveProbability >= 0.75) ?? forecast.ladder[0];
+  const strongestBelow = forecast.ladder.find((row) => row.belowProbability >= 0.75) ?? forecast.ladder.at(-1);
   const trendlineSupportsUp = forecast.mid != null && spot >= forecast.mid;
+  const trendlineSupportsDown = forecast.mid != null && spot < forecast.mid;
   const picksSupportUp = forecast.model?.side === "UP" && forecast.study?.side === "UP";
-  const aboveConfirmed = strongestAbove.aboveProbability >= 0.75 && trendlineSupportsUp && picksSupportUp;
+  const picksSupportDown = forecast.model?.side === "DOWN" && forecast.study?.side === "DOWN";
+  const vwapSupportsUp = forecast.vwap != null && spot >= forecast.vwap;
+  const vwapSupportsDown = forecast.vwap != null && spot < forecast.vwap;
+  const aboveConfirmed = strongestAbove.aboveProbability >= 0.75 && trendlineSupportsUp && vwapSupportsUp && picksSupportUp;
+  const belowConfirmed = strongestBelow != null && strongestBelow.belowProbability >= 0.75 && trendlineSupportsDown && vwapSupportsDown && picksSupportDown;
 
   return (
     <section className="border border-border bg-card" aria-labelledby="hourly-btc-title">
@@ -178,7 +182,8 @@ export function HourlyBtcForecastPanel() {
           </div>
         </div>
 
-        <div className={`mt-3 border p-4 ${aboveConfirmed ? "border-success/45 bg-success/10" : "border-warning/45 bg-warning/10"}`}>
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+        <div className={`border p-4 ${aboveConfirmed ? "border-success/45 bg-success/10" : "border-warning/45 bg-warning/10"}`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-[10px] uppercase text-muted-foreground">Most likely price or above</div>
@@ -186,13 +191,24 @@ export function HourlyBtcForecastPanel() {
                 BTC {money(strongestAbove.target)} or above · BUY YES
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
-                Our probability {percent(strongestAbove.aboveProbability)} · Model, Study, and MID confirmation required
+                 Our probability {percent(strongestAbove.aboveProbability)} · Model, Study, MID, and VWAP required
               </div>
             </div>
             <div className={`text-sm font-bold ${aboveConfirmed ? "text-success" : "text-warning"}`}>
               {aboveConfirmed ? "CONFIRMED" : "WAIT — NOT CONFIRMED"}
             </div>
           </div>
+        </div>
+        {strongestBelow && <div className={`border p-4 ${belowConfirmed ? "border-destructive/45 bg-destructive/10" : "border-warning/45 bg-warning/10"}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-[10px] uppercase text-muted-foreground">Most likely price or below</div>
+              <div className="mt-1 text-lg font-bold tabular-nums text-foreground">BTC below {money(strongestBelow.target)} · BUY NO</div>
+              <div className="mt-1 text-xs text-muted-foreground">Our probability {percent(strongestBelow.belowProbability)} · Model, Study, MID, and VWAP required</div>
+            </div>
+            <div className={`text-sm font-bold ${belowConfirmed ? "text-destructive" : "text-warning"}`}>{belowConfirmed ? "CONFIRMED" : "WAIT — NOT CONFIRMED"}</div>
+          </div>
+        </div>}
         </div>
       </header>
 
@@ -241,9 +257,15 @@ export function HourlyBtcForecastPanel() {
             <Metric label="BUY / support" value={money(forecast.buy)} tone="text-success" />
             <Metric label="Hourly open" value={money(forecast.hourlyOpen)} />
             <Metric label="Expected move" value={`±${money(forecast.expectedMoveUsd)}`} />
+            <Metric label="Upside range" value={`+${money(forecast.expectedMoveUpUsd)}`} />
+            <Metric label="Downside range" value={`−${money(forecast.expectedMoveDownUsd)}`} />
             <Metric label="Volatility" value={forecast.volatilityRegime} />
             <Metric label="Session VWAP" value={money(forecast.vwap)} />
             <Metric label="5m volume" value={volumeRatio == null ? "—" : `${volumeRatio.toFixed(2)}× avg`} />
+            <Metric label="Signal strength" value={`${forecast.signalScore >= 0 ? "+" : ""}${forecast.signalScore.toFixed(2)}`} tone={forecast.signalScore >= 0 ? "text-success" : "text-destructive"} />
+            <Metric label="Trend alignment" value={`${forecast.trendAlignment >= 0 ? "+" : ""}${forecast.trendAlignment}`} />
+            <Metric label="Channel position" value={forecast.channelPosition == null ? "—" : `${Math.round(forecast.channelPosition * 100)}%`} />
+            <Metric label="Breakout" value={forecast.breakout} tone={forecast.breakout === "UP" ? "text-success" : forecast.breakout === "DOWN" ? "text-destructive" : "text-muted-foreground"} />
           </dl>
           <div className="mt-5 flex items-start gap-2 border-t border-border pt-4 text-[10px] leading-relaxed text-muted-foreground">
             <Activity className="mt-0.5 h-3.5 w-3.5 shrink-0" />

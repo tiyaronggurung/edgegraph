@@ -39,7 +39,9 @@ describe("buildHourlyForecast", () => {
     const result = buildHourlyForecast(input(windowStart + 20 * MINUTE));
     for (let index = 1; index < result.ladder.length; index += 1) {
       expect(result.ladder[index].aboveProbability).toBeLessThanOrEqual(result.ladder[index - 1].aboveProbability);
+      expect(result.ladder[index].belowProbability).toBeGreaterThanOrEqual(result.ladder[index - 1].belowProbability);
     }
+    for (const row of result.ladder) expect(row.aboveProbability + row.belowProbability).toBeCloseTo(1, 10);
   });
 
   it("holds Study in studying state before the 15-minute lock", () => {
@@ -63,6 +65,17 @@ describe("buildHourlyForecast", () => {
       c: candle.c + (index % 2 === 0 ? 180 : -180),
     }));
     expect(buildHourlyForecast(volatile).expectedMoveUsd).toBeGreaterThan(buildHourlyForecast(quiet).expectedMoveUsd);
+  });
+
+  it("publishes v2 trendline and directional-volatility diagnostics", () => {
+    const result = buildHourlyForecast(input(windowStart + 20 * MINUTE));
+    expect(result.modelVersion).toBe("h1-confluence-v2");
+    expect(result.expectedMoveUpUsd).toBeGreaterThan(0);
+    expect(result.expectedMoveDownUsd).toBeGreaterThan(0);
+    expect(result.signalScore).toBeGreaterThanOrEqual(-1.5);
+    expect(result.signalScore).toBeLessThanOrEqual(1.5);
+    expect(result.trendAlignment).toBeGreaterThanOrEqual(-100);
+    expect(result.trendAlignment).toBeLessThanOrEqual(100);
   });
 
   it("maps time to fixed hourly checkpoints", () => {
