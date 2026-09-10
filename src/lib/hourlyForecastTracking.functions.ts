@@ -71,7 +71,7 @@ export function checkpointFor(secondsLeft: number, elapsedSeconds: number): Hour
 
 export const captureHourlyForecast = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => captureSchema.parse(data))
+  .validator((data: unknown) => captureSchema.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (data.priorWindowEnd && data.priorCloseSpot) {
