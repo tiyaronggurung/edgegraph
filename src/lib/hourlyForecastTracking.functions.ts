@@ -121,7 +121,7 @@ export const getHourlyForecastScorecard = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<HourlyScorecard> => {
     const { data, error } = await context.supabase
       .from("btc_hourly_forecast_snapshots")
-      .select("window_start,checkpoint,spot,model_side,study_side,model_confidence,study_confidence,mid_level,trendline_mid_side,verdict,ladder,close_spot,volatility_regime,settled_at")
+      .select("window_start,checkpoint,spot,hourly_open,model_side,study_side,model_confidence,study_confidence,mid_level,trendline_mid_side,verdict,ladder,close_spot,volatility_regime,settled_at")
       .not("settled_at", "is", null)
       .order("settled_at", { ascending: false })
       .limit(5000);
@@ -136,7 +136,7 @@ export const getHourlyForecastScorecard = createServerFn({ method: "GET" })
     const score = (label: string, eligible: (row: typeof hours[number]) => boolean, side: (row: typeof hours[number]) => "UP" | "DOWN" | null): HourlyScoreRow => {
       const sample = hours.filter(eligible).map((row) => ({ row, side: side(row) })).filter((item) => item.side != null);
       const wins = sample.filter(({ row, side: picked }) => {
-        const actual = Number(row.close_spot) >= Number(row.spot) ? "UP" : "DOWN";
+        const actual = Number(row.close_spot) >= Number(row.hourly_open) ? "UP" : "DOWN";
         return picked === actual;
       }).length;
       return { label, n: sample.length, wins, hitRate: sample.length ? wins / sample.length : 0 };

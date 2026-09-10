@@ -1,10 +1,11 @@
-import { keepPreviousData, useQueries } from "@tanstack/react-query";
+import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Activity, ArrowDown, ArrowUp, Clock3, LockKeyhole } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { getBtcCandles, type CandleTf } from "@/lib/btcCandles.functions";
 import { buildHourlyForecast, HOURLY_STUDY_LOCK_MINUTE, type HourlySide } from "@/lib/hourlyBtcForecast";
+import { captureHourlyForecast, checkpointFor, getHourlyForecastScorecard } from "@/lib/hourlyForecastTracking.functions";
 
 const TIMEFRAMES: Array<{ tf: CandleTf; limit: number }> = [
   { tf: "1m", limit: 180 },
@@ -49,8 +50,11 @@ function PickBox({ label, side, confidence, locked }: {
 
 export function HourlyBtcForecastPanel() {
   const candlesFn = useServerFn(getBtcCandles);
+  const captureForecast = useServerFn(captureHourlyForecast);
+  const scorecardFn = useServerFn(getHourlyForecastScorecard);
   const live = useLiveCompositeSpot();
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const lastCaptureKey = useRef<string | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 1_000);
@@ -82,6 +86,49 @@ export function HourlyBtcForecastPanel() {
       candles1h: dataByTf["1h"],
     });
   }, [nowMs, spot, dataByTf["1m"], dataByTf["5m"], dataByTf["15m"], dataByTf["1h"]]);
+
+  const scorecard = useQuery({
+    queryKey: ["btc-hourly-forecast-scorecard"],
+    queryFn: () => scorecardFn(),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+
+  useEffect(() => {
+    if (!forecast) return;
+    const elapsedSeconds = Math.floor((nowMs - forecast.windowStart) / 1000);
+    const checkpoint = checkpointFor(forecast.secondsLeft, elapsedSeconds);
+    if (!checkpoint) return;
+    const captureKey = `${forecast.windowStart}:${checkpoint}`;
+    if (lastCaptureKey.current === captureKey) return;
+    const priorWindowEnd = forecast.windowStart;
+    const priorCloseCandle = dataByTf["1m"].filter((candle) => candle.t < priorWindowEnd).at(-1);
+    lastCaptureKey.current = captureKey;
+    void captureForecast({ data: {
+      windowStart: forecast.windowStart,
+      windowEnd: forecast.windowEnd,
+      checkpoint,
+      spot,
+      hourlyOpen: forecast.hourlyOpen,
+      expectedMoveUsd: forecast.expectedMoveUsd,
+      realizedVolatility: forecast.realizedVolatility,
+      volatilityRegime: forecast.volatilityRegime,
+      volumeRatio: forecast.volumeAverage > 0 ? forecast.volumeNow / forecast.volumeAverage : null,
+      buy: forecast.buy,
+      mid: forecast.mid,
+      sell: forecast.sell,
+      model: forecast.model,
+      study: forecast.study,
+      verdict: forecast.verdict,
+      ladder: forecast.ladder,
+      dataAsOf: forecast.dataAsOf,
+      modelVersion: forecast.modelVersion,
+      priorWindowEnd,
+      priorCloseSpot: priorCloseCandle?.c ?? null,
+    } }).then(() => scorecard.refetch()).catch(() => {
+      lastCaptureKey.current = null;
+    });
+  }, [captureForecast, dataByTf, forecast, nowMs, scorecard, spot]);
 
   if (!forecast || spot == null) {
     return <section className="border border-border bg-card p-5 text-sm text-muted-foreground">Loading one-hour BTC forecast…</section>;
@@ -171,6 +218,7 @@ export function HourlyBtcForecastPanel() {
             <Metric label="BUY / support" value={money(forecast.buy)} tone="text-success" />
             <Metric label="Hourly open" value={money(forecast.hourlyOpen)} />
             <Metric label="Expected move" value={`±${money(forecast.expectedMoveUsd)}`} />
+            <Metric label="Volatility" value={forecast.volatilityRegime} />
             <Metric label="Session VWAP" value={money(forecast.vwap)} />
             <Metric label="5m volume" value={volumeRatio == null ? "—" : `${volumeRatio.toFixed(2)}× avg`} />
           </dl>
@@ -180,7 +228,62 @@ export function HourlyBtcForecastPanel() {
           </div>
         </aside>
       </div>
+      <HourlyScorecard data={scorecard.data} loading={scorecard.isLoading} />
     </section>
+  );
+}
+
+function HourlyScorecard({ data, loading }: {
+  data: Awaited<ReturnType<typeof getHourlyForecastScorecard>> | undefined;
+  loading: boolean;
+}) {
+  return (
+    <div className="border-t border-border p-4 md:p-5">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <div className="terminal-label">Hourly shadow scorecard</div>
+          <h3 className="mt-1 text-sm font-semibold">Which signal and volatility regime is most accurate</h3>
+        </div>
+        <div className="text-xs tabular-nums text-muted-foreground">
+          {loading ? "Loading…" : `${data?.settledHours ?? 0} settled hours`}
+        </div>
+      </div>
+      {!loading && (data?.settledHours ?? 0) === 0 ? (
+        <p className="mt-3 text-xs text-muted-foreground">Tracking has started. Accuracy appears after the first recorded hour settles.</p>
+      ) : (
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="overflow-x-auto border border-border">
+            <table className="w-full min-w-[420px] text-xs">
+              <thead className="border-b border-border text-[10px] uppercase text-muted-foreground">
+                <tr><th className="px-3 py-2 text-left">Signal</th><th className="px-3 py-2 text-right">Record</th><th className="px-3 py-2 text-right">Accuracy</th></tr>
+              </thead>
+              <tbody>{data?.signals.map((row) => (
+                <tr key={row.label} className="border-b border-border/60 last:border-0">
+                  <td className="px-3 py-2">{row.label}{data.bestSignal === row.label ? <span className="ml-2 text-success">BEST</span> : null}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{row.wins}/{row.n}</td>
+                  <td className="px-3 py-2 text-right font-semibold tabular-nums">{row.n ? percent(row.hitRate) : "—"}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+          <div className="overflow-x-auto border border-border">
+            <table className="w-full min-w-[420px] text-xs">
+              <thead className="border-b border-border text-[10px] uppercase text-muted-foreground">
+                <tr><th className="px-3 py-2 text-left">Volatility</th><th className="px-3 py-2 text-right">Predicted</th><th className="px-3 py-2 text-right">Actual</th><th className="px-3 py-2 text-right">Error</th></tr>
+              </thead>
+              <tbody>{data?.volatility.map((row) => (
+                <tr key={row.regime} className="border-b border-border/60 last:border-0">
+                  <td className="px-3 py-2">{row.regime} <span className="text-muted-foreground">({row.n})</span></td>
+                  <td className="px-3 py-2 text-right tabular-nums">{row.n ? percent(row.predicted) : "—"}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{row.n ? percent(row.actual) : "—"}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{row.n ? row.brier.toFixed(3) : "—"}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
