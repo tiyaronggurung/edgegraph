@@ -108,20 +108,25 @@ function studyPick(
   input: HourlyForecastInput,
   windowStart: number,
   hourlyOpen: number,
-  buy: number | null,
-  mid: number | null,
-  sell: number | null,
 ): HourlyLockedPick | null {
   const lockAt = windowStart + HOURLY_STUDY_LOCK_MINUTE * MINUTE_MS;
   if (input.nowMs < lockAt) return null;
   const lockSpot = lastCloseAt(input.candles1m, lockAt);
   if (lockSpot == null) return null;
+  const lockTrend = detectTrendlines(input.candles5m.filter((candle) => candle.t <= lockAt));
+  const lockBuy = lockTrend.lowerAtNow;
+  const lockSell = lockTrend.upperAtNow;
+  const lockMid = lockBuy != null && lockSell != null && lockBuy < lockSell
+    ? (lockBuy + lockSell) / 2
+    : null;
   const moveScale = Math.max(hourlyOpen * realizedVol1m(
     input.candles1m.filter((candle) => candle.t <= lockAt).slice(-60).map((candle) => candle.c),
   ) * Math.sqrt(45), 1);
   const openingMove = clamp((lockSpot - hourlyOpen) / moveScale, -1.5, 1.5);
-  const midVote = mid == null ? 0 : lockSpot >= mid ? 1 : -1;
-  const breakoutVote = sell != null && lockSpot > sell ? 0.8 : buy != null && lockSpot < buy ? -0.8 : 0;
+  const midVote = lockMid == null ? 0 : lockSpot >= lockMid ? 1 : -1;
+  const breakoutVote = lockSell != null && lockSpot > lockSell
+    ? 0.8
+    : lockBuy != null && lockSpot < lockBuy ? -0.8 : 0;
   const score = openingMove
     + midVote * 0.8
     + breakoutVote
@@ -153,7 +158,8 @@ export function buildHourlyForecast(input: HourlyForecastInput): HourlyForecast 
   const secondsLeft = Math.max(1, Math.floor((windowEnd - input.nowMs) / 1000));
   const hourlyOpen = openingPrice(input.candles1m, windowStart, input.spot);
   const closed5m = input.candles5m.filter((candle) => candle.t < input.nowMs).slice(-90);
-  const trend = detectTrendlines(closed5m);
+  const channelCandles = input.candles15m.filter((candle) => candle.t < input.nowMs).slice(-90);
+  const trend = detectTrendlines(channelCandles);
   const validChannel = trend.lowerAtNow != null && trend.upperAtNow != null && trend.lowerAtNow < trend.upperAtNow;
   const buy = validChannel ? trend.lowerAtNow : null;
   const sell = validChannel ? trend.upperAtNow : null;
@@ -166,7 +172,7 @@ export function buildHourlyForecast(input: HourlyForecastInput): HourlyForecast 
     + trendVote(input.candles15m, input.nowMs) * 0.1
     + trendVote(input.candles1h, input.nowMs) * 0.08;
   const model = modelPick(input, windowStart);
-  const study = studyPick(input, windowStart, hourlyOpen, buy, mid, sell);
+  const study = studyPick(input, windowStart, hourlyOpen);
   const driftUsd = clamp(currentBias * expectedMoveUsd, -expectedMoveUsd * 0.35, expectedMoveUsd * 0.35);
   const ladder = ladderTargets(input.spot).map((target) => {
     const z = (input.spot + driftUsd - target) / expectedMoveUsd;
