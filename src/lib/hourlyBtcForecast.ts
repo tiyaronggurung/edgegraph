@@ -1,6 +1,6 @@
 import { normCdf, realizedVol1m } from "@/lib/ownModel/ownModel";
 import { detectTrendlines, type TCandle } from "@/lib/ta/trendlines";
-import { emaSeries, sessionVwap, structure } from "@/lib/ta/taEngine";
+import { emaSeries, structure } from "@/lib/ta/taEngine";
 import type { Candle } from "@/lib/ta/chartSignals";
 
 export const HOURLY_MODEL_VERSION = "h1-diffusion-v1";
@@ -135,6 +135,18 @@ function ladderTargets(spot: number): number[] {
   return Array.from({ length: 9 }, (_, index) => center + (index - 4) * 100);
 }
 
+function weightedTypicalPrice(candles: TCandle[]): number | null {
+  if (!candles.length) return null;
+  let priceVolume = 0;
+  let volume = 0;
+  for (const candle of candles) {
+    const weight = candle.v ?? 1;
+    priceVolume += ((candle.h + candle.l + candle.c) / 3) * weight;
+    volume += weight;
+  }
+  return volume > 0 ? priceVolume / volume : null;
+}
+
 export function buildHourlyForecast(input: HourlyForecastInput): HourlyForecast {
   const windowStart = Math.floor(input.nowMs / HOUR_MS) * HOUR_MS;
   const windowEnd = windowStart + HOUR_MS;
@@ -142,10 +154,11 @@ export function buildHourlyForecast(input: HourlyForecastInput): HourlyForecast 
   const hourlyOpen = openingPrice(input.candles1m, windowStart, input.spot);
   const closed5m = input.candles5m.filter((candle) => candle.t < input.nowMs).slice(-90);
   const trend = detectTrendlines(closed5m);
-  const buy = trend.lowerAtNow;
-  const sell = trend.upperAtNow;
+  const validChannel = trend.lowerAtNow != null && trend.upperAtNow != null && trend.lowerAtNow < trend.upperAtNow;
+  const buy = validChannel ? trend.lowerAtNow : null;
+  const sell = validChannel ? trend.upperAtNow : null;
   const mid = buy != null && sell != null ? (buy + sell) / 2 : null;
-  const vwap = sessionVwap(indicatorCandles(closed5m));
+  const vwap = weightedTypicalPrice(closed5m.filter((candle) => candle.t >= windowStart));
   const closes1m = input.candles1m.filter((candle) => candle.t <= input.nowMs).slice(-120).map((candle) => candle.c);
   const volatility = realizedVol1m(closes1m);
   const expectedMoveUsd = Math.max(input.spot * volatility * Math.sqrt(secondsLeft / 60), 1);
