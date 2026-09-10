@@ -384,7 +384,7 @@ export function decideEntry(
     return { action: "SKIP", code: "EDGE_TOO_SMALL", reason: `edge ${edge.toFixed(1)}¢ < ${rules.minEdgeCents}¢`, edgeCents: edge, ...base };
   }
   // High-cushion exception (C): when spot is far on our side of the strike the
-  // hard 70¢ ceiling lifts to highCushionMaxPriceCents.
+  // ceiling lifts to highCushionMaxPriceCents.
   const cushionForSide = side === "YES" ? m.cushionUsd : -m.cushionUsd;
   const ceiling =
     cushionForSide >= rules.highCushionUsd
