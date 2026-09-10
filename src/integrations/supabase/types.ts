@@ -2176,6 +2176,102 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_hourly_forecast_snapshots: {
+        Row: {
+          buy_level: number | null
+          captured_at: string
+          checkpoint: string
+          close_spot: number | null
+          created_at: string
+          data_as_of: string | null
+          expected_move_usd: number
+          hourly_open: number
+          id: string
+          ladder: Json
+          mid_level: number | null
+          model_confidence: number | null
+          model_locked_at: string | null
+          model_side: string | null
+          model_version: string
+          realized_vol_1m: number
+          sell_level: number | null
+          settled_at: string | null
+          spot: number
+          study_confidence: number | null
+          study_locked_at: string | null
+          study_side: string | null
+          trendline_mid_side: string | null
+          updated_at: string
+          verdict: string
+          volatility_regime: string
+          volume_ratio: number | null
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          buy_level?: number | null
+          captured_at?: string
+          checkpoint: string
+          close_spot?: number | null
+          created_at?: string
+          data_as_of?: string | null
+          expected_move_usd: number
+          hourly_open: number
+          id?: string
+          ladder?: Json
+          mid_level?: number | null
+          model_confidence?: number | null
+          model_locked_at?: string | null
+          model_side?: string | null
+          model_version: string
+          realized_vol_1m: number
+          sell_level?: number | null
+          settled_at?: string | null
+          spot: number
+          study_confidence?: number | null
+          study_locked_at?: string | null
+          study_side?: string | null
+          trendline_mid_side?: string | null
+          updated_at?: string
+          verdict: string
+          volatility_regime: string
+          volume_ratio?: number | null
+          window_end: string
+          window_start: string
+        }
+        Update: {
+          buy_level?: number | null
+          captured_at?: string
+          checkpoint?: string
+          close_spot?: number | null
+          created_at?: string
+          data_as_of?: string | null
+          expected_move_usd?: number
+          hourly_open?: number
+          id?: string
+          ladder?: Json
+          mid_level?: number | null
+          model_confidence?: number | null
+          model_locked_at?: string | null
+          model_side?: string | null
+          model_version?: string
+          realized_vol_1m?: number
+          sell_level?: number | null
+          settled_at?: string | null
+          spot?: number
+          study_confidence?: number | null
+          study_locked_at?: string | null
+          study_side?: string | null
+          trendline_mid_side?: string | null
+          updated_at?: string
+          verdict?: string
+          volatility_regime?: string
+          volume_ratio?: number | null
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       btc_isotonic_fit: {
         Row: {
           brier_test: number | null
