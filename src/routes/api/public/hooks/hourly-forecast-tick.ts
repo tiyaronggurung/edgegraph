@@ -3,6 +3,7 @@ import { verifyCronRequest } from "@/lib/cronAuth";
 import { buildHourlyForecast } from "@/lib/hourlyBtcForecast";
 import { checkpointFor } from "@/lib/hourlyForecastTracking.functions";
 import type { TCandle } from "@/lib/ta/trendlines";
+import type { Json } from "@/integrations/supabase/types";
 
 const TF_LIMITS = { "1m": 180, "5m": 180, "15m": 160, "1h": 180 } as const;
 
@@ -68,7 +69,7 @@ async function runHourlyTick() {
     study_locked_at: forecast.study ? new Date(forecast.study.lockedAt).toISOString() : null,
     trendline_mid_side: forecast.mid == null ? null : spot >= forecast.mid ? "UP" : "DOWN",
     verdict: forecast.verdict,
-    ladder: forecast.ladder,
+    ladder: forecast.ladder.map((row) => ({ ...row })) as Json,
     data_as_of: forecast.dataAsOf ? new Date(forecast.dataAsOf).toISOString() : null,
     model_version: forecast.modelVersion,
   }, { onConflict: "window_start,checkpoint", ignoreDuplicates: true });

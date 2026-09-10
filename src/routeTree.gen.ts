@@ -50,6 +50,7 @@ import { Route as ApiPublicHooksBtcSnapshotTickRouteImport } from './routes/api/
 import { Route as ApiPublicHooksCandlesIngestRouteImport } from './routes/api/public/hooks/candles-ingest'
 import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
 import { Route as ApiPublicHooksCryptoStudyRouteImport } from './routes/api/public/hooks/crypto-study'
+import { Route as ApiPublicHooksHourlyForecastTickRouteImport } from './routes/api/public/hooks/hourly-forecast-tick'
 import { Route as ApiPublicHooksKalshiBookTickRouteImport } from './routes/api/public/hooks/kalshi-book-tick'
 import { Route as ApiPublicHooksMarketContextTickRouteImport } from './routes/api/public/hooks/market-context-tick'
 import { Route as ApiPublicHooksMarketIntelMatchRouteImport } from './routes/api/public/hooks/market-intel-match'
@@ -290,6 +291,12 @@ const ApiPublicHooksCryptoStudyRoute =
     path: '/api/public/hooks/crypto-study',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksHourlyForecastTickRoute =
+  ApiPublicHooksHourlyForecastTickRouteImport.update({
+    id: '/api/public/hooks/hourly-forecast-tick',
+    path: '/api/public/hooks/hourly-forecast-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksKalshiBookTickRoute =
   ApiPublicHooksKalshiBookTickRouteImport.update({
     id: '/api/public/hooks/kalshi-book-tick',
@@ -452,6 +459,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
+  '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
   '/api/public/hooks/kalshi-book-tick': typeof ApiPublicHooksKalshiBookTickRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
   '/api/public/hooks/market-intel-match': typeof ApiPublicHooksMarketIntelMatchRoute
@@ -514,6 +522,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
+  '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
   '/api/public/hooks/kalshi-book-tick': typeof ApiPublicHooksKalshiBookTickRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
   '/api/public/hooks/market-intel-match': typeof ApiPublicHooksMarketIntelMatchRoute
@@ -578,6 +587,7 @@ export interface FileRoutesById {
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
+  '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
   '/api/public/hooks/kalshi-book-tick': typeof ApiPublicHooksKalshiBookTickRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
   '/api/public/hooks/market-intel-match': typeof ApiPublicHooksMarketIntelMatchRoute
@@ -642,6 +652,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
+    | '/api/public/hooks/hourly-forecast-tick'
     | '/api/public/hooks/kalshi-book-tick'
     | '/api/public/hooks/market-context-tick'
     | '/api/public/hooks/market-intel-match'
@@ -704,6 +715,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
+    | '/api/public/hooks/hourly-forecast-tick'
     | '/api/public/hooks/kalshi-book-tick'
     | '/api/public/hooks/market-context-tick'
     | '/api/public/hooks/market-intel-match'
@@ -767,6 +779,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
+    | '/api/public/hooks/hourly-forecast-tick'
     | '/api/public/hooks/kalshi-book-tick'
     | '/api/public/hooks/market-context-tick'
     | '/api/public/hooks/market-intel-match'
@@ -814,6 +827,7 @@ export interface RootRouteChildren {
   ApiPublicHooksCandlesIngestRoute: typeof ApiPublicHooksCandlesIngestRoute
   ApiPublicHooksCaptureClosingOddsRoute: typeof ApiPublicHooksCaptureClosingOddsRoute
   ApiPublicHooksCryptoStudyRoute: typeof ApiPublicHooksCryptoStudyRoute
+  ApiPublicHooksHourlyForecastTickRoute: typeof ApiPublicHooksHourlyForecastTickRoute
   ApiPublicHooksKalshiBookTickRoute: typeof ApiPublicHooksKalshiBookTickRoute
   ApiPublicHooksMarketContextTickRoute: typeof ApiPublicHooksMarketContextTickRoute
   ApiPublicHooksMarketIntelMatchRoute: typeof ApiPublicHooksMarketIntelMatchRoute
@@ -1124,6 +1138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCryptoStudyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/hourly-forecast-tick': {
+      id: '/api/public/hooks/hourly-forecast-tick'
+      path: '/api/public/hooks/hourly-forecast-tick'
+      fullPath: '/api/public/hooks/hourly-forecast-tick'
+      preLoaderRoute: typeof ApiPublicHooksHourlyForecastTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/kalshi-book-tick': {
       id: '/api/public/hooks/kalshi-book-tick'
       path: '/api/public/hooks/kalshi-book-tick'
@@ -1350,6 +1371,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksCandlesIngestRoute: ApiPublicHooksCandlesIngestRoute,
   ApiPublicHooksCaptureClosingOddsRoute: ApiPublicHooksCaptureClosingOddsRoute,
   ApiPublicHooksCryptoStudyRoute: ApiPublicHooksCryptoStudyRoute,
+  ApiPublicHooksHourlyForecastTickRoute: ApiPublicHooksHourlyForecastTickRoute,
   ApiPublicHooksKalshiBookTickRoute: ApiPublicHooksKalshiBookTickRoute,
   ApiPublicHooksMarketContextTickRoute: ApiPublicHooksMarketContextTickRoute,
   ApiPublicHooksMarketIntelMatchRoute: ApiPublicHooksMarketIntelMatchRoute,
