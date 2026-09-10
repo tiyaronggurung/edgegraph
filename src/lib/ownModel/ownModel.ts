@@ -35,7 +35,9 @@ export interface OwnRules {
 export const OWN_RULES: OwnRules = {
   minEdgeCents: 8,
   minPriceCents: 50,
-  maxPriceCents: 70,
+  /* Data-validated cap (45d backtest): locked Study at 61–85¢ = +$648 over
+   * 54 trades; 86¢+ = 90% wins but −$318 (price eats the edge). Hard block 86¢+. */
+  maxPriceCents: 85,
   lateBlockSeconds: 300,
   lateCushionUsd: 60,
   maxPairCostCents: 96,
