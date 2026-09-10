@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildHourlyForecast } from "@/lib/hourlyBtcForecast";
+import { checkpointFor } from "@/lib/hourlyForecastTracking.functions";
 import type { TCandle } from "@/lib/ta/trendlines";
 
 const HOUR = 3_600_000;
@@ -52,5 +53,22 @@ describe("buildHourlyForecast", () => {
     const result = buildHourlyForecast(input(windowStart + 20 * MINUTE));
     expect(result.study).not.toBeNull();
     expect(result.study?.lockedAt).toBe(windowStart + 15 * MINUTE);
+  });
+
+  it("widens the expected move when realized volatility increases", () => {
+    const quiet = input(windowStart + 20 * MINUTE);
+    const volatile = input(windowStart + 20 * MINUTE);
+    volatile.candles1m = volatile.candles1m.map((candle, index) => ({
+      ...candle,
+      c: candle.c + (index % 2 === 0 ? 180 : -180),
+    }));
+    expect(buildHourlyForecast(volatile).expectedMoveUsd).toBeGreaterThan(buildHourlyForecast(quiet).expectedMoveUsd);
+  });
+
+  it("maps time to fixed hourly checkpoints", () => {
+    expect(checkpointFor(3_570, 30)).toBe("OPEN");
+    expect(checkpointFor(2_700, 900)).toBe("STUDY_LOCK");
+    expect(checkpointFor(1_800, 1_800)).toBe("T30");
+    expect(checkpointFor(300, 3_300)).toBe("T5");
   });
 });

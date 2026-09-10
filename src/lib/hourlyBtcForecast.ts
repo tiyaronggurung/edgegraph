@@ -37,6 +37,8 @@ export interface HourlyForecast {
   secondsLeft: number;
   hourlyOpen: number;
   expectedMoveUsd: number;
+  realizedVolatility: number;
+  volatilityRegime: "LOW" | "NORMAL" | "HIGH";
   buy: number | null;
   mid: number | null;
   sell: number | null;
@@ -167,6 +169,7 @@ export function buildHourlyForecast(input: HourlyForecastInput): HourlyForecast 
   const vwap = weightedTypicalPrice(closed5m.filter((candle) => candle.t >= windowStart));
   const closes1m = input.candles1m.filter((candle) => candle.t <= input.nowMs).slice(-120).map((candle) => candle.c);
   const volatility = realizedVol1m(closes1m);
+  const volatilityRegime = volatility < 0.00045 ? "LOW" : volatility < 0.0009 ? "NORMAL" : "HIGH";
   const expectedMoveUsd = Math.max(input.spot * volatility * Math.sqrt(secondsLeft / 60), 1);
   const currentBias = trendVote(input.candles5m, input.nowMs) * 0.08
     + trendVote(input.candles15m, input.nowMs) * 0.1
@@ -195,7 +198,7 @@ export function buildHourlyForecast(input: HourlyForecastInput): HourlyForecast 
       : model.side === study.side ? "AGREE" : "DISAGREE";
 
   return {
-    windowStart, windowEnd, secondsLeft, hourlyOpen, expectedMoveUsd,
+    windowStart, windowEnd, secondsLeft, hourlyOpen, expectedMoveUsd, realizedVolatility: volatility, volatilityRegime,
     buy, mid, sell, vwap, model, study, verdict, ladder,
     volumeNow, volumeAverage, dataAsOf, modelVersion: HOURLY_MODEL_VERSION,
   };
