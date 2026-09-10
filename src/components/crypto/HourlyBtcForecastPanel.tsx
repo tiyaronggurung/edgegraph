@@ -306,6 +306,33 @@ function HourlyScorecard({ data, loading }: {
           </div>
         </div>
       )}
+      <div className="mt-5 overflow-x-auto border border-border">
+        <table className="w-full min-w-[620px] text-xs">
+          <thead className="border-b border-border text-[10px] uppercase text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 text-left">Our probability</th>
+              <th className="px-3 py-2 text-right">ABOVE record</th>
+              <th className="px-3 py-2 text-right">ABOVE actual</th>
+              <th className="px-3 py-2 text-right">BELOW record</th>
+              <th className="px-3 py-2 text-right">BELOW actual</th>
+            </tr>
+          </thead>
+          <tbody>{[0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98].map((threshold) => {
+            const above = data?.reliability.find((row) => row.threshold === threshold && row.direction === "ABOVE");
+            const below = data?.reliability.find((row) => row.threshold === threshold && row.direction === "BELOW");
+            return (
+              <tr key={threshold} className="border-b border-border/60 last:border-0">
+                <td className="px-3 py-2 font-semibold tabular-nums">{percent(threshold)}+</td>
+                <td className="px-3 py-2 text-right tabular-nums">{above?.n ? `${above.wins}/${above.n}` : "—"}</td>
+                <td className="px-3 py-2 text-right font-semibold text-success tabular-nums">{above?.n ? percent(above.hitRate) : "—"}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{below?.n ? `${below.wins}/${below.n}` : "—"}</td>
+                <td className="px-3 py-2 text-right font-semibold text-destructive tabular-nums">{below?.n ? percent(below.hitRate) : "—"}</td>
+              </tr>
+            );
+          })}</tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-[10px] text-muted-foreground">Actual rates use settled hourly targets only. A probability is not treated as reliable until its recorded sample grows.</p>
     </div>
   );
 }

@@ -51,10 +51,19 @@ export interface HourlyVolatilityRow {
   brier: number;
 }
 
+export interface HourlyReliabilityRow {
+  threshold: number;
+  direction: "ABOVE" | "BELOW";
+  n: number;
+  wins: number;
+  hitRate: number;
+}
+
 export interface HourlyScorecard {
   settledHours: number;
   signals: HourlyScoreRow[];
   volatility: HourlyVolatilityRow[];
+  reliability: HourlyReliabilityRow[];
   bestSignal: string | null;
   lastSettledAt: string | null;
 }
@@ -157,7 +166,16 @@ export const getHourlyForecastScorecard = createServerFn({ method: "GET" })
         const target = Number(entry.target);
         const probability = Number(entry.aboveProbability);
         if (!Number.isFinite(target) || !Number.isFinite(probability)) return [];
-        return [{ regime: row.volatility_regime, probability, outcome: Number(row.close_spot) >= target ? 1 : 0 }];
+        const aboveOutcome = Number(row.close_spot) >= target ? 1 : 0;
+        return [{
+          regime: row.volatility_regime,
+          probability,
+          outcome: aboveOutcome,
+          aboveProbability: probability,
+          belowProbability: 1 - probability,
+          aboveOutcome,
+          belowOutcome: 1 - aboveOutcome,
+        }];
       });
     });
     const volatility = ["LOW", "NORMAL", "HIGH"].map((regime) => {
@@ -167,11 +185,20 @@ export const getHourlyForecastScorecard = createServerFn({ method: "GET" })
       const brier = sample.length ? sample.reduce((sum, row) => sum + (row.probability - row.outcome) ** 2, 0) / sample.length : 0;
       return { regime, n: sample.length, predicted, actual, brier };
     });
+    const thresholds = [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98];
+    const reliability = thresholds.flatMap((threshold): HourlyReliabilityRow[] => (["ABOVE", "BELOW"] as const).map((direction) => {
+      const sample = ladderRows.filter((row) => (
+        direction === "ABOVE" ? row.aboveProbability : row.belowProbability
+      ) >= threshold);
+      const wins = sample.reduce((sum, row) => sum + (direction === "ABOVE" ? row.aboveOutcome : row.belowOutcome), 0);
+      return { threshold, direction, n: sample.length, wins, hitRate: sample.length ? wins / sample.length : 0 };
+    }));
     const eligibleBest = signals.filter((row) => row.n >= 10).sort((a, b) => b.hitRate - a.hitRate);
     return {
       settledHours: hours.length,
       signals,
       volatility,
+      reliability,
       bestSignal: eligibleBest[0]?.label ?? null,
       lastSettledAt: rows[0]?.settled_at ?? null,
     };
