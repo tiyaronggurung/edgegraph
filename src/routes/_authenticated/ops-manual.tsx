@@ -65,6 +65,7 @@ function OpsManualPage() {
         <>
           <OpsStatusBanner dash={q.data} onRefresh={() => q.refetch()} />
           <OpsKalshiAccount />
+          <OpsKalshiPnlChart />
           {isAdmin && <OpsAutoTradePanel />}
           <OpsQualificationCard dash={q.data} />
           <OpsStakingPanel dash={q.data} onRefresh={() => q.refetch()} />
