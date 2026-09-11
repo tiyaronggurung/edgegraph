@@ -491,12 +491,13 @@ export async function loadKalshiPnlSeries(
     rawPoints.sort((a, b) => a.t.localeCompare(b.t));
 
     const totalPnl = Math.round(rawPoints.reduce((a, p) => a + p.pnl, 0) * 100) / 100;
+    // Use the SAME cash balance the "Live Kalshi account — real money" card shows
+    // (settled cash), not portfolio_value which includes open position marks.
     const currentBalance =
-      typeof bal.portfolio_value === "number" && Number.isFinite(bal.portfolio_value)
-        ? Math.round(bal.portfolio_value * 100) / 100
-        : bal.balance_dollars != null && Number.isFinite(Number(bal.balance_dollars))
-          ? Math.round(Number(bal.balance_dollars) * 100) / 100
-          : c2d(bal.balance);
+      bal.balance_dollars != null && Number.isFinite(Number(bal.balance_dollars))
+        ? Math.round(Number(bal.balance_dollars) * 100) / 100
+        : c2d(bal.balance);
+
     const startingBalance = currentBalance != null && Number.isFinite(currentBalance)
       ? Math.round((currentBalance - totalPnl) * 100) / 100
       : null;
