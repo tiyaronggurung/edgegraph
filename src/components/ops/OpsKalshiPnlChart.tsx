@@ -150,6 +150,7 @@ export function OpsKalshiPnlChart() {
                 tick={{ fontSize: 10 }}
                 stroke="hsl(var(--muted-foreground))"
                 width={56}
+                domain={["auto", "auto"]}
                 tickFormatter={(v: number) => `$${v.toFixed(0)}`}
               />
               <Tooltip
