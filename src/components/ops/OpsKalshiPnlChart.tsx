@@ -108,14 +108,15 @@ export function OpsKalshiPnlChart() {
 
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <div className="text-2xl font-bold text-foreground">{usd(current)}</div>
-        {netChange != null && (
-          <div className={cn("text-sm font-bold", up ? "text-emerald-400" : "text-red-400")}>
-            {up ? "+" : ""}{usd(netChange)} in this range
-          </div>
-        )}
+        <div className={cn("text-sm font-bold", up ? "text-emerald-400" : "text-red-400")}>
+          {up ? "+" : "−"}${Math.abs(netChange).toFixed(2)}
+          {view.firstBalance > 0 && (
+            <> ({up ? "+" : "−"}{Math.abs((netChange / view.firstBalance) * 100).toFixed(2)}%)</>
+          )}{" "}
+          <span className="text-muted-foreground font-normal">{range === "ALL" ? "all time" : range}</span>
+        </div>
         <div className="text-[11px] text-muted-foreground">
-          {view.n} settled · {view.wins}W / {view.losses}L
-          {startingBalance != null && <> · started {usd(startingBalance)}</>}
+          {view.n} settled · {view.wins}W / {view.losses}L · started {usd(view.firstBalance)}
         </div>
       </div>
 
@@ -123,8 +124,8 @@ export function OpsKalshiPnlChart() {
       {q.data && !q.data.connected && (
         <div className="text-xs text-red-400">{q.data.error ?? "Kalshi account not connected."}</div>
       )}
-      {q.data?.connected && view.points.length === 0 && (
-        <div className="text-xs text-muted-foreground">No settled trades in this range.</div>
+      {q.data?.connected && view.n === 0 && (
+        <div className="text-xs text-muted-foreground">No settled trades in this range — balance flat.</div>
       )}
 
       {view.points.length > 0 && (
