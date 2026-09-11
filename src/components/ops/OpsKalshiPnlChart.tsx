@@ -38,28 +38,34 @@ export function OpsKalshiPnlChart() {
   const view = useMemo(() => {
     const spec = RANGES.find((r) => r.key === range)!;
     const cutoff = spec.ms == null ? 0 : Date.now() - spec.ms;
-    const inRange = all.filter((p) => Date.parse(p.t) >= cutoff);
-    const points = inRange.map((p) => ({ t: p.t, balance: p.balance, pnl: p.pnl }));
-    const firstBalance = points[0]?.balance ?? startingBalance ?? 0;
-    const lastBalance = points[points.length - 1]?.balance ?? currentBalance ?? 0;
+    const cutoffIso = new Date(cutoff).toISOString();
+    const firstIdx = all.findIndex((p) => Date.parse(p.t) >= cutoff);
+    const inRange = firstIdx === -1 ? [] : all.slice(firstIdx);
+    // Balance as it stood at the start of the range (anchor point)
+    const baseline =
+      firstIdx === -1
+        ? (all[all.length - 1]?.balance ?? currentBalance ?? startingBalance ?? 0)
+        : firstIdx === 0
+          ? (startingBalance ?? all[0]!.balance - all[0]!.pnl)
+          : all[firstIdx - 1]!.balance;
+
+    const points: Array<{ t: string; balance: number; pnl: number | null }> = [
+      { t: spec.ms == null && inRange.length > 0 ? inRange[0]!.t : cutoffIso, balance: baseline, pnl: null },
+      ...inRange.map((p) => ({ t: p.t, balance: p.balance, pnl: p.pnl as number | null })),
+    ];
+    // Always terminate the curve at "now" so flat ranges still render a line
+    const lastBalance = inRange[inRange.length - 1]?.balance ?? baseline;
+    points.push({ t: new Date().toISOString(), balance: lastBalance, pnl: null });
+
     const wins = inRange.filter((p) => p.pnl > 0).length;
     const losses = inRange.filter((p) => p.pnl < 0).length;
-    const periodPnl = Math.round((lastBalance - firstBalance) * 100) / 100;
-    return {
-      points,
-      firstBalance,
-      lastBalance,
-      periodPnl,
-      n: inRange.length,
-      wins,
-      losses,
-    };
+    const periodPnl = Math.round((lastBalance - baseline) * 100) / 100;
+    return { points, firstBalance: baseline, lastBalance, periodPnl, n: inRange.length, wins, losses };
   }, [all, range, currentBalance, startingBalance]);
 
-  const current = currentBalance ?? view.lastBalance;
-  const start = startingBalance ?? view.firstBalance;
-  const netChange = current != null && start != null ? Math.round((current - start) * 100) / 100 : null;
-  const up = (netChange ?? 0) >= 0;
+  const current = view.lastBalance;
+  const netChange = view.periodPnl;
+  const up = netChange >= 0;
   const stroke = up ? "#34d399" : "#f87171";
 
   const fmtTick = (t: string) => {
@@ -102,14 +108,15 @@ export function OpsKalshiPnlChart() {
 
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <div className="text-2xl font-bold text-foreground">{usd(current)}</div>
-        {netChange != null && (
-          <div className={cn("text-sm font-bold", up ? "text-emerald-400" : "text-red-400")}>
-            {up ? "+" : ""}{usd(netChange)} in this range
-          </div>
-        )}
+        <div className={cn("text-sm font-bold", up ? "text-emerald-400" : "text-red-400")}>
+          {up ? "+" : "−"}${Math.abs(netChange).toFixed(2)}
+          {view.firstBalance > 0 && (
+            <> ({up ? "+" : "−"}{Math.abs((netChange / view.firstBalance) * 100).toFixed(2)}%)</>
+          )}{" "}
+          <span className="text-muted-foreground font-normal">{range === "ALL" ? "all time" : range}</span>
+        </div>
         <div className="text-[11px] text-muted-foreground">
-          {view.n} settled · {view.wins}W / {view.losses}L
-          {startingBalance != null && <> · started {usd(startingBalance)}</>}
+          {view.n} settled · {view.wins}W / {view.losses}L · started {usd(view.firstBalance)}
         </div>
       </div>
 
@@ -117,8 +124,8 @@ export function OpsKalshiPnlChart() {
       {q.data && !q.data.connected && (
         <div className="text-xs text-red-400">{q.data.error ?? "Kalshi account not connected."}</div>
       )}
-      {q.data?.connected && view.points.length === 0 && (
-        <div className="text-xs text-muted-foreground">No settled trades in this range.</div>
+      {q.data?.connected && view.n === 0 && (
+        <div className="text-xs text-muted-foreground">No settled trades in this range — balance flat.</div>
       )}
 
       {view.points.length > 0 && (
@@ -143,6 +150,7 @@ export function OpsKalshiPnlChart() {
                 tick={{ fontSize: 10 }}
                 stroke="hsl(var(--muted-foreground))"
                 width={56}
+                domain={["auto", "auto"]}
                 tickFormatter={(v: number) => `$${v.toFixed(0)}`}
               />
               <Tooltip
