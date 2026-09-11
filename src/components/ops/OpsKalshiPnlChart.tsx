@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { LineChart as LineChartIcon, RefreshCw } from "lucide-react";
 import { opsGetKalshiPnlSeries } from "@/lib/opsManual/opsManual.functions";
 import { cn } from "@/lib/utils";
@@ -32,31 +32,34 @@ export function OpsKalshiPnlChart() {
   });
 
   const all = q.data?.points ?? [];
+  const currentBalance = q.data?.currentBalance ?? null;
+  const startingBalance = q.data?.startingBalance ?? null;
 
   const view = useMemo(() => {
     const spec = RANGES.find((r) => r.key === range)!;
     const cutoff = spec.ms == null ? 0 : Date.now() - spec.ms;
     const inRange = all.filter((p) => Date.parse(p.t) >= cutoff);
-    const before = all.filter((p) => Date.parse(p.t) < cutoff);
-    // Curve starts at 0 for the selected range so the shape reads as P/L in that period.
-    let running = 0;
-    const points = inRange.map((p) => {
-      running = Math.round((running + p.pnl) * 100) / 100;
-      return { t: p.t, cum: running, pnl: p.pnl };
-    });
+    const points = inRange.map((p) => ({ t: p.t, balance: p.balance, pnl: p.pnl }));
+    const firstBalance = points[0]?.balance ?? startingBalance ?? 0;
+    const lastBalance = points[points.length - 1]?.balance ?? currentBalance ?? 0;
     const wins = inRange.filter((p) => p.pnl > 0).length;
     const losses = inRange.filter((p) => p.pnl < 0).length;
+    const periodPnl = Math.round((lastBalance - firstBalance) * 100) / 100;
     return {
       points,
-      total: running,
+      firstBalance,
+      lastBalance,
+      periodPnl,
       n: inRange.length,
       wins,
       losses,
-      carriedIn: Math.round(before.reduce((a, p) => a + p.pnl, 0) * 100) / 100,
     };
-  }, [all, range]);
+  }, [all, range, currentBalance, startingBalance]);
 
-  const up = view.total >= 0;
+  const current = currentBalance ?? view.lastBalance;
+  const start = startingBalance ?? view.firstBalance;
+  const netChange = current != null && start != null ? Math.round((current - start) * 100) / 100 : null;
+  const up = (netChange ?? 0) >= 0;
   const stroke = up ? "#34d399" : "#f87171";
 
   const fmtTick = (t: string) => {
@@ -71,7 +74,7 @@ export function OpsKalshiPnlChart() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <LineChartIcon className="h-4 w-4 text-[color:var(--color-primary)]" />
-          <h2 className="text-sm font-bold uppercase tracking-widest">// Kalshi P/L — real money</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest">// Kalshi Balance — real money</h2>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex border border-border rounded overflow-hidden">
@@ -98,13 +101,15 @@ export function OpsKalshiPnlChart() {
       </header>
 
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <div className={cn("text-2xl font-bold", up ? "text-emerald-400" : "text-red-400")}>
-          {up ? "+" : ""}
-          {usd(view.total)}
-        </div>
+        <div className="text-2xl font-bold text-foreground">{usd(current)}</div>
+        {netChange != null && (
+          <div className={cn("text-sm font-bold", up ? "text-emerald-400" : "text-red-400")}>
+            {up ? "+" : ""}{usd(netChange)} in this range
+          </div>
+        )}
         <div className="text-[11px] text-muted-foreground">
           {view.n} settled · {view.wins}W / {view.losses}L
-          {range !== "ALL" && view.carriedIn !== 0 && <> · before this range {usd(view.carriedIn)}</>}
+          {startingBalance != null && <> · started {usd(startingBalance)}</>}
         </div>
       </div>
 
@@ -138,9 +143,8 @@ export function OpsKalshiPnlChart() {
                 tick={{ fontSize: 10 }}
                 stroke="hsl(var(--muted-foreground))"
                 width={56}
-                tickFormatter={(v: number) => `$${v}`}
+                tickFormatter={(v: number) => `$${v.toFixed(0)}`}
               />
-              <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" />
               <Tooltip
                 contentStyle={{
                   background: "hsl(var(--popover))",
@@ -149,11 +153,14 @@ export function OpsKalshiPnlChart() {
                   fontSize: 11,
                 }}
                 labelFormatter={(t) => new Date(t as string).toLocaleString()}
-                formatter={(value: number, name) => [usd(value), name === "cum" ? "Cumulative P/L" : "Trade"]}
+                formatter={(value: number, name) => [
+                  usd(value),
+                  name === "balance" ? "Total balance" : "Trade P/L",
+                ]}
               />
               <Area
                 type="monotone"
-                dataKey="cum"
+                dataKey="balance"
                 stroke={stroke}
                 strokeWidth={2}
                 fill="url(#opsKalshiPnlFill)"
@@ -166,7 +173,7 @@ export function OpsKalshiPnlChart() {
       )}
 
       <div className="text-[10px] text-muted-foreground">
-        Realized P/L from settled Kalshi trades · updated{" "}
+        Total balance money from settled Kalshi trades · current balance {currentBalance != null ? usd(currentBalance) : "—"} · updated{" "}
         {q.data ? new Date(q.data.fetchedAt).toLocaleTimeString() : "—"}
       </div>
     </section>

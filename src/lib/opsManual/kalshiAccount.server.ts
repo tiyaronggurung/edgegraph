@@ -419,11 +419,12 @@ export async function loadKalshiAccount(
   }
 }
 
-export type KalshiPnlPoint = { t: string; pnl: number };
+export type KalshiPnlPoint = { t: string; pnl: number; balance: number };
 
 /**
- * All settled Kalshi trades as a time-ordered P/L series (oldest first).
- * Read-only; used by the Ops P/L chart to build 1D / 1W / 1M / All curves.
+ * All settled Kalshi trades as a time-ordered balance series (oldest first).
+ * The line represents actual total balance money, not just cumulative profit.
+ * Read-only; used by the Ops balance chart to build 1D / 1W / 1M / All curves.
  */
 export async function loadKalshiPnlSeries(
   supabase: {
@@ -437,25 +438,40 @@ export async function loadKalshiPnlSeries(
     };
   },
   userId: string,
-): Promise<{ connected: boolean; error?: string; points: KalshiPnlPoint[]; fetchedAt: string }> {
+): Promise<{
+  connected: boolean;
+  error?: string;
+  currentBalance: number | null;
+  startingBalance: number | null;
+  points: KalshiPnlPoint[];
+  fetchedAt: string;
+}> {
   const fetchedAt = new Date().toISOString();
   const { data, error } = await supabase
     .from("profiles")
     .select("kalshi_api_key_id, kalshi_private_key_pem")
     .eq("id", userId)
     .maybeSingle();
-  if (error) return { connected: false, error: error.message, points: [], fetchedAt };
+  if (error) return { connected: false, error: error.message, currentBalance: null, startingBalance: null, points: [], fetchedAt };
 
   const prof = (data ?? {}) as { kalshi_api_key_id?: string | null; kalshi_private_key_pem?: string | null };
   const keyId = (prof.kalshi_api_key_id ?? "").trim();
   const pem = prof.kalshi_private_key_pem ?? "";
   if (!keyId || !pem.trim()) {
-    return { connected: false, error: "No Kalshi API credentials saved on this account.", points: [], fetchedAt };
+    return { connected: false, error: "No Kalshi API credentials saved on this account.", currentBalance: null, startingBalance: null, points: [], fetchedAt };
   }
 
   try {
-    const { settlements } = await fetchAllSettlements(keyId, pem);
-    const points: KalshiPnlPoint[] = [];
+    const [bal, { settlements }] = await Promise.all([
+      kalshiGet<{ balance?: number; balance_dollars?: string; portfolio_value?: number }>(
+        "/portfolio/balance",
+        keyId,
+        pem,
+      ),
+      fetchAllSettlements(keyId, pem),
+    ]);
+
+    const rawPoints: { t: string; pnl: number }[] = [];
     for (const s of settlements) {
       if (!s.settled_time) continue;
       const yes = num(s.yes_count_fp) || num(s.yes_count);
@@ -470,11 +486,33 @@ export async function loadKalshiPnlSeries(
             100,
         ) / 100;
       const revenue = Math.round((c2d(s.revenue) + Math.min(yes, no)) * 100) / 100;
-      points.push({ t: s.settled_time, pnl: Math.round((revenue - cost) * 100) / 100 });
+      rawPoints.push({ t: s.settled_time, pnl: Math.round((revenue - cost) * 100) / 100 });
     }
-    points.sort((a, b) => a.t.localeCompare(b.t));
-    return { connected: true, points, fetchedAt };
+    rawPoints.sort((a, b) => a.t.localeCompare(b.t));
+
+    const totalPnl = Math.round(rawPoints.reduce((a, p) => a + p.pnl, 0) * 100) / 100;
+    const currentBalance =
+      typeof bal.portfolio_value === "number" && Number.isFinite(bal.portfolio_value)
+        ? Math.round(bal.portfolio_value * 100) / 100
+        : bal.balance_dollars != null && Number.isFinite(Number(bal.balance_dollars))
+          ? Math.round(Number(bal.balance_dollars) * 100) / 100
+          : c2d(bal.balance);
+    const startingBalance = currentBalance != null && Number.isFinite(currentBalance)
+      ? Math.round((currentBalance - totalPnl) * 100) / 100
+      : null;
+
+    let running = 0;
+    const points: KalshiPnlPoint[] = rawPoints.map((p) => {
+      running = Math.round((running + p.pnl) * 100) / 100;
+      return {
+        t: p.t,
+        pnl: p.pnl,
+        balance: startingBalance != null ? Math.round((startingBalance + running) * 100) / 100 : running,
+      };
+    });
+
+    return { connected: true, currentBalance, startingBalance, points, fetchedAt };
   } catch (e) {
-    return { connected: false, error: e instanceof Error ? e.message : String(e), points: [], fetchedAt };
+    return { connected: false, error: e instanceof Error ? e.message : String(e), currentBalance: null, startingBalance: null, points: [], fetchedAt };
   }
 }
