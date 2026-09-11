@@ -117,3 +117,11 @@ export const opsGetKalshiAccount = createServerFn({ method: "GET" })
     const { loadKalshiAccount } = await import("./kalshiAccount.server");
     return await loadKalshiAccount(context.supabase as never, context.userId, { days: 30 });
   });
+
+/** Time-ordered realized P/L of every settled Kalshi trade (for the P/L chart). */
+export const opsGetKalshiPnlSeries = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { loadKalshiPnlSeries } = await import("./kalshiAccount.server");
+    return await loadKalshiPnlSeries(context.supabase as never, context.userId);
+  });

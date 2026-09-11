@@ -418,3 +418,63 @@ export async function loadKalshiAccount(
     return { ...empty, error: e instanceof Error ? e.message : String(e) };
   }
 }
+
+export type KalshiPnlPoint = { t: string; pnl: number };
+
+/**
+ * All settled Kalshi trades as a time-ordered P/L series (oldest first).
+ * Read-only; used by the Ops P/L chart to build 1D / 1W / 1M / All curves.
+ */
+export async function loadKalshiPnlSeries(
+  supabase: {
+    from: (t: string) => {
+      select: (c: string) => {
+        eq: (
+          col: string,
+          v: string,
+        ) => { maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }> };
+      };
+    };
+  },
+  userId: string,
+): Promise<{ connected: boolean; error?: string; points: KalshiPnlPoint[]; fetchedAt: string }> {
+  const fetchedAt = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("kalshi_api_key_id, kalshi_private_key_pem")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) return { connected: false, error: error.message, points: [], fetchedAt };
+
+  const prof = (data ?? {}) as { kalshi_api_key_id?: string | null; kalshi_private_key_pem?: string | null };
+  const keyId = (prof.kalshi_api_key_id ?? "").trim();
+  const pem = prof.kalshi_private_key_pem ?? "";
+  if (!keyId || !pem.trim()) {
+    return { connected: false, error: "No Kalshi API credentials saved on this account.", points: [], fetchedAt };
+  }
+
+  try {
+    const { settlements } = await fetchAllSettlements(keyId, pem);
+    const points: KalshiPnlPoint[] = [];
+    for (const s of settlements) {
+      if (!s.settled_time) continue;
+      const yes = num(s.yes_count_fp) || num(s.yes_count);
+      const no = num(s.no_count_fp) || num(s.no_count);
+      const cost =
+        Math.round(
+          (num(s.yes_total_cost_dollars) +
+            num(s.no_total_cost_dollars) +
+            c2d(s.yes_total_cost) +
+            c2d(s.no_total_cost) +
+            num(s.fee_cost)) *
+            100,
+        ) / 100;
+      const revenue = Math.round((c2d(s.revenue) + Math.min(yes, no)) * 100) / 100;
+      points.push({ t: s.settled_time, pnl: Math.round((revenue - cost) * 100) / 100 });
+    }
+    points.sort((a, b) => a.t.localeCompare(b.t));
+    return { connected: true, points, fetchedAt };
+  } catch (e) {
+    return { connected: false, error: e instanceof Error ? e.message : String(e), points: [], fetchedAt };
+  }
+}
