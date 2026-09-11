@@ -39,7 +39,6 @@ export function OpsKalshiPnlChart() {
     const spec = RANGES.find((r) => r.key === range)!;
     const cutoff = spec.ms == null ? 0 : Date.now() - spec.ms;
     const inRange = all.filter((p) => Date.parse(p.t) >= cutoff);
-    const before = all.filter((p) => Date.parse(p.t) < cutoff);
     const points = inRange.map((p) => ({ t: p.t, balance: p.balance, pnl: p.pnl }));
     const firstBalance = points[0]?.balance ?? startingBalance ?? 0;
     const lastBalance = points[points.length - 1]?.balance ?? currentBalance ?? 0;
