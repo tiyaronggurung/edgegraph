@@ -38,28 +38,34 @@ export function OpsKalshiPnlChart() {
   const view = useMemo(() => {
     const spec = RANGES.find((r) => r.key === range)!;
     const cutoff = spec.ms == null ? 0 : Date.now() - spec.ms;
-    const inRange = all.filter((p) => Date.parse(p.t) >= cutoff);
-    const points = inRange.map((p) => ({ t: p.t, balance: p.balance, pnl: p.pnl }));
-    const firstBalance = points[0]?.balance ?? startingBalance ?? 0;
-    const lastBalance = points[points.length - 1]?.balance ?? currentBalance ?? 0;
+    const cutoffIso = new Date(cutoff).toISOString();
+    const firstIdx = all.findIndex((p) => Date.parse(p.t) >= cutoff);
+    const inRange = firstIdx === -1 ? [] : all.slice(firstIdx);
+    // Balance as it stood at the start of the range (anchor point)
+    const baseline =
+      firstIdx === -1
+        ? (all[all.length - 1]?.balance ?? currentBalance ?? startingBalance ?? 0)
+        : firstIdx === 0
+          ? (startingBalance ?? all[0]!.balance - all[0]!.pnl)
+          : all[firstIdx - 1]!.balance;
+
+    const points: Array<{ t: string; balance: number; pnl: number | null }> = [
+      { t: spec.ms == null && inRange.length > 0 ? inRange[0]!.t : cutoffIso, balance: baseline, pnl: null },
+      ...inRange.map((p) => ({ t: p.t, balance: p.balance, pnl: p.pnl as number | null })),
+    ];
+    // Always terminate the curve at "now" so flat ranges still render a line
+    const lastBalance = inRange[inRange.length - 1]?.balance ?? baseline;
+    points.push({ t: new Date().toISOString(), balance: lastBalance, pnl: null });
+
     const wins = inRange.filter((p) => p.pnl > 0).length;
     const losses = inRange.filter((p) => p.pnl < 0).length;
-    const periodPnl = Math.round((lastBalance - firstBalance) * 100) / 100;
-    return {
-      points,
-      firstBalance,
-      lastBalance,
-      periodPnl,
-      n: inRange.length,
-      wins,
-      losses,
-    };
+    const periodPnl = Math.round((lastBalance - baseline) * 100) / 100;
+    return { points, firstBalance: baseline, lastBalance, periodPnl, n: inRange.length, wins, losses };
   }, [all, range, currentBalance, startingBalance]);
 
-  const current = currentBalance ?? view.lastBalance;
-  const start = startingBalance ?? view.firstBalance;
-  const netChange = current != null && start != null ? Math.round((current - start) * 100) / 100 : null;
-  const up = (netChange ?? 0) >= 0;
+  const current = view.lastBalance;
+  const netChange = view.periodPnl;
+  const up = netChange >= 0;
   const stroke = up ? "#34d399" : "#f87171";
 
   const fmtTick = (t: string) => {
