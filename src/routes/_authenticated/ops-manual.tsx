@@ -55,6 +55,9 @@ function OpsManualPage() {
         is hit. Paper trading below is fully simulated.
       </p>
 
+      <OpsKalshiAccount />
+      <OpsKalshiPnlChart />
+
       <OpsOwnEnginePanel />
 
       <OpsPaperTradePanel />
@@ -65,8 +68,6 @@ function OpsManualPage() {
       {q.data && (
         <>
           <OpsStatusBanner dash={q.data} onRefresh={() => q.refetch()} />
-          <OpsKalshiAccount />
-          <OpsKalshiPnlChart />
           {isAdmin && <OpsAutoTradePanel />}
           <OpsQualificationCard dash={q.data} />
           <OpsStakingPanel dash={q.data} onRefresh={() => q.refetch()} />
