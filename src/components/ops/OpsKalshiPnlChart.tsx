@@ -155,7 +155,7 @@ export function OpsKalshiPnlChart() {
                 labelFormatter={(t) => new Date(t as string).toLocaleString()}
                 formatter={(value: number, name) => [
                   usd(value),
-                  name === "balance" ? "Total balance" : "Trade P/L",
+                  name === "balance" ? "Cash balance" : "Trade P/L",
                 ]}
               />
               <Area
@@ -173,7 +173,7 @@ export function OpsKalshiPnlChart() {
       )}
 
       <div className="text-[10px] text-muted-foreground">
-        Total balance money from settled Kalshi trades · current balance {currentBalance != null ? usd(currentBalance) : "—"} · updated{" "}
+        Kalshi cash balance over time from settled trades · current cash balance {currentBalance != null ? usd(currentBalance) : "—"} · updated{" "}
         {q.data ? new Date(q.data.fetchedAt).toLocaleTimeString() : "—"}
       </div>
     </section>
