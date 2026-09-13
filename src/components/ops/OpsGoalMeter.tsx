@@ -31,6 +31,7 @@ function Cell({ label, value, tone }: { label: string; value: string; tone?: str
 
 export function OpsGoalMeter({ balance }: { balance: number | null | undefined }) {
   const [cfg, setCfg] = useState<Cfg | null>(null);
+  const [savedFlash, setSavedFlash] = useState(false);
 
   useEffect(() => {
     try {
@@ -53,6 +54,8 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     setCfg(next);
     try {
       localStorage.setItem(KEY, JSON.stringify(next));
+      setSavedFlash(true);
+      window.setTimeout(() => setSavedFlash(false), 1500);
     } catch {
       /* ignore */
     }
@@ -124,6 +127,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               className="w-24 bg-transparent border border-border rounded px-1 py-0.5 text-foreground"
             />
           </label>
+          {savedFlash && <span className="text-emerald-400">Saved ✓</span>}
         </div>
       </div>
 
