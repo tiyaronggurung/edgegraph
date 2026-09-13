@@ -104,6 +104,24 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     const planNow = start * Math.pow(GOAL / start, Math.min(elapsedDays, HORIZON_DAYS) / HORIZON_DAYS);
     const aheadBy = balance - planNow;
 
+    // ---- Dated end-of-day plan with excess carry-forward ----
+    // EOD goal for run-day k (k = 1..HORIZON) = where the plan curve says you
+    // must END that calendar day. Any excess over today's EOD goal carries
+    // forward and shrinks tomorrow's required win dollar-for-dollar.
+    const eodGoalForDay = (dayIdx: number) =>
+      start * Math.pow(GOAL / start, Math.min(dayIdx, HORIZON_DAYS) / HORIZON_DAYS);
+    const dateForDay = (dayIdx: number) =>
+      new Date(startMs + (dayIdx - 1) * 86_400_000).toISOString().slice(0, 10); // the calendar date that EOD falls on
+    const todayDayIdx = Math.min(elapsedDays + 1, HORIZON_DAYS); // current run-day
+    const dailyPlan = [0, 1, 2].map((offset) => {
+      const dayIdx = todayDayIdx + offset;
+      const eodGoal = eodGoalForDay(dayIdx);
+      // Win still needed by that day's EOD, given the CURRENT balance
+      // (excess already banked reduces this automatically).
+      const winNeeded = Math.max(0, eodGoal - balance);
+      return { dayIdx, date: dateForDay(dayIdx), eodGoal, winNeeded, covered: balance >= eodGoal };
+    });
+
     // Discipline metrics:
     // 1) How many plan-days your current balance already covers.
     //    > 0 means you're ahead of the curve; < 0 means behind.
@@ -118,7 +136,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
         ? Math.ceil(Math.log(GOAL / balance) / Math.log(1 + actualRate))
         : null;
 
-    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays, tomorrowRequired, tomorrowPlan, daysAhead, excess, fiveDayTarget };
+    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays, tomorrowRequired, tomorrowPlan, daysAhead, excess, fiveDayTarget, dailyPlan };
   }, [cfg, balance]);
 
   if (!cfg) return null;
@@ -286,6 +304,42 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               }
               tone="text-emerald-400"
             />
+          </div>
+
+          <div className="border border-border rounded p-2 space-y-1">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Dated day-by-day plan — excess carries forward
+            </div>
+            <div className="grid grid-cols-4 gap-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+              <span>End of day</span>
+              <span className="text-right">EOD goal balance</span>
+              <span className="text-right">Win still needed</span>
+              <span className="text-right">Status</span>
+            </div>
+            {m.dailyPlan.map((d, i) => (
+              <div
+                key={d.dayIdx}
+                className={cn(
+                  "grid grid-cols-4 gap-1 text-xs tabular-nums border-t border-border/60 pt-1",
+                  i === 0 && "text-[color:var(--color-primary)]",
+                )}
+              >
+                <span>
+                  {i === 0 ? "Today" : i === 1 ? "Tomorrow" : `Day ${d.dayIdx}`} · {d.date}
+                </span>
+                <span className="text-right font-bold">{usd(d.eodGoal)}</span>
+                <span className={cn("text-right font-bold", d.covered ? "text-emerald-400" : "text-foreground")}>
+                  {d.covered ? "+$0 — covered" : `+${usd(d.winNeeded)}`}
+                </span>
+                <span className={cn("text-right", d.covered ? "text-emerald-400" : "text-muted-foreground")}>
+                  {d.covered ? "✓ banked" : "pending"}
+                </span>
+              </div>
+            ))}
+            <div className="text-[10px] text-muted-foreground">
+              Win more than today's goal and the extra dollars automatically shrink tomorrow's
+              "win still needed" — e.g. beat today by $154 and tomorrow's target drops by $154.
+            </div>
           </div>
         </>
       )}
