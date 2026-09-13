@@ -272,6 +272,20 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               value={m.excess != null && m.excess > 0 ? `+${usd(m.excess)}` : "—"}
               tone={m.excess != null && m.excess > 0 ? "text-emerald-400" : undefined}
             />
+            <Cell
+              label="5-day goal balance"
+              value={m.fiveDayTarget != null ? usd(m.fiveDayTarget) : "—"}
+              tone="text-[color:var(--color-primary)]"
+            />
+            <Cell
+              label="Win needed in 5 days"
+              value={
+                m.fiveDayTarget != null
+                  ? `+${usd(Math.max(0, m.fiveDayTarget - (balance ?? 0)))}`
+                  : "—"
+              }
+              tone="text-emerald-400"
+            />
           </div>
         </>
       )}
