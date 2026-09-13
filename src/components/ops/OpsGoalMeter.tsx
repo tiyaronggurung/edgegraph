@@ -94,16 +94,12 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     const elapsedDays = Math.max(0, Math.floor((now - startMs) / 86_400_000));
     const remaining = Math.max(0, GOAL - balance);
 
-    // Log-scale progress for the bar: compounding from start -> GOAL.
-    const progress = Math.min(
-      1,
-      Math.max(0, Math.log(Math.max(balance, 1) / start) / Math.log(GOAL / start)),
-    );
-
-    // Ahead/behind vs the ORIGINAL 100-day growth curve (the fair yardstick —
-    // the $1k/day goal only applies from today forward, never retroactively).
-    const planCurveNow = start * Math.pow(GOAL / start, Math.min(elapsedDays, HORIZON_DAYS) / HORIZON_DAYS);
-    const aheadBy = balance - planCurveNow;
+    // Flat daily plan yardstick: start + dailyGoal per elapsed day.
+    const plannedNow = start + dailyGoal * elapsedDays;
+    const flatAheadBy = balance - plannedNow;
+    // Linear bar from start -> GOAL; marker = where the flat plan says we should be.
+    const linearProgress = Math.min(1, Math.max(0, (balance - start) / (GOAL - start)));
+    const planMarkerPct = Math.min(1, Math.max(0, (plannedNow - start) / (GOAL - start)));
 
     // ---- Today's flat daily goal ----
     // todayWin = won since the day started. Target = dailyGoal minus anything
