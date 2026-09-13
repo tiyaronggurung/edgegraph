@@ -78,13 +78,17 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
       Math.max(0, Math.log(Math.max(balance, 1) / start) / Math.log(GOAL / start)),
     );
 
-    const actualRate = elapsedDays > 0 ? Math.pow(balance / start, 1 / elapsedDays) - 1 : 0;
-    const requiredRate = daysLeft > 0 ? Math.pow(GOAL / Math.max(balance, 1), 1 / daysLeft) - 1 : Infinity;
-    // Exact average dollars needed per remaining day to hit the goal.
-    const requiredPerDay = daysLeft > 0 ? Math.max(0, GOAL - balance) / daysLeft : null;
     // Exact elapsed fraction of a day for precise "days left" display.
     const elapsedExact = Math.max(0, (Date.now() - startMs) / 86_400_000);
     const daysLeftExact = Math.max(0, HORIZON_DAYS - elapsedExact);
+    // Actual rate is meaningless before ~2 days of data (one good hour skews it).
+    const reliableRate = elapsedExact >= 2;
+    const actualRate = reliableRate ? Math.pow(balance / start, 1 / elapsedExact) - 1 : null;
+
+    // Rolling 5-day target: where the required-rate curve says we must be in 5 days.
+    const fiveDayTarget = Number.isFinite(requiredRate)
+      ? balance * Math.pow(1 + requiredRate, Math.min(5, daysLeftExact))
+      : null;
 
     // Per-day goals:
     // 1) Catch-up target: balance needed tomorrow if we compound at requiredRate.
