@@ -169,6 +169,30 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
             </div>
           </div>
 
+          {m.tomorrowRequired != null && (balance ?? 0) < GOAL && (
+            <div className="border border-[color:var(--color-primary)]/50 bg-[color:var(--color-primary)]/5 rounded p-2 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Tomorrow's goal balance
+                </div>
+                <div className="text-lg font-bold tabular-nums text-[color:var(--color-primary)]">
+                  {usd(m.tomorrowRequired)}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Win needed by then
+                </div>
+                <div className="text-lg font-bold tabular-nums text-emerald-400">
+                  +{usd(Math.max(0, m.tomorrowRequired - (balance ?? 0)))}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  on plan pace: {usd(m.tomorrowPlan)}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <Cell label="Day" value={`${Math.min(m.elapsedDays, HORIZON_DAYS)} / ${HORIZON_DAYS}`} />
             <Cell label="Days left" value={m.daysLeftExact.toFixed(1)} />
