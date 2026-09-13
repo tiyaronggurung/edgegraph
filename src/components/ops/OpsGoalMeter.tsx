@@ -187,18 +187,39 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
                 <div className="text-lg font-bold tabular-nums text-[color:var(--color-primary)]">
                   {usd(m.tomorrowRequired)}
                 </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Win needed by then
-                </div>
-                <div className="text-lg font-bold tabular-nums text-emerald-400">
-                  +{usd(Math.max(0, m.tomorrowRequired - (balance ?? 0)))}
-                </div>
                 <div className="text-[10px] text-muted-foreground">
                   on plan pace: {usd(m.tomorrowPlan)}
                 </div>
               </div>
+              {m.excess != null && m.excess > 0 ? (
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-widest text-emerald-400">
+                    Goal already covered — excess
+                  </div>
+                  <div className="text-lg font-bold tabular-nums text-emerald-400">
+                    +{usd(m.excess)}
+                  </div>
+                  <div className="text-[10px] text-emerald-400">
+                    {m.daysAhead >= 1
+                      ? `${m.daysAhead.toFixed(1)} days ahead of plan — bank it, stop for today`
+                      : "Ahead of tomorrow — bank it, no chasing"}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    Win needed by tomorrow
+                  </div>
+                  <div className="text-lg font-bold tabular-nums text-emerald-400">
+                    +{usd(Math.max(0, m.tomorrowRequired - (balance ?? 0)))}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {m.daysAhead >= 0
+                      ? `${m.daysAhead.toFixed(1)} days ahead of plan — hit this and stop`
+                      : `${Math.abs(m.daysAhead).toFixed(1)} days behind plan — hit this, no overbetting`}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
