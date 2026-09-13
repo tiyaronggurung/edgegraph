@@ -148,7 +148,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
           <Flag className="h-3.5 w-3.5" />
           // $100k goal — flat daily plan
         </div>
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted-foreground flex-wrap">
           <label className="flex items-center gap-1">
             Start
             <input
@@ -176,6 +176,19 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               value={cfg.dailyGoal ?? DEFAULT_DAILY_GOAL}
               onChange={(e) => save({ ...cfg, dailyGoal: Number(e.target.value) || DEFAULT_DAILY_GOAL })}
               className="w-20 bg-transparent border border-border rounded px-1 py-0.5 text-foreground"
+            />
+          </label>
+          <label className="flex items-center gap-1">
+            Today opened at $
+            <input
+              type="number"
+              min={0}
+              value={cfg.anchorDate === todayISO() && Number.isFinite(cfg.anchorBalance) ? cfg.anchorBalance : ""}
+              placeholder="day-open balance"
+              onChange={(e) =>
+                save({ ...cfg, anchorDate: todayISO(), anchorBalance: Number(e.target.value) || 0 })
+              }
+              className="w-24 bg-transparent border border-border rounded px-1 py-0.5 text-foreground"
             />
           </label>
           {savedFlash && <span className="text-emerald-400">Saved ✓</span>}
@@ -240,6 +253,12 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
                         ? " — goal covered, stop for today"
                         : ` — end today at ${usd(m.todayEodGoal)}, then stop.`}
                     </div>
+                    {m.todayWin > m.dailyGoal && (
+                      <div className="text-emerald-400 font-bold">
+                        You're {usd(m.todayWin - m.dailyGoal)} ahead of today's {usd(m.dailyGoal)} goal
+                        → tomorrow's goal drops to {usd(Math.max(0, m.dailyGoal - (m.todayWin - m.dailyGoal)))}.
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">
