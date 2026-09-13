@@ -305,6 +305,42 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               tone="text-emerald-400"
             />
           </div>
+
+          <div className="border border-border rounded p-2 space-y-1">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Dated day-by-day plan — excess carries forward
+            </div>
+            <div className="grid grid-cols-4 gap-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+              <span>End of day</span>
+              <span className="text-right">EOD goal balance</span>
+              <span className="text-right">Win still needed</span>
+              <span className="text-right">Status</span>
+            </div>
+            {m.dailyPlan.map((d, i) => (
+              <div
+                key={d.dayIdx}
+                className={cn(
+                  "grid grid-cols-4 gap-1 text-xs tabular-nums border-t border-border/60 pt-1",
+                  i === 0 && "text-[color:var(--color-primary)]",
+                )}
+              >
+                <span>
+                  {i === 0 ? "Today" : i === 1 ? "Tomorrow" : `Day ${d.dayIdx}`} · {d.date}
+                </span>
+                <span className="text-right font-bold">{usd(d.eodGoal)}</span>
+                <span className={cn("text-right font-bold", d.covered ? "text-emerald-400" : "text-foreground")}>
+                  {d.covered ? "+$0 — covered" : `+${usd(d.winNeeded)}`}
+                </span>
+                <span className={cn("text-right", d.covered ? "text-emerald-400" : "text-muted-foreground")}>
+                  {d.covered ? "✓ banked" : "pending"}
+                </span>
+              </div>
+            ))}
+            <div className="text-[10px] text-muted-foreground">
+              Win more than today's goal and the extra dollars automatically shrink tomorrow's
+              "win still needed" — e.g. beat today by $154 and tomorrow's target drops by $154.
+            </div>
+          </div>
         </>
       )}
     </div>
