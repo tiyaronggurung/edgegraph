@@ -127,8 +127,8 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     });
 
     return {
-      start, dailyGoal, elapsedDays, remaining, progress,
-      planCurveNow, aheadBy,
+      start, dailyGoal, elapsedDays, remaining,
+      plannedNow, flatAheadBy, linearProgress, planMarkerPct,
       anchored, carryExcess, todayWin, todayTarget, todayEodGoal,
       projectedMs, deadlineMs, daysLeftDeadline, onDeadlinePace,
       dailyPlan,
