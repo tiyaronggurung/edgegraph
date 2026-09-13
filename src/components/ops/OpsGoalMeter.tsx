@@ -87,28 +87,20 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
 
   const m = useMemo(() => {
     if (!cfg || balance == null || !Number.isFinite(balance)) return null;
-    const start = Math.max(1, cfg.startBankroll);
     const dailyGoal = Math.max(1, cfg.dailyGoal ?? DEFAULT_DAILY_GOAL);
     const startMs = new Date(`${cfg.startDate}T00:00:00Z`).getTime();
     const now = Date.now();
     const elapsedDays = Math.max(0, Math.floor((now - startMs) / 86_400_000));
     const remaining = Math.max(0, GOAL - balance);
 
-    // Flat daily plan yardstick: start + dailyGoal per elapsed day.
-    const plannedNow = start + dailyGoal * elapsedDays;
-    const flatAheadBy = balance - plannedNow;
-    // Linear bar from start -> GOAL; marker = where the flat plan says we should be.
-    const linearProgress = Math.min(1, Math.max(0, (balance - start) / (GOAL - start)));
-    const planMarkerPct = Math.min(1, Math.max(0, (plannedNow - start) / (GOAL - start)));
-
-    // ---- Today's flat daily goal ----
-    // todayWin = won since the day started. Target = dailyGoal minus anything
-    // banked from yesterday, minus what you've already won today.
-    const anchored = cfg.anchorDate === todayISO() && Number.isFinite(cfg.anchorBalance);
-    const carryExcess = anchored ? Math.max(0, cfg.carryExcess ?? 0) : 0;
-    const todayWin = anchored ? balance - (cfg.anchorBalance as number) : 0;
-    const todayTarget = Math.max(0, dailyGoal - carryExcess - Math.max(0, todayWin));
+    // The daily plan is based only on $1,000 balance milestones. At $4,155,
+    // $155 is already banked toward day 5, so the next target is $845.
+    const completedDailyGoals = Math.floor(balance / dailyGoal);
+    const bankedTowardNext = balance - completedDailyGoals * dailyGoal;
+    const todayTarget = bankedTowardNext > 0 ? dailyGoal - bankedTowardNext : dailyGoal;
     const todayEodGoal = balance + todayTarget;
+    const linearProgress = Math.min(1, Math.max(0, balance / GOAL));
+    const nextTargetMarkerPct = Math.min(1, Math.max(0, todayEodGoal / GOAL));
 
     // Projected $100k date at the flat daily goal, from the live balance.
     const daysNeeded = remaining / dailyGoal;
@@ -127,9 +119,8 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     });
 
     return {
-      start, dailyGoal, elapsedDays, remaining,
-      plannedNow, flatAheadBy, linearProgress, planMarkerPct,
-      anchored, carryExcess, todayWin, todayTarget, todayEodGoal,
+      dailyGoal, elapsedDays, remaining, completedDailyGoals, bankedTowardNext,
+      linearProgress, nextTargetMarkerPct, todayTarget, todayEodGoal,
       projectedMs, deadlineMs, daysLeftDeadline, onDeadlinePace,
       dailyPlan,
     };
@@ -174,19 +165,6 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               className="w-20 bg-transparent border border-border rounded px-1 py-0.5 text-foreground"
             />
           </label>
-          <label className="flex items-center gap-1">
-            Today opened at $
-            <input
-              type="number"
-              min={0}
-              value={cfg.anchorDate === todayISO() && Number.isFinite(cfg.anchorBalance) ? cfg.anchorBalance : ""}
-              placeholder="day-open balance"
-              onChange={(e) =>
-                save({ ...cfg, anchorDate: todayISO(), anchorBalance: Number(e.target.value) || 0 })
-              }
-              className="w-24 bg-transparent border border-border rounded px-1 py-0.5 text-foreground"
-            />
-          </label>
           {savedFlash && <span className="text-emerald-400">Saved ✓</span>}
         </div>
       </div>
@@ -197,7 +175,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
         <>
           <div className="space-y-1">
             <div className="flex justify-between text-[11px] font-mono">
-              <span className="text-muted-foreground">{usd(m.start)}</span>
+              <span className="text-muted-foreground">$0</span>
               <span className="font-bold text-[color:var(--color-primary)]">
                 {usd(balance)} · {(m.linearProgress * 100).toFixed(1)}%
               </span>
@@ -210,15 +188,15 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               />
               <div
                 className="absolute inset-y-0 w-px bg-foreground/70"
-                style={{ left: `${m.planMarkerPct * 100}%` }}
-                title="Where the flat daily plan says you should be today"
+                style={{ left: `${m.nextTargetMarkerPct * 100}%` }}
+                title="Next $1,000 balance target"
               />
             </div>
             <div className="text-[10px] text-muted-foreground">
-              Marker = flat {usd(m.dailyGoal)}/day plan ({usd(m.plannedNow)} by day {m.elapsedDays}).{" "}
-              <span className={m.flatAheadBy >= 0 ? "text-emerald-400" : "text-red-400"}>
-                {m.flatAheadBy >= 0 ? "Ahead" : "Behind"} by {usd(Math.abs(m.flatAheadBy))}
-              </span>
+              Marker = next {usd(m.dailyGoal)} balance goal at {usd(m.todayEodGoal)}. You already banked{" "}
+              <span className="text-emerald-400 font-bold">+{usd(m.bankedTowardNext)}</span>
+              {" "}→ next win target is {usd(m.dailyGoal)} − {usd(m.bankedTowardNext)} ={" "}
+              <span className="text-[color:var(--color-primary)] font-bold">{usd(m.todayTarget)}</span>.
             </div>
           </div>
 
@@ -233,28 +211,11 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
                     +{usd(Math.ceil(m.todayTarget))}
                   </div>
                   <div className="text-[10px] text-muted-foreground space-y-0.5">
-                    {m.carryExcess > 0 && (
-                      <div>
-                        Yesterday you banked{" "}
-                        <span className="text-emerald-400 font-bold">+{usd(m.carryExcess)}</span> over
-                        the {usd(m.dailyGoal)} goal — so today is {usd(m.dailyGoal)} − {usd(m.carryExcess)}.
-                      </div>
-                    )}
                     <div>
-                      Won today so far:{" "}
-                      <span className={m.todayWin >= 0 ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>
-                        {m.todayWin >= 0 ? "+" : "−"}{usd(Math.abs(m.todayWin))}
-                      </span>
-                      {m.todayTarget <= 0
-                        ? " — goal covered, stop for today"
-                        : ` — end today at ${usd(m.todayEodGoal)}, then stop.`}
+                      Banked toward this {usd(m.dailyGoal)} goal:{" "}
+                      <span className="text-emerald-400 font-bold">+{usd(m.bankedTowardNext)}</span>
+                      {` — win ${usd(m.todayTarget)} more and stop at ${usd(m.todayEodGoal)}.`}
                     </div>
-                    {m.todayWin > m.dailyGoal && (
-                      <div className="text-emerald-400 font-bold">
-                        You're {usd(m.todayWin - m.dailyGoal)} ahead of today's {usd(m.dailyGoal)} goal
-                        → tomorrow's goal drops to {usd(Math.max(0, m.dailyGoal - (m.todayWin - m.dailyGoal)))}.
-                      </div>
-                    )}
                   </div>
                 </div>
                 <div className="text-right">
@@ -278,12 +239,12 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
           )}
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <Cell label="Run day" value={`${m.elapsedDays + 1}`} />
+            <Cell label="Current goal day" value={`${m.completedDailyGoals + 1}`} />
             <Cell label="Remaining to goal" value={usd(m.remaining)} />
             <Cell
-              label="Ahead of plan"
-              value={`${m.flatAheadBy >= 0 ? "+" : "−"}${usd(Math.abs(m.flatAheadBy))}`}
-              tone={m.flatAheadBy >= 0 ? "text-emerald-400" : "text-red-400"}
+              label="Banked toward next $1k"
+              value={`+${usd(m.bankedTowardNext)}`}
+              tone="text-emerald-400"
             />
             <Cell
               label="Projected $100k"
