@@ -8,8 +8,9 @@ const DEFAULT_START_DATE = "2026-09-12";
 // Current run restart: user confirmed the 100-day run restarts from $1,883
 // (Kalshi cash balance, mid-Sep 2026).
 const DEFAULT_START_BANKROLL = 1883;
-// v5: flat-quota planner — fixed goal date, daily $ quota = remaining / days left.
-const KEY = "ops-100k-goal-v5";
+// v5: flat-quota planner (fixed goal date, daily $ quota = remaining / days left).
+// Key stays v4 so the user's saved start date/bankroll carry over.
+const KEY = "ops-100k-goal-v4";
 
 const usd = (n: number | null | undefined) =>
   n == null || !Number.isFinite(n) ? "—" : `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
