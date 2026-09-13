@@ -223,7 +223,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
             <Cell label="Remaining to goal" value={usd(m.remaining)} />
             <Cell
               label="Banked vs plan"
-              value={`${m.banked >= 0 ? "+" : "−"}${usd(Math.abs(m.banked)).slice(1) ? usd(Math.abs(m.banked)) : "$0"}`}
+              value={`${m.banked >= 0 ? "+" : "−"}${usd(Math.abs(m.banked))}`}
               tone={m.banked >= 0 ? "text-emerald-400" : "text-red-400"}
             />
             <Cell
