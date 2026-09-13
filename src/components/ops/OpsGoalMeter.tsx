@@ -253,6 +253,12 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
                         ? " — goal covered, stop for today"
                         : ` — end today at ${usd(m.todayEodGoal)}, then stop.`}
                     </div>
+                    {m.todayWin > m.dailyGoal && (
+                      <div className="text-emerald-400 font-bold">
+                        You're {usd(m.todayWin - m.dailyGoal)} ahead of today's {usd(m.dailyGoal)} goal
+                        → tomorrow's goal drops to {usd(Math.max(0, m.dailyGoal - (m.todayWin - m.dailyGoal)))}.
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">
