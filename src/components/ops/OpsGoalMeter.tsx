@@ -183,6 +183,10 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
                 {m.aheadBy >= 0 ? "Ahead" : "Behind"} by {usd(Math.abs(m.aheadBy))}
               </span>
             </div>
+            <div className="text-[10px] text-muted-foreground">
+              % is compounding progress (log scale) — $1,883 → $100k means every doubling counts
+              equally, so $4k is a small-looking but real chunk of the run.
+            </div>
           </div>
 
           {m.tomorrowRequired != null && (balance ?? 0) < GOAL && (
