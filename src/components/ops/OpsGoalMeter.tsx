@@ -17,6 +17,8 @@ const usd = (n: number | null | undefined) =>
 
 const dateISO = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const todayISO = () => dateISO(Date.now());
+const dateLabel = (ms: number) =>
+  new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(ms));
 
 type Cfg = {
   startDate: string;
@@ -42,6 +44,7 @@ function Cell({ label, value, tone }: { label: string; value: string; tone?: str
 export function OpsGoalMeter({ balance }: { balance: number | null | undefined }) {
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [hoveredMilestone, setHoveredMilestone] = useState<number | null>(null);
 
   useEffect(() => {
     try {
@@ -101,6 +104,10 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     const todayEodGoal = balance + todayTarget;
     const linearProgress = Math.min(1, Math.max(0, balance / GOAL));
     const nextTargetMarkerPct = Math.min(1, Math.max(0, todayEodGoal / GOAL));
+    const milestoneTicks = Array.from(
+      { length: Math.floor(GOAL / dailyGoal) },
+      (_, index) => (index + 1) * dailyGoal,
+    );
 
     // Projected $100k date at the flat daily goal, from the live balance.
     const daysNeeded = remaining / dailyGoal;
@@ -122,11 +129,30 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
       dailyGoal, elapsedDays, remaining, completedDailyGoals, bankedTowardNext,
       linearProgress, nextTargetMarkerPct, todayTarget, todayEodGoal,
       projectedMs, deadlineMs, daysLeftDeadline, onDeadlinePace,
-      dailyPlan,
+      dailyPlan, milestoneTicks,
     };
   }, [cfg, balance]);
 
   if (!cfg) return null;
+
+  const inspectedMilestone = m ? hoveredMilestone ?? m.todayEodGoal : GOAL;
+  const inspectedSurpassed = balance != null && inspectedMilestone <= balance;
+  const inspectedDaysAway = m
+    ? Math.max(0, Math.ceil((inspectedMilestone - m.todayEodGoal) / m.dailyGoal))
+    : 0;
+  const inspectedDateMs = Date.now() + inspectedDaysAway * 86_400_000;
+
+  const inspectMilestoneAt = (clientX: number, element: HTMLDivElement) => {
+    if (!m) return;
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const position = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const milestone = Math.min(
+      GOAL,
+      Math.max(m.dailyGoal, Math.round((position * GOAL) / m.dailyGoal) * m.dailyGoal),
+    );
+    setHoveredMilestone(milestone);
+  };
 
   return (
     <div className="border border-border rounded p-3 space-y-3">
@@ -181,22 +207,88 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               </span>
               <span className="text-muted-foreground">{usd(GOAL)}</span>
             </div>
-            <div className="relative h-3 rounded bg-muted overflow-hidden border border-border">
+            <div
+              className="group relative h-5 cursor-crosshair overflow-hidden rounded border border-border bg-muted outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              role="slider"
+              tabIndex={0}
+              aria-label="Inspect one-thousand-dollar balance milestones"
+              aria-valuemin={m.dailyGoal}
+              aria-valuemax={GOAL}
+              aria-valuenow={inspectedMilestone}
+              onPointerMove={(event) => inspectMilestoneAt(event.clientX, event.currentTarget)}
+              onPointerDown={(event) => inspectMilestoneAt(event.clientX, event.currentTarget)}
+              onPointerLeave={() => setHoveredMilestone(null)}
+              onFocus={() => setHoveredMilestone(m.todayEodGoal)}
+              onBlur={() => setHoveredMilestone(null)}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                event.preventDefault();
+                const direction = event.key === "ArrowRight" ? 1 : -1;
+                setHoveredMilestone(
+                  Math.min(GOAL, Math.max(m.dailyGoal, inspectedMilestone + direction * m.dailyGoal)),
+                );
+              }}
+            >
               <div
-                className="absolute inset-y-0 left-0 bg-[color:var(--color-primary)]"
+                className="absolute inset-y-0 left-0 bg-[color:var(--color-primary)] transition-[width] duration-300"
                 style={{ width: `${m.linearProgress * 100}%` }}
               />
+              {m.milestoneTicks.map((milestone) => (
+                <span
+                  key={milestone}
+                  className={cn(
+                    "pointer-events-none absolute bottom-0 z-10 w-px bg-foreground/20",
+                    milestone % 10_000 === 0 ? "h-full bg-foreground/45" : "h-1.5",
+                  )}
+                  style={{ left: `${(milestone / GOAL) * 100}%` }}
+                />
+              ))}
               <div
-                className="absolute inset-y-0 w-px bg-foreground/70"
+                className="pointer-events-none absolute inset-y-0 z-20 w-0.5 bg-foreground shadow-[0_0_8px_var(--color-foreground)]"
                 style={{ left: `${m.nextTargetMarkerPct * 100}%` }}
                 title="Next $1,000 balance target"
               />
+              <div
+                className={cn(
+                  "pointer-events-none absolute inset-y-0 z-30 w-px bg-warning opacity-0 transition-opacity",
+                  hoveredMilestone != null && "opacity-100",
+                )}
+                style={{ left: `${(inspectedMilestone / GOAL) * 100}%` }}
+              />
             </div>
-            <div className="text-[10px] text-muted-foreground">
-              Marker = next {usd(m.dailyGoal)} balance goal at {usd(m.todayEodGoal)}. You already banked{" "}
-              <span className="text-emerald-400 font-bold">+{usd(m.bankedTowardNext)}</span>
-              {" "}→ next win target is {usd(m.dailyGoal)} − {usd(m.bankedTowardNext)} ={" "}
-              <span className="text-[color:var(--color-primary)] font-bold">{usd(m.todayTarget)}</span>.
+            <div className="grid grid-cols-2 gap-px overflow-hidden rounded border border-border bg-border md:grid-cols-4">
+              <div className="bg-background p-2">
+                <div className="text-[9px] uppercase tracking-widest text-muted-foreground">Goal balance</div>
+                <div className="text-sm font-bold tabular-nums text-foreground">{usd(inspectedMilestone)}</div>
+              </div>
+              <div className="bg-background p-2">
+                <div className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  {inspectedSurpassed ? "Status" : "Destination"}
+                </div>
+                <div className={cn("text-sm font-bold tabular-nums", inspectedSurpassed ? "text-success" : "text-primary")}>
+                  {inspectedSurpassed ? "Surpassed ✓" : dateLabel(inspectedDateMs)}
+                </div>
+              </div>
+              <div className="bg-background p-2">
+                <div className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  {inspectedSurpassed ? "Next balance" : "Win remaining"}
+                </div>
+                <div className="text-sm font-bold tabular-nums text-foreground">
+                  {inspectedSurpassed ? usd(m.todayEodGoal) : `+${usd(Math.max(0, inspectedMilestone - (balance ?? 0)))}`}
+                </div>
+              </div>
+              <div className="bg-background p-2">
+                <div className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  {inspectedSurpassed ? "Next destination" : "Time to target"}
+                </div>
+                <div className="text-sm font-bold tabular-nums text-foreground">
+                  {inspectedSurpassed ? dateLabel(Date.now()) : inspectedDaysAway === 0 ? "Today" : `${inspectedDaysAway} day${inspectedDaysAway === 1 ? "" : "s"}`}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-[9px] uppercase tracking-widest text-muted-foreground">
+              <span>Every tick = {usd(m.dailyGoal)}</span>
+              <span>Next: {usd(m.todayEodGoal)} by {dateLabel(Date.now())}</span>
             </div>
           </div>
 
