@@ -4,11 +4,10 @@ import { cn } from "@/lib/utils";
 
 const GOAL = 100_000;
 const HORIZON_DAYS = 100;
-const DEFAULT_START_DATE = "2026-08-21";
-// Reconstructed Aug 21, 2026 Kalshi cash balance (start of the 100-day run):
-// current $9,877.43 − ~$4,597 P/L earned Aug 21→24 (today +$4,414.20; Aug 21–23
-// ≈ +$183 at the 29-day pre-today pace of ~$61/day, from 30d realized P/L $6,182).
-const DEFAULT_START_BANKROLL = 5280;
+const DEFAULT_START_DATE = "2026-09-12";
+// Current run restart: user confirmed the 100-day run restarts from $1,883
+// (Kalshi cash balance, mid-Sep 2026).
+const DEFAULT_START_BANKROLL = 1883;
 const KEY = "ops-100k-goal-v3";
 
 const usd = (n: number | null | undefined) =>
@@ -77,6 +76,11 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
 
     const actualRate = elapsedDays > 0 ? Math.pow(balance / start, 1 / elapsedDays) - 1 : 0;
     const requiredRate = daysLeft > 0 ? Math.pow(GOAL / Math.max(balance, 1), 1 / daysLeft) - 1 : Infinity;
+    // Exact average dollars needed per remaining day to hit the goal.
+    const requiredPerDay = daysLeft > 0 ? Math.max(0, GOAL - balance) / daysLeft : null;
+    // Exact elapsed fraction of a day for precise "days left" display.
+    const elapsedExact = Math.max(0, (Date.now() - startMs) / 86_400_000);
+    const daysLeftExact = Math.max(0, HORIZON_DAYS - elapsedExact);
 
     // Pace: where should we be today on the planned curve?
     const planNow = start * Math.pow(GOAL / start, Math.min(elapsedDays, HORIZON_DAYS) / HORIZON_DAYS);
