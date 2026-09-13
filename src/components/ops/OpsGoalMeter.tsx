@@ -86,6 +86,13 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     const elapsedExact = Math.max(0, (Date.now() - startMs) / 86_400_000);
     const daysLeftExact = Math.max(0, HORIZON_DAYS - elapsedExact);
 
+    // Per-day goals:
+    // 1) Catch-up target: balance needed tomorrow if we compound at requiredRate.
+    const tomorrowRequired = Number.isFinite(requiredRate) ? balance * (1 + requiredRate) : null;
+    // 2) Plan target: where the original 100-day curve says we should be tomorrow.
+    const tomorrowPlan =
+      start * Math.pow(GOAL / start, Math.min(elapsedDays + 1, HORIZON_DAYS) / HORIZON_DAYS);
+
     // Pace: where should we be today on the planned curve?
     const planNow = start * Math.pow(GOAL / start, Math.min(elapsedDays, HORIZON_DAYS) / HORIZON_DAYS);
     const aheadBy = balance - planNow;
@@ -95,7 +102,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
         ? Math.ceil(Math.log(GOAL / balance) / Math.log(1 + actualRate))
         : null;
 
-    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays };
+    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays, tomorrowRequired, tomorrowPlan };
   }, [cfg, balance]);
 
   if (!cfg) return null;
@@ -161,6 +168,30 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               </span>
             </div>
           </div>
+
+          {m.tomorrowRequired != null && (balance ?? 0) < GOAL && (
+            <div className="border border-[color:var(--color-primary)]/50 bg-[color:var(--color-primary)]/5 rounded p-2 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Tomorrow's goal balance
+                </div>
+                <div className="text-lg font-bold tabular-nums text-[color:var(--color-primary)]">
+                  {usd(m.tomorrowRequired)}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Win needed by then
+                </div>
+                <div className="text-lg font-bold tabular-nums text-emerald-400">
+                  +{usd(Math.max(0, m.tomorrowRequired - (balance ?? 0)))}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  on plan pace: {usd(m.tomorrowPlan)}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <Cell label="Day" value={`${Math.min(m.elapsedDays, HORIZON_DAYS)} / ${HORIZON_DAYS}`} />
