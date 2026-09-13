@@ -102,7 +102,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
         ? Math.ceil(Math.log(GOAL / balance) / Math.log(1 + actualRate))
         : null;
 
-    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays };
+    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays, tomorrowRequired, tomorrowPlan };
   }, [cfg, balance]);
 
   if (!cfg) return null;
