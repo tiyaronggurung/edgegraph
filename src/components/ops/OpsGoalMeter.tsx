@@ -175,7 +175,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
         <>
           <div className="space-y-1">
             <div className="flex justify-between text-[11px] font-mono">
-              <span className="text-muted-foreground">$0</span>
+              <span className="text-muted-foreground">{usd(cfg.startBankroll)}</span>
               <span className="font-bold text-[color:var(--color-primary)]">
                 {usd(balance)} · {(m.linearProgress * 100).toFixed(1)}%
               </span>
