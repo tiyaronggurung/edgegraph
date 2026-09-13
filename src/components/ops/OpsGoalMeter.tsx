@@ -97,12 +97,21 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     const planNow = start * Math.pow(GOAL / start, Math.min(elapsedDays, HORIZON_DAYS) / HORIZON_DAYS);
     const aheadBy = balance - planNow;
 
+    // Discipline metrics:
+    // 1) How many plan-days your current balance already covers.
+    //    > 0 means you're ahead of the curve; < 0 means behind.
+    const daysAhead = (Math.log(Math.max(balance, 1) / start) / Math.log(GOAL / start)) * HORIZON_DAYS - elapsedDays;
+    // 2) Excess = how far above TOMORROW's required balance you already are.
+    //    If positive, today's job is done — anything more is greed, not goal.
+    const excess =
+      tomorrowRequired != null ? balance - tomorrowRequired : null;
+
     const etaDays =
       actualRate > 0 && balance < GOAL
         ? Math.ceil(Math.log(GOAL / balance) / Math.log(1 + actualRate))
         : null;
 
-    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays, tomorrowRequired, tomorrowPlan };
+    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays, tomorrowRequired, tomorrowPlan, daysAhead, excess };
   }, [cfg, balance]);
 
   if (!cfg) return null;
@@ -178,18 +187,39 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
                 <div className="text-lg font-bold tabular-nums text-[color:var(--color-primary)]">
                   {usd(m.tomorrowRequired)}
                 </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Win needed by then
-                </div>
-                <div className="text-lg font-bold tabular-nums text-emerald-400">
-                  +{usd(Math.max(0, m.tomorrowRequired - (balance ?? 0)))}
-                </div>
                 <div className="text-[10px] text-muted-foreground">
                   on plan pace: {usd(m.tomorrowPlan)}
                 </div>
               </div>
+              {m.excess != null && m.excess > 0 ? (
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-widest text-emerald-400">
+                    Goal already covered — excess
+                  </div>
+                  <div className="text-lg font-bold tabular-nums text-emerald-400">
+                    +{usd(m.excess)}
+                  </div>
+                  <div className="text-[10px] text-emerald-400">
+                    {m.daysAhead >= 1
+                      ? `${m.daysAhead.toFixed(1)} days ahead of plan — bank it, stop for today`
+                      : "Ahead of tomorrow — bank it, no chasing"}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    Win needed by tomorrow
+                  </div>
+                  <div className="text-lg font-bold tabular-nums text-emerald-400">
+                    +{usd(Math.max(0, m.tomorrowRequired - (balance ?? 0)))}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {m.daysAhead >= 0
+                      ? `${m.daysAhead.toFixed(1)} days ahead of plan — hit this and stop`
+                      : `${Math.abs(m.daysAhead).toFixed(1)} days behind plan — hit this, no overbetting`}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -220,6 +250,16 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               label="ETA at current pace"
               value={m.etaDays == null ? (balance ?? 0) >= GOAL ? "Goal hit" : "—" : `${m.etaDays}d`}
               tone={m.etaDays != null && m.etaDays <= m.daysLeft ? "text-emerald-400" : "text-orange-400"}
+            />
+            <Cell
+              label="Days ahead of plan"
+              value={`${m.daysAhead >= 0 ? "+" : "−"}${Math.abs(m.daysAhead).toFixed(1)}`}
+              tone={m.daysAhead >= 0 ? "text-emerald-400" : "text-red-400"}
+            />
+            <Cell
+              label="Excess above tomorrow"
+              value={m.excess != null && m.excess > 0 ? `+${usd(m.excess)}` : "—"}
+              tone={m.excess != null && m.excess > 0 ? "text-emerald-400" : undefined}
             />
           </div>
         </>
