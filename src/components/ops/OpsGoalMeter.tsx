@@ -258,7 +258,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
             />
             <Cell
               label="Excess above tomorrow"
-              value={m.excess != null && m.excess > 0 ? `+${usd(m.excess).replace("$", "$")}` : "—"}
+              value={m.excess != null && m.excess > 0 ? `+${usd(m.excess)}` : "—"}
               tone={m.excess != null && m.excess > 0 ? "text-emerald-400" : undefined}
             />
           </div>
