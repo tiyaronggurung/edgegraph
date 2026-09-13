@@ -251,6 +251,16 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               value={m.etaDays == null ? (balance ?? 0) >= GOAL ? "Goal hit" : "—" : `${m.etaDays}d`}
               tone={m.etaDays != null && m.etaDays <= m.daysLeft ? "text-emerald-400" : "text-orange-400"}
             />
+            <Cell
+              label="Days ahead of plan"
+              value={`${m.daysAhead >= 0 ? "+" : "−"}${Math.abs(m.daysAhead).toFixed(1)}`}
+              tone={m.daysAhead >= 0 ? "text-emerald-400" : "text-red-400"}
+            />
+            <Cell
+              label="Excess above tomorrow"
+              value={m.excess != null && m.excess > 0 ? `+${usd(m.excess).replace("$", "$")}` : "—"}
+              tone={m.excess != null && m.excess > 0 ? "text-emerald-400" : undefined}
+            />
           </div>
         </>
       )}
