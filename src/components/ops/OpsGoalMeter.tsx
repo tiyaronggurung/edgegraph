@@ -199,31 +199,14 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
         <div className="text-xs text-muted-foreground">Waiting on live cash balance…</div>
       ) : (
         <>
-          <div className="space-y-1">
-            <div className="flex justify-between text-[11px] font-mono">
-              <span className="text-muted-foreground">{usd(m.start)}</span>
-              <span className="font-bold text-[color:var(--color-primary)]">
-                {usd(balance)} · {(m.progress * 100).toFixed(1)}%
-              </span>
-              <span className="text-muted-foreground">{usd(GOAL)}</span>
-            </div>
-            <div className="relative h-3 rounded bg-muted overflow-hidden border border-border">
-              <div
-                className="absolute inset-y-0 left-0 bg-[color:var(--color-primary)]"
-                style={{ width: `${m.progress * 100}%` }}
-              />
-              <div
-                className="absolute inset-y-0 w-px bg-foreground/70"
-                style={{ left: `${Math.min(100, (m.elapsedDays / HORIZON_DAYS) * 100)}%` }}
-                title="Where the plan says you should be today"
-              />
-            </div>
-            <div className="text-[10px] text-muted-foreground">
-              Marker = original plan curve ({usd(m.planCurveNow)} by day {m.elapsedDays}).{" "}
-              <span className={m.aheadBy >= 0 ? "text-emerald-400" : "text-red-400"}>
-                {m.aheadBy >= 0 ? "Ahead" : "Behind"} overall by {usd(Math.abs(m.aheadBy))}
-              </span>
-            </div>
+          <div className="text-xs">
+            <span className="text-muted-foreground">Started {usd(m.start)} →</span>{" "}
+            <span className="font-bold text-[color:var(--color-primary)]">now {usd(balance)}</span>{" "}
+            <span className="text-muted-foreground">→ goal {usd(GOAL)}.</span>{" "}
+            <span className={m.aheadBy >= 0 ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>
+              {m.aheadBy >= 0 ? "Ahead of" : "Behind"} the 100-day plan by {usd(Math.abs(m.aheadBy))}
+            </span>
+            <span className="text-muted-foreground"> (plan says {usd(m.planCurveNow)} by day {m.elapsedDays}).</span>
           </div>
 
           {(balance ?? 0) < GOAL && (
