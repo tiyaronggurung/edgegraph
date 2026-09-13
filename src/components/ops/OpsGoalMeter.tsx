@@ -86,6 +86,13 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     const elapsedExact = Math.max(0, (Date.now() - startMs) / 86_400_000);
     const daysLeftExact = Math.max(0, HORIZON_DAYS - elapsedExact);
 
+    // Per-day goals:
+    // 1) Catch-up target: balance needed tomorrow if we compound at requiredRate.
+    const tomorrowRequired = Number.isFinite(requiredRate) ? balance * (1 + requiredRate) : null;
+    // 2) Plan target: where the original 100-day curve says we should be tomorrow.
+    const tomorrowPlan =
+      start * Math.pow(GOAL / start, Math.min(elapsedDays + 1, HORIZON_DAYS) / HORIZON_DAYS);
+
     // Pace: where should we be today on the planned curve?
     const planNow = start * Math.pow(GOAL / start, Math.min(elapsedDays, HORIZON_DAYS) / HORIZON_DAYS);
     const aheadBy = balance - planNow;
