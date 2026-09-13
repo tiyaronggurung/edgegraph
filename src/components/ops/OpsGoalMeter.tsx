@@ -94,16 +94,12 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     const elapsedDays = Math.max(0, Math.floor((now - startMs) / 86_400_000));
     const remaining = Math.max(0, GOAL - balance);
 
-    // Log-scale progress for the bar: compounding from start -> GOAL.
-    const progress = Math.min(
-      1,
-      Math.max(0, Math.log(Math.max(balance, 1) / start) / Math.log(GOAL / start)),
-    );
-
-    // Ahead/behind vs the ORIGINAL 100-day growth curve (the fair yardstick —
-    // the $1k/day goal only applies from today forward, never retroactively).
-    const planCurveNow = start * Math.pow(GOAL / start, Math.min(elapsedDays, HORIZON_DAYS) / HORIZON_DAYS);
-    const aheadBy = balance - planCurveNow;
+    // Flat daily plan yardstick: start + dailyGoal per elapsed day.
+    const plannedNow = start + dailyGoal * elapsedDays;
+    const flatAheadBy = balance - plannedNow;
+    // Linear bar from start -> GOAL; marker = where the flat plan says we should be.
+    const linearProgress = Math.min(1, Math.max(0, (balance - start) / (GOAL - start)));
+    const planMarkerPct = Math.min(1, Math.max(0, (plannedNow - start) / (GOAL - start)));
 
     // ---- Today's flat daily goal ----
     // todayWin = won since the day started. Target = dailyGoal minus anything
@@ -131,8 +127,8 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     });
 
     return {
-      start, dailyGoal, elapsedDays, remaining, progress,
-      planCurveNow, aheadBy,
+      start, dailyGoal, elapsedDays, remaining,
+      plannedNow, flatAheadBy, linearProgress, planMarkerPct,
       anchored, carryExcess, todayWin, todayTarget, todayEodGoal,
       projectedMs, deadlineMs, daysLeftDeadline, onDeadlinePace,
       dailyPlan,
@@ -199,14 +195,31 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
         <div className="text-xs text-muted-foreground">Waiting on live cash balance…</div>
       ) : (
         <>
-          <div className="text-xs">
-            <span className="text-muted-foreground">Started {usd(m.start)} →</span>{" "}
-            <span className="font-bold text-[color:var(--color-primary)]">now {usd(balance)}</span>{" "}
-            <span className="text-muted-foreground">→ goal {usd(GOAL)}.</span>{" "}
-            <span className={m.aheadBy >= 0 ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>
-              {m.aheadBy >= 0 ? "Ahead of" : "Behind"} the 100-day plan by {usd(Math.abs(m.aheadBy))}
-            </span>
-            <span className="text-muted-foreground"> (plan says {usd(m.planCurveNow)} by day {m.elapsedDays}).</span>
+          <div className="space-y-1">
+            <div className="flex justify-between text-[11px] font-mono">
+              <span className="text-muted-foreground">{usd(m.start)}</span>
+              <span className="font-bold text-[color:var(--color-primary)]">
+                {usd(balance)} · {(m.linearProgress * 100).toFixed(1)}%
+              </span>
+              <span className="text-muted-foreground">{usd(GOAL)}</span>
+            </div>
+            <div className="relative h-3 rounded bg-muted overflow-hidden border border-border">
+              <div
+                className="absolute inset-y-0 left-0 bg-[color:var(--color-primary)]"
+                style={{ width: `${m.linearProgress * 100}%` }}
+              />
+              <div
+                className="absolute inset-y-0 w-px bg-foreground/70"
+                style={{ left: `${m.planMarkerPct * 100}%` }}
+                title="Where the flat daily plan says you should be today"
+              />
+            </div>
+            <div className="text-[10px] text-muted-foreground">
+              Marker = flat {usd(m.dailyGoal)}/day plan ({usd(m.plannedNow)} by day {m.elapsedDays}).{" "}
+              <span className={m.flatAheadBy >= 0 ? "text-emerald-400" : "text-red-400"}>
+                {m.flatAheadBy >= 0 ? "Ahead" : "Behind"} by {usd(Math.abs(m.flatAheadBy))}
+              </span>
+            </div>
           </div>
 
           {(balance ?? 0) < GOAL && (
@@ -268,9 +281,9 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
             <Cell label="Run day" value={`${m.elapsedDays + 1}`} />
             <Cell label="Remaining to goal" value={usd(m.remaining)} />
             <Cell
-              label="Ahead of plan curve"
-              value={`${m.aheadBy >= 0 ? "+" : "−"}${usd(Math.abs(m.aheadBy))}`}
-              tone={m.aheadBy >= 0 ? "text-emerald-400" : "text-red-400"}
+              label="Ahead of plan"
+              value={`${m.flatAheadBy >= 0 ? "+" : "−"}${usd(Math.abs(m.flatAheadBy))}`}
+              tone={m.flatAheadBy >= 0 ? "text-emerald-400" : "text-red-400"}
             />
             <Cell
               label="Projected $100k"
