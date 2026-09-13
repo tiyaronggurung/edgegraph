@@ -4,12 +4,12 @@ import { cn } from "@/lib/utils";
 
 const GOAL = 100_000;
 const HORIZON_DAYS = 100;
-const DEFAULT_START_DATE = "2026-08-21";
-// Reconstructed Aug 21, 2026 Kalshi cash balance (start of the 100-day run):
-// current $9,877.43 − ~$4,597 P/L earned Aug 21→24 (today +$4,414.20; Aug 21–23
-// ≈ +$183 at the 29-day pre-today pace of ~$61/day, from 30d realized P/L $6,182).
-const DEFAULT_START_BANKROLL = 5280;
-const KEY = "ops-100k-goal-v3";
+const DEFAULT_START_DATE = "2026-09-12";
+// Current run restart: user confirmed the 100-day run restarts from $1,883
+// (Kalshi cash balance, mid-Sep 2026).
+const DEFAULT_START_BANKROLL = 1883;
+// v4: restart of the run at $1,883 (mid-Sep 2026); fresh key applies new defaults.
+const KEY = "ops-100k-goal-v4";
 
 const usd = (n: number | null | undefined) =>
   n == null || !Number.isFinite(n) ? "—" : `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -31,6 +31,7 @@ function Cell({ label, value, tone }: { label: string; value: string; tone?: str
 
 export function OpsGoalMeter({ balance }: { balance: number | null | undefined }) {
   const [cfg, setCfg] = useState<Cfg | null>(null);
+  const [savedFlash, setSavedFlash] = useState(false);
 
   useEffect(() => {
     try {
@@ -53,6 +54,8 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     setCfg(next);
     try {
       localStorage.setItem(KEY, JSON.stringify(next));
+      setSavedFlash(true);
+      window.setTimeout(() => setSavedFlash(false), 1500);
     } catch {
       /* ignore */
     }
@@ -77,6 +80,11 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
 
     const actualRate = elapsedDays > 0 ? Math.pow(balance / start, 1 / elapsedDays) - 1 : 0;
     const requiredRate = daysLeft > 0 ? Math.pow(GOAL / Math.max(balance, 1), 1 / daysLeft) - 1 : Infinity;
+    // Exact average dollars needed per remaining day to hit the goal.
+    const requiredPerDay = daysLeft > 0 ? Math.max(0, GOAL - balance) / daysLeft : null;
+    // Exact elapsed fraction of a day for precise "days left" display.
+    const elapsedExact = Math.max(0, (Date.now() - startMs) / 86_400_000);
+    const daysLeftExact = Math.max(0, HORIZON_DAYS - elapsedExact);
 
     // Pace: where should we be today on the planned curve?
     const planNow = start * Math.pow(GOAL / start, Math.min(elapsedDays, HORIZON_DAYS) / HORIZON_DAYS);
@@ -87,7 +95,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
         ? Math.ceil(Math.log(GOAL / balance) / Math.log(1 + actualRate))
         : null;
 
-    return { start, elapsedDays, daysLeft, targetDate, progress, actualRate, requiredRate, planNow, aheadBy, etaDays };
+    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays };
   }, [cfg, balance]);
 
   if (!cfg) return null;
@@ -119,6 +127,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               className="w-24 bg-transparent border border-border rounded px-1 py-0.5 text-foreground"
             />
           </label>
+          {savedFlash && <span className="text-emerald-400">Saved ✓</span>}
         </div>
       </div>
 
@@ -155,7 +164,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <Cell label="Day" value={`${Math.min(m.elapsedDays, HORIZON_DAYS)} / ${HORIZON_DAYS}`} />
-            <Cell label="Days left" value={String(m.daysLeft)} />
+            <Cell label="Days left" value={m.daysLeftExact.toFixed(1)} />
             <Cell label="Remaining to goal" value={usd(GOAL - (balance ?? 0))} />
             <Cell label="Target date" value={m.targetDate.toISOString().slice(0, 10)} />
             <Cell
@@ -170,7 +179,11 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
             />
             <Cell
               label="Required $ / day"
-              value={m.daysLeft > 0 ? usd(((balance ?? 0) * m.requiredRate)) : "—"}
+              value={
+                m.requiredPerDay != null
+                  ? `$${m.requiredPerDay.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                  : "—"
+              }
             />
             <Cell
               label="ETA at current pace"
