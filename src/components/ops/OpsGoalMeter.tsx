@@ -78,6 +78,9 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
       Math.max(0, Math.log(Math.max(balance, 1) / start) / Math.log(GOAL / start)),
     );
 
+    const requiredRate = daysLeft > 0 ? Math.pow(GOAL / Math.max(balance, 1), 1 / daysLeft) - 1 : Infinity;
+    // Exact average dollars needed per remaining day to hit the goal.
+    const requiredPerDay = daysLeft > 0 ? Math.max(0, GOAL - balance) / daysLeft : null;
     // Exact elapsed fraction of a day for precise "days left" display.
     const elapsedExact = Math.max(0, (Date.now() - startMs) / 86_400_000);
     const daysLeftExact = Math.max(0, HORIZON_DAYS - elapsedExact);
