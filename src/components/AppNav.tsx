@@ -206,6 +206,18 @@ export function AppNav() {
               {l.label}
             </Link>
           ))}
+          <Link
+            to="/ops-manual"
+            onClick={() => setOpen(false)}
+            className={cn(
+              "flex items-center gap-2 rounded px-2 py-2 text-sm uppercase tracking-wider",
+              path.startsWith("/ops-manual")
+                ? "bg-muted text-[color:var(--color-primary)]"
+                : "text-foreground hover:bg-muted",
+            )}
+          >
+            <Target className="h-4 w-4" /> Ops
+          </Link>
           <div className="border-t border-border mt-2 pt-2 flex items-center justify-between">
             <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
             <button onClick={() => signOut()} className="text-xs text-[color:var(--color-destructive)]">
