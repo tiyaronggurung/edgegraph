@@ -104,6 +104,24 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     const planNow = start * Math.pow(GOAL / start, Math.min(elapsedDays, HORIZON_DAYS) / HORIZON_DAYS);
     const aheadBy = balance - planNow;
 
+    // ---- Dated end-of-day plan with excess carry-forward ----
+    // EOD goal for run-day k (k = 1..HORIZON) = where the plan curve says you
+    // must END that calendar day. Any excess over today's EOD goal carries
+    // forward and shrinks tomorrow's required win dollar-for-dollar.
+    const eodGoalForDay = (dayIdx: number) =>
+      start * Math.pow(GOAL / start, Math.min(dayIdx, HORIZON_DAYS) / HORIZON_DAYS);
+    const dateForDay = (dayIdx: number) =>
+      new Date(startMs + (dayIdx - 1) * 86_400_000).toISOString().slice(0, 10); // the calendar date that EOD falls on
+    const todayDayIdx = Math.min(elapsedDays + 1, HORIZON_DAYS); // current run-day
+    const dailyPlan = [0, 1, 2].map((offset) => {
+      const dayIdx = todayDayIdx + offset;
+      const eodGoal = eodGoalForDay(dayIdx);
+      // Win still needed by that day's EOD, given the CURRENT balance
+      // (excess already banked reduces this automatically).
+      const winNeeded = Math.max(0, eodGoal - balance);
+      return { dayIdx, date: dateForDay(dayIdx), eodGoal, winNeeded, covered: balance >= eodGoal };
+    });
+
     // Discipline metrics:
     // 1) How many plan-days your current balance already covers.
     //    > 0 means you're ahead of the curve; < 0 means behind.
