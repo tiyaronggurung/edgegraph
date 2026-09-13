@@ -78,13 +78,20 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
       Math.max(0, Math.log(Math.max(balance, 1) / start) / Math.log(GOAL / start)),
     );
 
-    const actualRate = elapsedDays > 0 ? Math.pow(balance / start, 1 / elapsedDays) - 1 : 0;
     const requiredRate = daysLeft > 0 ? Math.pow(GOAL / Math.max(balance, 1), 1 / daysLeft) - 1 : Infinity;
     // Exact average dollars needed per remaining day to hit the goal.
     const requiredPerDay = daysLeft > 0 ? Math.max(0, GOAL - balance) / daysLeft : null;
     // Exact elapsed fraction of a day for precise "days left" display.
     const elapsedExact = Math.max(0, (Date.now() - startMs) / 86_400_000);
     const daysLeftExact = Math.max(0, HORIZON_DAYS - elapsedExact);
+    // Actual rate is meaningless before ~2 days of data (one good hour skews it).
+    const reliableRate = elapsedExact >= 2;
+    const actualRate = reliableRate ? Math.pow(balance / start, 1 / elapsedExact) - 1 : null;
+
+    // Rolling 5-day target: where the required-rate curve says we must be in 5 days.
+    const fiveDayTarget = Number.isFinite(requiredRate)
+      ? balance * Math.pow(1 + requiredRate, Math.min(5, daysLeftExact))
+      : null;
 
     // Per-day goals:
     // 1) Catch-up target: balance needed tomorrow if we compound at requiredRate.
@@ -107,11 +114,11 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
       tomorrowRequired != null ? balance - tomorrowRequired : null;
 
     const etaDays =
-      actualRate > 0 && balance < GOAL
+      actualRate != null && actualRate > 0 && balance < GOAL
         ? Math.ceil(Math.log(GOAL / balance) / Math.log(1 + actualRate))
         : null;
 
-    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays, tomorrowRequired, tomorrowPlan, daysAhead, excess };
+    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays, tomorrowRequired, tomorrowPlan, daysAhead, excess, fiveDayTarget };
   }, [cfg, balance]);
 
   if (!cfg) return null;
@@ -176,6 +183,10 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
                 {m.aheadBy >= 0 ? "Ahead" : "Behind"} by {usd(Math.abs(m.aheadBy))}
               </span>
             </div>
+            <div className="text-[10px] text-muted-foreground">
+              % is compounding progress (log scale) — $1,883 → $100k means every doubling counts
+              equally, so $4k is a small-looking but real chunk of the run.
+            </div>
           </div>
 
           {m.tomorrowRequired != null && (balance ?? 0) < GOAL && (
@@ -235,8 +246,8 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
             />
             <Cell
               label="Actual rate / day"
-              value={m.elapsedDays > 0 ? `${(m.actualRate * 100).toFixed(2)}%` : "—"}
-              tone={m.actualRate >= 0 ? "text-emerald-400" : "text-red-400"}
+              value={m.actualRate != null ? `${(m.actualRate * 100).toFixed(2)}%` : "—"}
+              tone={m.actualRate != null && m.actualRate >= 0 ? "text-emerald-400" : m.actualRate != null ? "text-red-400" : undefined}
             />
             <Cell
               label="Required $ / day"
@@ -260,6 +271,20 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               label="Excess above tomorrow"
               value={m.excess != null && m.excess > 0 ? `+${usd(m.excess)}` : "—"}
               tone={m.excess != null && m.excess > 0 ? "text-emerald-400" : undefined}
+            />
+            <Cell
+              label="5-day goal balance"
+              value={m.fiveDayTarget != null ? usd(m.fiveDayTarget) : "—"}
+              tone="text-[color:var(--color-primary)]"
+            />
+            <Cell
+              label="Win needed in 5 days"
+              value={
+                m.fiveDayTarget != null
+                  ? `+${usd(Math.max(0, m.fiveDayTarget - (balance ?? 0)))}`
+                  : "—"
+              }
+              tone="text-emerald-400"
             />
           </div>
         </>
