@@ -242,8 +242,8 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
             />
             <Cell
               label="Actual rate / day"
-              value={m.elapsedDays > 0 ? `${(m.actualRate * 100).toFixed(2)}%` : "—"}
-              tone={m.actualRate >= 0 ? "text-emerald-400" : "text-red-400"}
+              value={m.actualRate != null ? `${(m.actualRate * 100).toFixed(2)}%` : "—"}
+              tone={m.actualRate != null && m.actualRate >= 0 ? "text-emerald-400" : m.actualRate != null ? "text-red-400" : undefined}
             />
             <Cell
               label="Required $ / day"
