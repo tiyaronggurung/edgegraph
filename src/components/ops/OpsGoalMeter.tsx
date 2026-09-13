@@ -97,12 +97,21 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     const planNow = start * Math.pow(GOAL / start, Math.min(elapsedDays, HORIZON_DAYS) / HORIZON_DAYS);
     const aheadBy = balance - planNow;
 
+    // Discipline metrics:
+    // 1) How many plan-days your current balance already covers.
+    //    > 0 means you're ahead of the curve; < 0 means behind.
+    const daysAhead = (Math.log(Math.max(balance, 1) / start) / Math.log(GOAL / start)) * HORIZON_DAYS - elapsedDays;
+    // 2) Excess = how far above TOMORROW's required balance you already are.
+    //    If positive, today's job is done — anything more is greed, not goal.
+    const excess =
+      tomorrowRequired != null ? balance - tomorrowRequired : null;
+
     const etaDays =
       actualRate > 0 && balance < GOAL
         ? Math.ceil(Math.log(GOAL / balance) / Math.log(1 + actualRate))
         : null;
 
-    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays, tomorrowRequired, tomorrowPlan };
+    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays, tomorrowRequired, tomorrowPlan, daysAhead, excess };
   }, [cfg, balance]);
 
   if (!cfg) return null;
