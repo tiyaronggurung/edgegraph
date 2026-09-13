@@ -8,7 +8,8 @@ const DEFAULT_START_DATE = "2026-09-12";
 // Current run restart: user confirmed the 100-day run restarts from $1,883
 // (Kalshi cash balance, mid-Sep 2026).
 const DEFAULT_START_BANKROLL = 1883;
-const KEY = "ops-100k-goal-v3";
+// v4: restart of the run at $1,883 (mid-Sep 2026); fresh key applies new defaults.
+const KEY = "ops-100k-goal-v4";
 
 const usd = (n: number | null | undefined) =>
   n == null || !Number.isFinite(n) ? "—" : `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
