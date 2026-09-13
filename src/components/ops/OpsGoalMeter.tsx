@@ -281,9 +281,9 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
             <Cell label="Run day" value={`${m.elapsedDays + 1}`} />
             <Cell label="Remaining to goal" value={usd(m.remaining)} />
             <Cell
-              label="Ahead of plan curve"
-              value={`${m.aheadBy >= 0 ? "+" : "−"}${usd(Math.abs(m.aheadBy))}`}
-              tone={m.aheadBy >= 0 ? "text-emerald-400" : "text-red-400"}
+              label="Ahead of plan"
+              value={`${m.flatAheadBy >= 0 ? "+" : "−"}${usd(Math.abs(m.flatAheadBy))}`}
+              tone={m.flatAheadBy >= 0 ? "text-emerald-400" : "text-red-400"}
             />
             <Cell
               label="Projected $100k"
