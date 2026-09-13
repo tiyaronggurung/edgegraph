@@ -3,12 +3,11 @@ import { Flag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const GOAL = 100_000;
-const HORIZON_DAYS = 100;
 const DEFAULT_START_DATE = "2026-09-12";
 // Current run restart: user confirmed the 100-day run restarts from $1,883
 // (Kalshi cash balance, mid-Sep 2026).
 const DEFAULT_START_BANKROLL = 1883;
-// v5: flat-quota planner (fixed goal date, daily $ quota = remaining / days left).
+const DEFAULT_DAILY_GOAL = 1000;
 // Key stays v4 so the user's saved start date/bankroll carry over.
 const KEY = "ops-100k-goal-v4";
 
@@ -17,7 +16,7 @@ const usd = (n: number | null | undefined) =>
 
 const dateISO = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
-type Cfg = { startDate: string; startBankroll: number };
+type Cfg = { startDate: string; startBankroll: number; dailyGoal?: number };
 
 function Cell({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
@@ -45,7 +44,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     } catch {
       /* ignore */
     }
-    setCfg({ startDate: DEFAULT_START_DATE, startBankroll: DEFAULT_START_BANKROLL });
+    setCfg({ startDate: DEFAULT_START_DATE, startBankroll: DEFAULT_START_BANKROLL, dailyGoal: DEFAULT_DAILY_GOAL });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -63,54 +62,50 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
   const m = useMemo(() => {
     if (!cfg || balance == null || !Number.isFinite(balance)) return null;
     const start = Math.max(1, cfg.startBankroll);
+    const dailyGoal = Math.max(1, cfg.dailyGoal ?? DEFAULT_DAILY_GOAL);
     const startMs = new Date(`${cfg.startDate}T00:00:00Z`).getTime();
     const now = Date.now();
-    const elapsedExact = Math.max(0, (now - startMs) / 86_400_000);
-    const elapsedDays = Math.floor(elapsedExact);
-    const daysLeftExact = Math.max(0, HORIZON_DAYS - elapsedExact);
-    const daysLeft = Math.max(1, Math.ceil(daysLeftExact));
-    const goalDateMs = startMs + HORIZON_DAYS * 86_400_000;
+    const elapsedDays = Math.max(0, Math.floor((now - startMs) / 86_400_000));
+    const remaining = Math.max(0, GOAL - balance);
 
-    // Log-scale progress: compounding from start -> GOAL
+    // Log-scale progress for the bar: compounding from start -> GOAL.
     const progress = Math.min(
       1,
       Math.max(0, Math.log(Math.max(balance, 1) / start) / Math.log(GOAL / start)),
     );
 
-    // ---- Flat-quota discipline plan ----
-    // THE number: average $/day needed from TODAY to hit GOAL by the fixed date.
-    // Win more than this today -> tomorrow's quota drops. Miss it -> quota rises.
-    // The goal date never moves in the math; only the daily workload does.
-    const remaining = Math.max(0, GOAL - balance);
-    const dailyQuota = remaining / daysLeft;
+    // ---- Flat $1k/day plan with banked excess ----
+    // Plan says: by the START of run-day k you should have start + dailyGoal*(k-1).
+    // "Banked" = how far ahead of (or behind) that plan you are right now.
+    // Ahead by $154  ->  today's goal is $1,000 - $154 = $846.
+    // Behind by $200 ->  today's goal is $1,000 + $200 (shortfall due today, not averaged away).
+    const plannedNow = start + dailyGoal * elapsedDays; // plan for start of today
+    const banked = balance - plannedNow;
+    const todayTarget = Math.min(GOAL - balance, Math.max(0, dailyGoal - banked));
+    const todayEodGoal = balance + todayTarget;
 
-    // Pace check vs the original plan curve (only used for the marker/ahead readout).
-    const planNow = start * Math.pow(GOAL / start, Math.min(elapsedDays, HORIZON_DAYS) / HORIZON_DAYS);
-    const aheadBy = balance - planNow;
-    const daysAhead =
-      (Math.log(Math.max(balance, 1) / start) / Math.log(GOAL / start)) * HORIZON_DAYS - elapsedDays;
+    // Projected $100k date at the flat daily goal (averaged: remaining / dailyGoal).
+    const daysNeeded = remaining / dailyGoal;
+    const projectedMs = now + Math.ceil(daysNeeded) * 86_400_000;
+    // Fixed 100-day deadline from the start date.
+    const deadlineMs = startMs + HORIZON_DAYS_TOTAL * 86_400_000;
+    const daysLeftDeadline = Math.max(0, (deadlineMs - now) / 86_400_000);
+    const onDeadlinePace = projectedMs <= deadlineMs;
 
-    // Actual growth rate — unreliable before ~2 days of data.
-    const reliableRate = elapsedExact >= 2;
-    const actualRate = reliableRate ? Math.pow(balance / start, 1 / elapsedExact) - 1 : null;
-    const etaDays =
-      actualRate != null && actualRate > 0 && balance < GOAL
-        ? Math.ceil(Math.log(GOAL / balance) / Math.log(1 + actualRate))
-        : null;
-    const etaDateMs = etaDays != null ? now + etaDays * 86_400_000 : null;
-
-    // Dated day-by-day plan: flat quota steps from the CURRENT balance.
-    // Excess carries forward automatically because this recomputes off live balance.
+    // Next 3 days: each row assumes you hit exactly that day's target;
+    // any excess banked today shrinks tomorrow's target dollar-for-dollar.
     const dailyPlan = [0, 1, 2].map((offset) => {
       const date = dateISO(now + offset * 86_400_000);
-      const eodGoal = Math.min(GOAL, balance + dailyQuota * (offset + 1));
-      return { date, eodGoal, quota: dailyQuota, label: offset === 0 ? "Today" : offset === 1 ? "Tomorrow" : "Day 3" };
+      const target = offset === 0 ? todayTarget : Math.min(dailyGoal, Math.max(0, GOAL - (balance + todayTarget + dailyGoal * (offset - 1))));
+      const eod = Math.min(GOAL, balance + todayTarget + dailyGoal * offset);
+      return { date, target, eod, label: offset === 0 ? "Today" : offset === 1 ? "Tomorrow" : "Day 3" };
     });
 
     return {
-      start, elapsedDays, daysLeft, daysLeftExact, goalDateMs, progress,
-      remaining, dailyQuota, planNow, aheadBy, daysAhead,
-      actualRate, etaDays, etaDateMs, dailyPlan,
+      start, dailyGoal, elapsedDays, remaining, progress,
+      plannedNow, banked, todayTarget, todayEodGoal,
+      projectedMs, deadlineMs, daysLeftDeadline, onDeadlinePace,
+      dailyPlan,
     };
   }, [cfg, balance]);
 
@@ -121,7 +116,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="terminal-label flex items-center gap-2">
           <Flag className="h-3.5 w-3.5" />
-          // $100k goal — {HORIZON_DAYS} day run
+          // $100k goal — flat daily plan
         </div>
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted-foreground">
           <label className="flex items-center gap-1">
@@ -140,7 +135,17 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               min={1}
               value={cfg.startBankroll}
               onChange={(e) => save({ ...cfg, startBankroll: Number(e.target.value) || 1 })}
-              className="w-24 bg-transparent border border-border rounded px-1 py-0.5 text-foreground"
+              className="w-20 bg-transparent border border-border rounded px-1 py-0.5 text-foreground"
+            />
+          </label>
+          <label className="flex items-center gap-1">
+            Goal $/day
+            <input
+              type="number"
+              min={1}
+              value={cfg.dailyGoal ?? DEFAULT_DAILY_GOAL}
+              onChange={(e) => save({ ...cfg, dailyGoal: Number(e.target.value) || DEFAULT_DAILY_GOAL })}
+              className="w-20 bg-transparent border border-border rounded px-1 py-0.5 text-foreground"
             />
           </label>
           {savedFlash && <span className="text-emerald-400">Saved ✓</span>}
@@ -164,17 +169,6 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
                 className="absolute inset-y-0 left-0 bg-[color:var(--color-primary)]"
                 style={{ width: `${m.progress * 100}%` }}
               />
-              <div
-                className="absolute inset-y-0 w-px bg-foreground/70"
-                style={{ left: `${Math.min(100, (m.elapsedDays / HORIZON_DAYS) * 100)}%` }}
-                title="Where the plan says you should be today"
-              />
-            </div>
-            <div className="text-[10px] text-muted-foreground">
-              Marker = plan pace ({usd(m.planNow)} by day {m.elapsedDays}).{" "}
-              <span className={m.aheadBy >= 0 ? "text-emerald-400" : "text-red-400"}>
-                {m.aheadBy >= 0 ? "Ahead" : "Behind"} by {usd(Math.abs(m.aheadBy))}
-              </span>
             </div>
           </div>
 
@@ -186,66 +180,62 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
                     Today's win target · {m.dailyPlan[0]?.date}
                   </div>
                   <div className="text-2xl font-bold tabular-nums text-[color:var(--color-primary)]">
-                    +{usd(Math.ceil(m.dailyQuota))}
+                    +{usd(Math.ceil(m.todayTarget))}
                   </div>
                   <div className="text-[10px] text-muted-foreground">
-                    End today at {usd(m.dailyPlan[0]?.eodGoal)} — hit it and stop.
+                    {m.banked >= 0 ? (
+                      <>
+                        You're <span className="text-emerald-400 font-bold">+{usd(m.banked)} ahead</span> of
+                        the day {m.elapsedDays} plan — so today is {usd(m.dailyGoal)} − {usd(m.banked)}. End
+                        today at {usd(m.todayEodGoal)}, then stop.
+                      </>
+                    ) : (
+                      <>
+                        You're <span className="text-red-400 font-bold">{usd(m.banked)} behind</span> the
+                        day {m.elapsedDays} plan — today is {usd(m.dailyGoal)} + {usd(Math.abs(m.banked))} shortfall.
+                        End today at {usd(m.todayEodGoal)}.
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                    Goal date (fixed)
+                    Projected $100k date
                   </div>
-                  <div className="text-lg font-bold tabular-nums">{dateISO(m.goalDateMs)}</div>
+                  <div className={cn("text-lg font-bold tabular-nums", m.onDeadlinePace ? "text-emerald-400" : "text-orange-400")}>
+                    {dateISO(m.projectedMs)}
+                  </div>
                   <div className="text-[10px] text-muted-foreground">
-                    {m.daysLeft} days left · {usd(m.remaining)} to go
+                    deadline {dateISO(m.deadlineMs)} · {m.daysLeftDeadline.toFixed(0)}d left
                   </div>
                 </div>
               </div>
               <div className="text-[10px] text-muted-foreground border-t border-border/60 pt-1.5">
-                How this works: the quota = what's left ÷ days left. Beat it and tomorrow's quota
-                drops dollar-for-dollar. Miss it and the shortfall is spread over the remaining
-                days — the goal date stays fixed, the workload moves. No chasing, no overbetting.
+                The rule: flat {usd(m.dailyGoal)}/day. Win extra and it banks — tomorrow's target
+                drops by exactly that much. Miss and the shortfall lands on tomorrow, and the
+                projected date pushes out. Hit the number, then stop. No chasing.
               </div>
             </div>
           )}
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <Cell label="Day" value={`${Math.min(m.elapsedDays, HORIZON_DAYS)} / ${HORIZON_DAYS}`} />
-            <Cell label="Days left" value={m.daysLeftExact.toFixed(1)} />
+            <Cell label="Run day" value={`${m.elapsedDays + 1}`} />
             <Cell label="Remaining to goal" value={usd(m.remaining)} />
             <Cell
-              label="Required $ / day"
-              value={`$${m.dailyQuota.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
-              tone="text-[color:var(--color-primary)]"
+              label="Banked vs plan"
+              value={`${m.banked >= 0 ? "+" : "−"}${usd(Math.abs(m.banked))}`}
+              tone={m.banked >= 0 ? "text-emerald-400" : "text-red-400"}
             />
             <Cell
-              label="Actual rate / day"
-              value={m.actualRate != null ? `${(m.actualRate * 100).toFixed(2)}%` : "—"}
-              tone={m.actualRate != null && m.actualRate >= 0 ? "text-emerald-400" : m.actualRate != null ? "text-red-400" : undefined}
+              label="Projected $100k"
+              value={dateISO(m.projectedMs)}
+              tone={m.onDeadlinePace ? "text-emerald-400" : "text-orange-400"}
             />
-            <Cell
-              label="ETA at current pace"
-              value={
-                (balance ?? 0) >= GOAL
-                  ? "Goal hit"
-                  : m.etaDays == null
-                    ? "—"
-                    : `${m.etaDays}d · ${dateISO(m.etaDateMs!)}`
-              }
-              tone={m.etaDays != null && m.etaDays <= m.daysLeft ? "text-emerald-400" : "text-orange-400"}
-            />
-            <Cell
-              label="Days ahead of plan"
-              value={`${m.daysAhead >= 0 ? "+" : "−"}${Math.abs(m.daysAhead).toFixed(1)}`}
-              tone={m.daysAhead >= 0 ? "text-emerald-400" : "text-red-400"}
-            />
-            <Cell label="Target date" value={dateISO(m.goalDateMs)} />
           </div>
 
           <div className="border border-border rounded p-2 space-y-1">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-              Next 3 days — flat quota, excess carries forward
+              Next 3 days — excess banks into the next day
             </div>
             <div className="grid grid-cols-3 gap-1 text-[10px] uppercase tracking-widest text-muted-foreground">
               <span>Day</span>
@@ -261,13 +251,13 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
                 )}
               >
                 <span>{d.label} · {d.date}</span>
-                <span className="text-right font-bold">+{usd(Math.ceil(d.quota))}</span>
-                <span className="text-right font-bold">{usd(d.eodGoal)}</span>
+                <span className="text-right font-bold">+{usd(Math.ceil(d.target))}</span>
+                <span className="text-right font-bold">{usd(d.eod)}</span>
               </div>
             ))}
             <div className="text-[10px] text-muted-foreground">
-              Beat today's target and every future row recomputes lower off the higher balance.
-              Fall short and the quota rises tomorrow. Discipline = hit the number, then stop.
+              Example: end today $154 over target and tomorrow's row drops from {usd(m.dailyGoal)} to{" "}
+              {usd(Math.max(0, m.dailyGoal - 154))} automatically.
             </div>
           </div>
         </>
@@ -275,3 +265,5 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
     </div>
   );
 }
+
+const HORIZON_DAYS_TOTAL = 100;
