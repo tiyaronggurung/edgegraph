@@ -91,7 +91,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
         ? Math.ceil(Math.log(GOAL / balance) / Math.log(1 + actualRate))
         : null;
 
-    return { start, elapsedDays, daysLeft, targetDate, progress, actualRate, requiredRate, planNow, aheadBy, etaDays };
+    return { start, elapsedDays, daysLeft, daysLeftExact, targetDate, progress, actualRate, requiredRate, requiredPerDay, planNow, aheadBy, etaDays };
   }, [cfg, balance]);
 
   if (!cfg) return null;
@@ -159,7 +159,7 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <Cell label="Day" value={`${Math.min(m.elapsedDays, HORIZON_DAYS)} / ${HORIZON_DAYS}`} />
-            <Cell label="Days left" value={String(m.daysLeft)} />
+            <Cell label="Days left" value={m.daysLeftExact.toFixed(1)} />
             <Cell label="Remaining to goal" value={usd(GOAL - (balance ?? 0))} />
             <Cell label="Target date" value={m.targetDate.toISOString().slice(0, 10)} />
             <Cell
@@ -174,7 +174,11 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
             />
             <Cell
               label="Required $ / day"
-              value={m.daysLeft > 0 ? usd(((balance ?? 0) * m.requiredRate)) : "—"}
+              value={
+                m.requiredPerDay != null
+                  ? `$${m.requiredPerDay.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                  : "—"
+              }
             />
             <Cell
               label="ETA at current pace"
