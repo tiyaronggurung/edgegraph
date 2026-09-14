@@ -140,13 +140,28 @@ export function OpsGoalMeter({
       return { date, target, eod, label: offset === 0 ? "Today" : offset === 1 ? "Tomorrow" : "Day 3" };
     });
 
+    // Today's winning pace vs. today's $1k target (read-only projection).
+    const todayProfit = todayPnl ?? 0;
+    const pace = (() => {
+      if (nowMs == null) return null;
+      const d = new Date(nowMs);
+      const localStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      const elapsedH = Math.max(0.01, (nowMs - localStart) / 3_600_000);
+      const remainingH = Math.max(0.01, 24 - elapsedH);
+      const currentRate = todayProfit / elapsedH;
+      const shortfall = Math.max(0, todayTarget - todayProfit);
+      const neededRate = shortfall / remainingH;
+      const projectedEod = currentRate * 24;
+      return { currentRate, neededRate, projectedEod, onPace: projectedEod >= todayTarget };
+    })();
+
     return {
       dailyGoal, elapsedDays, remaining, completedDailyGoals, bankedTowardNext,
       linearProgress, nextTargetMarkerPct, todayTarget, todayEodGoal,
       projectedMs, deadlineMs, daysLeftDeadline, onDeadlinePace,
-      dailyPlan, milestoneTicks,
+      dailyPlan, milestoneTicks, pace,
     };
-  }, [cfg, balance]);
+  }, [cfg, balance, todayPnl, nowMs]);
 
   if (!cfg) return null;
 
