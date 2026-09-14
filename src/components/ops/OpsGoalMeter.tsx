@@ -44,7 +44,15 @@ function Cell({ label, value, tone }: { label: string; value: string; tone?: str
   );
 }
 
-export function OpsGoalMeter({ balance }: { balance: number | null | undefined }) {
+export function OpsGoalMeter({
+  balance,
+  winRate,
+  btcWinRate,
+}: {
+  balance: number | null | undefined;
+  winRate?: number | null;
+  btcWinRate?: number | null;
+}) {
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const [hoveredMilestone, setHoveredMilestone] = useState<number | null>(null);
