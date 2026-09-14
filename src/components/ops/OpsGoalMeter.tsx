@@ -354,7 +354,10 @@ export function OpsGoalMeter({
               value={dateISO(m.projectedMs)}
               tone={m.onDeadlinePace ? "text-emerald-400" : "text-orange-400"}
             />
+            <Cell label="Current win rate" value={pct(winRate)} />
+            <Cell label="BTC 15m win rate" value={pct(btcWinRate)} />
           </div>
+
 
           <div className="border border-border rounded p-2 space-y-1">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
