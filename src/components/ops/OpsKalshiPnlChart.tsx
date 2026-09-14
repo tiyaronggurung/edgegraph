@@ -118,7 +118,14 @@ export function OpsKalshiPnlChart() {
           <span className="text-muted-foreground font-normal">{range === "ALL" ? "all time" : range}</span>
         </div>
         <div className="text-[11px] text-muted-foreground">
-          {view.n} settled · {view.wins}W / {view.losses}L · started {usd(view.firstBalance)}
+          {hover
+            ? new Date(hover.t).toLocaleString(undefined, {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : `${view.n} settled · ${view.wins}W / ${view.losses}L · started ${usd(view.firstBalance)}`}
         </div>
       </div>
 
