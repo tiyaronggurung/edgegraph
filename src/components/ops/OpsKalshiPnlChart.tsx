@@ -140,7 +140,15 @@ export function OpsKalshiPnlChart() {
       {view.points.length > 0 && (
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={view.points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <AreaChart
+              data={view.points}
+              margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+              onMouseMove={(s: any) => {
+                const p = s?.activePayload?.[0]?.payload;
+                if (p && typeof p.balance === "number") setHover({ t: p.t, balance: p.balance });
+              }}
+              onMouseLeave={() => setHover(null)}
+            >
               <defs>
                 <linearGradient id="opsKalshiPnlFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={stroke} stopOpacity={0.35} />
