@@ -85,7 +85,12 @@ export function OpsKalshiAccount({ onBankroll }: { onBankroll?: (v: number) => v
             />
           </div>
 
-          <OpsGoalMeter balance={a.balance} winRate={a.totals.winRate} btcWinRate={a.btcOnly.winRate} />
+          <OpsGoalMeter
+            balance={a.balance}
+            winRate={a.totals.winRate}
+            btcWinRate={a.btcOnly.winRate}
+            todayPnl={a.today.pnl}
+          />
 
 
           {onBankroll && a.balance != null && (

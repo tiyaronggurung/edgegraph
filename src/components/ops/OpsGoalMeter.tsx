@@ -16,6 +16,8 @@ const usd = (n: number | null | undefined) =>
   n == null || !Number.isFinite(n) ? "—" : `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 const pct = (n: number | null | undefined) =>
   n == null || !Number.isFinite(n) ? "—" : `${(n * 100).toFixed(1)}%`;
+const rate = (n: number | null | undefined) =>
+  n == null || !Number.isFinite(n) ? "—" : `${n < 0 ? "−" : "+$"}${Math.abs(n).toFixed(0)}/h`;
 
 
 const dateISO = (ms: number) => new Date(ms).toISOString().slice(0, 10);
@@ -48,14 +50,18 @@ export function OpsGoalMeter({
   balance,
   winRate,
   btcWinRate,
+  todayPnl,
 }: {
   balance: number | null | undefined;
   winRate?: number | null;
   btcWinRate?: number | null;
+  todayPnl?: number | null;
 }) {
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const [hoveredMilestone, setHoveredMilestone] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  useEffect(() => setNowMs(Date.now()), []);
 
   useEffect(() => {
     try {
@@ -136,13 +142,28 @@ export function OpsGoalMeter({
       return { date, target, eod, label: offset === 0 ? "Today" : offset === 1 ? "Tomorrow" : "Day 3" };
     });
 
+    // Today's winning pace vs. today's $1k target (read-only projection).
+    const todayProfit = todayPnl ?? 0;
+    const pace = (() => {
+      if (nowMs == null) return null;
+      const d = new Date(nowMs);
+      const localStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      const elapsedH = Math.max(0.01, (nowMs - localStart) / 3_600_000);
+      const remainingH = Math.max(0.01, 24 - elapsedH);
+      const currentRate = todayProfit / elapsedH;
+      const shortfall = Math.max(0, todayTarget - todayProfit);
+      const neededRate = shortfall / remainingH;
+      const projectedEod = currentRate * 24;
+      return { currentRate, neededRate, projectedEod, onPace: projectedEod >= todayTarget };
+    })();
+
     return {
       dailyGoal, elapsedDays, remaining, completedDailyGoals, bankedTowardNext,
       linearProgress, nextTargetMarkerPct, todayTarget, todayEodGoal,
       projectedMs, deadlineMs, daysLeftDeadline, onDeadlinePace,
-      dailyPlan, milestoneTicks,
+      dailyPlan, milestoneTicks, pace,
     };
-  }, [cfg, balance]);
+  }, [cfg, balance, todayPnl, nowMs]);
 
   if (!cfg) return null;
 
@@ -305,7 +326,7 @@ export function OpsGoalMeter({
 
           {(balance ?? 0) < GOAL && (
             <div className="border border-[color:var(--color-primary)]/50 bg-[color:var(--color-primary)]/5 rounded p-3 space-y-2">
-              <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
                     Today's win target · {m.dailyPlan[0]?.date}
@@ -321,7 +342,18 @@ export function OpsGoalMeter({
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    Pace to today&apos;s goal
+                  </div>
+                  <div className={cn("text-lg font-bold tabular-nums", m.pace?.onPace ? "text-emerald-400" : "text-orange-400")}>
+                    {m.pace ? usd(m.pace.projectedEod) : "—"}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {m.pace ? `current ${rate(m.pace.currentRate)} · need ${rate(m.pace.neededRate)}` : "—"}
+                  </div>
+                </div>
+                <div className="md:text-right">
                   <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
                     Projected $100k date
                   </div>
