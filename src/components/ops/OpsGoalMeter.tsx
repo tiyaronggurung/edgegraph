@@ -48,10 +48,12 @@ export function OpsGoalMeter({
   balance,
   winRate,
   btcWinRate,
+  todayPnl,
 }: {
   balance: number | null | undefined;
   winRate?: number | null;
   btcWinRate?: number | null;
+  todayPnl?: number | null;
 }) {
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
