@@ -326,7 +326,7 @@ export function OpsGoalMeter({
 
           {(balance ?? 0) < GOAL && (
             <div className="border border-[color:var(--color-primary)]/50 bg-[color:var(--color-primary)]/5 rounded p-3 space-y-2">
-              <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
                     Today's win target · {m.dailyPlan[0]?.date}
@@ -342,7 +342,18 @@ export function OpsGoalMeter({
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    Pace to today&apos;s goal
+                  </div>
+                  <div className={cn("text-lg font-bold tabular-nums", m.pace?.onPace ? "text-emerald-400" : "text-orange-400")}>
+                    {m.pace ? usd(m.pace.projectedEod) : "—"}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {m.pace ? `current ${rate(m.pace.currentRate)} · need ${rate(m.pace.neededRate)}` : "—"}
+                  </div>
+                </div>
+                <div className="md:text-right">
                   <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
                     Projected $100k date
                   </div>
