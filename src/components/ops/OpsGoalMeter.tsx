@@ -14,6 +14,9 @@ const KEY = "ops-100k-goal-v4";
 
 const usd = (n: number | null | undefined) =>
   n == null || !Number.isFinite(n) ? "—" : `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+const pct = (n: number | null | undefined) =>
+  n == null || !Number.isFinite(n) ? "—" : `${(n * 100).toFixed(1)}%`;
+
 
 const dateISO = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const todayISO = () => dateISO(Date.now());
@@ -41,7 +44,15 @@ function Cell({ label, value, tone }: { label: string; value: string; tone?: str
   );
 }
 
-export function OpsGoalMeter({ balance }: { balance: number | null | undefined }) {
+export function OpsGoalMeter({
+  balance,
+  winRate,
+  btcWinRate,
+}: {
+  balance: number | null | undefined;
+  winRate?: number | null;
+  btcWinRate?: number | null;
+}) {
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const [hoveredMilestone, setHoveredMilestone] = useState<number | null>(null);
@@ -343,7 +354,10 @@ export function OpsGoalMeter({ balance }: { balance: number | null | undefined }
               value={dateISO(m.projectedMs)}
               tone={m.onDeadlinePace ? "text-emerald-400" : "text-orange-400"}
             />
+            <Cell label="Current win rate" value={pct(winRate)} />
+            <Cell label="BTC 15m win rate" value={pct(btcWinRate)} />
           </div>
+
 
           <div className="border border-border rounded p-2 space-y-1">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
