@@ -171,17 +171,8 @@ export function OpsKalshiPnlChart() {
                 tickFormatter={(v: number) => `$${v.toFixed(0)}`}
               />
               <Tooltip
-                contentStyle={{
-                  background: "hsl(var(--popover))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: 6,
-                  fontSize: 11,
-                }}
-                labelFormatter={(t) => new Date(t as string).toLocaleString()}
-                formatter={(value: number, name) => [
-                  usd(value),
-                  name === "balance" ? "Cash balance" : "Trade P/L",
-                ]}
+                cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
+                content={() => null}
               />
               <Area
                 type="monotone"
