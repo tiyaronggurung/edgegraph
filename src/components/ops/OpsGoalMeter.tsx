@@ -14,6 +14,9 @@ const KEY = "ops-100k-goal-v4";
 
 const usd = (n: number | null | undefined) =>
   n == null || !Number.isFinite(n) ? "—" : `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+const pct = (n: number | null | undefined) =>
+  n == null || !Number.isFinite(n) ? "—" : `${(n * 100).toFixed(1)}%`;
+
 
 const dateISO = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const todayISO = () => dateISO(Date.now());
