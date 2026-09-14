@@ -63,8 +63,10 @@ export function OpsKalshiPnlChart() {
     return { points, firstBalance: baseline, lastBalance, periodPnl, n: inRange.length, wins, losses };
   }, [all, range, currentBalance, startingBalance]);
 
-  const current = view.lastBalance;
-  const netChange = view.periodPnl;
+  const [hover, setHover] = useState<{ t: string; balance: number } | null>(null);
+
+  const current = hover?.balance ?? view.lastBalance;
+  const netChange = Math.round((current - view.firstBalance) * 100) / 100;
   const up = netChange >= 0;
   const stroke = up ? "#34d399" : "#f87171";
 
@@ -116,7 +118,14 @@ export function OpsKalshiPnlChart() {
           <span className="text-muted-foreground font-normal">{range === "ALL" ? "all time" : range}</span>
         </div>
         <div className="text-[11px] text-muted-foreground">
-          {view.n} settled · {view.wins}W / {view.losses}L · started {usd(view.firstBalance)}
+          {hover
+            ? new Date(hover.t).toLocaleString(undefined, {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : `${view.n} settled · ${view.wins}W / ${view.losses}L · started ${usd(view.firstBalance)}`}
         </div>
       </div>
 
@@ -131,7 +140,15 @@ export function OpsKalshiPnlChart() {
       {view.points.length > 0 && (
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={view.points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <AreaChart
+              data={view.points}
+              margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+              onMouseMove={(s: any) => {
+                const p = s?.activePayload?.[0]?.payload;
+                if (p && typeof p.balance === "number") setHover({ t: p.t, balance: p.balance });
+              }}
+              onMouseLeave={() => setHover(null)}
+            >
               <defs>
                 <linearGradient id="opsKalshiPnlFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={stroke} stopOpacity={0.35} />
@@ -154,17 +171,8 @@ export function OpsKalshiPnlChart() {
                 tickFormatter={(v: number) => `$${v.toFixed(0)}`}
               />
               <Tooltip
-                contentStyle={{
-                  background: "hsl(var(--popover))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: 6,
-                  fontSize: 11,
-                }}
-                labelFormatter={(t) => new Date(t as string).toLocaleString()}
-                formatter={(value: number, name) => [
-                  usd(value),
-                  name === "balance" ? "Cash balance" : "Trade P/L",
-                ]}
+                cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
+                content={() => null}
               />
               <Area
                 type="monotone"
@@ -173,6 +181,7 @@ export function OpsKalshiPnlChart() {
                 strokeWidth={2}
                 fill="url(#opsKalshiPnlFill)"
                 dot={false}
+                activeDot={{ r: 4, fill: stroke, stroke: "hsl(var(--background))", strokeWidth: 2 }}
                 isAnimationActive={false}
               />
             </AreaChart>
