@@ -181,6 +181,7 @@ export function OpsKalshiPnlChart() {
                 strokeWidth={2}
                 fill="url(#opsKalshiPnlFill)"
                 dot={false}
+                activeDot={{ r: 4, fill: stroke, stroke: "hsl(var(--background))", strokeWidth: 2 }}
                 isAnimationActive={false}
               />
             </AreaChart>
