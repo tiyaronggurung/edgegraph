@@ -58,6 +58,8 @@ export function OpsGoalMeter({
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const [hoveredMilestone, setHoveredMilestone] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  useEffect(() => setNowMs(Date.now()), []);
 
   useEffect(() => {
     try {
