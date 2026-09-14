@@ -63,8 +63,10 @@ export function OpsKalshiPnlChart() {
     return { points, firstBalance: baseline, lastBalance, periodPnl, n: inRange.length, wins, losses };
   }, [all, range, currentBalance, startingBalance]);
 
-  const current = view.lastBalance;
-  const netChange = view.periodPnl;
+  const [hover, setHover] = useState<{ t: string; balance: number } | null>(null);
+
+  const current = hover?.balance ?? view.lastBalance;
+  const netChange = Math.round((current - view.firstBalance) * 100) / 100;
   const up = netChange >= 0;
   const stroke = up ? "#34d399" : "#f87171";
 
