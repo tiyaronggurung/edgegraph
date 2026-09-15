@@ -55,10 +55,11 @@ function OpsManualPage() {
         is hit. Paper trading below is fully simulated.
       </p>
 
-      <OpsKalshiAccount />
       <OpsKalshiPnlChart />
+      <OpsKalshiAccount />
 
       <OpsOwnEnginePanel />
+
 
       <OpsPaperTradePanel />
 
