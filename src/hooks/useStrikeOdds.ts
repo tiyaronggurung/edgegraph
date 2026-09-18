@@ -195,6 +195,7 @@ export function useStrikeOdds(
       macd: hist == null || ref == null || ref <= 0 ? null : clamp(hist / ref / 0.0005, -1, 1),
       cost: null,
       flow: null,
+      brk: null,
     } satisfies StrikeOddsParts;
   };
 
@@ -213,15 +214,40 @@ export function useStrikeOdds(
   }
   const flow = nz(ctx?.flowImbalance) == null ? null : clamp((ctx?.flowImbalance as number) / 0.25, -1, 1);
 
+  // --- break structure: where the running price sits in its recent range ----
+  // +1 = printing new highs, -1 = new lows, 0 = mid-range chop. This is what
+  // separates "price is above the strike" from "price is above the strike AND
+  // still breaking out".
+  let rangeHigh: number | null = null;
+  let rangeLow: number | null = null;
+  let brk: number | null = null;
+  if (spot != null && spot > 0 && tape.length >= 10) {
+    const lastT = (tape[tape.length - 1] as Tick).t;
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let i = tape.length - 1; i >= 0; i--) {
+      const t = tape[i] as Tick;
+      if (lastT - t.t > BRK_WINDOW_MS) break;
+      if (t.p > hi) hi = t.p;
+      if (t.p < lo) lo = t.p;
+    }
+    if (Number.isFinite(hi) && Number.isFinite(lo) && hi > lo) {
+      rangeHigh = hi;
+      rangeLow = lo;
+      brk = clamp(((spot - lo) / (hi - lo)) * 2 - 1, -1, 1);
+    }
+  }
+
   const parts: StrikeOddsParts = {
     sma: mix(p1.sma, p15.sma),
     rsi: mix(p1.rsi, p15.rsi),
     macd: mix(p1.macd, p15.macd),
     cost,
     flow,
+    brk,
   };
 
-  const W = { sma: 0.28, rsi: 0.18, macd: 0.26, cost: 0.16, flow: 0.12 } as const;
+  const W = { sma: 0.24, rsi: 0.14, macd: 0.22, cost: 0.12, flow: 0.10, brk: 0.18 } as const;
   let tiltNum = 0;
   let tiltDen = 0;
   (Object.keys(W) as (keyof typeof W)[]).forEach((k) => {
