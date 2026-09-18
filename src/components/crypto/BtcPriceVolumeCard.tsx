@@ -199,6 +199,7 @@ export function BtcPriceVolumeCard() {
               {" · "}MACD <span className={tiltTone(odds.parts.macd)}>{sig(odds.parts.macd)}</span>
               {" · "}cost <span className={tiltTone(odds.parts.cost)}>{sig(odds.parts.cost)}</span>
               {" · "}flow <span className={tiltTone(odds.parts.flow)}>{sig(odds.parts.flow)}</span>
+              {" · "}brk <span className={tiltTone(odds.parts.brk)}>{sig(odds.parts.brk)}</span>
             </span>
             <span className="text-muted-foreground">
               tilt <span className={tiltTone(odds.tilt)}>{sig(odds.tilt)}</span>
