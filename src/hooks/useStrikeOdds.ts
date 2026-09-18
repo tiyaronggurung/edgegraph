@@ -85,13 +85,23 @@ export interface StrikeOdds {
   timeWeight: number;
   /** Standardised distance to strike. */
   z: number | null;
-  /** Probability price crosses the strike before close, 0-1. */
+  /** Probability price crosses the strike before close, 0-1 (drift-adjusted). */
   flipRisk: number | null;
   /** Side the price would flip to if it crosses. */
   flipSide: "UP" | "DOWN" | null;
   /** True when a flip looks likely early enough to matter. */
   flipFlag: boolean;
   flipReason: string | null;
+  /** Combined drift, log-return per second (positive = up). */
+  drift: number | null;
+  /** Same drift expressed as USD per minute at the current price. */
+  driftUsdPerMin: number | null;
+  /** Signed USD distance to the strike (positive = strike is above spot). */
+  distanceUsd: number | null;
+  /** Seconds until drift alone reaches the strike, null when drifting away. */
+  etaSeconds: number | null;
+  /** Seconds of runway left after a projected cross; negative = won't make it. */
+  leadSeconds: number | null;
 }
 
 interface Tick { t: number; p: number }
