@@ -1995,6 +1995,9 @@ export type Database = {
       }
       btc_flow_lean_log: {
         Row: {
+          avg_buy_price: number | null
+          avg_sell_price: number | null
+          buy_quote_usd: number | null
           buy_window_btc: number | null
           expected_win_rate: number | null
           id: string
@@ -2003,12 +2006,16 @@ export type Database = {
           lean: string
           logged_at: string
           seconds_to_close: number | null
+          sell_quote_usd: number | null
           sell_window_btc: number | null
           spot: number | null
           vol_window_btc: number | null
           window_start: string
         }
         Insert: {
+          avg_buy_price?: number | null
+          avg_sell_price?: number | null
+          buy_quote_usd?: number | null
           buy_window_btc?: number | null
           expected_win_rate?: number | null
           id?: string
@@ -2017,12 +2024,16 @@ export type Database = {
           lean: string
           logged_at?: string
           seconds_to_close?: number | null
+          sell_quote_usd?: number | null
           sell_window_btc?: number | null
           spot?: number | null
           vol_window_btc?: number | null
           window_start: string
         }
         Update: {
+          avg_buy_price?: number | null
+          avg_sell_price?: number | null
+          buy_quote_usd?: number | null
           buy_window_btc?: number | null
           expected_win_rate?: number | null
           id?: string
@@ -2031,6 +2042,7 @@ export type Database = {
           lean?: string
           logged_at?: string
           seconds_to_close?: number | null
+          sell_quote_usd?: number | null
           sell_window_btc?: number | null
           spot?: number | null
           vol_window_btc?: number | null
