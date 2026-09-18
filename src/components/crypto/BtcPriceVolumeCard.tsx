@@ -47,6 +47,43 @@ export function BtcPriceVolumeCard() {
   const chg = data?.change24hPct ?? null;
   const up = (chg ?? 0) >= 0;
 
+  // --- Flow lean (read-only) ---------------------------------------------
+  // Lean uses the last 3 closed minutes (the leg that carried edge in the
+  // study); window imbalance is shown as context.
+  const imbM3 = win?.m3?.imbalance ?? null;
+  const imbWin = win?.window?.imbalance ?? null;
+  const lean = computeFlowLean(imbM3);
+  const now = Date.now();
+  const winStart = Math.floor(now / 900_000) * 900_000;
+  const secondsToClose = Math.max(0, Math.round((winStart + 900_000 - now) / 1000));
+  const winRate = flowLeanWinRate(lean, secondsToClose);
+
+  // Log one row per minute per window so the lean can be scored later.
+  const logFlow = useServerFn(logBtcFlowLean);
+  const loggedRef = useRef<string>("");
+  useEffect(() => {
+    if (!win?.ok || imbM3 == null) return;
+    const bucket = `${winStart}:${Math.floor(now / 60_000)}`;
+    if (loggedRef.current === bucket) return;
+    loggedRef.current = bucket;
+    void logFlow({
+      data: {
+        windowStart: new Date(winStart).toISOString(),
+        secondsToClose,
+        lean,
+        imbM3,
+        imbWindow: imbWin,
+        volWindowBtc: win?.window?.total ?? null,
+        buyWindowBtc: win?.window?.buy ?? null,
+        sellWindowBtc: win?.window?.sell ?? null,
+        spot: price,
+        expectedWinRate: winRate,
+      },
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [win?.lastCloseTime, imbM3]);
+
+
   return (
     <Card>
       <CardHeader className="pb-2">
