@@ -91,6 +91,13 @@ function toRollup(label: string, agg: Agg): FlowRollup {
     netUsdPct: totalUsd > 0 ? (agg.buyUsd - agg.sellUsd) / totalUsd : null,
     priceChangePct:
       agg.firstOpen && agg.lastClose ? (agg.lastClose - agg.firstOpen) / agg.firstOpen : null,
+    feeUsd: totalUsd * FEE_RATE,
+    effAvgBuyPrice: agg.buyBtc > 0 ? (agg.buyUsd * (1 + FEE_RATE)) / agg.buyBtc : null,
+    effAvgSellPrice: agg.sellBtc > 0 ? (agg.sellUsd * (1 - FEE_RATE)) / agg.sellBtc : null,
+    netUsdPctAfterFees:
+      totalUsd > 0
+        ? (agg.buyUsd * (1 + FEE_RATE) - agg.sellUsd * (1 - FEE_RATE)) / totalUsd
+        : null,
   };
 }
 
