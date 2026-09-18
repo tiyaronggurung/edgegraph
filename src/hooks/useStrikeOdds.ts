@@ -97,7 +97,9 @@ export interface StrikeOdds {
   z: number | null;
   /** Probability price crosses the strike before close, 0-1 (drift-adjusted). */
   flipRisk: number | null;
-  /** Side the price would flip to if it crosses. */
+  /** Side price currently sits on: UP = above the strike, DOWN = below it. */
+  side: "UP" | "DOWN" | null;
+  /** Side the price would flip INTO if it crosses the strike (always the opposite of `side`). */
   flipSide: "UP" | "DOWN" | null;
   /** True when a flip looks likely early enough to matter. */
   flipFlag: boolean;
@@ -298,7 +300,7 @@ export function useStrikeOdds(
   if (spot == null || strike == null || strike <= 0 || spot <= 0) {
     return {
       pUp: null, pBase: null, upAsk: null, downAsk: null, spread: null, sigma, samples: tape.length,
-      tilt, parts, timeWeight, z: null, flipRisk: null, flipSide: null,
+      tilt, parts, timeWeight, z: null, flipRisk: null, side: null, flipSide: null,
       flipFlag: false, flipReason: null, ...emptyTail,
     };
   }
@@ -321,7 +323,7 @@ export function useStrikeOdds(
   if (pBase == null || z == null) {
     return {
       pUp: null, pBase: null, upAsk: null, downAsk: null, spread: null, sigma, samples: tape.length,
-      tilt, parts, timeWeight, z: null, flipRisk: null, flipSide: null,
+      tilt, parts, timeWeight, z: null, flipRisk: null, side: null, flipSide: null,
       flipFlag: false, flipReason: null, ...emptyTail,
     };
   }
@@ -422,6 +424,7 @@ export function useStrikeOdds(
     timeWeight,
     z,
     flipRisk,
+    side,
     flipSide,
     flipFlag,
     flipReason,

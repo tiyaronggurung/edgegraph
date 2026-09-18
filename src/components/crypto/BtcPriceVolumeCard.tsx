@@ -136,6 +136,11 @@ export function BtcPriceVolumeCard() {
   const tiltTone = (v: number | null) =>
     v == null ? "text-muted-foreground" : v > 0.1 ? "text-emerald-400" : v < -0.1 ? "text-rose-400" : "text-muted-foreground";
   const sig = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${(v * 100).toFixed(0)}`);
+  // "now UP +$22" — which side price currently sits on, and by how much.
+  const gapTxt =
+    odds.distanceUsd == null || odds.side == null
+      ? ""
+      : ` ${odds.side === "UP" ? "+" : "−"}$${Math.abs(odds.distanceUsd).toFixed(0)}`;
 
   // Log one row per minute per window so the lean can be scored later.
   const logFlow = useServerFn(logBtcFlowLean);
@@ -257,8 +262,8 @@ export function BtcPriceVolumeCard() {
           <div className="mt-1 flex items-center justify-between text-[10px]">
             <span className={odds.flipFlag ? "text-amber-300 font-semibold" : "text-muted-foreground"}>
               {odds.flipFlag
-                ? `⚠ flip → ${odds.flipSide} · ${odds.flipReason}`
-                : `flip risk ${odds.flipRisk == null ? "—" : `${(odds.flipRisk * 100).toFixed(0)}%`}`}
+                ? `⚠ now ${odds.side ?? "—"}${gapTxt} · crossing the strike makes it ${odds.flipSide ?? "—"} · ${odds.flipReason}`
+                : `now ${odds.side ?? "—"}${gapTxt} · a cross would make it ${odds.flipSide ?? "—"} · risk ${odds.flipRisk == null ? "—" : `${(odds.flipRisk * 100).toFixed(0)}%`}`}
             </span>
             <span className="text-muted-foreground font-mono">
               base {odds.pBase == null ? "—" : `${(odds.pBase * 100).toFixed(0)}%`}
@@ -276,7 +281,8 @@ export function BtcPriceVolumeCard() {
           </div>
           <div className="mt-0.5 text-[10px] text-muted-foreground">
             distance alone is capped — a high price needs indicators, break structure and drift on
-            the same side, with time nearly out · display only
+            the same side, with time nearly out · flip side is always the opposite of where price
+            sits now, named before it happens · display only
           </div>
 
         </div>
