@@ -19,6 +19,33 @@ const usd = (v: number | null) => {
 const price = (v: number | null) =>
   v == null ? "—" : `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
+const rsiClass = (v: number | null) =>
+  v == null
+    ? "text-muted-foreground"
+    : v >= 70
+      ? "text-rose-400"
+      : v <= 30
+        ? "text-emerald-400"
+        : "text-muted-foreground";
+
+const signClass = (v: number | null | undefined) =>
+  (v ?? 0) > 0 ? "text-emerald-400" : (v ?? 0) < 0 ? "text-rose-400" : "text-muted-foreground";
+
+function IndBlock({ label, snap }: { label: string; snap: import("@/lib/btcFlowLeanHistory.functions").IndicatorSnap }) {
+  return (
+    <div className="flex items-center gap-2 text-[11px]">
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className={signClass(snap.smaDistPct)}>
+        SMA20 {snap.smaDistPct == null ? "—" : `${snap.smaDistPct >= 0 ? "+" : ""}${(snap.smaDistPct * 100).toFixed(2)}%`}
+      </span>
+      <span className={rsiClass(snap.rsi)}>RSI {snap.rsi == null ? "—" : snap.rsi.toFixed(0)}</span>
+      <span className={signClass(snap.hist)}>
+        MACD {snap.hist == null ? "—" : `${snap.hist >= 0 ? "+" : ""}${snap.hist.toFixed(1)}`}
+      </span>
+    </div>
+  );
+}
+
 export function FlowLeanLog() {
   const fn = useServerFn(getBtcFlowLeanHistory);
   const q = useQuery({
