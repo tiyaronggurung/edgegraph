@@ -167,8 +167,15 @@ export async function driveCheapEntry(): Promise<CheapEntryTickResult> {
       }
       const askCents = askCache.get(cacheKey) ?? null;
 
+      const winStartMs = new Date(w.close_time).getTime() - 15 * 60 * 1000;
+
       for (const u of userRows) {
         if (already.has(`${u.id}|${w.ticker}`)) continue;
+        // Only act on windows that STARTED after the switch was flipped on —
+        // enabling mid-window never touches the window already running.
+        if (u.cheap_entry_enabled_at && winStartMs < new Date(u.cheap_entry_enabled_at).getTime()) {
+          continue;
+        }
         out.attempts++;
 
         if (askCents == null) {
