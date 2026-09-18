@@ -141,8 +141,25 @@ export function useLiveCompositeSpot(): LiveCompositeSpot {
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
+
+    // rAF is frozen while the tab is hidden, so on return the displayed value
+    // can be far behind. Snap straight to the live target instead of walking
+    // it back a few dollars per frame.
+    const snap = () => {
+      if (cancelled) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      const target = targetRef.current;
+      if (target == null) return;
+      currentRef.current = target;
+      setDisplaySpot(Number(target.toFixed(2)));
+    };
+    document.addEventListener("visibilitychange", snap);
+    window.addEventListener("focus", snap);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", snap);
+      window.removeEventListener("focus", snap);
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
   }, []);
