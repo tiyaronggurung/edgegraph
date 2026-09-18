@@ -197,13 +197,18 @@ export function FlowLeanLog() {
                   <td className="px-3 py-1.5 text-center">
                     {r.result ? (
                       <span
+                        title={
+                          r.resultSource === "settled"
+                            ? "Actual settled market outcome (above/below strike)"
+                            : "Estimated from the 15m candle open vs close — no settled outcome yet"
+                        }
                         className={`px-1.5 py-0.5 rounded border ${
                           r.hit === true
                             ? "border-emerald-500/50 text-emerald-300"
                             : r.hit === false
                               ? "border-rose-500/50 text-rose-300"
                               : "border-border text-muted-foreground"
-                        }`}
+                        } ${r.resultSource === "candle" ? "border-dashed opacity-80" : ""}`}
                       >
                         {r.result}
                         {r.hit === true ? " ✓" : r.hit === false ? " ✗" : ""}
@@ -219,7 +224,8 @@ export function FlowLeanLog() {
         </div>
       )}
       <div className="px-3 py-1.5 border-t border-border text-[10px] text-muted-foreground">
-        read-only · result = 15m candle open vs close · * avg prices include 0.10% taker fee (buy +fee,
+        read-only · result = actual settled outcome vs strike when available (dashed = estimated from the
+        15m candle) · * avg prices include 0.10% taker fee (buy +fee,
         sell −fee) · net $ is after fees · SMA 20 / RSI 14 / MACD 12-26-9, row values on 15m candles ·
         not wired to any bet
       </div>
