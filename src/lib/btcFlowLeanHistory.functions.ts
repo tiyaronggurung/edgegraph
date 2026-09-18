@@ -68,8 +68,8 @@ export interface FlowLeanHistoryResult {
   scored: number;
   hits: number;
   rollups: FlowRollup[];
-  /** Live indicator readings: fast (1m candles) and slow (15m candles). */
-  live: { m1: IndicatorSnap; m15: IndicatorSnap };
+  /** Live indicator readings: fast (1m), slow (15m) and the SMA stack (1m). */
+  live: { m1: IndicatorSnap; m15: IndicatorSnap; stack: SmaStack };
 }
 
 const WINDOW_MS = 15 * 60 * 1000;
@@ -220,6 +220,122 @@ function indicatorSeries(closes: number[]): IndicatorSnap[] {
   });
 }
 
+// ---- Multi-SMA stack (10 / 50 / 200) on 1m closes ----
+// The lines themselves lag; the value is the ORDER of the stack, the
+// separation of the fast line from the mid line, and the CROSS between them —
+// all of which lead price rather than follow it.
+export interface SmaStack {
+  close: number | null;
+  sma10: number | null;
+  sma50: number | null;
+  sma200: number | null;
+  /** close vs each line as a fraction (positive = price above the line). */
+  dist10Pct: number | null;
+  dist50Pct: number | null;
+  dist200Pct: number | null;
+  /** Fast line vs mid line as a fraction; positive = fast above mid (bullish). */
+  spread1050Pct: number | null;
+  /** Same separation one minute ago — a sign change is a fresh cross. */
+  spread1050PctPrev: number | null;
+  /** Fast line's move over the last minute, as a fraction. */
+  slope10Pct: number | null;
+  /** Seconds since the fast line last crossed the mid line; null = none seen. */
+  crossAgeSec: number | null;
+  /** Side the fast line crossed INTO: UP = crossed above the mid, DOWN = below. */
+  crossSide: "UP" | "DOWN" | null;
+  /** Bull stack (10>50>200), bear stack (10<50<200), or mixed. */
+  order: "BULL" | "BEAR" | "MIXED";
+}
+
+const STACK_FAST = 10;
+const STACK_MID = 50;
+const STACK_SLOW = 200;
+
+const EMPTY_STACK: SmaStack = {
+  close: null,
+  sma10: null,
+  sma50: null,
+  sma200: null,
+  dist10Pct: null,
+  dist50Pct: null,
+  dist200Pct: null,
+  spread1050Pct: null,
+  spread1050PctPrev: null,
+  slope10Pct: null,
+  crossAgeSec: null,
+  crossSide: null,
+  order: "MIXED",
+};
+
+function smaAt(values: number[], len: number, i: number): number | null {
+  if (i + 1 < len) return null;
+  let sum = 0;
+  for (let j = i - len + 1; j <= i; j++) sum += values[j] as number;
+  return sum / len;
+}
+
+/** Stack read at the latest candle, including the most recent fast/mid cross. */
+function smaStack(closes: number[]): SmaStack {
+  const i = closes.length - 1;
+  if (i < 0) return EMPTY_STACK;
+  const close = closes[i] ?? null;
+  const sma10 = smaAt(closes, STACK_FAST, i);
+  const sma50 = smaAt(closes, STACK_MID, i);
+  const sma200 = smaAt(closes, STACK_SLOW, i);
+  const dist = (sma: number | null) =>
+    sma != null && sma > 0 && close != null ? (close - sma) / sma : null;
+  const spread = (j: number) => {
+    const f = smaAt(closes, STACK_FAST, j);
+    const s = smaAt(closes, STACK_MID, j);
+    return f != null && s != null && s > 0 ? (f - s) / s : null;
+  };
+  const spreadNow = spread(i);
+  const spreadPrev = i >= 1 ? spread(i - 1) : null;
+  const sma10Prev = i >= 1 ? smaAt(closes, STACK_FAST, i - 1) : null;
+  const slope10Pct =
+    sma10 != null && sma10Prev != null && sma10Prev > 0 ? (sma10 - sma10Prev) / sma10Prev : null;
+
+  // Walk back to the most recent sign change in the fast/mid separation.
+  let crossAgeSec: number | null = null;
+  let crossSide: "UP" | "DOWN" | null = null;
+  for (let j = i; j >= 1; j--) {
+    const a = spread(j);
+    const b = spread(j - 1);
+    if (a == null || b == null) break;
+    if (a === 0 || b === 0) continue;
+    if (a > 0 !== b > 0) {
+      crossAgeSec = (i - j) * 60;
+      crossSide = a > 0 ? "UP" : "DOWN";
+      break;
+    }
+  }
+
+  const order: SmaStack["order"] =
+    sma10 != null && sma50 != null && sma200 != null
+      ? sma10 > sma50 && sma50 > sma200
+        ? "BULL"
+        : sma10 < sma50 && sma50 < sma200
+          ? "BEAR"
+          : "MIXED"
+      : "MIXED";
+
+  return {
+    close,
+    sma10,
+    sma50,
+    sma200,
+    dist10Pct: dist(sma10),
+    dist50Pct: dist(sma50),
+    dist200Pct: dist(sma200),
+    spread1050Pct: spreadNow,
+    spread1050PctPrev: spreadPrev,
+    slope10Pct,
+    crossAgeSec,
+    crossSide,
+    order,
+  };
+}
+
 async function fetchKlines(interval: string, limit: number): Promise<number[][]> {
   try {
     const res = await fetch(
@@ -301,6 +417,7 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
     const live = {
       m1: ind1m[ind1m.length - 1] ?? EMPTY_IND,
       m15: ind15[ind15.length - 1] ?? EMPTY_IND,
+      stack: smaStack(k1m.map((k) => Number(k[4]) || 0)),
     };
 
     let scored = 0;
