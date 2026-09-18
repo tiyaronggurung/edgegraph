@@ -262,8 +262,8 @@ export function BtcPriceVolumeCard() {
           <div className="mt-1 flex items-center justify-between text-[10px]">
             <span className={odds.flipFlag ? "text-amber-300 font-semibold" : "text-muted-foreground"}>
               {odds.flipFlag
-                ? `⚠ flip → ${odds.flipSide} · ${odds.flipReason}`
-                : `flip risk ${odds.flipRisk == null ? "—" : `${(odds.flipRisk * 100).toFixed(0)}%`}`}
+                ? `⚠ now ${odds.side ?? "—"}${gapTxt} · crossing the strike makes it ${odds.flipSide ?? "—"} · ${odds.flipReason}`
+                : `now ${odds.side ?? "—"}${gapTxt} · a cross would make it ${odds.flipSide ?? "—"} · risk ${odds.flipRisk == null ? "—" : `${(odds.flipRisk * 100).toFixed(0)}%`}`}
             </span>
             <span className="text-muted-foreground font-mono">
               base {odds.pBase == null ? "—" : `${(odds.pBase * 100).toFixed(0)}%`}
