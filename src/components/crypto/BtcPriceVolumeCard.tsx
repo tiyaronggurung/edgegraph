@@ -77,6 +77,11 @@ export function BtcPriceVolumeCard() {
     queryKey: ["btc-card-strike", winStart],
     queryFn: () => strikeFn(),
     refetchInterval: 1_500,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    retry: 3,
+    retryDelay: (a) => Math.min(750 * 2 ** a, 5_000),
     staleTime: 0,
     gcTime: 60_000,
   });
@@ -110,6 +115,11 @@ export function BtcPriceVolumeCard() {
     queryKey: ["btc-flow-lean-history"],
     queryFn: () => histFn(),
     refetchInterval: 20_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    retry: 3,
+    retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
     placeholderData: keepPreviousData,
   });
   const currentRow = hist?.rows?.find((r) => r.result == null) ?? hist?.rows?.[0] ?? null;
