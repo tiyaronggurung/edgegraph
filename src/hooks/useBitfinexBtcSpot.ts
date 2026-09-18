@@ -67,8 +67,23 @@ export function useBitfinexBtcSpot(): BitfinexBtcSpot {
     };
     connect();
 
+    const revive = () => {
+      if (cancelled) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      const ws = wsRef.current;
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      connect();
+    };
+    document.addEventListener("visibilitychange", revive);
+    window.addEventListener("focus", revive);
+    window.addEventListener("online", revive);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", revive);
+      window.removeEventListener("focus", revive);
+      window.removeEventListener("online", revive);
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       try { wsRef.current?.close(); } catch { /* ignore */ }
     };
