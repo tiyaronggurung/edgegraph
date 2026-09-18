@@ -46,6 +46,49 @@ export function FlowLeanLog() {
         ) : null}
       </div>
 
+      {d && d.rollups.length > 0 && (
+        <div className="px-3 py-2 border-b border-border overflow-x-auto">
+          <table className="w-full text-[11px] min-w-[430px]">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                <th className="text-left font-normal py-0.5">Span</th>
+                <th className="text-right font-normal px-2">In $</th>
+                <th className="text-right font-normal px-2">Out $</th>
+                <th className="text-right font-normal px-2">Net $</th>
+                <th className="text-right font-normal px-2">Avg buy</th>
+                <th className="text-right font-normal px-2">Avg sell</th>
+                <th className="text-right font-normal">Px</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.rollups.map(r => (
+                <tr key={r.label} className="border-t border-border/40">
+                  <td className="py-1 text-muted-foreground">{r.label}</td>
+                  <td className="px-2 text-right text-emerald-400">{usd(r.buyUsd)}</td>
+                  <td className="px-2 text-right text-rose-400">{usd(r.sellUsd)}</td>
+                  <td
+                    className={`px-2 text-right font-semibold ${
+                      (r.netUsdPct ?? 0) > 0 ? "text-emerald-400" : (r.netUsdPct ?? 0) < 0 ? "text-rose-400" : ""
+                    }`}
+                  >
+                    {r.netUsdPct == null ? "—" : `${(r.netUsdPct * 100).toFixed(1)}%`}
+                  </td>
+                  <td className="px-2 text-right">{price(r.avgBuyPrice)}</td>
+                  <td className="px-2 text-right">{price(r.avgSellPrice)}</td>
+                  <td
+                    className={`text-right ${
+                      (r.priceChangePct ?? 0) > 0 ? "text-emerald-400" : (r.priceChangePct ?? 0) < 0 ? "text-rose-400" : ""
+                    }`}
+                  >
+                    {r.priceChangePct == null ? "—" : `${(r.priceChangePct * 100).toFixed(2)}%`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {!d ? (
         <div className="p-4 text-sm text-muted-foreground">{q.isLoading ? "Loading…" : "No data."}</div>
       ) : d.rows.length === 0 ? (
