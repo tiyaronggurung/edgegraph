@@ -15,6 +15,7 @@ import {
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useStrikeOdds } from "@/hooks/useStrikeOdds";
 import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
+import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
 
 function fmtUsd(x: number | null | undefined): string {
   if (x == null || !Number.isFinite(x)) return "—";
@@ -72,9 +73,28 @@ export function BtcPriceVolumeCard() {
   const secondsToClose = Math.max(0, Math.round((winStart + 900_000 - now) / 1000));
   const winRate = flowLeanWinRate(lean, secondsToClose);
 
+  // Live SMA/RSI/MACD + average taker cost (shared query with the flow log).
+  const histFn = useServerFn(getBtcFlowLeanHistory);
+  const { data: hist } = useQuery({
+    queryKey: ["btc-flow-lean-history"],
+    queryFn: () => histFn(),
+    refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
+  });
+  const currentRow = hist?.rows?.find((r) => r.result == null) ?? hist?.rows?.[0] ?? null;
+
   // Our own quote off the live composite vs the strike (display only).
-  const odds = useStrikeOdds(price, strike ?? null, kalshi?.secondsToClose ?? secondsToClose);
+  const odds = useStrikeOdds(price, strike ?? null, kalshi?.secondsToClose ?? secondsToClose, {
+    m1: hist?.live?.m1 ?? null,
+    m15: hist?.live?.m15 ?? null,
+    avgBuyPrice: currentRow?.avgBuyPrice ?? null,
+    avgSellPrice: currentRow?.avgSellPrice ?? null,
+    flowImbalance: imbM3,
+  });
   const cents = (v: number | null) => (v == null ? "—" : `${(v * 100).toFixed(1)}¢`);
+  const tiltTone = (v: number | null) =>
+    v == null ? "text-muted-foreground" : v > 0.1 ? "text-emerald-400" : v < -0.1 ? "text-rose-400" : "text-muted-foreground";
+  const sig = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${(v * 100).toFixed(0)}`);
 
   // Log one row per minute per window so the lean can be scored later.
   const logFlow = useServerFn(logBtcFlowLean);
@@ -150,8 +170,31 @@ export function BtcPriceVolumeCard() {
               p(up) {odds.pUp == null ? "—" : `${(odds.pUp * 100).toFixed(1)}%`}
             </span>
           </div>
+          <div className="mt-1 flex items-center justify-between font-mono text-[10px]">
+            <span className="text-muted-foreground">
+              SMA <span className={tiltTone(odds.parts.sma)}>{sig(odds.parts.sma)}</span>
+              {" · "}RSI <span className={tiltTone(odds.parts.rsi)}>{sig(odds.parts.rsi)}</span>
+              {" · "}MACD <span className={tiltTone(odds.parts.macd)}>{sig(odds.parts.macd)}</span>
+              {" · "}cost <span className={tiltTone(odds.parts.cost)}>{sig(odds.parts.cost)}</span>
+              {" · "}flow <span className={tiltTone(odds.parts.flow)}>{sig(odds.parts.flow)}</span>
+            </span>
+            <span className="text-muted-foreground">
+              tilt <span className={tiltTone(odds.tilt)}>{sig(odds.tilt)}</span>
+              {" · "}t-wt {(odds.timeWeight * 100).toFixed(0)}%
+            </span>
+          </div>
+          <div className="mt-1 flex items-center justify-between text-[10px]">
+            <span className={odds.flipFlag ? "text-amber-300 font-semibold" : "text-muted-foreground"}>
+              {odds.flipFlag
+                ? `⚠ flip risk → ${odds.flipSide} · ${odds.flipReason}`
+                : `flip risk ${odds.flipRisk == null ? "—" : `${(odds.flipRisk * 100).toFixed(0)}%`}`}
+            </span>
+            <span className="text-muted-foreground font-mono">
+              base {odds.pBase == null ? "—" : `${(odds.pBase * 100).toFixed(0)}%`}
+            </span>
+          </div>
           <div className="mt-0.5 text-[10px] text-muted-foreground">
-            recomputed on every composite tick · display only · not wired to any bet
+            time-weighted SMA/RSI/MACD + avg cost + flow · display only · not wired to any bet
           </div>
         </div>
 
