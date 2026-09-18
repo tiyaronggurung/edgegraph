@@ -29,8 +29,14 @@ export interface FlowLeanHistoryRow {
   avgSellPrice: number | null;
   /** Indicators on the 15m candles as of this window's close. */
   ind: IndicatorSnap;
-  /** "UP" | "DOWN" from the 15m candle open vs close, null while unsettled. */
+  /**
+   * "UP" | "DOWN" — prefer the actual settled market outcome (above/below the
+   * strike); fall back to the Binance 15m candle open vs close. Null while
+   * unsettled.
+   */
   result: "UP" | "DOWN" | null;
+  /** Where the result came from: settled market outcome or candle estimate. */
+  resultSource: "settled" | "candle" | null;
   hit: boolean | null;
 }
 
