@@ -15,6 +15,7 @@ import {
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useStrikeOdds } from "@/hooks/useStrikeOdds";
 import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
+import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
 
 function fmtUsd(x: number | null | undefined): string {
   if (x == null || !Number.isFinite(x)) return "—";
