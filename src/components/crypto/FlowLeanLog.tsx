@@ -73,6 +73,13 @@ export function FlowLeanLog() {
         ) : null}
       </div>
 
+      {d?.live && (
+        <div className="px-3 py-2 border-b border-border flex flex-wrap gap-x-6 gap-y-1">
+          <IndBlock label="1m" snap={d.live.m1} />
+          <IndBlock label="15m" snap={d.live.m15} />
+        </div>
+      )}
+
       {d && d.rollups.length > 0 && (
         <div className="px-3 py-2 border-b border-border overflow-x-auto">
           <table className="w-full text-[11px] min-w-[430px]">
@@ -139,6 +146,9 @@ export function FlowLeanLog() {
                 <th className="text-right px-2 py-1.5 font-normal">Avg buy</th>
                 <th className="text-right px-2 py-1.5 font-normal">Avg sell</th>
                 <th className="text-right px-2 py-1.5 font-normal">Net</th>
+                <th className="text-right px-2 py-1.5 font-normal">SMA20</th>
+                <th className="text-right px-2 py-1.5 font-normal">RSI</th>
+                <th className="text-right px-2 py-1.5 font-normal">MACD</th>
                 <th className="text-center px-2 py-1.5 font-normal">Lean</th>
                 <th className="text-center px-3 py-1.5 font-normal">Result</th>
               </tr>
@@ -159,6 +169,17 @@ export function FlowLeanLog() {
                     }`}
                   >
                     {pct(r.imbWindow)}
+                  </td>
+                  <td className={`px-2 py-1.5 text-right ${signClass(r.ind.smaDistPct)}`}>
+                    {r.ind.smaDistPct == null
+                      ? "—"
+                      : `${r.ind.smaDistPct >= 0 ? "+" : ""}${(r.ind.smaDistPct * 100).toFixed(2)}%`}
+                  </td>
+                  <td className={`px-2 py-1.5 text-right ${rsiClass(r.ind.rsi)}`}>
+                    {r.ind.rsi == null ? "—" : r.ind.rsi.toFixed(0)}
+                  </td>
+                  <td className={`px-2 py-1.5 text-right ${signClass(r.ind.hist)}`}>
+                    {r.ind.hist == null ? "—" : `${r.ind.hist >= 0 ? "+" : ""}${r.ind.hist.toFixed(1)}`}
                   </td>
                   <td className="px-2 py-1.5 text-center">
                     <span
@@ -199,7 +220,8 @@ export function FlowLeanLog() {
       )}
       <div className="px-3 py-1.5 border-t border-border text-[10px] text-muted-foreground">
         read-only · result = 15m candle open vs close · * avg prices include 0.10% taker fee (buy +fee,
-        sell −fee) · net $ is after fees · not wired to any bet
+        sell −fee) · net $ is after fees · SMA 20 / RSI 14 / MACD 12-26-9, row values on 15m candles ·
+        not wired to any bet
       </div>
     </div>
   );
