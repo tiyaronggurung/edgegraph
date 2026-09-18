@@ -99,8 +99,12 @@ export function FlowLeanLog() {
             <thead className="sticky top-0 bg-card">
               <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 <th className="text-left px-3 py-1.5 font-normal">Window</th>
-                <th className="text-right px-2 py-1.5 font-normal">In ↑</th>
-                <th className="text-right px-2 py-1.5 font-normal">Out ↓</th>
+                <th className="text-right px-2 py-1.5 font-normal">In ₿</th>
+                <th className="text-right px-2 py-1.5 font-normal">Out ₿</th>
+                <th className="text-right px-2 py-1.5 font-normal">In $</th>
+                <th className="text-right px-2 py-1.5 font-normal">Out $</th>
+                <th className="text-right px-2 py-1.5 font-normal">Avg buy</th>
+                <th className="text-right px-2 py-1.5 font-normal">Avg sell</th>
                 <th className="text-right px-2 py-1.5 font-normal">Net</th>
                 <th className="text-center px-2 py-1.5 font-normal">Lean</th>
                 <th className="text-center px-3 py-1.5 font-normal">Result</th>
