@@ -64,8 +64,11 @@ export interface StrikeOdds {
   pUp: number | null;
   /** Pure diffusion probability before the technical tilt. */
   pBase: number | null;
+  /** UP price in 0-1; upAsk + downAsk always = 1 (100¢ total). */
   upAsk: number | null;
   downAsk: number | null;
+  /** Bookmaker margin per side, 0-1 — shown for reference, not added to prices. */
+  spread: number | null;
   /** Annualized realized vol used, for display. */
   sigma: number | null;
   /** Ticks in the tape — low counts mean the estimate is still warming up. */
@@ -199,7 +202,7 @@ export function useStrikeOdds(
 
   if (spot == null || strike == null || strike <= 0 || spot <= 0) {
     return {
-      pUp: null, pBase: null, upAsk: null, downAsk: null, sigma, samples: tape.length,
+      pUp: null, pBase: null, upAsk: null, downAsk: null, spread: null, sigma, samples: tape.length,
       tilt, parts, timeWeight, z: null, flipRisk: null, flipSide: null,
       flipFlag: false, flipReason: null,
     };
@@ -211,7 +214,7 @@ export function useStrikeOdds(
   const pBase = z == null ? null : clamp(phi(z), 0.001, 0.999);
   if (pBase == null || z == null) {
     return {
-      pUp: null, pBase: null, upAsk: null, downAsk: null, sigma, samples: tape.length,
+      pUp: null, pBase: null, upAsk: null, downAsk: null, spread: null, sigma, samples: tape.length,
       tilt, parts, timeWeight, z: null, flipRisk: null, flipSide: null,
       flipFlag: false, flipReason: null,
     };
@@ -236,8 +239,10 @@ export function useStrikeOdds(
   return {
     pUp,
     pBase,
-    upAsk: clamp(pUp + spread / 2, 0.01, 0.99),
-    downAsk: clamp(1 - pUp + spread / 2, 0.01, 0.99),
+    // Prices sum to exactly 1 (100¢ total); the margin is reported separately.
+    upAsk: pUp,
+    downAsk: 1 - pUp,
+    spread,
     sigma,
     samples: tape.length,
     tilt,
