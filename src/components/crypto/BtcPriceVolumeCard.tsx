@@ -131,6 +131,7 @@ export function BtcPriceVolumeCard() {
     avgBuyPrice: currentRow?.avgBuyPrice ?? null,
     avgSellPrice: currentRow?.avgSellPrice ?? null,
     flowImbalance: imbM3,
+    stack: hist?.live?.stack ?? null,
   });
   const cents = (v: number | null) => (v == null ? "—" : `${(v * 100).toFixed(1)}¢`);
   const tiltTone = (v: number | null) =>
@@ -234,12 +235,20 @@ export function BtcPriceVolumeCard() {
               {" · "}cost <span className={tiltTone(odds.parts.cost)}>{sig(odds.parts.cost)}</span>
               {" · "}flow <span className={tiltTone(odds.parts.flow)}>{sig(odds.parts.flow)}</span>
               {" · "}brk <span className={tiltTone(odds.parts.brk)}>{sig(odds.parts.brk)}</span>
+              {" · "}stk <span className={tiltTone(odds.parts.stk)}>{sig(odds.parts.stk)}</span>
             </span>
             <span className="text-muted-foreground">
               tilt <span className={tiltTone(odds.tilt)}>{sig(odds.tilt)}</span>
               {" · "}t-wt {(odds.timeWeight * 100).toFixed(0)}%
             </span>
           </div>
+          {odds.stackNote != null && (
+            <div className="mt-1 font-mono text-[10px] text-muted-foreground">
+              SMA 10/50/200{" "}
+              <span className={tiltTone(odds.parts.stk)}>{odds.stackNote}</span>
+              {odds.stackFlip > 0 ? " · cross against our side" : ""}
+            </div>
+          )}
           <div className="mt-1 flex items-center justify-between font-mono text-[10px]">
             <span className="text-muted-foreground">
               drift{" "}
@@ -281,8 +290,9 @@ export function BtcPriceVolumeCard() {
           </div>
           <div className="mt-0.5 text-[10px] text-muted-foreground">
             distance alone is capped — a high price needs indicators, break structure and drift on
-            the same side, with time nearly out · flip side is always the opposite of where price
-            sits now, named before it happens · display only
+            the same side, with time nearly out · SMA 10/50/200 stack feeds the odds and arms flip
+            warnings early, it never calls direction on its own · flip side is always the opposite
+            of where price sits now, named before it happens · display only
           </div>
 
         </div>
