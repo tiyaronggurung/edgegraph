@@ -4,6 +4,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+/** Standard-setting indicator snapshot (SMA 20, RSI 14, MACD 12/26/9). */
+export interface IndicatorSnap {
+  close: number | null;
+  sma: number | null;
+  /** close vs SMA as a fraction. */
+  smaDistPct: number | null;
+  rsi: number | null;
+  macd: number | null;
+  signal: number | null;
+  hist: number | null;
+}
+
 export interface FlowLeanHistoryRow {
   windowStart: string;
   lean: string;
@@ -15,6 +27,8 @@ export interface FlowLeanHistoryRow {
   sellUsd: number | null;
   avgBuyPrice: number | null;
   avgSellPrice: number | null;
+  /** Indicators on the 15m candles as of this window's close. */
+  ind: IndicatorSnap;
   /** "UP" | "DOWN" from the 15m candle open vs close, null while unsettled. */
   result: "UP" | "DOWN" | null;
   hit: boolean | null;
@@ -48,6 +62,8 @@ export interface FlowLeanHistoryResult {
   scored: number;
   hits: number;
   rollups: FlowRollup[];
+  /** Live indicator readings: fast (1m candles) and slow (15m candles). */
+  live: { m1: IndicatorSnap; m15: IndicatorSnap };
 }
 
 const WINDOW_MS = 15 * 60 * 1000;
@@ -101,6 +117,103 @@ function toRollup(label: string, agg: Agg): FlowRollup {
   };
 }
 
+// ---- Indicators (standard settings: SMA 20, RSI 14, MACD 12/26/9) ----
+const SMA_LEN = 20;
+const RSI_LEN = 14;
+const MACD_FAST = 12;
+const MACD_SLOW = 26;
+const MACD_SIGNAL = 9;
+
+const EMPTY_IND: IndicatorSnap = {
+  close: null,
+  sma: null,
+  smaDistPct: null,
+  rsi: null,
+  macd: null,
+  signal: null,
+  hist: null,
+};
+
+/** EMA series over closes; index-aligned with the input. */
+function emaSeries(values: number[], len: number): (number | null)[] {
+  const k = 2 / (len + 1);
+  const out: (number | null)[] = [];
+  let prev: number | null = null;
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i] as number;
+    if (i + 1 < len) {
+      out.push(null);
+      continue;
+    }
+    if (prev == null) {
+      let sum = 0;
+      for (let j = i - len + 1; j <= i; j++) sum += values[j] as number;
+      prev = sum / len;
+    } else {
+      prev = v * k + prev * (1 - k);
+    }
+    out.push(prev);
+  }
+  return out;
+}
+
+/** Wilder-smoothed RSI series; index-aligned with the input. */
+function rsiSeries(values: number[], len: number): (number | null)[] {
+  const out: (number | null)[] = new Array(values.length).fill(null);
+  if (values.length <= len) return out;
+  let gain = 0;
+  let loss = 0;
+  for (let i = 1; i <= len; i++) {
+    const ch = (values[i] as number) - (values[i - 1] as number);
+    if (ch >= 0) gain += ch;
+    else loss -= ch;
+  }
+  gain /= len;
+  loss /= len;
+  out[len] = loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
+  for (let i = len + 1; i < values.length; i++) {
+    const ch = (values[i] as number) - (values[i - 1] as number);
+    gain = (gain * (len - 1) + Math.max(0, ch)) / len;
+    loss = (loss * (len - 1) + Math.max(0, -ch)) / len;
+    out[i] = loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
+  }
+  return out;
+}
+
+/** Indicator snapshot at every candle index, from a list of closes. */
+function indicatorSeries(closes: number[]): IndicatorSnap[] {
+  const rsi = rsiSeries(closes, RSI_LEN);
+  const emaFast = emaSeries(closes, MACD_FAST);
+  const emaSlow = emaSeries(closes, MACD_SLOW);
+  const macdLine = closes.map((_, i) => {
+    const f = emaFast[i];
+    const s = emaSlow[i];
+    return f != null && s != null ? f - s : null;
+  });
+  const defined = macdLine.map((v) => v ?? 0);
+  const signalRaw = emaSeries(defined, MACD_SIGNAL);
+
+  return closes.map((close, i) => {
+    let sma: number | null = null;
+    if (i + 1 >= SMA_LEN) {
+      let sum = 0;
+      for (let j = i - SMA_LEN + 1; j <= i; j++) sum += closes[j] as number;
+      sma = sum / SMA_LEN;
+    }
+    const macd = macdLine[i] ?? null;
+    const signal = macd == null ? null : (signalRaw[i] ?? null);
+    return {
+      close,
+      sma,
+      smaDistPct: sma ? (close - sma) / sma : null,
+      rsi: rsi[i] ?? null,
+      macd,
+      signal,
+      hist: macd != null && signal != null ? macd - signal : null,
+    };
+  });
+}
+
 async function fetchKlines(interval: string, limit: number): Promise<number[][]> {
   try {
     const res = await fetch(
@@ -127,7 +240,7 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
         .order("seconds_to_close", { ascending: true })
         .limit(500),
       fetchKlines("15m", 250),
-      fetchKlines("1m", 60),
+      fetchKlines("1m", 250),
     ]);
 
     // Keep the latest row (smallest seconds_to_close) per window.
@@ -153,6 +266,19 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
         result: settled ? ((agg.lastClose ?? 0) >= (agg.firstOpen ?? 0) ? "UP" : "DOWN") : null,
       });
     }
+
+    // Indicators per 15m candle close, keyed by window start.
+    const ind15 = indicatorSeries(k15.map((k) => Number(k[4]) || 0));
+    const indByWindow = new Map<string, IndicatorSnap>();
+    k15.forEach((k, i) => {
+      const snap = ind15[i];
+      if (snap) indByWindow.set(new Date(Number(k[0])).toISOString(), snap);
+    });
+    const ind1m = indicatorSeries(k1m.map((k) => Number(k[4]) || 0));
+    const live = {
+      m1: ind1m[ind1m.length - 1] ?? EMPTY_IND,
+      m15: ind15[ind15.length - 1] ?? EMPTY_IND,
+    };
 
     let scored = 0;
     let hits = 0;
@@ -181,6 +307,7 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
           sellUsd: agg.sellUsd || null,
           avgBuyPrice: agg.buyBtc > 0 ? agg.buyUsd / agg.buyBtc : null,
           avgSellPrice: agg.sellBtc > 0 ? agg.sellUsd / agg.sellBtc : null,
+          ind: indByWindow.get(key) ?? EMPTY_IND,
           result,
           hit,
         };
@@ -213,5 +340,5 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
     for (const k of k15) if (Number(k[0]) >= dayStart) addKline(aggDay, k);
     rollups.push(toRollup("Today (UTC)", aggDay));
 
-    return { rows, scored, hits, rollups };
+    return { rows, scored, hits, rollups, live };
   });

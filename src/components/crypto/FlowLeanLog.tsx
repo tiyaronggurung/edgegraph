@@ -19,6 +19,33 @@ const usd = (v: number | null) => {
 const price = (v: number | null) =>
   v == null ? "—" : `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
+const rsiClass = (v: number | null) =>
+  v == null
+    ? "text-muted-foreground"
+    : v >= 70
+      ? "text-rose-400"
+      : v <= 30
+        ? "text-emerald-400"
+        : "text-muted-foreground";
+
+const signClass = (v: number | null | undefined) =>
+  (v ?? 0) > 0 ? "text-emerald-400" : (v ?? 0) < 0 ? "text-rose-400" : "text-muted-foreground";
+
+function IndBlock({ label, snap }: { label: string; snap: import("@/lib/btcFlowLeanHistory.functions").IndicatorSnap }) {
+  return (
+    <div className="flex items-center gap-2 text-[11px]">
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className={signClass(snap.smaDistPct)}>
+        SMA20 {snap.smaDistPct == null ? "—" : `${snap.smaDistPct >= 0 ? "+" : ""}${(snap.smaDistPct * 100).toFixed(2)}%`}
+      </span>
+      <span className={rsiClass(snap.rsi)}>RSI {snap.rsi == null ? "—" : snap.rsi.toFixed(0)}</span>
+      <span className={signClass(snap.hist)}>
+        MACD {snap.hist == null ? "—" : `${snap.hist >= 0 ? "+" : ""}${snap.hist.toFixed(1)}`}
+      </span>
+    </div>
+  );
+}
+
 export function FlowLeanLog() {
   const fn = useServerFn(getBtcFlowLeanHistory);
   const q = useQuery({
@@ -45,6 +72,13 @@ export function FlowLeanLog() {
           </span>
         ) : null}
       </div>
+
+      {d?.live && (
+        <div className="px-3 py-2 border-b border-border flex flex-wrap gap-x-6 gap-y-1">
+          <IndBlock label="1m" snap={d.live.m1} />
+          <IndBlock label="15m" snap={d.live.m15} />
+        </div>
+      )}
 
       {d && d.rollups.length > 0 && (
         <div className="px-3 py-2 border-b border-border overflow-x-auto">
@@ -112,6 +146,9 @@ export function FlowLeanLog() {
                 <th className="text-right px-2 py-1.5 font-normal">Avg buy</th>
                 <th className="text-right px-2 py-1.5 font-normal">Avg sell</th>
                 <th className="text-right px-2 py-1.5 font-normal">Net</th>
+                <th className="text-right px-2 py-1.5 font-normal">SMA20</th>
+                <th className="text-right px-2 py-1.5 font-normal">RSI</th>
+                <th className="text-right px-2 py-1.5 font-normal">MACD</th>
                 <th className="text-center px-2 py-1.5 font-normal">Lean</th>
                 <th className="text-center px-3 py-1.5 font-normal">Result</th>
               </tr>
@@ -132,6 +169,17 @@ export function FlowLeanLog() {
                     }`}
                   >
                     {pct(r.imbWindow)}
+                  </td>
+                  <td className={`px-2 py-1.5 text-right ${signClass(r.ind.smaDistPct)}`}>
+                    {r.ind.smaDistPct == null
+                      ? "—"
+                      : `${r.ind.smaDistPct >= 0 ? "+" : ""}${(r.ind.smaDistPct * 100).toFixed(2)}%`}
+                  </td>
+                  <td className={`px-2 py-1.5 text-right ${rsiClass(r.ind.rsi)}`}>
+                    {r.ind.rsi == null ? "—" : r.ind.rsi.toFixed(0)}
+                  </td>
+                  <td className={`px-2 py-1.5 text-right ${signClass(r.ind.hist)}`}>
+                    {r.ind.hist == null ? "—" : `${r.ind.hist >= 0 ? "+" : ""}${r.ind.hist.toFixed(1)}`}
                   </td>
                   <td className="px-2 py-1.5 text-center">
                     <span
@@ -172,7 +220,8 @@ export function FlowLeanLog() {
       )}
       <div className="px-3 py-1.5 border-t border-border text-[10px] text-muted-foreground">
         read-only · result = 15m candle open vs close · * avg prices include 0.10% taker fee (buy +fee,
-        sell −fee) · net $ is after fees · not wired to any bet
+        sell −fee) · net $ is after fees · SMA 20 / RSI 14 / MACD 12-26-9, row values on 15m candles ·
+        not wired to any bet
       </div>
     </div>
   );
