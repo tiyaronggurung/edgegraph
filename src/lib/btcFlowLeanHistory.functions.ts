@@ -240,7 +240,7 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
         .order("seconds_to_close", { ascending: true })
         .limit(500),
       fetchKlines("15m", 250),
-      fetchKlines("1m", 60),
+      fetchKlines("1m", 250),
     ]);
 
     // Keep the latest row (smallest seconds_to_close) per window.
@@ -266,6 +266,19 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
         result: settled ? ((agg.lastClose ?? 0) >= (agg.firstOpen ?? 0) ? "UP" : "DOWN") : null,
       });
     }
+
+    // Indicators per 15m candle close, keyed by window start.
+    const ind15 = indicatorSeries(k15.map((k) => Number(k[4]) || 0));
+    const indByWindow = new Map<string, IndicatorSnap>();
+    k15.forEach((k, i) => {
+      const snap = ind15[i];
+      if (snap) indByWindow.set(new Date(Number(k[0])).toISOString(), snap);
+    });
+    const ind1m = indicatorSeries(k1m.map((k) => Number(k[4]) || 0));
+    const live = {
+      m1: ind1m[ind1m.length - 1] ?? EMPTY_IND,
+      m15: ind15[ind15.length - 1] ?? EMPTY_IND,
+    };
 
     let scored = 0;
     let hits = 0;
@@ -294,6 +307,7 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
           sellUsd: agg.sellUsd || null,
           avgBuyPrice: agg.buyBtc > 0 ? agg.buyUsd / agg.buyBtc : null,
           avgSellPrice: agg.sellBtc > 0 ? agg.sellUsd / agg.sellBtc : null,
+          ind: indByWindow.get(key) ?? EMPTY_IND,
           result,
           hit,
         };
