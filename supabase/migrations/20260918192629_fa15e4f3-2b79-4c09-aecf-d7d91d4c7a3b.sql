@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS cheap_entry_live_enabled boolean NOT NULL DEFAULT false;
