@@ -50,6 +50,7 @@ import { Route as ApiPublicHooksBtcSnapshotTickRouteImport } from './routes/api/
 import { Route as ApiPublicHooksCandlesIngestRouteImport } from './routes/api/public/hooks/candles-ingest'
 import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
 import { Route as ApiPublicHooksCryptoStudyRouteImport } from './routes/api/public/hooks/crypto-study'
+import { Route as ApiPublicHooksFlowLeanWriterRouteImport } from './routes/api/public/hooks/flow-lean-writer'
 import { Route as ApiPublicHooksHourlyForecastTickRouteImport } from './routes/api/public/hooks/hourly-forecast-tick'
 import { Route as ApiPublicHooksKalshiBookTickRouteImport } from './routes/api/public/hooks/kalshi-book-tick'
 import { Route as ApiPublicHooksMarketContextTickRouteImport } from './routes/api/public/hooks/market-context-tick'
@@ -291,6 +292,12 @@ const ApiPublicHooksCryptoStudyRoute =
     path: '/api/public/hooks/crypto-study',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksFlowLeanWriterRoute =
+  ApiPublicHooksFlowLeanWriterRouteImport.update({
+    id: '/api/public/hooks/flow-lean-writer',
+    path: '/api/public/hooks/flow-lean-writer',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksHourlyForecastTickRoute =
   ApiPublicHooksHourlyForecastTickRouteImport.update({
     id: '/api/public/hooks/hourly-forecast-tick',
@@ -459,6 +466,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
+  '/api/public/hooks/flow-lean-writer': typeof ApiPublicHooksFlowLeanWriterRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
   '/api/public/hooks/kalshi-book-tick': typeof ApiPublicHooksKalshiBookTickRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
@@ -522,6 +530,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
+  '/api/public/hooks/flow-lean-writer': typeof ApiPublicHooksFlowLeanWriterRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
   '/api/public/hooks/kalshi-book-tick': typeof ApiPublicHooksKalshiBookTickRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
@@ -587,6 +596,7 @@ export interface FileRoutesById {
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
+  '/api/public/hooks/flow-lean-writer': typeof ApiPublicHooksFlowLeanWriterRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
   '/api/public/hooks/kalshi-book-tick': typeof ApiPublicHooksKalshiBookTickRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
@@ -652,6 +662,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
+    | '/api/public/hooks/flow-lean-writer'
     | '/api/public/hooks/hourly-forecast-tick'
     | '/api/public/hooks/kalshi-book-tick'
     | '/api/public/hooks/market-context-tick'
@@ -715,6 +726,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
+    | '/api/public/hooks/flow-lean-writer'
     | '/api/public/hooks/hourly-forecast-tick'
     | '/api/public/hooks/kalshi-book-tick'
     | '/api/public/hooks/market-context-tick'
@@ -779,6 +791,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/crypto-study'
+    | '/api/public/hooks/flow-lean-writer'
     | '/api/public/hooks/hourly-forecast-tick'
     | '/api/public/hooks/kalshi-book-tick'
     | '/api/public/hooks/market-context-tick'
@@ -827,6 +840,7 @@ export interface RootRouteChildren {
   ApiPublicHooksCandlesIngestRoute: typeof ApiPublicHooksCandlesIngestRoute
   ApiPublicHooksCaptureClosingOddsRoute: typeof ApiPublicHooksCaptureClosingOddsRoute
   ApiPublicHooksCryptoStudyRoute: typeof ApiPublicHooksCryptoStudyRoute
+  ApiPublicHooksFlowLeanWriterRoute: typeof ApiPublicHooksFlowLeanWriterRoute
   ApiPublicHooksHourlyForecastTickRoute: typeof ApiPublicHooksHourlyForecastTickRoute
   ApiPublicHooksKalshiBookTickRoute: typeof ApiPublicHooksKalshiBookTickRoute
   ApiPublicHooksMarketContextTickRoute: typeof ApiPublicHooksMarketContextTickRoute
@@ -1138,6 +1152,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCryptoStudyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/flow-lean-writer': {
+      id: '/api/public/hooks/flow-lean-writer'
+      path: '/api/public/hooks/flow-lean-writer'
+      fullPath: '/api/public/hooks/flow-lean-writer'
+      preLoaderRoute: typeof ApiPublicHooksFlowLeanWriterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/hourly-forecast-tick': {
       id: '/api/public/hooks/hourly-forecast-tick'
       path: '/api/public/hooks/hourly-forecast-tick'
@@ -1371,6 +1392,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksCandlesIngestRoute: ApiPublicHooksCandlesIngestRoute,
   ApiPublicHooksCaptureClosingOddsRoute: ApiPublicHooksCaptureClosingOddsRoute,
   ApiPublicHooksCryptoStudyRoute: ApiPublicHooksCryptoStudyRoute,
+  ApiPublicHooksFlowLeanWriterRoute: ApiPublicHooksFlowLeanWriterRoute,
   ApiPublicHooksHourlyForecastTickRoute: ApiPublicHooksHourlyForecastTickRoute,
   ApiPublicHooksKalshiBookTickRoute: ApiPublicHooksKalshiBookTickRoute,
   ApiPublicHooksMarketContextTickRoute: ApiPublicHooksMarketContextTickRoute,
