@@ -119,10 +119,42 @@ export function BtcPriceVolumeCard() {
           <span className={`text-2xl font-bold font-mono ${live.spot != null ? "text-foreground" : "text-muted-foreground"}`}>
             {price != null ? `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
           </span>
-          <span className="text-[10px] text-muted-foreground">
-            {live.spot != null ? "live composite" : "binance last"}
-          </span>
+          <div className="text-right">
+            <div className="font-mono text-sm">
+              <span className="text-[10px] text-muted-foreground">strike </span>
+              {strike != null ? `$${strike.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+            </div>
+            <span className="text-[10px] text-muted-foreground">
+              {live.spot != null ? "live composite" : "binance last"}
+              {strike != null && price != null
+                ? ` · ${price >= strike ? "+" : ""}${(price - strike).toFixed(0)}`
+                : ""}
+            </span>
+          </div>
         </div>
+
+        <div className="rounded border border-border/60 bg-muted/10 px-2 py-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-muted-foreground">Our odds on this strike</span>
+            <span className="text-[10px] text-muted-foreground font-mono">
+              {odds.sigma != null ? `σ ${(odds.sigma * 100).toFixed(0)}%` : "warming up"}
+            </span>
+          </div>
+          <div className="mt-1 flex items-center justify-between font-mono text-[11px]">
+            <span>
+              <span className="text-emerald-400">UP {cents(odds.upAsk)}</span>
+              {" · "}
+              <span className="text-rose-400">DOWN {cents(odds.downAsk)}</span>
+            </span>
+            <span className="text-muted-foreground">
+              p(up) {odds.pUp == null ? "—" : `${(odds.pUp * 100).toFixed(1)}%`}
+            </span>
+          </div>
+          <div className="mt-0.5 text-[10px] text-muted-foreground">
+            recomputed on every composite tick · display only · not wired to any bet
+          </div>
+        </div>
+
 
         <div className="rounded border border-border/60 bg-muted/10 px-2 py-1.5">
           <div className="flex items-center justify-between">
