@@ -163,6 +163,7 @@ export function CheapEntryAutoBetPanel() {
           <thead className="text-muted-foreground">
             <tr className="text-left">
               <th className="py-1 font-medium">Window</th>
+              <th className="font-medium">Mode</th>
               <th className="font-medium">Src</th>
               <th className="font-medium">Side</th>
               <th className="font-medium text-right">Entry</th>
@@ -174,6 +175,9 @@ export function CheapEntryAutoBetPanel() {
               <tr key={r.id} className="border-t border-border/40">
                 <td className="py-1 tabular-nums">
                   {new Date(r.close_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </td>
+                <td className={r.live ? "text-red-400 font-bold" : "text-muted-foreground"}>
+                  {r.live ? "LIVE" : "paper"}
                 </td>
                 <td className="text-muted-foreground">{r.pick_source ?? "—"}</td>
                 <td className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>
@@ -188,7 +192,7 @@ export function CheapEntryAutoBetPanel() {
               </tr>
             ))}
             {!stats.data?.rows?.length && (
-              <tr><td colSpan={5} className="py-3 text-center text-muted-foreground">
+              <tr><td colSpan={6} className="py-3 text-center text-muted-foreground">
                 No cheap entries yet — waiting for a window priced 20–65¢.
               </td></tr>
             )}
@@ -210,8 +214,9 @@ export function CheapEntryAutoBetPanel() {
       )}
 
       <div className="text-[9px] text-muted-foreground leading-relaxed">
-        Paper money only — no Kalshi order is sent. One buy per window, never under 20¢,
-        never inside the last 60 seconds. Runs on the server, so it works with this tab closed.
+        With Live off this is paper money. With Live on, real Kalshi orders are placed for you.
+        One buy per window, never under 20¢, never inside the last 60 seconds, and only windows
+        starting after you switch it on. Runs on the server, so it works with this tab closed.
       </div>
     </div>
   );
