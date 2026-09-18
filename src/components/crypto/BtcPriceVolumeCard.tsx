@@ -1,8 +1,8 @@
 // BTC Price & Volume — live Binance BTC/USDT price, 24h change, and REAL
 // BTC traded volume (BTC + USD notional). Read-only display card.
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getBtcPriceVolume } from "@/lib/btcPriceVolume.functions";
