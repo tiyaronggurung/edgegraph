@@ -179,6 +179,7 @@ export function BtcPriceVolumeCard() {
             <span className="text-[10px] text-muted-foreground">Our odds on this strike</span>
             <span className="text-[10px] text-muted-foreground font-mono">
               {odds.sigma != null ? `σ ${(odds.sigma * 100).toFixed(0)}%` : "warming up"}
+              {odds.spread != null ? ` · vig ${(odds.spread * 100).toFixed(1)}¢` : ""}
             </span>
           </div>
           <div className="mt-1 flex items-center justify-between font-mono text-[11px]">
