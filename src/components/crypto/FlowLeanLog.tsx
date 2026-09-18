@@ -72,10 +72,11 @@ export function FlowLeanLog() {
                       (r.netUsdPct ?? 0) > 0 ? "text-emerald-400" : (r.netUsdPct ?? 0) < 0 ? "text-rose-400" : ""
                     }`}
                   >
-                    {r.netUsdPct == null ? "—" : `${(r.netUsdPct * 100).toFixed(1)}%`}
+                    {r.netUsdPctAfterFees == null ? "—" : `${(r.netUsdPctAfterFees * 100).toFixed(1)}%`}
                   </td>
-                  <td className="px-2 text-right">{price(r.avgBuyPrice)}</td>
-                  <td className="px-2 text-right">{price(r.avgSellPrice)}</td>
+                  <td className="px-2 text-right text-amber-400/80">{usd(r.feeUsd)}</td>
+                  <td className="px-2 text-right">{price(r.effAvgBuyPrice)}</td>
+                  <td className="px-2 text-right">{price(r.effAvgSellPrice)}</td>
                   <td
                     className={`text-right ${
                       (r.priceChangePct ?? 0) > 0 ? "text-emerald-400" : (r.priceChangePct ?? 0) < 0 ? "text-rose-400" : ""
