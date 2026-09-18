@@ -281,7 +281,8 @@ export function BtcPriceVolumeCard() {
           </div>
           <div className="mt-0.5 text-[10px] text-muted-foreground">
             distance alone is capped — a high price needs indicators, break structure and drift on
-            the same side, with time nearly out · display only
+            the same side, with time nearly out · flip side is always the opposite of where price
+            sits now, named before it happens · display only
           </div>
 
         </div>
