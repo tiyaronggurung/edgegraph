@@ -31,7 +31,17 @@ export interface FlowRollup {
   /** USD imbalance: (in - out) / total. */
   netUsdPct: number | null;
   priceChangePct: number | null;
+  /** Taker fee cost on both sides at FEE_RATE. */
+  feeUsd: number;
+  /** Avg buy price incl. fee paid, avg sell price net of fee received. */
+  effAvgBuyPrice: number | null;
+  effAvgSellPrice: number | null;
+  /** Net USD flow after fees, as % of total traded USD. */
+  netUsdPctAfterFees: number | null;
 }
+
+/** Taker fee assumption on each side (0.10%). */
+export const FEE_RATE = 0.001;
 
 export interface FlowLeanHistoryResult {
   rows: FlowLeanHistoryRow[];
