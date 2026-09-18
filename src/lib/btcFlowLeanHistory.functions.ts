@@ -340,5 +340,5 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
     for (const k of k15) if (Number(k[0]) >= dayStart) addKline(aggDay, k);
     rollups.push(toRollup("Today (UTC)", aggDay));
 
-    return { rows, scored, hits, rollups };
+    return { rows, scored, hits, rollups, live };
   });
