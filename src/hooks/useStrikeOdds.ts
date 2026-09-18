@@ -28,6 +28,11 @@ const VEL_WINDOW_MS = 30_000;  // horizon for measured price velocity
 const MOM_PERSIST = 0.35;      // how much of measured velocity is assumed to carry
 const TILT_DRIFT_K = 0.9;      // technical tilt → drift, in σ-per-second units
 const DRIFT_CAP_SIGMAS = 1.5;  // projected drift can't exceed this many σ√T
+const BRK_WINDOW_MS = 10 * 60_000; // range used for break-high / break-low read
+const P_CAP_BASE = 0.88;       // ceiling when indicators do NOT confirm the side
+const P_CAP_MAX = 0.97;        // ceiling only when confirmed AND time is nearly out
+const SHRINK_MIN = 0.55;       // how hard we pull a fully-unconfirmed edge to 50/50
+const WARM_SAMPLES = 40;       // tape size before we trust the vol estimate fully
 
 
 function erf(x: number): number {
