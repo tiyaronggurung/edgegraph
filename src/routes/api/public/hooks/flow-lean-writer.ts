@@ -109,6 +109,10 @@ export const Route = createFileRoute("/api/public/hooks/flow-lean-writer")({
           vol_window_btc: w ? Number(w.total.toFixed(4)) : null,
           buy_window_btc: w ? Number(w.buy.toFixed(4)) : null,
           sell_window_btc: w ? Number(w.sell.toFixed(4)) : null,
+          buy_quote_usd: w ? Number(w.quoteBuy.toFixed(2)) : null,
+          sell_quote_usd: w ? Number(w.quoteSell.toFixed(2)) : null,
+          avg_buy_price: w?.avgBuyPrice != null ? Number(w.avgBuyPrice.toFixed(2)) : null,
+          avg_sell_price: w?.avgSellPrice != null ? Number(w.avgSellPrice.toFixed(2)) : null,
           spot,
           expected_win_rate: null,
         });
