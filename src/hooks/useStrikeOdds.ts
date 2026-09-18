@@ -214,7 +214,7 @@ export function useStrikeOdds(
   const pBase = z == null ? null : clamp(phi(z), 0.001, 0.999);
   if (pBase == null || z == null) {
     return {
-      pUp: null, pBase: null, upAsk: null, downAsk: null, sigma, samples: tape.length,
+      pUp: null, pBase: null, upAsk: null, downAsk: null, spread: null, sigma, samples: tape.length,
       tilt, parts, timeWeight, z: null, flipRisk: null, flipSide: null,
       flipFlag: false, flipReason: null,
     };
