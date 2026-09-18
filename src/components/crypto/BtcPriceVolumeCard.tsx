@@ -108,6 +108,37 @@ export function BtcPriceVolumeCard() {
 
         <div className="rounded border border-border/60 bg-muted/10 px-2 py-1.5">
           <div className="flex items-center justify-between">
+            <span className="text-[10px] text-muted-foreground">Flow lean (last 3m taker flow)</span>
+            <Badge
+              className={
+                lean === "UP"
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                  : lean === "DOWN"
+                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                    : "bg-muted text-muted-foreground border border-border/60"
+              }
+            >
+              {lean}
+            </Badge>
+          </div>
+          <div className="mt-1 flex items-center justify-between font-mono text-[11px]">
+            <span>
+              3m {imbM3 != null ? `${(imbM3 * 100).toFixed(1)}%` : "—"}
+              <span className="text-muted-foreground">
+                {" "}· win {imbWin != null ? `${(imbWin * 100).toFixed(1)}%` : "—"}
+              </span>
+            </span>
+            <span className="text-muted-foreground">
+              {winRate != null ? `hist ${(winRate * 100).toFixed(0)}%` : "—"} · {Math.floor(secondsToClose / 60)}m{secondsToClose % 60}s left
+            </span>
+          </div>
+          <div className="mt-0.5 text-[10px] text-muted-foreground">
+            read-only · logged each minute · not wired to any bet
+          </div>
+        </div>
+
+        <div className="rounded border border-border/60 bg-muted/10 px-2 py-1.5">
+          <div className="flex items-center justify-between">
             <span className="text-[10px] text-muted-foreground">BTC volume this 15m window</span>
             {win?.window && (
               <span className="text-[10px] font-mono">
