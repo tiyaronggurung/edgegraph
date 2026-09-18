@@ -1993,6 +1993,51 @@ export type Database = {
           },
         ]
       }
+      btc_flow_lean_log: {
+        Row: {
+          buy_window_btc: number | null
+          expected_win_rate: number | null
+          id: string
+          imb_m3: number | null
+          imb_window: number | null
+          lean: string
+          logged_at: string
+          seconds_to_close: number | null
+          sell_window_btc: number | null
+          spot: number | null
+          vol_window_btc: number | null
+          window_start: string
+        }
+        Insert: {
+          buy_window_btc?: number | null
+          expected_win_rate?: number | null
+          id?: string
+          imb_m3?: number | null
+          imb_window?: number | null
+          lean: string
+          logged_at?: string
+          seconds_to_close?: number | null
+          sell_window_btc?: number | null
+          spot?: number | null
+          vol_window_btc?: number | null
+          window_start: string
+        }
+        Update: {
+          buy_window_btc?: number | null
+          expected_win_rate?: number | null
+          id?: string
+          imb_m3?: number | null
+          imb_window?: number | null
+          lean?: string
+          logged_at?: string
+          seconds_to_close?: number | null
+          sell_window_btc?: number | null
+          spot?: number | null
+          vol_window_btc?: number | null
+          window_start?: string
+        }
+        Relationships: []
+      }
       btc_gate_config: {
         Row: {
           btc_entry_gate_enabled: boolean

@@ -1,11 +1,17 @@
 // BTC Price & Volume — live Binance BTC/USDT price, 24h change, and REAL
 // BTC traded volume (BTC + USD notional). Read-only display card.
+import { useEffect, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getBtcPriceVolume } from "@/lib/btcPriceVolume.functions";
 import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
+import {
+  computeFlowLean,
+  flowLeanWinRate,
+  logBtcFlowLean,
+} from "@/lib/btcFlowLean.functions";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 
 function fmtUsd(x: number | null | undefined): string {
@@ -41,6 +47,43 @@ export function BtcPriceVolumeCard() {
   const chg = data?.change24hPct ?? null;
   const up = (chg ?? 0) >= 0;
 
+  // --- Flow lean (read-only) ---------------------------------------------
+  // Lean uses the last 3 closed minutes (the leg that carried edge in the
+  // study); window imbalance is shown as context.
+  const imbM3 = win?.m3?.imbalance ?? null;
+  const imbWin = win?.window?.imbalance ?? null;
+  const lean = computeFlowLean(imbM3);
+  const now = Date.now();
+  const winStart = Math.floor(now / 900_000) * 900_000;
+  const secondsToClose = Math.max(0, Math.round((winStart + 900_000 - now) / 1000));
+  const winRate = flowLeanWinRate(lean, secondsToClose);
+
+  // Log one row per minute per window so the lean can be scored later.
+  const logFlow = useServerFn(logBtcFlowLean);
+  const loggedRef = useRef<string>("");
+  useEffect(() => {
+    if (!win?.ok || imbM3 == null) return;
+    const bucket = `${winStart}:${Math.floor(now / 60_000)}`;
+    if (loggedRef.current === bucket) return;
+    loggedRef.current = bucket;
+    void logFlow({
+      data: {
+        windowStart: new Date(winStart).toISOString(),
+        secondsToClose,
+        lean,
+        imbM3,
+        imbWindow: imbWin,
+        volWindowBtc: win?.window?.total ?? null,
+        buyWindowBtc: win?.window?.buy ?? null,
+        sellWindowBtc: win?.window?.sell ?? null,
+        spot: price,
+        expectedWinRate: winRate,
+      },
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [win?.lastCloseTime, imbM3]);
+
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -61,6 +104,37 @@ export function BtcPriceVolumeCard() {
           <span className="text-[10px] text-muted-foreground">
             {live.spot != null ? "live composite" : "binance last"}
           </span>
+        </div>
+
+        <div className="rounded border border-border/60 bg-muted/10 px-2 py-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-muted-foreground">Flow lean (last 3m taker flow)</span>
+            <Badge
+              className={
+                lean === "UP"
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                  : lean === "DOWN"
+                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                    : "bg-muted text-muted-foreground border border-border/60"
+              }
+            >
+              {lean}
+            </Badge>
+          </div>
+          <div className="mt-1 flex items-center justify-between font-mono text-[11px]">
+            <span>
+              3m {imbM3 != null ? `${(imbM3 * 100).toFixed(1)}%` : "—"}
+              <span className="text-muted-foreground">
+                {" "}· win {imbWin != null ? `${(imbWin * 100).toFixed(1)}%` : "—"}
+              </span>
+            </span>
+            <span className="text-muted-foreground">
+              {winRate != null ? `hist ${(winRate * 100).toFixed(0)}%` : "—"} · {Math.floor(secondsToClose / 60)}m{secondsToClose % 60}s left
+            </span>
+          </div>
+          <div className="mt-0.5 text-[10px] text-muted-foreground">
+            read-only · logged each minute · not wired to any bet
+          </div>
         </div>
 
         <div className="rounded border border-border/60 bg-muted/10 px-2 py-1.5">
