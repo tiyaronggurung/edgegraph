@@ -320,7 +320,7 @@ export function useStrikeOdds(
   const T = Math.max(secs, 1);
   const sd = sigmaSec * Math.sqrt(T);
   const zDrift = sd > 0 ? (logDist + drift * T) / sd : z;
-  const pUp = clamp(phi(zDrift), 0.01, 0.99);
+  const pRaw = clamp(phi(zDrift), 0.01, 0.99);
 
   // --- upcoming-flip detection (drift-adjusted barrier touch) --------------
   const side: "UP" | "DOWN" = spot >= strike ? "UP" : "DOWN";
@@ -359,9 +359,42 @@ export function useStrikeOdds(
     ? null
     : `${(flipRisk * 100).toFixed(0)}% touch risk · $${Math.abs(distanceUsd).toFixed(0)} to go at ${driftUsdPerMin >= 0 ? "+" : ""}${driftUsdPerMin.toFixed(0)}/min${etaTxt}`;
 
+  // --- calibration: distance alone is NOT enough ---------------------------
+  // Being past the strike only earns a high price when the indicators, the
+  // break structure and the measured drift all back that same side, and when
+  // there is little time left for the move to unwind. Otherwise the edge is
+  // pulled back toward 50/50 and hard-capped, so we never print a Kalshi-style
+  // 95% just because price is a few dollars the right side of the strike.
+  const sideSign = side === "UP" ? 1 : -1;
+  const conv: number[] = [];
+  if (tilt != null) conv.push(clamp(sideSign * tilt, -1, 1));
+  if (brk != null) conv.push(clamp(sideSign * brk, -1, 1));
+  conv.push(clamp((sideSign * drift) / Math.max(sigmaSec * 2, 1e-12), -1, 1));
+  // Cushion in σ: a $5 cushion with 12 minutes left is not real distance.
+  const cushionSigmas = sd > 0 ? clamp(b / sd, 0, 2) / 2 : 0;
+  conv.push(cushionSigmas);
+  const conviction = clamp(conv.reduce((a, v) => a + v, 0) / conv.length, -1, 1);
+
+  const agree = clamp(conviction, 0, 1);           // only positive backing lifts the cap
+  const timeDone = 1 - timeWeight;                 // 0 at open, 1 at the bell
+  const pCap = P_CAP_BASE + (P_CAP_MAX - P_CAP_BASE) * agree * timeDone;
+  let k = SHRINK_MIN + (1 - SHRINK_MIN) * ((conviction + 1) / 2);
+  if (tape.length < WARM_SAMPLES) k *= 0.85;       // cold tape = less trust in σ
+  const pCal = 0.5 + (pRaw - 0.5) * k;
+  const pUp = clamp(pCal, 1 - pCap, pCap);
+  const calibNote =
+    `conviction ${conviction >= 0 ? "+" : ""}${(conviction * 100).toFixed(0)}% · ` +
+    `cap ${(pCap * 100).toFixed(0)}% · raw ${(pRaw * 100).toFixed(0)}%`;
+
   const spread = SPREAD_BASE + SPREAD_K * Math.sqrt(secs / 900);
   return {
     pUp,
+    pRaw,
+    conviction,
+    pCap,
+    calibNote,
+    rangeHigh,
+    rangeLow,
     pBase,
     // Prices sum to exactly 1 (100¢ total); the margin is reported separately.
     upAsk: pUp,
