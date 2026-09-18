@@ -105,7 +105,7 @@ export function BtcPriceVolumeCard() {
   const currentRow = hist?.rows?.find((r) => r.result == null) ?? hist?.rows?.[0] ?? null;
 
   // Our own quote off the live composite vs the strike (display only).
-  const odds = useStrikeOdds(price, strike ?? null, kalshi?.secondsToClose ?? secondsToClose, {
+  const odds = useStrikeOdds(price, strike ?? null, secondsToClose, {
     m1: hist?.live?.m1 ?? null,
     m15: hist?.live?.m15 ?? null,
     avgBuyPrice: currentRow?.avgBuyPrice ?? null,
