@@ -199,6 +199,7 @@ export function BtcPriceVolumeCard() {
               {" · "}MACD <span className={tiltTone(odds.parts.macd)}>{sig(odds.parts.macd)}</span>
               {" · "}cost <span className={tiltTone(odds.parts.cost)}>{sig(odds.parts.cost)}</span>
               {" · "}flow <span className={tiltTone(odds.parts.flow)}>{sig(odds.parts.flow)}</span>
+              {" · "}brk <span className={tiltTone(odds.parts.brk)}>{sig(odds.parts.brk)}</span>
             </span>
             <span className="text-muted-foreground">
               tilt <span className={tiltTone(odds.tilt)}>{sig(odds.tilt)}</span>
@@ -234,8 +235,19 @@ export function BtcPriceVolumeCard() {
               base {odds.pBase == null ? "—" : `${(odds.pBase * 100).toFixed(0)}%`}
             </span>
           </div>
+          <div className="mt-1 flex items-center justify-between font-mono text-[10px]">
+            <span className="text-muted-foreground">
+              conviction{" "}
+              <span className={tiltTone(odds.conviction)}>{sig(odds.conviction)}</span>
+              {" · "}cap {(odds.pCap * 100).toFixed(0)}%
+            </span>
+            <span className="text-muted-foreground">
+              raw {odds.pRaw == null ? "—" : `${(odds.pRaw * 100).toFixed(0)}%`}
+            </span>
+          </div>
           <div className="mt-0.5 text-[10px] text-muted-foreground">
-            drift = live tape velocity + SMA/RSI/MACD/cost/flow, time-weighted · display only
+            distance alone is capped — a high price needs indicators, break structure and drift on
+            the same side, with time nearly out · display only
           </div>
 
         </div>

@@ -28,6 +28,11 @@ const VEL_WINDOW_MS = 30_000;  // horizon for measured price velocity
 const MOM_PERSIST = 0.35;      // how much of measured velocity is assumed to carry
 const TILT_DRIFT_K = 0.9;      // technical tilt → drift, in σ-per-second units
 const DRIFT_CAP_SIGMAS = 1.5;  // projected drift can't exceed this many σ√T
+const BRK_WINDOW_MS = 10 * 60_000; // range used for break-high / break-low read
+const P_CAP_BASE = 0.88;       // ceiling when indicators do NOT confirm the side
+const P_CAP_MAX = 0.97;        // ceiling only when confirmed AND time is nearly out
+const SHRINK_MIN = 0.55;       // how hard we pull a fully-unconfirmed edge to 50/50
+const WARM_SAMPLES = 40;       // tape size before we trust the vol estimate fully
 
 
 function erf(x: number): number {
@@ -61,6 +66,8 @@ export interface StrikeOddsParts {
   macd: number | null;
   cost: number | null;
   flow: number | null;
+  /** Where price sits in the last 10 min range: +1 = breaking highs, -1 = breaking lows. */
+  brk: number | null;
 }
 
 export interface StrikeOdds {
@@ -102,11 +109,22 @@ export interface StrikeOdds {
   etaSeconds: number | null;
   /** Seconds of runway left after a projected cross; negative = won't make it. */
   leadSeconds: number | null;
+  /** Uncalibrated probability straight from distance + drift. */
+  pRaw: number | null;
+  /** -1..+1: how much indicators, break structure and drift back the current side. */
+  conviction: number | null;
+  /** Ceiling applied to the winning side's probability. */
+  pCap: number;
+  /** Plain-language reason for the ceiling / shrink. */
+  calibNote: string;
+  /** Recent range used for the break read. */
+  rangeHigh: number | null;
+  rangeLow: number | null;
 }
 
 interface Tick { t: number; p: number }
 
-const EMPTY_PARTS: StrikeOddsParts = { sma: null, rsi: null, macd: null, cost: null, flow: null };
+const EMPTY_PARTS: StrikeOddsParts = { sma: null, rsi: null, macd: null, cost: null, flow: null, brk: null };
 
 export function useStrikeOdds(
   spot: number | null,
@@ -177,6 +195,7 @@ export function useStrikeOdds(
       macd: hist == null || ref == null || ref <= 0 ? null : clamp(hist / ref / 0.0005, -1, 1),
       cost: null,
       flow: null,
+      brk: null,
     } satisfies StrikeOddsParts;
   };
 
@@ -195,15 +214,40 @@ export function useStrikeOdds(
   }
   const flow = nz(ctx?.flowImbalance) == null ? null : clamp((ctx?.flowImbalance as number) / 0.25, -1, 1);
 
+  // --- break structure: where the running price sits in its recent range ----
+  // +1 = printing new highs, -1 = new lows, 0 = mid-range chop. This is what
+  // separates "price is above the strike" from "price is above the strike AND
+  // still breaking out".
+  let rangeHigh: number | null = null;
+  let rangeLow: number | null = null;
+  let brk: number | null = null;
+  if (spot != null && spot > 0 && tape.length >= 10) {
+    const lastT = (tape[tape.length - 1] as Tick).t;
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let i = tape.length - 1; i >= 0; i--) {
+      const t = tape[i] as Tick;
+      if (lastT - t.t > BRK_WINDOW_MS) break;
+      if (t.p > hi) hi = t.p;
+      if (t.p < lo) lo = t.p;
+    }
+    if (Number.isFinite(hi) && Number.isFinite(lo) && hi > lo) {
+      rangeHigh = hi;
+      rangeLow = lo;
+      brk = clamp(((spot - lo) / (hi - lo)) * 2 - 1, -1, 1);
+    }
+  }
+
   const parts: StrikeOddsParts = {
     sma: mix(p1.sma, p15.sma),
     rsi: mix(p1.rsi, p15.rsi),
     macd: mix(p1.macd, p15.macd),
     cost,
     flow,
+    brk,
   };
 
-  const W = { sma: 0.28, rsi: 0.18, macd: 0.26, cost: 0.16, flow: 0.12 } as const;
+  const W = { sma: 0.24, rsi: 0.14, macd: 0.22, cost: 0.12, flow: 0.10, brk: 0.18 } as const;
   let tiltNum = 0;
   let tiltDen = 0;
   (Object.keys(W) as (keyof typeof W)[]).forEach((k) => {
@@ -236,6 +280,8 @@ export function useStrikeOdds(
   const emptyTail = {
     drift: null, driftUsdPerMin: null, distanceUsd: null,
     etaSeconds: null, leadSeconds: null,
+    pRaw: null, conviction: null, pCap: P_CAP_BASE, calibNote: "warming up",
+    rangeHigh, rangeLow,
   };
 
   if (spot == null || strike == null || strike <= 0 || spot <= 0) {
@@ -274,7 +320,7 @@ export function useStrikeOdds(
   const T = Math.max(secs, 1);
   const sd = sigmaSec * Math.sqrt(T);
   const zDrift = sd > 0 ? (logDist + drift * T) / sd : z;
-  const pUp = clamp(phi(zDrift), 0.01, 0.99);
+  const pRaw = clamp(phi(zDrift), 0.01, 0.99);
 
   // --- upcoming-flip detection (drift-adjusted barrier touch) --------------
   const side: "UP" | "DOWN" = spot >= strike ? "UP" : "DOWN";
@@ -313,9 +359,42 @@ export function useStrikeOdds(
     ? null
     : `${(flipRisk * 100).toFixed(0)}% touch risk · $${Math.abs(distanceUsd).toFixed(0)} to go at ${driftUsdPerMin >= 0 ? "+" : ""}${driftUsdPerMin.toFixed(0)}/min${etaTxt}`;
 
+  // --- calibration: distance alone is NOT enough ---------------------------
+  // Being past the strike only earns a high price when the indicators, the
+  // break structure and the measured drift all back that same side, and when
+  // there is little time left for the move to unwind. Otherwise the edge is
+  // pulled back toward 50/50 and hard-capped, so we never print a Kalshi-style
+  // 95% just because price is a few dollars the right side of the strike.
+  const sideSign = side === "UP" ? 1 : -1;
+  const conv: number[] = [];
+  if (tilt != null) conv.push(clamp(sideSign * tilt, -1, 1));
+  if (brk != null) conv.push(clamp(sideSign * brk, -1, 1));
+  conv.push(clamp((sideSign * drift) / Math.max(sigmaSec * 2, 1e-12), -1, 1));
+  // Cushion in σ: a $5 cushion with 12 minutes left is not real distance.
+  const cushionSigmas = sd > 0 ? clamp(b / sd, 0, 2) / 2 : 0;
+  conv.push(cushionSigmas);
+  const conviction = clamp(conv.reduce((a, v) => a + v, 0) / conv.length, -1, 1);
+
+  const agree = clamp(conviction, 0, 1);           // only positive backing lifts the cap
+  const timeDone = 1 - timeWeight;                 // 0 at open, 1 at the bell
+  const pCap = P_CAP_BASE + (P_CAP_MAX - P_CAP_BASE) * agree * timeDone;
+  let k = SHRINK_MIN + (1 - SHRINK_MIN) * ((conviction + 1) / 2);
+  if (tape.length < WARM_SAMPLES) k *= 0.85;       // cold tape = less trust in σ
+  const pCal = 0.5 + (pRaw - 0.5) * k;
+  const pUp = clamp(pCal, 1 - pCap, pCap);
+  const calibNote =
+    `conviction ${conviction >= 0 ? "+" : ""}${(conviction * 100).toFixed(0)}% · ` +
+    `cap ${(pCap * 100).toFixed(0)}% · raw ${(pRaw * 100).toFixed(0)}%`;
+
   const spread = SPREAD_BASE + SPREAD_K * Math.sqrt(secs / 900);
   return {
     pUp,
+    pRaw,
+    conviction,
+    pCap,
+    calibNote,
+    rangeHigh,
+    rangeLow,
     pBase,
     // Prices sum to exactly 1 (100¢ total); the margin is reported separately.
     upAsk: pUp,
