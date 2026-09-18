@@ -9,6 +9,7 @@ import {
   getCheapEntrySettings,
   setCheapEntryEnabled,
   setCheapEntryStake,
+  setCheapEntryLive,
   getCheapEntryStats,
   getCheapEntrySkips,
 } from "@/lib/cheapEntryAutoBet.functions";
@@ -24,6 +25,7 @@ export function CheapEntryAutoBetPanel() {
   const skipsFn = useServerFn(getCheapEntrySkips);
   const setEnabledFn = useServerFn(setCheapEntryEnabled);
   const setStakeFn = useServerFn(setCheapEntryStake);
+  const setLiveFn = useServerFn(setCheapEntryLive);
   const qc = useQueryClient();
 
   const settings = useQuery({
@@ -61,6 +63,13 @@ export function CheapEntryAutoBetPanel() {
     qc.invalidateQueries({ queryKey: ["cheap-entry-settings"] });
   }
 
+  async function toggleLive(on: boolean) {
+    const res = await setLiveFn({ data: { live: on } });
+    if (!res.ok) { toast.error(res.error); return; }
+    toast.success(on ? "REAL MONEY mode ON — live Kalshi orders" : "Back to paper money");
+    qc.invalidateQueries({ queryKey: ["cheap-entry-settings"] });
+  }
+
   async function saveStake() {
     const cents = Math.round(Number(stakeUsd) * 100);
     if (!Number.isFinite(cents) || cents < 100 || cents > 10000) {
@@ -95,13 +104,39 @@ export function CheapEntryAutoBetPanel() {
     <div className="rounded-lg border border-border bg-card p-3 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <div className="text-xs uppercase tracking-widest font-bold">Cheap Entry Auto-Bet</div>
+          <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            Cheap Entry Auto-Bet
+            {settings.data?.live && (
+              <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[9px] font-bold text-red-400">
+                REAL MONEY
+              </span>
+            )}
+          </div>
           <div className="text-[10px] text-muted-foreground">
-            paper only · buys 20–65¢ · study side after lock, model side inside T-8m
+            buys 20–65¢ · study side after lock, model side inside T-8m
           </div>
         </div>
         <Switch checked={!!settings.data?.enabled} onCheckedChange={toggle} />
       </div>
+
+      <div className="flex items-center justify-between gap-2 rounded border border-red-500/30 bg-red-500/5 px-2 py-1.5">
+        <div className="text-[10px]">
+          <div className="font-bold uppercase tracking-widest text-red-400">Live (real money)</div>
+          <div className="text-muted-foreground">
+            {settings.data?.live
+              ? "Real Kalshi orders are placed automatically."
+              : settings.data?.hasKeys
+                ? "Off — paper fills only."
+                : "Add your Kalshi keys in Settings to enable."}
+          </div>
+        </div>
+        <Switch
+          checked={!!settings.data?.live}
+          disabled={!settings.data?.hasKeys}
+          onCheckedChange={toggleLive}
+        />
+      </div>
+
 
       <div className="flex items-end gap-2">
         <div className="space-y-1">
@@ -128,6 +163,7 @@ export function CheapEntryAutoBetPanel() {
           <thead className="text-muted-foreground">
             <tr className="text-left">
               <th className="py-1 font-medium">Window</th>
+              <th className="font-medium">Mode</th>
               <th className="font-medium">Src</th>
               <th className="font-medium">Side</th>
               <th className="font-medium text-right">Entry</th>
@@ -139,6 +175,9 @@ export function CheapEntryAutoBetPanel() {
               <tr key={r.id} className="border-t border-border/40">
                 <td className="py-1 tabular-nums">
                   {new Date(r.close_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </td>
+                <td className={r.live ? "text-red-400 font-bold" : "text-muted-foreground"}>
+                  {r.live ? "LIVE" : "paper"}
                 </td>
                 <td className="text-muted-foreground">{r.pick_source ?? "—"}</td>
                 <td className={r.side === "YES" ? "text-emerald-400" : "text-red-400"}>
@@ -153,7 +192,7 @@ export function CheapEntryAutoBetPanel() {
               </tr>
             ))}
             {!stats.data?.rows?.length && (
-              <tr><td colSpan={5} className="py-3 text-center text-muted-foreground">
+              <tr><td colSpan={6} className="py-3 text-center text-muted-foreground">
                 No cheap entries yet — waiting for a window priced 20–65¢.
               </td></tr>
             )}
@@ -175,8 +214,9 @@ export function CheapEntryAutoBetPanel() {
       )}
 
       <div className="text-[9px] text-muted-foreground leading-relaxed">
-        Paper money only — no Kalshi order is sent. One buy per window, never under 20¢,
-        never inside the last 60 seconds. Runs on the server, so it works with this tab closed.
+        With Live off this is paper money. With Live on, real Kalshi orders are placed for you.
+        One buy per window, never under 20¢, never inside the last 60 seconds, and only windows
+        starting after you switch it on. Runs on the server, so it works with this tab closed.
       </div>
     </div>
   );

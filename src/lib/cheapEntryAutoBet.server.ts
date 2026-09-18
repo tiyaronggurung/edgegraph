@@ -123,13 +123,16 @@ export async function driveCheapEntry(): Promise<CheapEntryTickResult> {
 
   const { data: users } = await supabaseAdmin
     .from("profiles")
-    .select("id, cheap_entry_stake_cents, cheap_entry_enabled_at")
+    .select("id, cheap_entry_stake_cents, cheap_entry_enabled_at, cheap_entry_live_enabled, kalshi_api_key_id, kalshi_private_key_pem")
     .eq("cheap_entry_enabled", true)
     .limit(200);
   const userRows = (users ?? []) as Array<{
     id: string;
     cheap_entry_stake_cents: number | null;
     cheap_entry_enabled_at: string | null;
+    cheap_entry_live_enabled: boolean | null;
+    kalshi_api_key_id: string | null;
+    kalshi_private_key_pem: string | null;
   }>;
 
   const out: CheapEntryTickResult = {
@@ -149,9 +152,17 @@ export async function driveCheapEntry(): Promise<CheapEntryTickResult> {
       .select("user_id, ticker")
       .in("ticker", tickers)
       .filter("entry_snapshot->>source", "eq", "cheap_entry");
-    const already = new Set(
-      ((existing ?? []) as any[]).map((r) => `${r.user_id}|${r.ticker}`),
-    );
+    // Live fills live in crypto_trades — check both so one window is never
+    // bought twice, even if the live switch was flipped mid-window.
+    const { data: existingLive } = await supabaseAdmin
+      .from("crypto_trades")
+      .select("user_id, ticker")
+      .in("ticker", tickers)
+      .filter("inputs_snapshot->>source", "eq", "cheap_entry");
+    const already = new Set([
+      ...((existing ?? []) as any[]).map((r) => `${r.user_id}|${r.ticker}`),
+      ...((existingLive ?? []) as any[]).map((r) => `${r.user_id}|${r.ticker}`),
+    ]);
 
     // Ask price per (ticker, side) — fetched once, shared across users.
     const askCache = new Map<string, number | null>();
@@ -186,6 +197,51 @@ export async function driveCheapEntry(): Promise<CheapEntryTickResult> {
           const reason = askCents < MIN_ASK_CENTS ? `below_${MIN_ASK_CENTS}c` : `above_${MAX_ASK_CENTS}c`;
           await logSkip(supabaseAdmin, u.id, w.ticker, w.close_time, w.strike, target.side, askCents, secondsToClose, reason);
           out.results.push({ userId: u.id, ticker: w.ticker, reason, fired: false, askCents });
+          continue;
+        }
+
+        const liveStakeCents = Math.max(100, Math.min(10000, Number(u.cheap_entry_stake_cents) || DEFAULT_STAKE_CENTS));
+
+        // ---- LIVE (real money) path ----
+        if (u.cheap_entry_live_enabled) {
+          if (!u.kalshi_api_key_id || !u.kalshi_private_key_pem) {
+            await logSkip(supabaseAdmin, u.id, w.ticker, w.close_time, w.strike, target.side, askCents, secondsToClose, "live_no_keys");
+            out.results.push({ userId: u.id, ticker: w.ticker, reason: "live_no_keys", fired: false, askCents });
+            continue;
+          }
+          const liveContracts = Math.max(1, Math.floor(liveStakeCents / askCents));
+          try {
+            const { submitKalshiBuy } = await import("./cryptoTrades.functions");
+            const result = await submitKalshiBuy(supabaseAdmin, u.id, {
+              ticker: w.ticker,
+              side: target.side,
+              contracts: liveContracts,
+              limitPriceCents: askCents,
+              strike: w.strike ?? undefined,
+              closeTime: w.close_time,
+              stakeUsd: liveStakeCents / 100,
+              inputsSnapshot: {
+                source: "cheap_entry",
+                pick_source: target.source,
+                ask_cents: askCents,
+                stake_cents: liveStakeCents,
+                seconds_to_close: secondsToClose,
+                strike: w.strike,
+                fired_at: new Date().toISOString(),
+              },
+            } as never);
+            already.add(`${u.id}|${w.ticker}`);
+            if (result.fillCount > 0) {
+              out.fired++;
+              out.results.push({ userId: u.id, ticker: w.ticker, reason: `fired_live_${target.source}`, fired: true, askCents });
+            } else {
+              out.results.push({ userId: u.id, ticker: w.ticker, reason: "live_unfilled", fired: false, askCents });
+            }
+          } catch (e: any) {
+            const msg = (e?.message ?? String(e)).slice(0, 120);
+            await logSkip(supabaseAdmin, u.id, w.ticker, w.close_time, w.strike, target.side, askCents, secondsToClose, `live_error:${msg}`);
+            out.results.push({ userId: u.id, ticker: w.ticker, reason: `live_error:${msg}`, fired: false, askCents });
+          }
           continue;
         }
 

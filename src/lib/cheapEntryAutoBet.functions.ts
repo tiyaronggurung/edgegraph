@@ -15,6 +15,7 @@ export interface CheapEntryFill {
   pnl_cents: number | null;
   created_at: string;
   pick_source: "study" | "model" | null;
+  live: boolean;
 }
 
 export const getCheapEntrySettings = createServerFn({ method: "GET" })
@@ -23,13 +24,38 @@ export const getCheapEntrySettings = createServerFn({ method: "GET" })
     const { supabase, userId } = context as any;
     const { data } = await supabase
       .from("profiles")
-      .select("cheap_entry_enabled, cheap_entry_stake_cents")
+      .select("cheap_entry_enabled, cheap_entry_stake_cents, cheap_entry_live_enabled, kalshi_api_key_id, kalshi_private_key_pem")
       .eq("id", userId)
       .maybeSingle();
     return {
       enabled: !!data?.cheap_entry_enabled,
+      live: !!data?.cheap_entry_live_enabled,
+      hasKeys: !!(data?.kalshi_api_key_id && data?.kalshi_private_key_pem),
       stakeCents: Math.max(100, Math.min(10000, Number(data?.cheap_entry_stake_cents) || 1000)),
     };
+  });
+
+export const setCheapEntryLive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ live: z.boolean() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+    if (data.live) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("kalshi_api_key_id, kalshi_private_key_pem")
+        .eq("id", userId)
+        .maybeSingle();
+      if (!prof?.kalshi_api_key_id || !prof?.kalshi_private_key_pem) {
+        return { ok: false as const, error: "Add your Kalshi keys in Settings before turning on real money." };
+      }
+    }
+    const { error } = await supabase
+      .from("profiles")
+      .update({ cheap_entry_live_enabled: data.live } as never)
+      .eq("id", userId);
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const, live: data.live };
   });
 
 export const setCheapEntryEnabled = createServerFn({ method: "POST" })
@@ -77,7 +103,7 @@ export const getCheapEntryStats = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false })
       .limit(60);
 
-    const rows = ((data ?? []) as any[]).map((r): CheapEntryFill => ({
+    const paperRows = ((data ?? []) as any[]).map((r): CheapEntryFill => ({
       id: r.id,
       ticker: r.ticker,
       close_time: r.close_time,
@@ -89,7 +115,44 @@ export const getCheapEntryStats = createServerFn({ method: "GET" })
       pnl_cents: r.pnl_cents,
       created_at: r.created_at,
       pick_source: (r.entry_snapshot?.pick_source as "study" | "model" | undefined) ?? null,
+      live: false,
     }));
+
+    // Real-money fills for the same engine.
+    const { data: liveData } = await supabase
+      .from("crypto_trades")
+      .select("id,ticker,close_time,side,contracts,stake_usd,status,pnl_usd,created_at,inputs_snapshot")
+      .eq("user_id", userId)
+      .filter("inputs_snapshot->>source", "eq", "cheap_entry")
+      .order("created_at", { ascending: false })
+      .limit(60);
+
+    const liveRows = ((liveData ?? []) as any[]).map((r): CheapEntryFill => {
+      const stakeCents = Math.round(Number(r.stake_usd ?? 0) * 100);
+      const pnl = r.pnl_usd == null ? null : Math.round(Number(r.pnl_usd) * 100);
+      const status: CheapEntryFill["status"] =
+        r.status === "error" ? "void" : pnl == null ? "open" : pnl > 0 ? "won" : "lost";
+      return {
+        id: r.id,
+        ticker: r.ticker,
+        close_time: r.close_time,
+        side: r.side,
+        contracts: r.contracts ?? 0,
+        fill_price_cents:
+          Number(r.inputs_snapshot?.ask_cents) ||
+          (r.contracts ? Math.round(stakeCents / r.contracts) : 0),
+        stake_cents: stakeCents,
+        status,
+        pnl_cents: pnl,
+        created_at: r.created_at,
+        pick_source: (r.inputs_snapshot?.pick_source as "study" | "model" | undefined) ?? null,
+        live: true,
+      };
+    });
+
+    const rows = [...liveRows, ...paperRows]
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+      .slice(0, 60);
 
     const tally = (list: CheapEntryFill[]) => ({
       fires: list.length,
