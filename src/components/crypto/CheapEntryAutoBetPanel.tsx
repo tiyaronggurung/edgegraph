@@ -9,6 +9,7 @@ import {
   getCheapEntrySettings,
   setCheapEntryEnabled,
   setCheapEntryStake,
+  setCheapEntryLive,
   getCheapEntryStats,
   getCheapEntrySkips,
 } from "@/lib/cheapEntryAutoBet.functions";
