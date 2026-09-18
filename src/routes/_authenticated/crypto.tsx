@@ -12,6 +12,7 @@ import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.f
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades, checkKalshiBalance, diagnoseKalshiAuth, type KalshiDiagStep } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats, getCalibrationReport, type CalibrationRow } from "@/lib/cryptoPredictions.functions";
 import { PredictionCoverageAudit } from "@/components/crypto/PredictionCoverageAudit";
+import { CheapEntryAutoBetPanel } from "@/components/crypto/CheapEntryAutoBetPanel";
 import { FlowLeanLog } from "@/components/crypto/FlowLeanLog";
 
 import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, autoExitLivePositions, settleAutoTradeSkipLog, getSkipReport, sellOddsBetOrder, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
@@ -4059,6 +4060,8 @@ function CryptoPage() {
         <PredictionCoverageAudit />
         <FlowLeanLog />
       </div>
+
+      <CheapEntryAutoBetPanel />
 
 
       <BtcPriceVolumeCard />
