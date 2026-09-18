@@ -280,6 +280,8 @@ export function useStrikeOdds(
   const emptyTail = {
     drift: null, driftUsdPerMin: null, distanceUsd: null,
     etaSeconds: null, leadSeconds: null,
+    pRaw: null, conviction: null, pCap: P_CAP_BASE, calibNote: "warming up",
+    rangeHigh, rangeLow,
   };
 
   if (spot == null || strike == null || strike <= 0 || spot <= 0) {
