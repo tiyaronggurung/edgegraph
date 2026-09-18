@@ -12,6 +12,8 @@ import { getBtcMarkets, type BtcMarket, type BtcCandle } from "@/lib/cryptoBtc.f
 import { placeKalshiOrder, listMyCryptoTrades, checkKalshiConfigured, sellKalshiOrder, settleExpiredTrades, checkKalshiBalance, diagnoseKalshiAuth, type KalshiDiagStep } from "@/lib/cryptoTrades.functions";
 import { getPredictionStats, getCalibrationReport, type CalibrationRow } from "@/lib/cryptoPredictions.functions";
 import { PredictionCoverageAudit } from "@/components/crypto/PredictionCoverageAudit";
+import { FlowLeanLog } from "@/components/crypto/FlowLeanLog";
+
 import { listAutoTradeOrders, settleAutoTradeOrders, runAutoTrade, autoExitLivePositions, settleAutoTradeSkipLog, getSkipReport, sellOddsBetOrder, type AutoTradeOrderRow } from "@/lib/cryptoAutoTrade.functions";
 import { recordOddsTape } from "@/lib/oddsTape.functions";
 import { getRecentOddsFlip } from "@/lib/oddsFlipAlert.functions";
@@ -4053,7 +4055,11 @@ function CryptoPage() {
       {/* Model / PRED / Green Hours bet panels moved to /crypto-paper (paper-only sandbox).
           Components remain exported from this file so the real-money path is preserved. */}
       {/* Read-only audit: which 15m windows never got a prediction row */}
-      <PredictionCoverageAudit />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <PredictionCoverageAudit />
+        <FlowLeanLog />
+      </div>
+
 
       <BtcPriceVolumeCard />
 
