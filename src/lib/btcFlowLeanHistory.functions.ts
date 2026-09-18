@@ -31,7 +31,17 @@ export interface FlowRollup {
   /** USD imbalance: (in - out) / total. */
   netUsdPct: number | null;
   priceChangePct: number | null;
+  /** Taker fee cost on both sides at FEE_RATE. */
+  feeUsd: number;
+  /** Avg buy price incl. fee paid, avg sell price net of fee received. */
+  effAvgBuyPrice: number | null;
+  effAvgSellPrice: number | null;
+  /** Net USD flow after fees, as % of total traded USD. */
+  netUsdPctAfterFees: number | null;
 }
+
+/** Taker fee assumption on each side (0.10%). */
+export const FEE_RATE = 0.001;
 
 export interface FlowLeanHistoryResult {
   rows: FlowLeanHistoryRow[];
@@ -81,6 +91,13 @@ function toRollup(label: string, agg: Agg): FlowRollup {
     netUsdPct: totalUsd > 0 ? (agg.buyUsd - agg.sellUsd) / totalUsd : null,
     priceChangePct:
       agg.firstOpen && agg.lastClose ? (agg.lastClose - agg.firstOpen) / agg.firstOpen : null,
+    feeUsd: totalUsd * FEE_RATE,
+    effAvgBuyPrice: agg.buyBtc > 0 ? (agg.buyUsd * (1 + FEE_RATE)) / agg.buyBtc : null,
+    effAvgSellPrice: agg.sellBtc > 0 ? (agg.sellUsd * (1 - FEE_RATE)) / agg.sellBtc : null,
+    netUsdPctAfterFees:
+      totalUsd > 0
+        ? (agg.buyUsd * (1 + FEE_RATE) - agg.sellUsd * (1 - FEE_RATE)) / totalUsd
+        : null,
   };
 }
 

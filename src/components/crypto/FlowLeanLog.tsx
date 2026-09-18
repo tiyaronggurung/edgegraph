@@ -55,8 +55,9 @@ export function FlowLeanLog() {
                 <th className="text-right font-normal px-2">In $</th>
                 <th className="text-right font-normal px-2">Out $</th>
                 <th className="text-right font-normal px-2">Net $</th>
-                <th className="text-right font-normal px-2">Avg buy</th>
-                <th className="text-right font-normal px-2">Avg sell</th>
+                <th className="text-right font-normal px-2">Fees</th>
+                <th className="text-right font-normal px-2">Avg buy*</th>
+                <th className="text-right font-normal px-2">Avg sell*</th>
                 <th className="text-right font-normal">Px</th>
               </tr>
             </thead>
@@ -68,13 +69,18 @@ export function FlowLeanLog() {
                   <td className="px-2 text-right text-rose-400">{usd(r.sellUsd)}</td>
                   <td
                     className={`px-2 text-right font-semibold ${
-                      (r.netUsdPct ?? 0) > 0 ? "text-emerald-400" : (r.netUsdPct ?? 0) < 0 ? "text-rose-400" : ""
+                      (r.netUsdPctAfterFees ?? 0) > 0
+                        ? "text-emerald-400"
+                        : (r.netUsdPctAfterFees ?? 0) < 0
+                          ? "text-rose-400"
+                          : ""
                     }`}
                   >
-                    {r.netUsdPct == null ? "—" : `${(r.netUsdPct * 100).toFixed(1)}%`}
+                    {r.netUsdPctAfterFees == null ? "—" : `${(r.netUsdPctAfterFees * 100).toFixed(1)}%`}
                   </td>
-                  <td className="px-2 text-right">{price(r.avgBuyPrice)}</td>
-                  <td className="px-2 text-right">{price(r.avgSellPrice)}</td>
+                  <td className="px-2 text-right text-amber-400/80">{usd(r.feeUsd)}</td>
+                  <td className="px-2 text-right">{price(r.effAvgBuyPrice)}</td>
+                  <td className="px-2 text-right">{price(r.effAvgSellPrice)}</td>
                   <td
                     className={`text-right ${
                       (r.priceChangePct ?? 0) > 0 ? "text-emerald-400" : (r.priceChangePct ?? 0) < 0 ? "text-rose-400" : ""
@@ -165,7 +171,8 @@ export function FlowLeanLog() {
         </div>
       )}
       <div className="px-3 py-1.5 border-t border-border text-[10px] text-muted-foreground">
-        read-only · result = 15m candle open vs close · not wired to any bet
+        read-only · result = 15m candle open vs close · * avg prices include 0.10% taker fee (buy +fee,
+        sell −fee) · net $ is after fees · not wired to any bet
       </div>
     </div>
   );
