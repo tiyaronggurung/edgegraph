@@ -320,7 +320,11 @@ export function useStrikeOdds(
   // endpoint rather than being bolted on after the fact.
   const T = Math.max(secs, 1);
   const sd = sigmaSec * Math.sqrt(T);
-  const zDrift = sd > 0 ? (logDist + drift * T) / sd : z;
+  // Drift may carry price to the strike plus a small overshoot — never further.
+  // Momentum alone must not price the far side of the strike as the favourite.
+  const maxMove = Math.abs(logDist) + CROSS_OVERSHOOT * sd;
+  const driftMove = clamp(drift * T, -maxMove, maxMove);
+  const zDrift = sd > 0 ? (logDist + driftMove) / sd : z;
   const pRaw = clamp(phi(zDrift), 0.01, 0.99);
 
   // --- upcoming-flip detection (drift-adjusted barrier touch) --------------
