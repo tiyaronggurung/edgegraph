@@ -37,12 +37,22 @@ export function BtcPriceVolumeCard() {
     queryKey: ["btc-price-volume"],
     queryFn: () => fn(),
     refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    retry: 3,
+    retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
     placeholderData: keepPreviousData,
   });
   const { data: win } = useQuery({
     queryKey: ["btc-price-volume-15m-window"],
     queryFn: () => spotVolFn(),
     refetchInterval: 3_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    retry: 3,
+    retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
     placeholderData: keepPreviousData,
   });
 
