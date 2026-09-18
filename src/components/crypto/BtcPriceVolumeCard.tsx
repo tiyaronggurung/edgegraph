@@ -72,6 +72,10 @@ export function BtcPriceVolumeCard() {
   const secondsToClose = Math.max(0, Math.round((winStart + 900_000 - now) / 1000));
   const winRate = flowLeanWinRate(lean, secondsToClose);
 
+  // Our own quote off the live composite vs the strike (display only).
+  const odds = useStrikeOdds(price, strike ?? null, kalshi?.secondsToClose ?? secondsToClose);
+  const cents = (v: number | null) => (v == null ? "—" : `${(v * 100).toFixed(1)}¢`);
+
   // Log one row per minute per window so the lean can be scored later.
   const logFlow = useServerFn(logBtcFlowLean);
   const loggedRef = useRef<string>("");
