@@ -136,6 +136,11 @@ export function BtcPriceVolumeCard() {
   const tiltTone = (v: number | null) =>
     v == null ? "text-muted-foreground" : v > 0.1 ? "text-emerald-400" : v < -0.1 ? "text-rose-400" : "text-muted-foreground";
   const sig = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${(v * 100).toFixed(0)}`);
+  // "now UP +$22" — which side price currently sits on, and by how much.
+  const gapTxt =
+    odds.distanceUsd == null || odds.side == null
+      ? ""
+      : ` ${odds.side === "UP" ? "+" : "−"}$${Math.abs(odds.distanceUsd).toFixed(0)}`;
 
   // Log one row per minute per window so the lean can be scored later.
   const logFlow = useServerFn(logBtcFlowLean);
