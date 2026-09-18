@@ -30,6 +30,12 @@ export function BtcPriceVolumeCard() {
     refetchInterval: 10_000,
     placeholderData: keepPreviousData,
   });
+  const { data: win } = useQuery({
+    queryKey: ["btc-price-volume-15m-window"],
+    queryFn: () => spotVolFn(),
+    refetchInterval: 10_000,
+    placeholderData: keepPreviousData,
+  });
 
   const price = live.spot ?? data?.price ?? null;
   const chg = data?.change24hPct ?? null;
@@ -55,6 +61,24 @@ export function BtcPriceVolumeCard() {
           <span className="text-[10px] text-muted-foreground">
             {live.spot != null ? "live composite" : "binance last"}
           </span>
+        </div>
+
+        <div className="rounded border border-border/60 bg-muted/10 px-2 py-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-muted-foreground">BTC volume this 15m window</span>
+            {win?.window && (
+              <span className="text-[10px] font-mono">
+                <span className="text-emerald-400">{win.window.buy.toFixed(1)}↑</span>
+                {" / "}
+                <span className="text-rose-400">{win.window.sell.toFixed(1)}↓</span>
+              </span>
+            )}
+          </div>
+          <div className="font-mono font-semibold">
+            {win?.window != null
+              ? `${win.window.total.toLocaleString(undefined, { maximumFractionDigits: 1 })} BTC`
+              : "—"}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
