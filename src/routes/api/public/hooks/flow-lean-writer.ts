@@ -15,17 +15,28 @@ function leg(rows: Kline[]) {
   if (!rows.length) return null;
   let total = 0;
   let buy = 0;
+  let quoteTotal = 0;
+  let quoteBuy = 0;
   for (const r of rows) {
     const v = Number(r[5]);
     const tb = Number(r[9]);
+    const q = Number(r[7]);
+    const qb = Number(r[10]);
     if (Number.isFinite(v)) total += v;
     if (Number.isFinite(tb)) buy += tb;
+    if (Number.isFinite(q)) quoteTotal += q;
+    if (Number.isFinite(qb)) quoteBuy += qb;
   }
   const sell = Math.max(0, total - buy);
+  const quoteSell = Math.max(0, quoteTotal - quoteBuy);
   return {
     buy,
     sell,
     total,
+    quoteBuy,
+    quoteSell,
+    avgBuyPrice: buy > 0 ? quoteBuy / buy : null,
+    avgSellPrice: sell > 0 ? quoteSell / sell : null,
     imbalance: total > 0 ? (buy - sell) / total : 0,
   };
 }
@@ -98,6 +109,10 @@ export const Route = createFileRoute("/api/public/hooks/flow-lean-writer")({
           vol_window_btc: w ? Number(w.total.toFixed(4)) : null,
           buy_window_btc: w ? Number(w.buy.toFixed(4)) : null,
           sell_window_btc: w ? Number(w.sell.toFixed(4)) : null,
+          buy_quote_usd: w ? Number(w.quoteBuy.toFixed(2)) : null,
+          sell_quote_usd: w ? Number(w.quoteSell.toFixed(2)) : null,
+          avg_buy_price: w?.avgBuyPrice != null ? Number(w.avgBuyPrice.toFixed(2)) : null,
+          avg_sell_price: w?.avgSellPrice != null ? Number(w.avgSellPrice.toFixed(2)) : null,
           spot,
           expected_win_rate: null,
         });

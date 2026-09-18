@@ -9,6 +9,15 @@ const hm = (iso: string) =>
 
 const pct = (v: number | null) => (v == null ? "—" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(0)}%`);
 const btc = (v: number | null) => (v == null ? "—" : v.toFixed(1));
+const usd = (v: number | null) => {
+  if (v == null) return "—";
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+  if (v >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
+  return `$${v.toFixed(0)}`;
+};
+const price = (v: number | null) =>
+  v == null ? "—" : `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
 export function FlowLeanLog() {
   const fn = useServerFn(getBtcFlowLeanHistory);
@@ -37,6 +46,49 @@ export function FlowLeanLog() {
         ) : null}
       </div>
 
+      {d && d.rollups.length > 0 && (
+        <div className="px-3 py-2 border-b border-border overflow-x-auto">
+          <table className="w-full text-[11px] min-w-[430px]">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                <th className="text-left font-normal py-0.5">Span</th>
+                <th className="text-right font-normal px-2">In $</th>
+                <th className="text-right font-normal px-2">Out $</th>
+                <th className="text-right font-normal px-2">Net $</th>
+                <th className="text-right font-normal px-2">Avg buy</th>
+                <th className="text-right font-normal px-2">Avg sell</th>
+                <th className="text-right font-normal">Px</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.rollups.map(r => (
+                <tr key={r.label} className="border-t border-border/40">
+                  <td className="py-1 text-muted-foreground">{r.label}</td>
+                  <td className="px-2 text-right text-emerald-400">{usd(r.buyUsd)}</td>
+                  <td className="px-2 text-right text-rose-400">{usd(r.sellUsd)}</td>
+                  <td
+                    className={`px-2 text-right font-semibold ${
+                      (r.netUsdPct ?? 0) > 0 ? "text-emerald-400" : (r.netUsdPct ?? 0) < 0 ? "text-rose-400" : ""
+                    }`}
+                  >
+                    {r.netUsdPct == null ? "—" : `${(r.netUsdPct * 100).toFixed(1)}%`}
+                  </td>
+                  <td className="px-2 text-right">{price(r.avgBuyPrice)}</td>
+                  <td className="px-2 text-right">{price(r.avgSellPrice)}</td>
+                  <td
+                    className={`text-right ${
+                      (r.priceChangePct ?? 0) > 0 ? "text-emerald-400" : (r.priceChangePct ?? 0) < 0 ? "text-rose-400" : ""
+                    }`}
+                  >
+                    {r.priceChangePct == null ? "—" : `${(r.priceChangePct * 100).toFixed(2)}%`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {!d ? (
         <div className="p-4 text-sm text-muted-foreground">{q.isLoading ? "Loading…" : "No data."}</div>
       ) : d.rows.length === 0 ? (
@@ -47,8 +99,12 @@ export function FlowLeanLog() {
             <thead className="sticky top-0 bg-card">
               <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 <th className="text-left px-3 py-1.5 font-normal">Window</th>
-                <th className="text-right px-2 py-1.5 font-normal">In ↑</th>
-                <th className="text-right px-2 py-1.5 font-normal">Out ↓</th>
+                <th className="text-right px-2 py-1.5 font-normal">In ₿</th>
+                <th className="text-right px-2 py-1.5 font-normal">Out ₿</th>
+                <th className="text-right px-2 py-1.5 font-normal">In $</th>
+                <th className="text-right px-2 py-1.5 font-normal">Out $</th>
+                <th className="text-right px-2 py-1.5 font-normal">Avg buy</th>
+                <th className="text-right px-2 py-1.5 font-normal">Avg sell</th>
                 <th className="text-right px-2 py-1.5 font-normal">Net</th>
                 <th className="text-center px-2 py-1.5 font-normal">Lean</th>
                 <th className="text-center px-3 py-1.5 font-normal">Result</th>
@@ -60,6 +116,10 @@ export function FlowLeanLog() {
                   <td className="px-3 py-1.5 text-muted-foreground">{hm(r.windowStart)}</td>
                   <td className="px-2 py-1.5 text-right text-emerald-400">{btc(r.buyBtc)}</td>
                   <td className="px-2 py-1.5 text-right text-rose-400">{btc(r.sellBtc)}</td>
+                  <td className="px-2 py-1.5 text-right text-emerald-400">{usd(r.buyUsd)}</td>
+                  <td className="px-2 py-1.5 text-right text-rose-400">{usd(r.sellUsd)}</td>
+                  <td className="px-2 py-1.5 text-right text-muted-foreground">{price(r.avgBuyPrice)}</td>
+                  <td className="px-2 py-1.5 text-right text-muted-foreground">{price(r.avgSellPrice)}</td>
                   <td
                     className={`px-2 py-1.5 text-right font-semibold ${
                       (r.imbWindow ?? 0) > 0 ? "text-emerald-400" : (r.imbWindow ?? 0) < 0 ? "text-rose-400" : ""
