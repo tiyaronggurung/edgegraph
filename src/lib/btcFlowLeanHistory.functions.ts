@@ -237,7 +237,7 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<FlowLeanHistoryResult> => {
     const since = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
-    const [{ data: logs }, k15, k1m] = await Promise.all([
+    const [{ data: logs }, { data: preds }, k15, k1m] = await Promise.all([
       context.supabase
         .from("btc_flow_lean_log")
         .select("window_start, seconds_to_close, lean")
@@ -245,9 +245,26 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
         .order("window_start", { ascending: false })
         .order("seconds_to_close", { ascending: true })
         .limit(500),
+      context.supabase
+        .from("btc_model_predictions")
+        .select("close_time, outcome")
+        .gte("close_time", since)
+        .not("outcome", "is", null)
+        .limit(200),
       fetchKlines("15m", 250),
       fetchKlines("1m", 250),
     ]);
+
+    // Actual settled outcomes keyed by window start (close_time − 15m).
+    // YES = settled above strike (UP), NO = below (DOWN).
+    const outcomeByWindow = new Map<string, "UP" | "DOWN">();
+    for (const p of preds ?? []) {
+      const ct = new Date(p.close_time as string).getTime();
+      if (!Number.isFinite(ct)) continue;
+      const key = new Date(ct - WINDOW_MS).toISOString();
+      const o = p.outcome as string;
+      if (o === "YES" || o === "NO") outcomeByWindow.set(key, o === "YES" ? "UP" : "DOWN");
+    }
 
     // Keep the latest row (smallest seconds_to_close) per window.
     const leanByWindow = new Map<string, string>();
