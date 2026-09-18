@@ -25,6 +25,7 @@ export function CheapEntryAutoBetPanel() {
   const skipsFn = useServerFn(getCheapEntrySkips);
   const setEnabledFn = useServerFn(setCheapEntryEnabled);
   const setStakeFn = useServerFn(setCheapEntryStake);
+  const setLiveFn = useServerFn(setCheapEntryLive);
   const qc = useQueryClient();
 
   const settings = useQuery({
@@ -59,6 +60,13 @@ export function CheapEntryAutoBetPanel() {
     const res = await setEnabledFn({ data: { enabled: on } });
     if (!res.ok) { toast.error(res.error); return; }
     toast.success(on ? "Cheap Entry auto-bet ON (paper)" : "Cheap Entry auto-bet off");
+    qc.invalidateQueries({ queryKey: ["cheap-entry-settings"] });
+  }
+
+  async function toggleLive(on: boolean) {
+    const res = await setLiveFn({ data: { live: on } });
+    if (!res.ok) { toast.error(res.error); return; }
+    toast.success(on ? "REAL MONEY mode ON — live Kalshi orders" : "Back to paper money");
     qc.invalidateQueries({ queryKey: ["cheap-entry-settings"] });
   }
 
