@@ -72,9 +72,28 @@ export function BtcPriceVolumeCard() {
   const secondsToClose = Math.max(0, Math.round((winStart + 900_000 - now) / 1000));
   const winRate = flowLeanWinRate(lean, secondsToClose);
 
+  // Live SMA/RSI/MACD + average taker cost (shared query with the flow log).
+  const histFn = useServerFn(getBtcFlowLeanHistory);
+  const { data: hist } = useQuery({
+    queryKey: ["btc-flow-lean-history"],
+    queryFn: () => histFn(),
+    refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
+  });
+  const currentRow = hist?.rows?.find((r) => r.result == null) ?? hist?.rows?.[0] ?? null;
+
   // Our own quote off the live composite vs the strike (display only).
-  const odds = useStrikeOdds(price, strike ?? null, kalshi?.secondsToClose ?? secondsToClose);
+  const odds = useStrikeOdds(price, strike ?? null, kalshi?.secondsToClose ?? secondsToClose, {
+    m1: hist?.live?.m1 ?? null,
+    m15: hist?.live?.m15 ?? null,
+    avgBuyPrice: currentRow?.avgBuyPrice ?? null,
+    avgSellPrice: currentRow?.avgSellPrice ?? null,
+    flowImbalance: imbM3,
+  });
   const cents = (v: number | null) => (v == null ? "—" : `${(v * 100).toFixed(1)}¢`);
+  const tiltTone = (v: number | null) =>
+    v == null ? "text-muted-foreground" : v > 0.1 ? "text-emerald-400" : v < -0.1 ? "text-rose-400" : "text-muted-foreground";
+  const sig = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${(v * 100).toFixed(0)}`);
 
   // Log one row per minute per window so the lean can be scored later.
   const logFlow = useServerFn(logBtcFlowLean);
