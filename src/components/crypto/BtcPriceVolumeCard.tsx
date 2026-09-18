@@ -13,6 +13,8 @@ import {
   logBtcFlowLean,
 } from "@/lib/btcFlowLean.functions";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
+import { useStrikeOdds } from "@/hooks/useStrikeOdds";
+import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
 
 function fmtUsd(x: number | null | undefined): string {
   if (x == null || !Number.isFinite(x)) return "—";
