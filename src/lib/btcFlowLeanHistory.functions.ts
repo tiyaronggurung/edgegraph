@@ -62,6 +62,8 @@ export interface FlowLeanHistoryResult {
   scored: number;
   hits: number;
   rollups: FlowRollup[];
+  /** Live indicator readings: fast (1m candles) and slow (15m candles). */
+  live: { m1: IndicatorSnap; m15: IndicatorSnap };
 }
 
 const WINDOW_MS = 15 * 60 * 1000;
@@ -113,6 +115,103 @@ function toRollup(label: string, agg: Agg): FlowRollup {
         ? (agg.buyUsd * (1 + FEE_RATE) - agg.sellUsd * (1 - FEE_RATE)) / totalUsd
         : null,
   };
+}
+
+// ---- Indicators (standard settings: SMA 20, RSI 14, MACD 12/26/9) ----
+const SMA_LEN = 20;
+const RSI_LEN = 14;
+const MACD_FAST = 12;
+const MACD_SLOW = 26;
+const MACD_SIGNAL = 9;
+
+const EMPTY_IND: IndicatorSnap = {
+  close: null,
+  sma: null,
+  smaDistPct: null,
+  rsi: null,
+  macd: null,
+  signal: null,
+  hist: null,
+};
+
+/** EMA series over closes; index-aligned with the input. */
+function emaSeries(values: number[], len: number): (number | null)[] {
+  const k = 2 / (len + 1);
+  const out: (number | null)[] = [];
+  let prev: number | null = null;
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i] as number;
+    if (i + 1 < len) {
+      out.push(null);
+      continue;
+    }
+    if (prev == null) {
+      let sum = 0;
+      for (let j = i - len + 1; j <= i; j++) sum += values[j] as number;
+      prev = sum / len;
+    } else {
+      prev = v * k + prev * (1 - k);
+    }
+    out.push(prev);
+  }
+  return out;
+}
+
+/** Wilder-smoothed RSI series; index-aligned with the input. */
+function rsiSeries(values: number[], len: number): (number | null)[] {
+  const out: (number | null)[] = new Array(values.length).fill(null);
+  if (values.length <= len) return out;
+  let gain = 0;
+  let loss = 0;
+  for (let i = 1; i <= len; i++) {
+    const ch = (values[i] as number) - (values[i - 1] as number);
+    if (ch >= 0) gain += ch;
+    else loss -= ch;
+  }
+  gain /= len;
+  loss /= len;
+  out[len] = loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
+  for (let i = len + 1; i < values.length; i++) {
+    const ch = (values[i] as number) - (values[i - 1] as number);
+    gain = (gain * (len - 1) + Math.max(0, ch)) / len;
+    loss = (loss * (len - 1) + Math.max(0, -ch)) / len;
+    out[i] = loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
+  }
+  return out;
+}
+
+/** Indicator snapshot at every candle index, from a list of closes. */
+function indicatorSeries(closes: number[]): IndicatorSnap[] {
+  const rsi = rsiSeries(closes, RSI_LEN);
+  const emaFast = emaSeries(closes, MACD_FAST);
+  const emaSlow = emaSeries(closes, MACD_SLOW);
+  const macdLine = closes.map((_, i) => {
+    const f = emaFast[i];
+    const s = emaSlow[i];
+    return f != null && s != null ? f - s : null;
+  });
+  const defined = macdLine.map((v) => v ?? 0);
+  const signalRaw = emaSeries(defined, MACD_SIGNAL);
+
+  return closes.map((close, i) => {
+    let sma: number | null = null;
+    if (i + 1 >= SMA_LEN) {
+      let sum = 0;
+      for (let j = i - SMA_LEN + 1; j <= i; j++) sum += closes[j] as number;
+      sma = sum / SMA_LEN;
+    }
+    const macd = macdLine[i] ?? null;
+    const signal = macd == null ? null : (signalRaw[i] ?? null);
+    return {
+      close,
+      sma,
+      smaDistPct: sma ? (close - sma) / sma : null,
+      rsi: rsi[i] ?? null,
+      macd,
+      signal,
+      hist: macd != null && signal != null ? macd - signal : null,
+    };
+  });
 }
 
 async function fetchKlines(interval: string, limit: number): Promise<number[][]> {
