@@ -103,7 +103,7 @@ export const getCheapEntryStats = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false })
       .limit(60);
 
-    const rows = ((data ?? []) as any[]).map((r): CheapEntryFill => ({
+    const paperRows = ((data ?? []) as any[]).map((r): CheapEntryFill => ({
       id: r.id,
       ticker: r.ticker,
       close_time: r.close_time,
@@ -115,7 +115,44 @@ export const getCheapEntryStats = createServerFn({ method: "GET" })
       pnl_cents: r.pnl_cents,
       created_at: r.created_at,
       pick_source: (r.entry_snapshot?.pick_source as "study" | "model" | undefined) ?? null,
+      live: false,
     }));
+
+    // Real-money fills for the same engine.
+    const { data: liveData } = await supabase
+      .from("crypto_trades")
+      .select("id,ticker,close_time,side,contracts,stake_usd,status,pnl_usd,created_at,inputs_snapshot")
+      .eq("user_id", userId)
+      .filter("inputs_snapshot->>source", "eq", "cheap_entry")
+      .order("created_at", { ascending: false })
+      .limit(60);
+
+    const liveRows = ((liveData ?? []) as any[]).map((r): CheapEntryFill => {
+      const stakeCents = Math.round(Number(r.stake_usd ?? 0) * 100);
+      const pnl = r.pnl_usd == null ? null : Math.round(Number(r.pnl_usd) * 100);
+      const status: CheapEntryFill["status"] =
+        r.status === "error" ? "void" : pnl == null ? "open" : pnl > 0 ? "won" : "lost";
+      return {
+        id: r.id,
+        ticker: r.ticker,
+        close_time: r.close_time,
+        side: r.side,
+        contracts: r.contracts ?? 0,
+        fill_price_cents:
+          Number(r.inputs_snapshot?.ask_cents) ||
+          (r.contracts ? Math.round(stakeCents / r.contracts) : 0),
+        stake_cents: stakeCents,
+        status,
+        pnl_cents: pnl,
+        created_at: r.created_at,
+        pick_source: (r.inputs_snapshot?.pick_source as "study" | "model" | undefined) ?? null,
+        live: true,
+      };
+    });
+
+    const rows = [...liveRows, ...paperRows]
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+      .slice(0, 60);
 
     const tally = (list: CheapEntryFill[]) => ({
       fires: list.length,
