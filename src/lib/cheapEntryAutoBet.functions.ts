@@ -15,6 +15,7 @@ export interface CheapEntryFill {
   pnl_cents: number | null;
   created_at: string;
   pick_source: "study" | "model" | null;
+  live: boolean;
 }
 
 export const getCheapEntrySettings = createServerFn({ method: "GET" })
