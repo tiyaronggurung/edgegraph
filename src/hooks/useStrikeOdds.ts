@@ -64,8 +64,11 @@ export interface StrikeOdds {
   pUp: number | null;
   /** Pure diffusion probability before the technical tilt. */
   pBase: number | null;
+  /** UP price in 0-1; upAsk + downAsk always = 1 (100¢ total). */
   upAsk: number | null;
   downAsk: number | null;
+  /** Bookmaker margin per side, 0-1 — shown for reference, not added to prices. */
+  spread: number | null;
   /** Annualized realized vol used, for display. */
   sigma: number | null;
   /** Ticks in the tape — low counts mean the estimate is still warming up. */
