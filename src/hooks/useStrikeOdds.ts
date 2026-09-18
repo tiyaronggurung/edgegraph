@@ -239,8 +239,10 @@ export function useStrikeOdds(
   return {
     pUp,
     pBase,
-    upAsk: clamp(pUp + spread / 2, 0.01, 0.99),
-    downAsk: clamp(1 - pUp + spread / 2, 0.01, 0.99),
+    // Prices sum to exactly 1 (100¢ total); the margin is reported separately.
+    upAsk: pUp,
+    downAsk: 1 - pUp,
+    spread,
     sigma,
     samples: tape.length,
     tilt,
