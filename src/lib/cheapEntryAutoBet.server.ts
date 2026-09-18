@@ -123,13 +123,16 @@ export async function driveCheapEntry(): Promise<CheapEntryTickResult> {
 
   const { data: users } = await supabaseAdmin
     .from("profiles")
-    .select("id, cheap_entry_stake_cents, cheap_entry_enabled_at")
+    .select("id, cheap_entry_stake_cents, cheap_entry_enabled_at, cheap_entry_live_enabled, kalshi_api_key_id, kalshi_private_key_pem")
     .eq("cheap_entry_enabled", true)
     .limit(200);
   const userRows = (users ?? []) as Array<{
     id: string;
     cheap_entry_stake_cents: number | null;
     cheap_entry_enabled_at: string | null;
+    cheap_entry_live_enabled: boolean | null;
+    kalshi_api_key_id: string | null;
+    kalshi_private_key_pem: string | null;
   }>;
 
   const out: CheapEntryTickResult = {
