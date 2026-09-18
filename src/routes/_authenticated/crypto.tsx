@@ -18,6 +18,7 @@ import { getRecentOddsFlip } from "@/lib/oddsFlipAlert.functions";
 import { detectBigFlip } from "@/lib/bigFlipDetector.functions";
 import { OurOddsLiveHunterPanel } from "@/components/crypto/OurOddsLiveHunterPanel";
 import { VolumeFlowPanel } from "@/components/crypto/VolumeFlowPanel";
+import { BtcPriceVolumeCard } from "@/components/crypto/BtcPriceVolumeCard";
 import { diagnoseRecentMisses, studyMissesWithAI, getLatestStudy, setRecommendationFeedback, type StudyRecommendation } from "@/lib/cryptoMisses.functions";
 import { recomputeShadowSim, getShadowSimReport, type ShadowSimGateStat } from "@/lib/cryptoShadowSim.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
@@ -4053,6 +4054,8 @@ function CryptoPage() {
           Components remain exported from this file so the real-money path is preserved. */}
       {/* Read-only audit: which 15m windows never got a prediction row */}
       <PredictionCoverageAudit />
+
+      <BtcPriceVolumeCard />
 
       {data && <TopPick markets={data.markets} />}
 
