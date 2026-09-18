@@ -202,7 +202,7 @@ export function useStrikeOdds(
 
   if (spot == null || strike == null || strike <= 0 || spot <= 0) {
     return {
-      pUp: null, pBase: null, upAsk: null, downAsk: null, sigma, samples: tape.length,
+      pUp: null, pBase: null, upAsk: null, downAsk: null, spread: null, sigma, samples: tape.length,
       tilt, parts, timeWeight, z: null, flipRisk: null, flipSide: null,
       flipFlag: false, flipReason: null,
     };
