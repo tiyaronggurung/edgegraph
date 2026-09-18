@@ -24,13 +24,38 @@ export const getCheapEntrySettings = createServerFn({ method: "GET" })
     const { supabase, userId } = context as any;
     const { data } = await supabase
       .from("profiles")
-      .select("cheap_entry_enabled, cheap_entry_stake_cents")
+      .select("cheap_entry_enabled, cheap_entry_stake_cents, cheap_entry_live_enabled, kalshi_api_key_id, kalshi_private_key_pem")
       .eq("id", userId)
       .maybeSingle();
     return {
       enabled: !!data?.cheap_entry_enabled,
+      live: !!data?.cheap_entry_live_enabled,
+      hasKeys: !!(data?.kalshi_api_key_id && data?.kalshi_private_key_pem),
       stakeCents: Math.max(100, Math.min(10000, Number(data?.cheap_entry_stake_cents) || 1000)),
     };
+  });
+
+export const setCheapEntryLive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ live: z.boolean() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+    if (data.live) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("kalshi_api_key_id, kalshi_private_key_pem")
+        .eq("id", userId)
+        .maybeSingle();
+      if (!prof?.kalshi_api_key_id || !prof?.kalshi_private_key_pem) {
+        return { ok: false as const, error: "Add your Kalshi keys in Settings before turning on real money." };
+      }
+    }
+    const { error } = await supabase
+      .from("profiles")
+      .update({ cheap_entry_live_enabled: data.live } as never)
+      .eq("id", userId);
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const, live: data.live };
   });
 
 export const setCheapEntryEnabled = createServerFn({ method: "POST" })
