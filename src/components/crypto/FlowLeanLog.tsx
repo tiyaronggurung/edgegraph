@@ -69,7 +69,11 @@ export function FlowLeanLog() {
                   <td className="px-2 text-right text-rose-400">{usd(r.sellUsd)}</td>
                   <td
                     className={`px-2 text-right font-semibold ${
-                      (r.netUsdPct ?? 0) > 0 ? "text-emerald-400" : (r.netUsdPct ?? 0) < 0 ? "text-rose-400" : ""
+                      (r.netUsdPctAfterFees ?? 0) > 0
+                        ? "text-emerald-400"
+                        : (r.netUsdPctAfterFees ?? 0) < 0
+                          ? "text-rose-400"
+                          : ""
                     }`}
                   >
                     {r.netUsdPctAfterFees == null ? "—" : `${(r.netUsdPctAfterFees * 100).toFixed(1)}%`}
