@@ -42,7 +42,7 @@ export function BtcPriceVolumeCard() {
   const { data: win } = useQuery({
     queryKey: ["btc-price-volume-15m-window"],
     queryFn: () => spotVolFn(),
-    refetchInterval: 10_000,
+    refetchInterval: 3_000,
     placeholderData: keepPreviousData,
   });
 
@@ -99,7 +99,7 @@ export function BtcPriceVolumeCard() {
   const { data: hist } = useQuery({
     queryKey: ["btc-flow-lean-history"],
     queryFn: () => histFn(),
-    refetchInterval: 60_000,
+    refetchInterval: 20_000,
     placeholderData: keepPreviousData,
   });
   const currentRow = hist?.rows?.find((r) => r.result == null) ?? hist?.rows?.[0] ?? null;
@@ -205,10 +205,29 @@ export function BtcPriceVolumeCard() {
               {" · "}t-wt {(odds.timeWeight * 100).toFixed(0)}%
             </span>
           </div>
+          <div className="mt-1 flex items-center justify-between font-mono text-[10px]">
+            <span className="text-muted-foreground">
+              drift{" "}
+              <span className={tiltTone(odds.driftUsdPerMin == null ? null : odds.driftUsdPerMin / 50)}>
+                {odds.driftUsdPerMin == null
+                  ? "—"
+                  : `${odds.driftUsdPerMin >= 0 ? "+" : ""}$${odds.driftUsdPerMin.toFixed(0)}/min`}
+              </span>
+              {" · "}to strike{" "}
+              {odds.distanceUsd == null
+                ? "—"
+                : `${odds.distanceUsd >= 0 ? "+" : ""}$${odds.distanceUsd.toFixed(0)}`}
+            </span>
+            <span className="text-muted-foreground">
+              {odds.etaSeconds != null && odds.etaSeconds <= secondsToClose
+                ? `cross in ~${Math.round(odds.etaSeconds)}s`
+                : "no cross projected"}
+            </span>
+          </div>
           <div className="mt-1 flex items-center justify-between text-[10px]">
             <span className={odds.flipFlag ? "text-amber-300 font-semibold" : "text-muted-foreground"}>
               {odds.flipFlag
-                ? `⚠ flip risk → ${odds.flipSide} · ${odds.flipReason}`
+                ? `⚠ flip → ${odds.flipSide} · ${odds.flipReason}`
                 : `flip risk ${odds.flipRisk == null ? "—" : `${(odds.flipRisk * 100).toFixed(0)}%`}`}
             </span>
             <span className="text-muted-foreground font-mono">
@@ -216,8 +235,9 @@ export function BtcPriceVolumeCard() {
             </span>
           </div>
           <div className="mt-0.5 text-[10px] text-muted-foreground">
-            time-weighted SMA/RSI/MACD + avg cost + flow · display only · not wired to any bet
+            drift = live tape velocity + SMA/RSI/MACD/cost/flow, time-weighted · display only
           </div>
+
         </div>
 
 
