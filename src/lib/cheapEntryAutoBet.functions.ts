@@ -39,7 +39,12 @@ export const setCheapEntryEnabled = createServerFn({ method: "POST" })
     const { supabase, userId } = context as any;
     const { error } = await supabase
       .from("profiles")
-      .update({ cheap_entry_enabled: data.enabled } as never)
+      .update({
+        cheap_entry_enabled: data.enabled,
+        // Arming stamps the moment it was switched on so the engine only
+        // touches windows that START after this — never the one running now.
+        cheap_entry_enabled_at: data.enabled ? new Date().toISOString() : null,
+      } as never)
       .eq("id", userId);
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const, enabled: data.enabled };

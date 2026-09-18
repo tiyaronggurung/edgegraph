@@ -5871,6 +5871,7 @@ export type Database = {
           bankroll: number
           billing_interval: string | null
           cheap_entry_enabled: boolean
+          cheap_entry_enabled_at: string | null
           cheap_entry_stake_cents: number
           created_at: string
           current_period_end: string | null
@@ -5897,6 +5898,7 @@ export type Database = {
           bankroll?: number
           billing_interval?: string | null
           cheap_entry_enabled?: boolean
+          cheap_entry_enabled_at?: string | null
           cheap_entry_stake_cents?: number
           created_at?: string
           current_period_end?: string | null
@@ -5923,6 +5925,7 @@ export type Database = {
           bankroll?: number
           billing_interval?: string | null
           cheap_entry_enabled?: boolean
+          cheap_entry_enabled_at?: string | null
           cheap_entry_stake_cents?: number
           created_at?: string
           current_period_end?: string | null

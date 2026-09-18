@@ -123,10 +123,14 @@ export async function driveCheapEntry(): Promise<CheapEntryTickResult> {
 
   const { data: users } = await supabaseAdmin
     .from("profiles")
-    .select("id, cheap_entry_stake_cents")
+    .select("id, cheap_entry_stake_cents, cheap_entry_enabled_at")
     .eq("cheap_entry_enabled", true)
     .limit(200);
-  const userRows = (users ?? []) as Array<{ id: string; cheap_entry_stake_cents: number | null }>;
+  const userRows = (users ?? []) as Array<{
+    id: string;
+    cheap_entry_stake_cents: number | null;
+    cheap_entry_enabled_at: string | null;
+  }>;
 
   const out: CheapEntryTickResult = {
     users: userRows.length,
@@ -163,8 +167,15 @@ export async function driveCheapEntry(): Promise<CheapEntryTickResult> {
       }
       const askCents = askCache.get(cacheKey) ?? null;
 
+      const winStartMs = new Date(w.close_time).getTime() - 15 * 60 * 1000;
+
       for (const u of userRows) {
         if (already.has(`${u.id}|${w.ticker}`)) continue;
+        // Only act on windows that STARTED after the switch was flipped on —
+        // enabling mid-window never touches the window already running.
+        if (u.cheap_entry_enabled_at && winStartMs < new Date(u.cheap_entry_enabled_at).getTime()) {
+          continue;
+        }
         out.attempts++;
 
         if (askCents == null) {
