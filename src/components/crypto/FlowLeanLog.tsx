@@ -171,7 +171,8 @@ export function FlowLeanLog() {
         </div>
       )}
       <div className="px-3 py-1.5 border-t border-border text-[10px] text-muted-foreground">
-        read-only · result = 15m candle open vs close · not wired to any bet
+        read-only · result = 15m candle open vs close · * avg prices include 0.10% taker fee (buy +fee,
+        sell −fee) · net $ is after fees · not wired to any bet
       </div>
     </div>
   );
