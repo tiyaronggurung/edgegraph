@@ -170,8 +170,31 @@ export function BtcPriceVolumeCard() {
               p(up) {odds.pUp == null ? "—" : `${(odds.pUp * 100).toFixed(1)}%`}
             </span>
           </div>
+          <div className="mt-1 flex items-center justify-between font-mono text-[10px]">
+            <span className="text-muted-foreground">
+              SMA <span className={tiltTone(odds.parts.sma)}>{sig(odds.parts.sma)}</span>
+              {" · "}RSI <span className={tiltTone(odds.parts.rsi)}>{sig(odds.parts.rsi)}</span>
+              {" · "}MACD <span className={tiltTone(odds.parts.macd)}>{sig(odds.parts.macd)}</span>
+              {" · "}cost <span className={tiltTone(odds.parts.cost)}>{sig(odds.parts.cost)}</span>
+              {" · "}flow <span className={tiltTone(odds.parts.flow)}>{sig(odds.parts.flow)}</span>
+            </span>
+            <span className="text-muted-foreground">
+              tilt <span className={tiltTone(odds.tilt)}>{sig(odds.tilt)}</span>
+              {" · "}t-wt {(odds.timeWeight * 100).toFixed(0)}%
+            </span>
+          </div>
+          <div className="mt-1 flex items-center justify-between text-[10px]">
+            <span className={odds.flipFlag ? "text-amber-300 font-semibold" : "text-muted-foreground"}>
+              {odds.flipFlag
+                ? `⚠ flip risk → ${odds.flipSide} · ${odds.flipReason}`
+                : `flip risk ${odds.flipRisk == null ? "—" : `${(odds.flipRisk * 100).toFixed(0)}%`}`}
+            </span>
+            <span className="text-muted-foreground font-mono">
+              base {odds.pBase == null ? "—" : `${(odds.pBase * 100).toFixed(0)}%`}
+            </span>
+          </div>
           <div className="mt-0.5 text-[10px] text-muted-foreground">
-            recomputed on every composite tick · display only · not wired to any bet
+            time-weighted SMA/RSI/MACD + avg cost + flow · display only · not wired to any bet
           </div>
         </div>
 
