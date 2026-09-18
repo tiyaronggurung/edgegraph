@@ -160,6 +160,15 @@ export function BtcPriceVolumeCard() {
           <span className={`text-2xl font-bold font-mono ${live.spot != null ? "text-foreground" : "text-muted-foreground"}`}>
             {price != null ? `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
           </span>
+          {strike != null && price != null && (
+            <span
+              className={`mb-1 font-mono text-xs font-semibold ${
+                price >= strike ? "text-emerald-500" : "text-red-500"
+              }`}
+            >
+              {price >= strike ? "+" : "−"}${Math.abs(price - strike).toFixed(2)}
+            </span>
+          )}
           <div className="text-right">
             <div className="font-mono text-sm">
               <span className="text-[10px] text-muted-foreground">strike </span>
