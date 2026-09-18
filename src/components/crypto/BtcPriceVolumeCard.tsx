@@ -46,6 +46,18 @@ export function BtcPriceVolumeCard() {
   });
 
   const price = live.spot ?? data?.price ?? null;
+  // Current 15m strike (read-only) + our own fast quote off it.
+  const strikeFn = useServerFn(getKalshiImpliedSpot);
+  const { data: kalshi } = useQuery({
+    queryKey: ["btc-card-strike"],
+    queryFn: () => strikeFn(),
+    refetchInterval: 5_000,
+    staleTime: 2_000,
+    placeholderData: keepPreviousData,
+  });
+  const lastStrikeRef = useRef<number | null>(null);
+  if (kalshi?.ok && kalshi.strike != null) lastStrikeRef.current = kalshi.strike;
+  const strike = kalshi?.strike ?? lastStrikeRef.current;
   const chg = data?.change24hPct ?? null;
   const up = (chg ?? 0) >= 0;
 
