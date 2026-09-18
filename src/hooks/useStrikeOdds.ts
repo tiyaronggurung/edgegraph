@@ -161,7 +161,7 @@ export function useStrikeOdds(
     const last = bars[bars.length - 1];
     if (!last || t.t - last.t >= VOL_BAR_MS) bars.push(t);
   }
-  if (bars.length >= 12) {
+  if (bars.length >= 8) {
     let ewma: number | null = null;
     let totalDt = 0;
     let steps = 0;
