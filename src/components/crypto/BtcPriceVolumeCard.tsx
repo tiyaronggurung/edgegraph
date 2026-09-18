@@ -235,8 +235,19 @@ export function BtcPriceVolumeCard() {
               base {odds.pBase == null ? "—" : `${(odds.pBase * 100).toFixed(0)}%`}
             </span>
           </div>
+          <div className="mt-1 flex items-center justify-between font-mono text-[10px]">
+            <span className="text-muted-foreground">
+              conviction{" "}
+              <span className={tiltTone(odds.conviction)}>{sig(odds.conviction)}</span>
+              {" · "}cap {(odds.pCap * 100).toFixed(0)}%
+            </span>
+            <span className="text-muted-foreground">
+              raw {odds.pRaw == null ? "—" : `${(odds.pRaw * 100).toFixed(0)}%`}
+            </span>
+          </div>
           <div className="mt-0.5 text-[10px] text-muted-foreground">
-            drift = live tape velocity + SMA/RSI/MACD/cost/flow, time-weighted · display only
+            distance alone is capped — a high price needs indicators, break structure and drift on
+            the same side, with time nearly out · display only
           </div>
 
         </div>
