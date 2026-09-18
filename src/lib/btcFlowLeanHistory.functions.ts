@@ -4,6 +4,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+/** Standard-setting indicator snapshot (SMA 20, RSI 14, MACD 12/26/9). */
+export interface IndicatorSnap {
+  close: number | null;
+  sma: number | null;
+  /** close vs SMA as a fraction. */
+  smaDistPct: number | null;
+  rsi: number | null;
+  macd: number | null;
+  signal: number | null;
+  hist: number | null;
+}
+
 export interface FlowLeanHistoryRow {
   windowStart: string;
   lean: string;
@@ -15,6 +27,8 @@ export interface FlowLeanHistoryRow {
   sellUsd: number | null;
   avgBuyPrice: number | null;
   avgSellPrice: number | null;
+  /** Indicators on the 15m candles as of this window's close. */
+  ind: IndicatorSnap;
   /** "UP" | "DOWN" from the 15m candle open vs close, null while unsettled. */
   result: "UP" | "DOWN" | null;
   hit: boolean | null;
