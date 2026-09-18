@@ -19,6 +19,8 @@ const SECONDS_PER_YEAR = 365 * 24 * 3600;
 const VOL_PRIOR = 0.45;        // annualized fallback before the tape warms up
 const LAMBDA = 0.94;           // EWMA decay on tick returns
 const TAPE_MAX = 900;
+const VOL_BAR_MS = 5000;       // vol is measured on ~5s bars, not interpolated ticks
+const VOL_MAX = 1.2;           // 120%/yr ceiling — above this the estimate is noise
 const MIN_DT_MS = 120;         // faster tape = faster reaction
 const SPREAD_BASE = 0.012;     // 1.2¢ floor
 const SPREAD_K = 0.05;         // widens with √(minutes left)
@@ -150,14 +152,22 @@ export function useStrikeOdds(
 
   const tape = tapeRef.current;
 
+  // Vol is measured on ~1s spaced samples, not raw ticks. The composite feed
+  // interpolates between exchange updates, so sub-second returns are mostly
+  // smoothing noise and blow the annualized estimate up to several hundred %.
   let sigma: number | null = null;
-  if (tape.length >= 12) {
+  const bars: Tick[] = [];
+  for (const t of tape) {
+    const last = bars[bars.length - 1];
+    if (!last || t.t - last.t >= VOL_BAR_MS) bars.push(t);
+  }
+  if (bars.length >= 8) {
     let ewma: number | null = null;
     let totalDt = 0;
     let steps = 0;
-    for (let i = 1; i < tape.length; i++) {
-      const a = tape[i - 1] as Tick;
-      const b = tape[i] as Tick;
+    for (let i = 1; i < bars.length; i++) {
+      const a = bars[i - 1] as Tick;
+      const b = bars[i] as Tick;
       if (a.p <= 0 || b.p <= 0) continue;
       const r = Math.log(b.p / a.p);
       ewma = ewma == null ? r * r : LAMBDA * ewma + (1 - LAMBDA) * r * r;
@@ -168,7 +178,7 @@ export function useStrikeOdds(
       const avgDtSec = totalDt / steps / 1000;
       const perSec = Math.sqrt(Math.max(ewma, 0) / Math.max(avgDtSec, 0.05));
       const annual = perSec * Math.sqrt(SECONDS_PER_YEAR);
-      if (Number.isFinite(annual) && annual > 0) sigma = clamp(annual, 0.05, 4);
+      if (Number.isFinite(annual) && annual > 0) sigma = clamp(annual, 0.10, VOL_MAX);
     }
   }
   const sigmaUsed = sigma ?? VOL_PRIOR;
@@ -320,7 +330,11 @@ export function useStrikeOdds(
   // endpoint rather than being bolted on after the fact.
   const T = Math.max(secs, 1);
   const sd = sigmaSec * Math.sqrt(T);
-  const zDrift = sd > 0 ? (logDist + drift * T) / sd : z;
+  // Drift may carry price to the strike plus a small overshoot — never further.
+  // Momentum alone must not price the far side of the strike as the favourite.
+  const maxMove = Math.abs(logDist) + CROSS_OVERSHOOT * sd;
+  const driftMove = clamp(drift * T, -maxMove, maxMove);
+  const zDrift = sd > 0 ? (logDist + driftMove) / sd : z;
   const pRaw = clamp(phi(zDrift), 0.01, 0.99);
 
   // --- upcoming-flip detection (drift-adjusted barrier touch) --------------
