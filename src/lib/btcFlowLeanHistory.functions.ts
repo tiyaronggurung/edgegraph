@@ -335,6 +335,7 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
           avgSellPrice: agg.sellBtc > 0 ? agg.sellUsd / agg.sellBtc : null,
           ind: indByWindow.get(key) ?? EMPTY_IND,
           result,
+          resultSource,
           hit,
         };
       });
