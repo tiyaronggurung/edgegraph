@@ -3,14 +3,17 @@
 // Deliberately independent of useOurQuote / ourOdds.ts — this powers the
 // price card only and must never feed model, Study, auto-trade or exit paths.
 //
-//   pUp = Φ( ln(S/K) / (σ · √T) )
-//   σ   = EWMA realized vol from the live composite tick tape
-//         (falls back to a 45%/yr prior until the tape warms up)
-//   ask = p + spread/2, spread widens with time to close
+//   pUp  = Φ( ln(S/K) / (σ · √T) )            base, pure diffusion
+//   tilt = SMA20 + RSI14 + MACD(12/26/9) + avg-cost (VWAP) blend, -1..+1
+//   pAdj = pUp + TILT_MAX · tilt · w(T)        technical tilt, time-decayed
+//   flip = 2·Φ(-|z|)                           chance of crossing before close
 //
-// It recomputes on every composite tick (~50-200ms), so it moves ahead of a
-// book that re-quotes on a slower cadence.
+// Time constraint: the technical tilt is strongest early in the window and
+// decays to ~0 by the close (no time left for momentum to carry price), while
+// the diffusion term naturally tightens as T → 0. Flip warnings are suppressed
+// inside the last FLIP_MIN_SECONDS because there is no time for a real cross.
 import { useEffect, useRef, useState } from "react";
+import type { IndicatorSnap } from "@/lib/btcFlowLeanHistory.functions";
 
 const SECONDS_PER_YEAR = 365 * 24 * 3600;
 const VOL_PRIOR = 0.45;        // annualized fallback before the tape warms up
@@ -19,6 +22,9 @@ const TAPE_MAX = 600;
 const MIN_DT_MS = 250;
 const SPREAD_BASE = 0.012;     // 1.2¢ floor
 const SPREAD_K = 0.05;         // widens with √(minutes left)
+const TILT_MAX = 0.10;         // max probability shift from technicals
+const FLIP_WARN = 0.32;        // flip risk that raises the early flag
+const FLIP_MIN_SECONDS = 45;   // below this there is no time to flip
 
 function erf(x: number): number {
   const sign = x < 0 ? -1 : 1;
@@ -31,24 +37,65 @@ function erf(x: number): number {
 }
 const phi = (x: number) => 0.5 * (1 + erf(x / Math.SQRT2));
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const nz = (v: number | null | undefined) => (v != null && Number.isFinite(v) ? v : null);
+
+export interface StrikeOddsContext {
+  /** Fast indicator read (1m candles). */
+  m1?: IndicatorSnap | null;
+  /** Slow indicator read (15m candles). */
+  m15?: IndicatorSnap | null;
+  /** Average taker buy / sell price over the current window (USD). */
+  avgBuyPrice?: number | null;
+  avgSellPrice?: number | null;
+  /** Taker flow imbalance (in - out) / total, -1..1. */
+  flowImbalance?: number | null;
+}
+
+export interface StrikeOddsParts {
+  sma: number | null;
+  rsi: number | null;
+  macd: number | null;
+  cost: number | null;
+  flow: number | null;
+}
 
 export interface StrikeOdds {
-  /** Probability the window closes above the strike, 0-1. */
+  /** Probability the window closes above the strike, 0-1 (tilt applied). */
   pUp: number | null;
+  /** Pure diffusion probability before the technical tilt. */
+  pBase: number | null;
   upAsk: number | null;
   downAsk: number | null;
   /** Annualized realized vol used, for display. */
   sigma: number | null;
   /** Ticks in the tape — low counts mean the estimate is still warming up. */
   samples: number;
+  /** Combined technical tilt, -1..+1 (positive = up). */
+  tilt: number | null;
+  /** Per-indicator contributions, -1..+1. */
+  parts: StrikeOddsParts;
+  /** How much of the tilt time still allows, 0..1. */
+  timeWeight: number;
+  /** Standardised distance to strike. */
+  z: number | null;
+  /** Probability price crosses the strike before close, 0-1. */
+  flipRisk: number | null;
+  /** Side the price would flip to if it crosses. */
+  flipSide: "UP" | "DOWN" | null;
+  /** True when a flip looks likely early enough to matter. */
+  flipFlag: boolean;
+  flipReason: string | null;
 }
 
 interface Tick { t: number; p: number }
+
+const EMPTY_PARTS: StrikeOddsParts = { sma: null, rsi: null, macd: null, cost: null, flow: null };
 
 export function useStrikeOdds(
   spot: number | null,
   strike: number | null,
   secondsToClose: number,
+  ctx?: StrikeOddsContext,
 ): StrikeOdds {
   const tapeRef = useRef<Tick[]>([]);
   const [, bump] = useState(0);
@@ -90,21 +137,116 @@ export function useStrikeOdds(
   }
   const sigmaUsed = sigma ?? VOL_PRIOR;
 
+  // --- time constraint ----------------------------------------------------
+  const secs = Math.max(secondsToClose, 0);
+  // Momentum needs runway: full weight early, ~0 at the bell.
+  const timeWeight = clamp(Math.sqrt(secs / 900), 0, 1);
+  // Fast candles matter more late in the window, slow candles early.
+  const fastW = clamp(1 - secs / 900, 0.25, 0.85);
+
+  // --- technical tilt -----------------------------------------------------
+  const indTilt = (snap: IndicatorSnap | null | undefined, px: number | null) => {
+    if (!snap) return EMPTY_PARTS;
+    const smaDist = nz(snap.smaDistPct);
+    const rsi = nz(snap.rsi);
+    const hist = nz(snap.hist);
+    const ref = px ?? nz(snap.close);
+    return {
+      // ±0.25% from the SMA saturates.
+      sma: smaDist == null ? null : clamp(smaDist / 0.0025, -1, 1),
+      // 50 neutral, 70/30 saturate.
+      rsi: rsi == null ? null : clamp((rsi - 50) / 20, -1, 1),
+      // MACD histogram as a fraction of price; 0.05% saturates.
+      macd: hist == null || ref == null || ref <= 0 ? null : clamp(hist / ref / 0.0005, -1, 1),
+      cost: null,
+      flow: null,
+    } satisfies StrikeOddsParts;
+  };
+
+  const p1 = indTilt(ctx?.m1, spot);
+  const p15 = indTilt(ctx?.m15, spot);
+  const mix = (a: number | null, b: number | null) =>
+    a == null && b == null ? null : a == null ? b : b == null ? a : fastW * a + (1 - fastW) * b;
+
+  // Average taker cost basis: price above the blended VWAP = buyers in profit.
+  const avgBuy = nz(ctx?.avgBuyPrice);
+  const avgSell = nz(ctx?.avgSellPrice);
+  let cost: number | null = null;
+  if (spot != null && spot > 0 && (avgBuy != null || avgSell != null)) {
+    const vwap = avgBuy != null && avgSell != null ? (avgBuy + avgSell) / 2 : (avgBuy ?? avgSell) as number;
+    if (vwap > 0) cost = clamp((spot - vwap) / vwap / 0.0015, -1, 1);
+  }
+  const flow = nz(ctx?.flowImbalance) == null ? null : clamp((ctx?.flowImbalance as number) / 0.25, -1, 1);
+
+  const parts: StrikeOddsParts = {
+    sma: mix(p1.sma, p15.sma),
+    rsi: mix(p1.rsi, p15.rsi),
+    macd: mix(p1.macd, p15.macd),
+    cost,
+    flow,
+  };
+
+  const W = { sma: 0.28, rsi: 0.18, macd: 0.26, cost: 0.16, flow: 0.12 } as const;
+  let tiltNum = 0;
+  let tiltDen = 0;
+  (Object.keys(W) as (keyof typeof W)[]).forEach((k) => {
+    const v = parts[k];
+    if (v == null) return;
+    tiltNum += W[k] * v;
+    tiltDen += W[k];
+  });
+  const tilt = tiltDen > 0 ? clamp(tiltNum / tiltDen, -1, 1) : null;
+
   if (spot == null || strike == null || strike <= 0 || spot <= 0) {
-    return { pUp: null, upAsk: null, downAsk: null, sigma, samples: tape.length };
+    return {
+      pUp: null, pBase: null, upAsk: null, downAsk: null, sigma, samples: tape.length,
+      tilt, parts, timeWeight, z: null, flipRisk: null, flipSide: null,
+      flipFlag: false, flipReason: null,
+    };
   }
 
-  const tYears = Math.max(secondsToClose, 1) / SECONDS_PER_YEAR;
+  const tYears = Math.max(secs, 1) / SECONDS_PER_YEAR;
   const denom = sigmaUsed * Math.sqrt(tYears);
-  const pUp = denom > 0 ? clamp(phi(Math.log(spot / strike) / denom), 0.001, 0.999) : null;
-  if (pUp == null) return { pUp: null, upAsk: null, downAsk: null, sigma, samples: tape.length };
+  const z = denom > 0 ? Math.log(spot / strike) / denom : null;
+  const pBase = z == null ? null : clamp(phi(z), 0.001, 0.999);
+  if (pBase == null || z == null) {
+    return {
+      pUp: null, pBase: null, upAsk: null, downAsk: null, sigma, samples: tape.length,
+      tilt, parts, timeWeight, z: null, flipRisk: null, flipSide: null,
+      flipFlag: false, flipReason: null,
+    };
+  }
 
-  const spread = SPREAD_BASE + SPREAD_K * Math.sqrt(Math.max(secondsToClose, 0) / 900);
+  const pUp = clamp(pBase + TILT_MAX * (tilt ?? 0) * timeWeight, 0.01, 0.99);
+
+  // --- upcoming-flip detection -------------------------------------------
+  // Probability the path touches the strike before close (reflection rule).
+  const flipRisk = clamp(2 * phi(-Math.abs(z)), 0, 1);
+  const side: "UP" | "DOWN" = spot >= strike ? "UP" : "DOWN";
+  const flipSide: "UP" | "DOWN" = side === "UP" ? "DOWN" : "UP";
+  // Tilt pushing against the side price is currently on.
+  const against = tilt == null ? 0 : side === "UP" ? Math.max(0, -tilt) : Math.max(0, tilt);
+  const flipFlag =
+    secs >= FLIP_MIN_SECONDS && flipRisk >= FLIP_WARN && against >= 0.25;
+  const flipReason = !flipFlag
+    ? null
+    : `${(flipRisk * 100).toFixed(0)}% touch risk with momentum ${against >= 0.6 ? "strongly" : ""} against ${side}`.replace("  ", " ");
+
+  const spread = SPREAD_BASE + SPREAD_K * Math.sqrt(secs / 900);
   return {
     pUp,
+    pBase,
     upAsk: clamp(pUp + spread / 2, 0.01, 0.99),
     downAsk: clamp(1 - pUp + spread / 2, 0.01, 0.99),
     sigma,
     samples: tape.length,
+    tilt,
+    parts,
+    timeWeight,
+    z,
+    flipRisk,
+    flipSide,
+    flipFlag,
+    flipReason,
   };
 }
