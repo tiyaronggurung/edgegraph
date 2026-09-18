@@ -311,7 +311,10 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
       .map(([key, lean]) => {
         const w = perWindow.get(key);
         const agg = w?.agg ?? emptyAgg();
-        const result = w?.result ?? null;
+        // Prefer the real settled market outcome; fall back to the candle.
+        const settled = outcomeByWindow.get(key);
+        const result = settled ?? w?.result ?? null;
+        const resultSource = settled ? "settled" : w?.result ? "candle" : null;
         let hit: boolean | null = null;
         if (result && (lean === "UP" || lean === "DOWN")) {
           hit = lean === result;
