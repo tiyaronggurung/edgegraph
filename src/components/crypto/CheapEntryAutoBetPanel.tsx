@@ -104,13 +104,39 @@ export function CheapEntryAutoBetPanel() {
     <div className="rounded-lg border border-border bg-card p-3 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <div className="text-xs uppercase tracking-widest font-bold">Cheap Entry Auto-Bet</div>
+          <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            Cheap Entry Auto-Bet
+            {settings.data?.live && (
+              <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[9px] font-bold text-red-400">
+                REAL MONEY
+              </span>
+            )}
+          </div>
           <div className="text-[10px] text-muted-foreground">
-            paper only · buys 20–65¢ · study side after lock, model side inside T-8m
+            buys 20–65¢ · study side after lock, model side inside T-8m
           </div>
         </div>
         <Switch checked={!!settings.data?.enabled} onCheckedChange={toggle} />
       </div>
+
+      <div className="flex items-center justify-between gap-2 rounded border border-red-500/30 bg-red-500/5 px-2 py-1.5">
+        <div className="text-[10px]">
+          <div className="font-bold uppercase tracking-widest text-red-400">Live (real money)</div>
+          <div className="text-muted-foreground">
+            {settings.data?.live
+              ? "Real Kalshi orders are placed automatically."
+              : settings.data?.hasKeys
+                ? "Off — paper fills only."
+                : "Add your Kalshi keys in Settings to enable."}
+          </div>
+        </div>
+        <Switch
+          checked={!!settings.data?.live}
+          disabled={!settings.data?.hasKeys}
+          onCheckedChange={toggleLive}
+        />
+      </div>
+
 
       <div className="flex items-end gap-2">
         <div className="space-y-1">
