@@ -286,14 +286,20 @@ export function useStrikeOdds(
           crossAgeSec < 90 ? "just now" : `${Math.round(crossAgeSec / 60)}m ago`
         }`
       : null;
-  const stackNote =
-    st == null || st.sma10 == null
-      ? null
-      : `${st.order === "BULL" ? "bull stack" : st.order === "BEAR" ? "bear stack" : "mixed stack"} · price ${
-          d10 == null ? "?" : d10 > 0 ? "above" : "below"
-        } SMA10 · ${d200 == null ? "SMA200 pending" : d200 > 0 ? "above" : "below"} SMA200${
-          stackCrossTxt ? ` · ${stackCrossTxt}` : ""
-        }`;
+  const stackNote = (() => {
+    if (st == null || st.sma10 == null) return null;
+    const label = (v: number | null) => (v == null ? null : v > 0 ? "above" : "below");
+    const bits = [
+      label(d10) != null ? `SMA10 ${label(d10)}` : null,
+      label(d50) != null ? `SMA50 ${label(d50)}` : null,
+      label(d200) != null ? `SMA200 ${label(d200)}` : null,
+    ].filter((x): x is string => x != null);
+    const order =
+      st.order === "BULL" ? "bull stack" : st.order === "BEAR" ? "bear stack" : "mixed stack";
+    return `${order}${bits.length ? ` · ${bits.join(" · ")}` : ""}${
+      stackCrossTxt ? ` · ${stackCrossTxt}` : ""
+    }`;
+  })();
 
   // --- break structure: where the running price sits in its recent range ----
   // +1 = printing new highs, -1 = new lows, 0 = mid-range chop. This is what
