@@ -29,8 +29,14 @@ export interface FlowLeanHistoryRow {
   avgSellPrice: number | null;
   /** Indicators on the 15m candles as of this window's close. */
   ind: IndicatorSnap;
-  /** "UP" | "DOWN" from the 15m candle open vs close, null while unsettled. */
+  /**
+   * "UP" | "DOWN" — prefer the actual settled market outcome (above/below the
+   * strike); fall back to the Binance 15m candle open vs close. Null while
+   * unsettled.
+   */
   result: "UP" | "DOWN" | null;
+  /** Where the result came from: settled market outcome or candle estimate. */
+  resultSource: "settled" | "candle" | null;
   hit: boolean | null;
 }
 
@@ -231,7 +237,7 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<FlowLeanHistoryResult> => {
     const since = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
-    const [{ data: logs }, k15, k1m] = await Promise.all([
+    const [{ data: logs }, { data: preds }, k15, k1m] = await Promise.all([
       context.supabase
         .from("btc_flow_lean_log")
         .select("window_start, seconds_to_close, lean")
@@ -239,9 +245,26 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
         .order("window_start", { ascending: false })
         .order("seconds_to_close", { ascending: true })
         .limit(500),
+      context.supabase
+        .from("btc_model_predictions")
+        .select("close_time, outcome")
+        .gte("close_time", since)
+        .not("outcome", "is", null)
+        .limit(200),
       fetchKlines("15m", 250),
       fetchKlines("1m", 250),
     ]);
+
+    // Actual settled outcomes keyed by window start (close_time − 15m).
+    // YES = settled above strike (UP), NO = below (DOWN).
+    const outcomeByWindow = new Map<string, "UP" | "DOWN">();
+    for (const p of preds ?? []) {
+      const ct = new Date(p.close_time as string).getTime();
+      if (!Number.isFinite(ct)) continue;
+      const key = new Date(ct - WINDOW_MS).toISOString();
+      const o = p.outcome as string;
+      if (o === "YES" || o === "NO") outcomeByWindow.set(key, o === "YES" ? "UP" : "DOWN");
+    }
 
     // Keep the latest row (smallest seconds_to_close) per window.
     const leanByWindow = new Map<string, string>();
@@ -288,7 +311,10 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
       .map(([key, lean]) => {
         const w = perWindow.get(key);
         const agg = w?.agg ?? emptyAgg();
-        const result = w?.result ?? null;
+        // Prefer the real settled market outcome; fall back to the candle.
+        const settled = outcomeByWindow.get(key);
+        const result = settled ?? w?.result ?? null;
+        const resultSource = settled ? "settled" : w?.result ? "candle" : null;
         let hit: boolean | null = null;
         if (result && (lean === "UP" || lean === "DOWN")) {
           hit = lean === result;
@@ -309,6 +335,7 @@ export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
           avgSellPrice: agg.sellBtc > 0 ? agg.sellUsd / agg.sellBtc : null,
           ind: indByWindow.get(key) ?? EMPTY_IND,
           result,
+          resultSource,
           hit,
         };
       });
