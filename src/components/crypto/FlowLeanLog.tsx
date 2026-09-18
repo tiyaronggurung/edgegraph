@@ -116,6 +116,10 @@ export function FlowLeanLog() {
                   <td className="px-3 py-1.5 text-muted-foreground">{hm(r.windowStart)}</td>
                   <td className="px-2 py-1.5 text-right text-emerald-400">{btc(r.buyBtc)}</td>
                   <td className="px-2 py-1.5 text-right text-rose-400">{btc(r.sellBtc)}</td>
+                  <td className="px-2 py-1.5 text-right text-emerald-400">{usd(r.buyUsd)}</td>
+                  <td className="px-2 py-1.5 text-right text-rose-400">{usd(r.sellUsd)}</td>
+                  <td className="px-2 py-1.5 text-right text-muted-foreground">{price(r.avgBuyPrice)}</td>
+                  <td className="px-2 py-1.5 text-right text-muted-foreground">{price(r.avgSellPrice)}</td>
                   <td
                     className={`px-2 py-1.5 text-right font-semibold ${
                       (r.imbWindow ?? 0) > 0 ? "text-emerald-400" : (r.imbWindow ?? 0) < 0 ? "text-rose-400" : ""
