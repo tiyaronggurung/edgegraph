@@ -152,9 +152,17 @@ export async function driveCheapEntry(): Promise<CheapEntryTickResult> {
       .select("user_id, ticker")
       .in("ticker", tickers)
       .filter("entry_snapshot->>source", "eq", "cheap_entry");
-    const already = new Set(
-      ((existing ?? []) as any[]).map((r) => `${r.user_id}|${r.ticker}`),
-    );
+    // Live fills live in crypto_trades — check both so one window is never
+    // bought twice, even if the live switch was flipped mid-window.
+    const { data: existingLive } = await supabaseAdmin
+      .from("crypto_trades")
+      .select("user_id, ticker")
+      .in("ticker", tickers)
+      .filter("inputs_snapshot->>source", "eq", "cheap_entry");
+    const already = new Set([
+      ...((existing ?? []) as any[]).map((r) => `${r.user_id}|${r.ticker}`),
+      ...((existingLive ?? []) as any[]).map((r) => `${r.user_id}|${r.ticker}`),
+    ]);
 
     // Ask price per (ticker, side) — fetched once, shared across users.
     const askCache = new Map<string, number | null>();
