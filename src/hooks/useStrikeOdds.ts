@@ -13,7 +13,7 @@
 // the diffusion term naturally tightens as T → 0. Flip warnings are suppressed
 // inside the last FLIP_MIN_SECONDS because there is no time for a real cross.
 import { useEffect, useRef, useState } from "react";
-import type { IndicatorSnap } from "@/lib/btcFlowLeanHistory.functions";
+import type { IndicatorSnap, SmaStack } from "@/lib/btcFlowLeanHistory.functions";
 
 const SECONDS_PER_YEAR = 365 * 24 * 3600;
 const VOL_PRIOR = 0.45;        // annualized fallback before the tape warms up
@@ -36,6 +36,11 @@ const P_CAP_BASE = 0.88;       // ceiling when indicators do NOT confirm the sid
 const P_CAP_MAX = 0.97;        // ceiling only when confirmed AND time is nearly out
 const SHRINK_MIN = 0.55;       // how hard we pull a fully-unconfirmed edge to 50/50
 const WARM_SAMPLES = 40;       // tape size before we trust the vol estimate fully
+const STK_SAT = 0.0012;        // 0.12% off an SMA line saturates the alignment read
+const SPREAD_SAT = 0.0008;     // fast/mid SMA separation that saturates
+const SLOPE_SAT = 0.00015;     // fast SMA moving 0.015% in a minute saturates
+const STACK_CROSS_FRESH_SEC = 8 * 60; // a fast/mid cross older than this is history
+const FLIP_STACK_BOOST = 0.12; // how far a fresh against-cross lowers the flip-risk bar
 
 
 function erf(x: number): number {
@@ -61,6 +66,8 @@ export interface StrikeOddsContext {
   avgSellPrice?: number | null;
   /** Taker flow imbalance (in - out) / total, -1..1. */
   flowImbalance?: number | null;
+  /** Multi-SMA stack read (10/50/200 on 1m closes) from the flow log feed. */
+  stack?: SmaStack | null;
 }
 
 export interface StrikeOddsParts {
@@ -71,6 +78,8 @@ export interface StrikeOddsParts {
   flow: number | null;
   /** Where price sits in the last 10 min range: +1 = breaking highs, -1 = breaking lows. */
   brk: number | null;
+  /** SMA 10/50/200 stack: alignment + slope + separation + order, -1..+1. */
+  stk: number | null;
 }
 
 export interface StrikeOdds {
@@ -125,11 +134,15 @@ export interface StrikeOdds {
   /** Recent range used for the break read. */
   rangeHigh: number | null;
   rangeLow: number | null;
+  /** Plain-language SMA-stack read: stack order, price alignment, fresh cross. */
+  stackNote: string | null;
+  /** 0..1: a fresh SMA10/50 cross pointing against the current side. */
+  stackFlip: number;
 }
 
 interface Tick { t: number; p: number }
 
-const EMPTY_PARTS: StrikeOddsParts = { sma: null, rsi: null, macd: null, cost: null, flow: null, brk: null };
+const EMPTY_PARTS: StrikeOddsParts = { sma: null, rsi: null, macd: null, cost: null, flow: null, brk: null, stk: null };
 
 export function useStrikeOdds(
   spot: number | null,
@@ -209,6 +222,7 @@ export function useStrikeOdds(
       cost: null,
       flow: null,
       brk: null,
+      stk: null,
     } satisfies StrikeOddsParts;
   };
 
@@ -226,6 +240,60 @@ export function useStrikeOdds(
     if (vwap > 0) cost = clamp((spot - vwap) / vwap / 0.0015, -1, 1);
   }
   const flow = nz(ctx?.flowImbalance) == null ? null : clamp((ctx?.flowImbalance as number) / 0.25, -1, 1);
+
+  // --- SMA stack (10 / 50 / 200 on 1m closes) ------------------------------
+  // Alignment = which trend frames are with us. Fast-line slope and its
+  // separation from the mid line = what is turning right now. Stack order =
+  // the slow filter. Input to tilt / conviction / flip timing only — never a
+  // direction source on its own.
+  const st = ctx?.stack ?? null;
+  const sat = (v: number | null | undefined, satPct: number) =>
+    v == null || !Number.isFinite(v) ? null : clamp(v / satPct, -1, 1);
+
+  const d10 = sat(st?.dist10Pct, STK_SAT);
+  const d50 = sat(st?.dist50Pct, STK_SAT);
+  const d200 = sat(st?.dist200Pct, STK_SAT);
+  const alignParts: number[] = [];
+  for (const v of [d10, d50, d200]) if (v != null) alignParts.push(v);
+  const stackAlign =
+    alignParts.length > 0
+      ? clamp(alignParts.reduce((a, v) => a + v, 0) / alignParts.length, -1, 1)
+      : null;
+
+  const spreadScore = sat(st?.spread1050Pct, SPREAD_SAT);
+  const slopeScore = sat(st?.slope10Pct, SLOPE_SAT);
+  const orderScore =
+    st?.order === "BULL" ? 1 : st?.order === "BEAR" ? -1 : st?.order === "MIXED" ? 0 : null;
+
+  const stkTerms: number[] = [];
+  let stkWeight = 0;
+  const pushStk = (v: number | null, w: number) => {
+    if (v == null) return;
+    stkTerms.push(v * w);
+    stkWeight += w;
+  };
+  pushStk(stackAlign, 0.35);
+  pushStk(spreadScore, 0.25);
+  pushStk(slopeScore, 0.25);
+  pushStk(orderScore, 0.15);
+  const stk =
+    stkWeight > 0 ? clamp(stkTerms.reduce((a, v) => a + v, 0) / stkWeight, -1, 1) : null;
+
+  const crossAgeSec = nz(st?.crossAgeSec);
+  const stackCrossTxt =
+    st?.crossSide != null && crossAgeSec != null && crossAgeSec <= STACK_CROSS_FRESH_SEC
+      ? `SMA10 crossed ${st.crossSide === "UP" ? "over" : "under"} SMA50 ${
+          crossAgeSec < 90 ? "just now" : `${Math.round(crossAgeSec / 60)}m ago`
+        }`
+      : null;
+  const stackNote =
+    st == null || st.sma10 == null
+      ? null
+      : `${st.order === "BULL" ? "bull stack" : st.order === "BEAR" ? "bear stack" : "mixed stack"} · price ${
+          d10 == null ? "?" : d10 > 0 ? "above" : "below"
+        } SMA10 · ${d200 == null ? "SMA200 pending" : d200 > 0 ? "above" : "below"} SMA200${
+          stackCrossTxt ? ` · ${stackCrossTxt}` : ""
+        }`;
 
   // --- break structure: where the running price sits in its recent range ----
   // +1 = printing new highs, -1 = new lows, 0 = mid-range chop. This is what
@@ -258,9 +326,12 @@ export function useStrikeOdds(
     cost,
     flow,
     brk,
+    stk,
   };
 
-  const W = { sma: 0.24, rsi: 0.14, macd: 0.22, cost: 0.12, flow: 0.10, brk: 0.18 } as const;
+  // The stack covers what the single SMA distance was saying, so it takes
+  // weight from `sma` instead of piling on top — nothing else gets diluted.
+  const W = { sma: 0.18, rsi: 0.13, macd: 0.20, cost: 0.11, flow: 0.10, brk: 0.17, stk: 0.11 } as const;
   let tiltNum = 0;
   let tiltDen = 0;
   (Object.keys(W) as (keyof typeof W)[]).forEach((k) => {
@@ -294,6 +365,7 @@ export function useStrikeOdds(
     drift: null, driftUsdPerMin: null, distanceUsd: null,
     etaSeconds: null, leadSeconds: null,
     pRaw: null, conviction: null, pCap: P_CAP_BASE, calibNote: "warming up",
+    stackNote: null, stackFlip: 0,
     rangeHigh, rangeLow,
   };
 
@@ -365,16 +437,29 @@ export function useStrikeOdds(
   const leadSeconds = etaSeconds == null ? null : secs - etaSeconds;
 
   const against = tilt == null ? 0 : side === "UP" ? Math.max(0, -tilt) : Math.max(0, tilt);
+  // A fresh SMA10/50 cross against the current side is a LEADING signal: it
+  // lowers the touch-risk bar needed to arm the warning, but only while the
+  // cross is recent and there is still time left for it to matter.
+  const stackFlip = (() => {
+    if (!st || st.crossSide == null || st.crossAgeSec == null) return 0;
+    if (st.crossAgeSec > STACK_CROSS_FRESH_SEC) return 0;
+    if (st.crossSide === side) return 0;            // cross is with us, not against us
+    const freshness = 1 - st.crossAgeSec / STACK_CROSS_FRESH_SEC;
+    const strength = clamp(Math.abs(st.spread1050Pct ?? 0) / SPREAD_SAT, 0, 1);
+    return clamp(freshness * (0.5 + 0.5 * strength), 0, 1);
+  })();
+  const warn = FLIP_WARN - FLIP_STACK_BOOST * stackFlip;
   const flipFlag =
     secs >= FLIP_MIN_SECONDS &&
-    flipRisk >= FLIP_WARN &&
+    flipRisk >= warn &&
     toward > 0 &&
-    (against >= 0.2 || (etaSeconds != null && etaSeconds <= secs));
+    (against >= 0.2 || (etaSeconds != null && etaSeconds <= secs) || stackFlip >= 0.5);
   const etaTxt =
     etaSeconds != null && etaSeconds <= secs ? ` · ~${Math.round(etaSeconds)}s to cross` : "";
+  const crossTxt = stackFlip > 0 && stackCrossTxt != null ? ` · ${stackCrossTxt}` : "";
   const flipReason = !flipFlag
     ? null
-    : `${(flipRisk * 100).toFixed(0)}% touch risk · $${Math.abs(distanceUsd).toFixed(0)} to go at ${driftUsdPerMin >= 0 ? "+" : ""}${driftUsdPerMin.toFixed(0)}/min${etaTxt}`;
+    : `${(flipRisk * 100).toFixed(0)}% touch risk · $${Math.abs(distanceUsd).toFixed(0)} to go at ${driftUsdPerMin >= 0 ? "+" : ""}${driftUsdPerMin.toFixed(0)}/min${etaTxt}${crossTxt}`;
 
   // --- calibration: distance alone is NOT enough ---------------------------
   // Being past the strike only earns a high price when the indicators, the
@@ -386,6 +471,9 @@ export function useStrikeOdds(
   const conv: number[] = [];
   if (tilt != null) conv.push(clamp(sideSign * tilt, -1, 1));
   if (brk != null) conv.push(clamp(sideSign * brk, -1, 1));
+  // Slow trend filter: price on the wrong side of the SMA stack is a weaker
+  // claim than price on the right side of it.
+  if (stackAlign != null) conv.push(clamp(sideSign * stackAlign, -1, 1));
   conv.push(clamp((sideSign * drift) / Math.max(sigmaSec * 2, 1e-12), -1, 1));
   // Cushion in σ: a $5 cushion with 12 minutes left is not real distance.
   const cushionSigmas = sd > 0 ? clamp(b / sd, 0, 2) / 2 : 0;
@@ -410,6 +498,8 @@ export function useStrikeOdds(
     conviction,
     pCap,
     calibNote,
+    stackNote,
+    stackFlip,
     rangeHigh,
     rangeLow,
     pBase,
