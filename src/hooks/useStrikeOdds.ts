@@ -19,8 +19,8 @@ const SECONDS_PER_YEAR = 365 * 24 * 3600;
 const VOL_PRIOR = 0.45;        // annualized fallback before the tape warms up
 const LAMBDA = 0.94;           // EWMA decay on tick returns
 const TAPE_MAX = 900;
-const VOL_BAR_MS = 1000;       // vol is measured on ~1s bars, not interpolated ticks
-const VOL_MAX = 1.5;           // 150%/yr ceiling — above this the estimate is noise
+const VOL_BAR_MS = 5000;       // vol is measured on ~5s bars, not interpolated ticks
+const VOL_MAX = 1.2;           // 120%/yr ceiling — above this the estimate is noise
 const MIN_DT_MS = 120;         // faster tape = faster reaction
 const SPREAD_BASE = 0.012;     // 1.2¢ floor
 const SPREAD_K = 0.05;         // widens with √(minutes left)
