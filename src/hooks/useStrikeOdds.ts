@@ -18,13 +18,17 @@ import type { IndicatorSnap } from "@/lib/btcFlowLeanHistory.functions";
 const SECONDS_PER_YEAR = 365 * 24 * 3600;
 const VOL_PRIOR = 0.45;        // annualized fallback before the tape warms up
 const LAMBDA = 0.94;           // EWMA decay on tick returns
-const TAPE_MAX = 600;
-const MIN_DT_MS = 250;
+const TAPE_MAX = 900;
+const MIN_DT_MS = 120;         // faster tape = faster reaction
 const SPREAD_BASE = 0.012;     // 1.2¢ floor
 const SPREAD_K = 0.05;         // widens with √(minutes left)
-const TILT_MAX = 0.10;         // max probability shift from technicals
 const FLIP_WARN = 0.32;        // flip risk that raises the early flag
-const FLIP_MIN_SECONDS = 45;   // below this there is no time to flip
+const FLIP_MIN_SECONDS = 20;   // below this there is no time to flip
+const VEL_WINDOW_MS = 30_000;  // horizon for measured price velocity
+const MOM_PERSIST = 0.35;      // how much of measured velocity is assumed to carry
+const TILT_DRIFT_K = 0.9;      // technical tilt → drift, in σ-per-second units
+const DRIFT_CAP_SIGMAS = 1.5;  // projected drift can't exceed this many σ√T
+
 
 function erf(x: number): number {
   const sign = x < 0 ? -1 : 1;
