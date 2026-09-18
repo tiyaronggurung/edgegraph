@@ -1,8 +1,8 @@
 // BTC Price & Volume — live Binance BTC/USDT price, 24h change, and REAL
 // BTC traded volume (BTC + USD notional). Read-only display card.
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getBtcPriceVolume } from "@/lib/btcPriceVolume.functions";
@@ -47,18 +47,42 @@ export function BtcPriceVolumeCard() {
   });
 
   const price = live.spot ?? data?.price ?? null;
+
+  // Local 1s clock so the countdown and window rollover never wait on a feed.
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const now = Date.now();
+  const winStart = Math.floor(now / 900_000) * 900_000;
+  const secondsToClose = Math.max(0, Math.round((winStart + 900_000 - now) / 1000));
+
   // Current 15m strike (read-only) + our own fast quote off it.
+  // Keyed by window so a rollover forces a fresh fetch instead of reusing the
+  // previous window's strike, and polled fast so a new strike lands right away.
   const strikeFn = useServerFn(getKalshiImpliedSpot);
+  const qc = useQueryClient();
   const { data: kalshi } = useQuery({
-    queryKey: ["btc-card-strike"],
+    queryKey: ["btc-card-strike", winStart],
     queryFn: () => strikeFn(),
-    refetchInterval: 5_000,
-    staleTime: 2_000,
-    placeholderData: keepPreviousData,
+    refetchInterval: 1_500,
+    staleTime: 0,
+    gcTime: 60_000,
   });
-  const lastStrikeRef = useRef<number | null>(null);
-  if (kalshi?.ok && kalshi.strike != null) lastStrikeRef.current = kalshi.strike;
-  const strike = kalshi?.strike ?? lastStrikeRef.current;
+  // Drop any strike cached against an earlier window the moment we roll over.
+  useEffect(() => {
+    void qc.invalidateQueries({ queryKey: ["btc-card-strike"] });
+  }, [winStart, qc]);
+
+  // Only reuse a held strike inside the same window; never across a rollover.
+  const lastStrikeRef = useRef<{ winStart: number; strike: number } | null>(null);
+  if (kalshi?.ok && kalshi.strike != null) {
+    lastStrikeRef.current = { winStart, strike: kalshi.strike };
+  }
+  const held = lastStrikeRef.current;
+  const strike =
+    kalshi?.strike ?? (held != null && held.winStart === winStart ? held.strike : null);
   const chg = data?.change24hPct ?? null;
   const up = (chg ?? 0) >= 0;
 
@@ -68,9 +92,6 @@ export function BtcPriceVolumeCard() {
   const imbM3 = win?.m3?.imbalance ?? null;
   const imbWin = win?.window?.imbalance ?? null;
   const lean = computeFlowLean(imbM3);
-  const now = Date.now();
-  const winStart = Math.floor(now / 900_000) * 900_000;
-  const secondsToClose = Math.max(0, Math.round((winStart + 900_000 - now) / 1000));
   const winRate = flowLeanWinRate(lean, secondsToClose);
 
   // Live SMA/RSI/MACD + average taker cost (shared query with the flow log).
@@ -84,7 +105,7 @@ export function BtcPriceVolumeCard() {
   const currentRow = hist?.rows?.find((r) => r.result == null) ?? hist?.rows?.[0] ?? null;
 
   // Our own quote off the live composite vs the strike (display only).
-  const odds = useStrikeOdds(price, strike ?? null, kalshi?.secondsToClose ?? secondsToClose, {
+  const odds = useStrikeOdds(price, strike ?? null, secondsToClose, {
     m1: hist?.live?.m1 ?? null,
     m15: hist?.live?.m15 ?? null,
     avgBuyPrice: currentRow?.avgBuyPrice ?? null,
