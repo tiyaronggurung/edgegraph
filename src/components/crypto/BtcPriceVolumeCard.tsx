@@ -5,6 +5,7 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getBtcPriceVolume } from "@/lib/btcPriceVolume.functions";
+import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 
 function fmtUsd(x: number | null | undefined): string {
@@ -21,6 +22,7 @@ function compact(x: number | null | undefined): string {
 
 export function BtcPriceVolumeCard() {
   const fn = useServerFn(getBtcPriceVolume);
+  const spotVolFn = useServerFn(getBtcSpotVolume);
   const live = useLiveCompositeSpot();
   const { data } = useQuery({
     queryKey: ["btc-price-volume"],
