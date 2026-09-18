@@ -66,6 +66,8 @@ export interface StrikeOddsParts {
   macd: number | null;
   cost: number | null;
   flow: number | null;
+  /** Where price sits in the last 10 min range: +1 = breaking highs, -1 = breaking lows. */
+  brk: number | null;
 }
 
 export interface StrikeOdds {
@@ -107,11 +109,22 @@ export interface StrikeOdds {
   etaSeconds: number | null;
   /** Seconds of runway left after a projected cross; negative = won't make it. */
   leadSeconds: number | null;
+  /** Uncalibrated probability straight from distance + drift. */
+  pRaw: number | null;
+  /** -1..+1: how much indicators, break structure and drift back the current side. */
+  conviction: number | null;
+  /** Ceiling applied to the winning side's probability. */
+  pCap: number;
+  /** Plain-language reason for the ceiling / shrink. */
+  calibNote: string;
+  /** Recent range used for the break read. */
+  rangeHigh: number | null;
+  rangeLow: number | null;
 }
 
 interface Tick { t: number; p: number }
 
-const EMPTY_PARTS: StrikeOddsParts = { sma: null, rsi: null, macd: null, cost: null, flow: null };
+const EMPTY_PARTS: StrikeOddsParts = { sma: null, rsi: null, macd: null, cost: null, flow: null, brk: null };
 
 export function useStrikeOdds(
   spot: number | null,
