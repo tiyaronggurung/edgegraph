@@ -55,8 +55,9 @@ export function FlowLeanLog() {
                 <th className="text-right font-normal px-2">In $</th>
                 <th className="text-right font-normal px-2">Out $</th>
                 <th className="text-right font-normal px-2">Net $</th>
-                <th className="text-right font-normal px-2">Avg buy</th>
-                <th className="text-right font-normal px-2">Avg sell</th>
+                <th className="text-right font-normal px-2">Fees</th>
+                <th className="text-right font-normal px-2">Avg buy*</th>
+                <th className="text-right font-normal px-2">Avg sell*</th>
                 <th className="text-right font-normal">Px</th>
               </tr>
             </thead>
