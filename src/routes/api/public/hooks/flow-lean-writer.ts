@@ -15,17 +15,28 @@ function leg(rows: Kline[]) {
   if (!rows.length) return null;
   let total = 0;
   let buy = 0;
+  let quoteTotal = 0;
+  let quoteBuy = 0;
   for (const r of rows) {
     const v = Number(r[5]);
     const tb = Number(r[9]);
+    const q = Number(r[7]);
+    const qb = Number(r[10]);
     if (Number.isFinite(v)) total += v;
     if (Number.isFinite(tb)) buy += tb;
+    if (Number.isFinite(q)) quoteTotal += q;
+    if (Number.isFinite(qb)) quoteBuy += qb;
   }
   const sell = Math.max(0, total - buy);
+  const quoteSell = Math.max(0, quoteTotal - quoteBuy);
   return {
     buy,
     sell,
     total,
+    quoteBuy,
+    quoteSell,
+    avgBuyPrice: buy > 0 ? quoteBuy / buy : null,
+    avgSellPrice: sell > 0 ? quoteSell / sell : null,
     imbalance: total > 0 ? (buy - sell) / total : 0,
   };
 }
