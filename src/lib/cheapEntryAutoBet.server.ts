@@ -200,6 +200,51 @@ export async function driveCheapEntry(): Promise<CheapEntryTickResult> {
           continue;
         }
 
+        const liveStakeCents = Math.max(100, Math.min(10000, Number(u.cheap_entry_stake_cents) || DEFAULT_STAKE_CENTS));
+
+        // ---- LIVE (real money) path ----
+        if (u.cheap_entry_live_enabled) {
+          if (!u.kalshi_api_key_id || !u.kalshi_private_key_pem) {
+            await logSkip(supabaseAdmin, u.id, w.ticker, w.close_time, w.strike, target.side, askCents, secondsToClose, "live_no_keys");
+            out.results.push({ userId: u.id, ticker: w.ticker, reason: "live_no_keys", fired: false, askCents });
+            continue;
+          }
+          const liveContracts = Math.max(1, Math.floor(liveStakeCents / askCents));
+          try {
+            const { submitKalshiBuy } = await import("./cryptoTrades.functions");
+            const result = await submitKalshiBuy(supabaseAdmin, u.id, {
+              ticker: w.ticker,
+              side: target.side,
+              contracts: liveContracts,
+              limitPriceCents: askCents,
+              strike: w.strike ?? undefined,
+              closeTime: w.close_time,
+              stakeUsd: liveStakeCents / 100,
+              inputsSnapshot: {
+                source: "cheap_entry",
+                pick_source: target.source,
+                ask_cents: askCents,
+                stake_cents: liveStakeCents,
+                seconds_to_close: secondsToClose,
+                strike: w.strike,
+                fired_at: new Date().toISOString(),
+              },
+            } as never);
+            already.add(`${u.id}|${w.ticker}`);
+            if (result.fillCount > 0) {
+              out.fired++;
+              out.results.push({ userId: u.id, ticker: w.ticker, reason: `fired_live_${target.source}`, fired: true, askCents });
+            } else {
+              out.results.push({ userId: u.id, ticker: w.ticker, reason: "live_unfilled", fired: false, askCents });
+            }
+          } catch (e: any) {
+            const msg = (e?.message ?? String(e)).slice(0, 120);
+            await logSkip(supabaseAdmin, u.id, w.ticker, w.close_time, w.strike, target.side, askCents, secondsToClose, `live_error:${msg}`);
+            out.results.push({ userId: u.id, ticker: w.ticker, reason: `live_error:${msg}`, fired: false, askCents });
+          }
+          continue;
+        }
+
         // Balance + stake
         const { data: bal } = await supabaseAdmin
           .from("paper_balances")
