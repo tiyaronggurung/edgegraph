@@ -99,7 +99,7 @@ export function BtcPriceVolumeCard() {
   const { data: hist } = useQuery({
     queryKey: ["btc-flow-lean-history"],
     queryFn: () => histFn(),
-    refetchInterval: 60_000,
+    refetchInterval: 20_000,
     placeholderData: keepPreviousData,
   });
   const currentRow = hist?.rows?.find((r) => r.result == null) ?? hist?.rows?.[0] ?? null;
