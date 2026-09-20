@@ -132,7 +132,7 @@ export const Route = createFileRoute("/api/public/hooks/prediction-row-tick")({
 
         const { error } = await supabaseAdmin.from("btc_model_predictions").insert({
           ticker,
-          event_ticker: (snap as any).event_ticker ?? null,
+          event_ticker: ticker.split("-").slice(0, 2).join("-"),
           strike,
           side,
           model_prob: pUp,
