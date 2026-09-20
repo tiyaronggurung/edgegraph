@@ -4064,6 +4064,8 @@ function CryptoPage() {
       <CheapEntryAutoBetPanel />
 
 
+      <BtcAgreementPanel />
+
       <BtcPriceVolumeCard />
 
       {data && <TopPick markets={data.markets} />}
