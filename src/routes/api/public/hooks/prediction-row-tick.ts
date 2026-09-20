@@ -80,7 +80,7 @@ export const Route = createFileRoute("/api/public/hooks/prediction-row-tick")({
         // Most recent Kalshi snapshot (written every 30s by btc-snapshot-tick).
         const { data: snap } = await supabaseAdmin
           .from("btc_kalshi_odds_snapshots")
-          .select("ticker, event_ticker, strike, snapped_at, seconds_to_close, kalshi_yes_bid, kalshi_yes_ask, spot_composite")
+          .select("ticker, strike, snapped_at, seconds_to_close, kalshi_yes_bid, kalshi_yes_ask, spot_composite")
           .order("snapped_at", { ascending: false })
           .limit(1)
           .maybeSingle();

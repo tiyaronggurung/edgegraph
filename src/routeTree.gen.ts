@@ -62,6 +62,7 @@ import { Route as ApiPublicHooksOddsShadowTickRouteImport } from './routes/api/p
 import { Route as ApiPublicHooksOpsAutoTradeTickRouteImport } from './routes/api/public/hooks/ops-auto-trade-tick'
 import { Route as ApiPublicHooksOpsDailyBacktestRouteImport } from './routes/api/public/hooks/ops-daily-backtest'
 import { Route as ApiPublicHooksPinRiskShadowTickRouteImport } from './routes/api/public/hooks/pin-risk-shadow-tick'
+import { Route as ApiPublicHooksPredictionRowTickRouteImport } from './routes/api/public/hooks/prediction-row-tick'
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
 import { Route as ApiPublicHooksSettleBtcPredictionsRouteImport } from './routes/api/public/hooks/settle-btc-predictions'
 import { Route as ApiPublicHooksSpotTickWriterRouteImport } from './routes/api/public/hooks/spot-tick-writer'
@@ -365,6 +366,12 @@ const ApiPublicHooksPinRiskShadowTickRoute =
     path: '/api/public/hooks/pin-risk-shadow-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksPredictionRowTickRoute =
+  ApiPublicHooksPredictionRowTickRouteImport.update({
+    id: '/api/public/hooks/prediction-row-tick',
+    path: '/api/public/hooks/prediction-row-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksRecomputePredictionsRoute =
   ApiPublicHooksRecomputePredictionsRouteImport.update({
     id: '/api/public/hooks/recompute-predictions',
@@ -485,6 +492,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/ops-auto-trade-tick': typeof ApiPublicHooksOpsAutoTradeTickRoute
   '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
+  '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/spot-tick-writer': typeof ApiPublicHooksSpotTickWriterRoute
@@ -550,6 +558,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/ops-auto-trade-tick': typeof ApiPublicHooksOpsAutoTradeTickRoute
   '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
+  '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/spot-tick-writer': typeof ApiPublicHooksSpotTickWriterRoute
@@ -617,6 +626,7 @@ export interface FileRoutesById {
   '/api/public/hooks/ops-auto-trade-tick': typeof ApiPublicHooksOpsAutoTradeTickRoute
   '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
+  '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/spot-tick-writer': typeof ApiPublicHooksSpotTickWriterRoute
@@ -684,6 +694,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ops-auto-trade-tick'
     | '/api/public/hooks/ops-daily-backtest'
     | '/api/public/hooks/pin-risk-shadow-tick'
+    | '/api/public/hooks/prediction-row-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/spot-tick-writer'
@@ -749,6 +760,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ops-auto-trade-tick'
     | '/api/public/hooks/ops-daily-backtest'
     | '/api/public/hooks/pin-risk-shadow-tick'
+    | '/api/public/hooks/prediction-row-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/spot-tick-writer'
@@ -815,6 +827,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ops-auto-trade-tick'
     | '/api/public/hooks/ops-daily-backtest'
     | '/api/public/hooks/pin-risk-shadow-tick'
+    | '/api/public/hooks/prediction-row-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/spot-tick-writer'
@@ -865,6 +878,7 @@ export interface RootRouteChildren {
   ApiPublicHooksOpsAutoTradeTickRoute: typeof ApiPublicHooksOpsAutoTradeTickRoute
   ApiPublicHooksOpsDailyBacktestRoute: typeof ApiPublicHooksOpsDailyBacktestRoute
   ApiPublicHooksPinRiskShadowTickRoute: typeof ApiPublicHooksPinRiskShadowTickRoute
+  ApiPublicHooksPredictionRowTickRoute: typeof ApiPublicHooksPredictionRowTickRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
   ApiPublicHooksSettleBtcPredictionsRoute: typeof ApiPublicHooksSettleBtcPredictionsRoute
   ApiPublicHooksSpotTickWriterRoute: typeof ApiPublicHooksSpotTickWriterRoute
@@ -1250,6 +1264,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPinRiskShadowTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/prediction-row-tick': {
+      id: '/api/public/hooks/prediction-row-tick'
+      path: '/api/public/hooks/prediction-row-tick'
+      fullPath: '/api/public/hooks/prediction-row-tick'
+      preLoaderRoute: typeof ApiPublicHooksPredictionRowTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/recompute-predictions': {
       id: '/api/public/hooks/recompute-predictions'
       path: '/api/public/hooks/recompute-predictions'
@@ -1425,6 +1446,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksOpsAutoTradeTickRoute: ApiPublicHooksOpsAutoTradeTickRoute,
   ApiPublicHooksOpsDailyBacktestRoute: ApiPublicHooksOpsDailyBacktestRoute,
   ApiPublicHooksPinRiskShadowTickRoute: ApiPublicHooksPinRiskShadowTickRoute,
+  ApiPublicHooksPredictionRowTickRoute: ApiPublicHooksPredictionRowTickRoute,
   ApiPublicHooksRecomputePredictionsRoute:
     ApiPublicHooksRecomputePredictionsRoute,
   ApiPublicHooksSettleBtcPredictionsRoute:
