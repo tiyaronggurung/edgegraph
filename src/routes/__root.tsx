@@ -126,7 +126,19 @@ function AuthCacheBridge() {
         qc.clear();
       }
       router.invalidate();
-      if (event !== "SIGNED_OUT") qc.invalidateQueries();
+      if (event !== "SIGNED_OUT") {
+        qc.invalidateQueries();
+        // Force an immediate refetch of everything on screen, then again once
+        // the post-login page has mounted its own feeds — this is what makes
+        // price, volume and odds fill in without a manual reload.
+        void qc.refetchQueries({ type: "active" });
+        window.setTimeout(() => {
+          void qc.refetchQueries({ type: "active" });
+        }, 800);
+        window.setTimeout(() => {
+          void qc.refetchQueries({ type: "active" });
+        }, 2_500);
+      }
       if (event === "SIGNED_IN" && typeof window !== "undefined") {
         const stored = sessionStorage.getItem("post_login_redirect");
         if (stored && stored.startsWith("/") && !stored.startsWith("//")) {
