@@ -1,3 +1,4 @@
+import { binanceFetch } from "@/lib/binanceFetch";
 // Public (no-auth) read-only chart data for the embeddable trendline view
 // (/embed/trendline). Mirrors the authenticated candle + trendline server fns
 // but performs NO database writes and NO shadow logging.

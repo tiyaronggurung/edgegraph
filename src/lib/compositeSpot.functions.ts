@@ -1,3 +1,4 @@
+import { binanceJson } from "@/lib/binanceFetch";
 // 1-second composite BTC spot (median of Coinbase, Binance, Kraken).
 // Lightweight, no auth — used by the trendline chart to tick the forming
 // candle every second. Kept independent from cryptoBtc.functions.ts so the

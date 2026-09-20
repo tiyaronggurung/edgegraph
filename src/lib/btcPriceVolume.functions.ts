@@ -1,3 +1,4 @@
+import { binanceFetch } from "@/lib/binanceFetch";
 // BTC price + real spot volume (Binance BTCUSDT) — read-only display feed.
 // Returns live last price, 24h change, and 24h traded volume (BTC and USD).
 import { createServerFn } from "@tanstack/react-start";

@@ -1,3 +1,4 @@
+import { binanceJson } from "@/lib/binanceFetch";
 import { createFileRoute } from "@tanstack/react-router";
 import { verifyCronRequest } from "@/lib/cronAuth";
 

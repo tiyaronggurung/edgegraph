@@ -1,3 +1,4 @@
+import { binanceFetch } from "@/lib/binanceFetch";
 // Read-only history: per-15m-window flow (BTC in vs out, USD in vs out, avg
 // buy/sell price) + actual result, plus rolled-up totals by timeframe.
 // Display only — nothing here touches entry, study, model or trendline paths.

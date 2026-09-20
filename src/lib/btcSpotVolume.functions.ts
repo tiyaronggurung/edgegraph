@@ -1,3 +1,4 @@
+import { binanceFetch } from "@/lib/binanceFetch";
 // BTC spot volume with taker buy/sell split.
 //
 // Binance klines already carry the aggressor split for free, keyless:
