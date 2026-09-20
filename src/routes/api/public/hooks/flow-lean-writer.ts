@@ -1,3 +1,4 @@
+import { binanceFetch } from "@/lib/binanceFetch";
 import { createFileRoute } from "@tanstack/react-router";
 import { verifyCronRequest } from "@/lib/cronAuth";
 
@@ -60,8 +61,8 @@ export const Route = createFileRoute("/api/public/hooks/flow-lean-writer")({
         const winStartMs = Math.floor(now / 900_000) * 900_000;
         const secondsToClose = Math.max(0, Math.round((winStartMs + 900_000 - now) / 1000));
 
-        const res = await fetch(
-          "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=31",
+        const res = await binanceFetch(
+          "/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=31",
           { headers: { accept: "application/json" } },
         );
         if (!res.ok) {

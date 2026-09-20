@@ -1,3 +1,4 @@
+import { binanceJson } from "@/lib/binanceFetch";
 // 1-second composite BTC spot (median of Coinbase, Binance, Kraken).
 // Lightweight, no auth — used by the trendline chart to tick the forming
 // candle every second. Kept independent from cryptoBtc.functions.ts so the
@@ -20,8 +21,7 @@ async function coinbase(): Promise<number> {
   return Number(j.price);
 }
 async function binance(): Promise<number> {
-  const j = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT")
-    .then(r => r.json() as Promise<{ price?: string }>);
+  const j = await binanceJson<{ price?: string }>("/api/v3/ticker/price?symbol=BTCUSDT");
   return Number(j.price);
 }
 async function kraken(): Promise<number> {

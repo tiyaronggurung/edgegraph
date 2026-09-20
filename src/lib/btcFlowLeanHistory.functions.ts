@@ -1,3 +1,4 @@
+import { binanceFetch } from "@/lib/binanceFetch";
 // Read-only history: per-15m-window flow (BTC in vs out, USD in vs out, avg
 // buy/sell price) + actual result, plus rolled-up totals by timeframe.
 // Display only — nothing here touches entry, study, model or trendline paths.
@@ -338,8 +339,8 @@ function smaStack(closes: number[]): SmaStack {
 
 async function fetchKlines(interval: string, limit: number): Promise<number[][]> {
   try {
-    const res = await fetch(
-      `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`,
+    const res = await binanceFetch(
+      `/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`,
     );
     if (!res.ok) return [];
     const kl = (await res.json()) as unknown[][];

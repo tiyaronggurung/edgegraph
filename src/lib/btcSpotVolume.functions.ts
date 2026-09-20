@@ -1,3 +1,4 @@
+import { binanceFetch } from "@/lib/binanceFetch";
 // BTC spot volume with taker buy/sell split.
 //
 // Binance klines already carry the aggressor split for free, keyless:
@@ -63,8 +64,8 @@ export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
     };
 
     try {
-      const res = await fetch(
-        "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=31",
+      const res = await binanceFetch(
+        "/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=31",
         { headers: { accept: "application/json" } },
       );
       if (!res.ok) return { ...empty, error: `binance ${res.status}` };

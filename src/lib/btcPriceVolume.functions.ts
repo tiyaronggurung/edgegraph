@@ -1,3 +1,4 @@
+import { binanceFetch } from "@/lib/binanceFetch";
 // BTC price + real spot volume (Binance BTCUSDT) — read-only display feed.
 // Returns live last price, 24h change, and 24h traded volume (BTC and USD).
 import { createServerFn } from "@tanstack/react-start";
@@ -25,8 +26,8 @@ export const getBtcPriceVolume = createServerFn({ method: "GET" }).handler(
       trades24h: null, error: null,
     };
     try {
-      const res = await fetch(
-        "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT",
+      const res = await binanceFetch(
+        "/api/v3/ticker/24hr?symbol=BTCUSDT",
         { headers: { accept: "application/json" } },
       );
       if (!res.ok) return { ...empty, error: `binance ${res.status}` };
