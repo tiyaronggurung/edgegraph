@@ -1,6 +1,6 @@
 // Agreement table — do all four read-only signals point the same way?
 //   1. Our odds on the live strike (same engine as the price card)
-//   2. BTC taker volume in vs out (last 3 closed minutes)
+//   2. BTC taker volume in vs out (running totals of this 15m window)
 //   3. Model pick
 //   4. Study pick (T7 lock, falls back to the shadow lock)
 // Display only. Nothing here is wired to any bet path.
