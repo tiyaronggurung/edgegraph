@@ -105,14 +105,15 @@ export function BtcAgreementPanel() {
   const oddsDir: Dir = odds.pUp == null ? null : odds.pUp >= 0.5 ? "UP" : "DOWN";
   const oddsDetail = odds.pUp == null ? "—" : `${(odds.pUp * 100).toFixed(1)}%`;
 
-  // 2. Volume in vs out (3m taker imbalance, dead zone ±5%)
-  const volDir: Dir = imbM3 == null ? null : imbM3 > 0.05 ? "UP" : imbM3 < -0.05 ? "DOWN" : null;
-  const buy = win?.m3?.buy ?? null;
-  const sell = win?.m3?.sell ?? null;
+  // 2. Volume in vs out — this 15m window's running taker totals (dead zone ±5%)
+  const imbWin = currentRow?.imbWindow ?? null;
+  const volDir: Dir = imbWin == null ? null : imbWin > 0.05 ? "UP" : imbWin < -0.05 ? "DOWN" : null;
+  const buy = currentRow?.buyBtc ?? null;
+  const sell = currentRow?.sellBtc ?? null;
   const volDetail =
     buy == null || sell == null
       ? "—"
-      : `${buy.toFixed(1)}↑ / ${sell.toFixed(1)}↓${imbM3 != null ? ` · ${(imbM3 * 100).toFixed(0)}%` : ""}`;
+      : `${buy.toFixed(1)}↑ / ${sell.toFixed(1)}↓ · ${(buy + sell).toFixed(1)} BTC${imbWin != null ? ` · ${(imbWin * 100).toFixed(0)}%` : ""}`;
 
   // 3 & 4. Model + study picks
   const sideOf = (s: "YES" | "NO" | null | undefined): Dir =>
