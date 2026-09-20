@@ -1,3 +1,4 @@
+import { binanceFetch } from "@/lib/binanceFetch";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { detectTrendlines, detectSpike, type TCandle } from "@/lib/ta/trendlines";
@@ -32,7 +33,7 @@ export interface TrendlineSnapshot {
 
 async function fetchBinance1m(limit = 300): Promise<TCandle[]> {
   const url = `/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=${limit}`;
-  const res = await fetch(url);
+  const res = await binanceFetch(url);
   if (!res.ok) throw new Error(`binance ${res.status}`);
   const raw = (await res.json()) as unknown[];
   return raw.map((row) => {
