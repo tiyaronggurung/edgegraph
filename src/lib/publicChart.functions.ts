@@ -29,8 +29,9 @@ async function fetchCoinbase(tf: CandleTf, limit: number): Promise<TCandle[]> {
 
 async function fetchBinance(tf: CandleTf, limit: number): Promise<TCandle[]> {
   const iv = tf === "1h" ? "1h" : tf === "1d" ? "1d" : tf;
-  const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${iv}&limit=${Math.min(1000, limit)}`;
-  const res = await fetch(url);
+  const res = await binanceFetch(
+    `/api/v3/klines?symbol=BTCUSDT&interval=${iv}&limit=${Math.min(1000, limit)}`,
+  );
   if (!res.ok) throw new Error(`binance ${res.status}`);
   const raw = (await res.json()) as unknown[];
   return raw.map((row) => {

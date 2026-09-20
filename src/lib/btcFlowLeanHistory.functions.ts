@@ -338,8 +338,8 @@ function smaStack(closes: number[]): SmaStack {
 
 async function fetchKlines(interval: string, limit: number): Promise<number[][]> {
   try {
-    const res = await fetch(
-      `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`,
+    const res = await binanceFetch(
+      `/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`,
     );
     if (!res.ok) return [];
     const kl = (await res.json()) as unknown[][];

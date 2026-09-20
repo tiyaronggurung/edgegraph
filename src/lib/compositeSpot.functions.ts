@@ -20,8 +20,7 @@ async function coinbase(): Promise<number> {
   return Number(j.price);
 }
 async function binance(): Promise<number> {
-  const j = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT")
-    .then(r => r.json() as Promise<{ price?: string }>);
+  const j = await binanceJson<{ price?: string }>("/api/v3/ticker/price?symbol=BTCUSDT");
   return Number(j.price);
 }
 async function kraken(): Promise<number> {

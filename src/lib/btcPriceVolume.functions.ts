@@ -25,8 +25,8 @@ export const getBtcPriceVolume = createServerFn({ method: "GET" }).handler(
       trades24h: null, error: null,
     };
     try {
-      const res = await fetch(
-        "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT",
+      const res = await binanceFetch(
+        "/api/v3/ticker/24hr?symbol=BTCUSDT",
         { headers: { accept: "application/json" } },
       );
       if (!res.ok) return { ...empty, error: `binance ${res.status}` };

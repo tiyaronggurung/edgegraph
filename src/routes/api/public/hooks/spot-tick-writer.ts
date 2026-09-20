@@ -32,9 +32,7 @@ async function fetchVenues(): Promise<VenueTick[]> {
       return { source: "coinbase" as const, spot: Number(j?.price), sourceTimestampMs: Number.isFinite(t) ? t : null };
     })(),
     (async () => {
-      const j = (await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT").then((r) =>
-        r.json(),
-      )) as { price?: string };
+      const j = await binanceJson<{ price?: string }>("/api/v3/ticker/price?symbol=BTCUSDT");
       return { source: "binance" as const, spot: Number(j?.price), sourceTimestampMs: null };
     })(),
     (async () => {
