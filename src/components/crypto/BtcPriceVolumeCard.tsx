@@ -114,7 +114,7 @@ export function BtcPriceVolumeCard() {
   const { data: hist } = useQuery({
     queryKey: ["btc-flow-lean-history"],
     queryFn: () => histFn(),
-    refetchInterval: 20_000,
+    refetchInterval: 5_000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
@@ -125,7 +125,10 @@ export function BtcPriceVolumeCard() {
   const currentRow = hist?.rows?.find((r) => r.result == null) ?? hist?.rows?.[0] ?? null;
 
   // Our own quote off the live composite vs the strike (display only).
-  const odds = useStrikeOdds(price, strike ?? null, secondsToClose, {
+  // Feed the RAW weighted target (not the smoothed display value) so the odds
+  // react on the tick itself — the rAF lerp is for the eye, not the math.
+  const oddsSpot = live.targetSpot ?? price;
+  const odds = useStrikeOdds(oddsSpot, strike ?? null, secondsToClose, {
     m1: hist?.live?.m1 ?? null,
     m15: hist?.live?.m15 ?? null,
     avgBuyPrice: currentRow?.avgBuyPrice ?? null,
