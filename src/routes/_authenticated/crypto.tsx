@@ -22,6 +22,7 @@ import { detectBigFlip } from "@/lib/bigFlipDetector.functions";
 import { OurOddsLiveHunterPanel } from "@/components/crypto/OurOddsLiveHunterPanel";
 import { VolumeFlowPanel } from "@/components/crypto/VolumeFlowPanel";
 import { BtcPriceVolumeCard } from "@/components/crypto/BtcPriceVolumeCard";
+import { BtcAgreementPanel } from "@/components/crypto/BtcAgreementPanel";
 import { diagnoseRecentMisses, studyMissesWithAI, getLatestStudy, setRecommendationFeedback, type StudyRecommendation } from "@/lib/cryptoMisses.functions";
 import { recomputeShadowSim, getShadowSimReport, type ShadowSimGateStat } from "@/lib/cryptoShadowSim.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
@@ -4063,6 +4064,8 @@ function CryptoPage() {
 
       <CheapEntryAutoBetPanel />
 
+
+      <BtcAgreementPanel />
 
       <BtcPriceVolumeCard />
 
