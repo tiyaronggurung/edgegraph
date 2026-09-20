@@ -14,7 +14,7 @@ import {
 } from "@/lib/btcFlowLean.functions";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useStrikeOdds } from "@/hooks/useStrikeOdds";
-import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
+import { getKalshiCurrentStrike } from "@/lib/kalshiCurrentStrike.functions";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
 
 function fmtUsd(x: number | null | undefined): string {
@@ -71,7 +71,7 @@ export function BtcPriceVolumeCard() {
   // Current 15m strike (read-only) + our own fast quote off it.
   // Keyed by window so a rollover forces a fresh fetch instead of reusing the
   // previous window's strike, and polled fast so a new strike lands right away.
-  const strikeFn = useServerFn(getKalshiImpliedSpot);
+  const strikeFn = useServerFn(getKalshiCurrentStrike);
   const qc = useQueryClient();
   const { data: kalshi } = useQuery({
     queryKey: ["btc-card-strike", winStart],
