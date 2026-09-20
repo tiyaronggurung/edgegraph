@@ -156,7 +156,7 @@ export function BtcAgreementPanel() {
       </CardHeader>
       <CardContent className="space-y-1 text-xs">
         <Row label="Our odds on this strike" dir={oddsDir} detail={`p(up) ${oddsDetail}`} />
-        <Row label="BTC volume in vs out (3m)" dir={volDir} detail={volDetail} />
+        <Row label="BTC volume in vs out (this 15m window)" dir={volDir} detail={volDetail} />
         <Row label="Model pick" dir={modelDir} detail={pct(cons?.modelConfidence)} />
         <Row
           label="Study pick"
