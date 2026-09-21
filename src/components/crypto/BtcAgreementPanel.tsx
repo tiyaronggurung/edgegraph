@@ -130,10 +130,16 @@ export function BtcAgreementPanel() {
       ? (buy - sell) / (buy + sell)
       : (fresh ? null : (currentRow?.imbWindow ?? null));
   const volDir: Dir = imbWin == null ? null : imbWin > 0.05 ? "UP" : imbWin < -0.05 ? "DOWN" : null;
+  const avgIn = fresh?.avgBuyPrice ?? null;
+  const avgOut = fresh?.avgSellPrice ?? null;
+  const avgTxt =
+    avgIn != null && avgOut != null
+      ? ` · in $${avgIn.toLocaleString(undefined, { maximumFractionDigits: 0 })} / out $${avgOut.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+      : "";
   const volDetail =
     buy == null || sell == null
       ? "—"
-      : `${buy.toFixed(1)}↑ / ${sell.toFixed(1)}↓ · ${(buy + sell).toFixed(1)} BTC${imbWin != null ? ` · ${(imbWin * 100).toFixed(0)}%` : ""}`;
+      : `${buy.toFixed(1)}↑ / ${sell.toFixed(1)}↓ · ${(buy + sell).toFixed(1)} BTC${imbWin != null ? ` · ${(imbWin * 100).toFixed(0)}%` : ""}${avgTxt}`;
 
   // 3 & 4. Model + study picks
   const sideOf = (s: "YES" | "NO" | null | undefined): Dir =>
