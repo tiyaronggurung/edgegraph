@@ -115,7 +115,7 @@ export const getBtcMultiVenueVolume = createServerFn({ method: "GET" }).handler(
         outQ = 0;
       let reachedStart = false;
       for (let page = 0; page < 8; page++) {
-        const url = `https://api.exchange.coinbase.com/products/BTC-USD/trades?limit=1000${after ? `&after=${after}` : ""}`;
+        const url: string = `https://api.exchange.coinbase.com/products/BTC-USD/trades?limit=1000${after ? `&after=${after}` : ""}`;
         const ctl = new AbortController();
         const t = setTimeout(() => ctl.abort(), TIMEOUT);
         let rows: { side: string; size: string; price: string; time: string }[];
