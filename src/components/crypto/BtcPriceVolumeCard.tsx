@@ -395,6 +395,37 @@ export function BtcPriceVolumeCard() {
               )}
             </div>
           )}
+          {winLeg && multi?.ok && multi.windowStart === winStart && multi.coinbaseFlow && (() => {
+            const ci = winLeg.buy + multi.coinbaseFlow.inBtc;
+            const co = winLeg.sell + multi.coinbaseFlow.outBtc;
+            const ct = ci + co;
+            const cImb = ct > 0 ? (ci - co) / ct : null;
+            return (
+              <div className="mt-1 rounded border border-border/60 bg-muted/20 px-1.5 py-1 font-mono text-[10px]">
+                <div className="flex flex-wrap items-center justify-between gap-x-2">
+                  <span className="text-muted-foreground">composite in/out (Binance + Coinbase)</span>
+                  {cImb != null && (
+                    <span className={`font-semibold ${cImb >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      {(cImb * 100).toFixed(0)}% {cImb >= 0 ? "buy-side" : "sell-side"}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-2">
+                  <span className="text-emerald-400 font-semibold">in {ci.toFixed(1)} BTC↑</span>
+                  <span className="text-muted-foreground">/</span>
+                  <span className="text-rose-400 font-semibold">out {co.toFixed(1)} BTC↓</span>
+                  <span className="text-muted-foreground">
+                    net {ci - co >= 0 ? "+" : "−"}{Math.abs(ci - co).toFixed(1)} BTC
+                  </span>
+                  {cImb != null && Math.abs(cImb) >= 0.05 && (
+                    <span className={cImb >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                      {cImb >= 0 ? "buyers in control" : "sellers in control"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
           {winLeg != null && (winLeg.avgBuyPrice != null || winLeg.avgSellPrice != null) && (
             <div className="mt-0.5 space-y-0.5 font-mono text-[10px]">
               <div className="flex items-center justify-between">
