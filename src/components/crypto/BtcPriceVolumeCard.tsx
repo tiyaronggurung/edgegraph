@@ -351,6 +351,42 @@ export function BtcPriceVolumeCard() {
               ? `${winLeg.total.toLocaleString(undefined, { maximumFractionDigits: 1 })} BTC`
               : "—"}
           </div>
+          {winLeg != null && (winLeg.avgBuyPrice != null || winLeg.avgSellPrice != null) && (
+            <div className="mt-0.5 space-y-0.5 font-mono text-[10px]">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">
+                  avg in{" "}
+                  <span className="text-emerald-400">
+                    {winLeg.avgBuyPrice != null ? `$${winLeg.avgBuyPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+                  </span>
+                  {" · "}avg out{" "}
+                  <span className="text-rose-400">
+                    {winLeg.avgSellPrice != null ? `$${winLeg.avgSellPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+                  </span>
+                </span>
+                {winLeg.avgBuyPrice != null && winLeg.avgSellPrice != null && (
+                  <span className={winLeg.avgBuyPrice >= winLeg.avgSellPrice ? "text-emerald-400" : "text-rose-400"}>
+                    {winLeg.avgBuyPrice >= winLeg.avgSellPrice ? "in-flow paying up" : "out-flow dumping"}
+                  </span>
+                )}
+              </div>
+              {price != null && winLeg.avgBuyPrice != null && (
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>
+                    now vs avg in{" "}
+                    <span className={price >= winLeg.avgBuyPrice ? "text-emerald-400" : "text-rose-400"}>
+                      {price >= winLeg.avgBuyPrice ? "+" : "−"}${Math.abs(price - winLeg.avgBuyPrice).toFixed(0)}
+                    </span>
+                  </span>
+                  <span>
+                    {price >= winLeg.avgBuyPrice
+                      ? "buyers in profit — in-flow pushed price"
+                      : "buyers underwater — in-flow not pushing"}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2">
