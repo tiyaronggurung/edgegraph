@@ -18,6 +18,14 @@ export interface SpotVolumeLeg {
   /** (buy - sell) / total, -1..1. Positive = net taker buying. */
   imbalance: number;
   trades: number;
+  /** USD notional bought (taker buy quote volume). */
+  buyUsd: number;
+  /** USD notional sold (quote volume minus taker buy quote volume). */
+  sellUsd: number;
+  /** Volume-weighted average price paid by buyers (money IN). */
+  avgBuyPrice: number | null;
+  /** Volume-weighted average price received by sellers (money OUT). */
+  avgSellPrice: number | null;
 }
 
 export interface BtcSpotVolume {
@@ -46,22 +54,31 @@ export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
 
     const leg = (rows: number[][]): SpotVolumeLeg | null => {
       if (rows.length === 0) return null;
-      let total = 0, buy = 0, trades = 0;
+      let total = 0, buy = 0, trades = 0, quote = 0, buyQuote = 0;
       for (const r of rows) {
         const v = Number(r[5]);
         const tb = Number(r[9]);
         const n = Number(r[8]);
+        const q = Number(r[7]);
+        const tbq = Number(r[10]);
         if (Number.isFinite(v)) total += v;
         if (Number.isFinite(tb)) buy += tb;
         if (Number.isFinite(n)) trades += n;
+        if (Number.isFinite(q)) quote += q;
+        if (Number.isFinite(tbq)) buyQuote += tbq;
       }
       const sell = Math.max(0, total - buy);
+      const sellQuote = Math.max(0, quote - buyQuote);
       return {
         buy: Number(buy.toFixed(4)),
         sell: Number(sell.toFixed(4)),
         total: Number(total.toFixed(4)),
         imbalance: total > 0 ? Number(((buy - sell) / total).toFixed(4)) : 0,
         trades,
+        buyUsd: Number(buyQuote.toFixed(2)),
+        sellUsd: Number(sellQuote.toFixed(2)),
+        avgBuyPrice: buy > 0 ? Number((buyQuote / buy).toFixed(2)) : null,
+        avgSellPrice: sell > 0 ? Number((sellQuote / sell).toFixed(2)) : null,
       };
     };
 
