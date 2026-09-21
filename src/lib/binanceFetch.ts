@@ -15,13 +15,29 @@ const HOSTS = [
 /** Remembers the host that last worked so we don't retry a blocked one. */
 let preferred = 0;
 
+const HOST_TIMEOUT_MS = 1_800;
+
+async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), HOST_TIMEOUT_MS);
+  const upstreamSignal = init?.signal;
+  const abortFromUpstream = () => controller.abort();
+  upstreamSignal?.addEventListener("abort", abortFromUpstream, { once: true });
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+    upstreamSignal?.removeEventListener("abort", abortFromUpstream);
+  }
+}
+
 export async function binanceFetch(path: string, init?: RequestInit): Promise<Response> {
   const order = [preferred, ...HOSTS.map((_, i) => i).filter((i) => i !== preferred)];
   let last: Response | null = null;
   let lastErr: unknown = null;
   for (const i of order) {
     try {
-      const res = await fetch(`${HOSTS[i]}${path}`, init);
+      const res = await fetchWithTimeout(`${HOSTS[i]}${path}`, init);
       if (res.ok) {
         preferred = i;
         return res;

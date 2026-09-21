@@ -48,7 +48,13 @@ export function BtcPriceVolumeCard() {
   });
   const { data: win } = useQuery({
     queryKey: ["btc-price-volume-15m-window"],
-    queryFn: () => spotVolFn(),
+    queryFn: async () => {
+      const result = await spotVolFn();
+      if (!result.ok || result.windowStart == null || result.window == null) {
+        throw new Error(result.error ?? "BTC window volume unavailable");
+      }
+      return result;
+    },
     refetchInterval: 3_000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
@@ -89,7 +95,13 @@ export function BtcPriceVolumeCard() {
   const qc = useQueryClient();
   const { data: kalshi } = useQuery({
     queryKey: ["btc-card-strike", winStart],
-    queryFn: () => strikeFn(),
+    queryFn: async () => {
+      const result = await strikeFn();
+      if (!result.ok || result.strike == null) {
+        throw new Error(result.error ?? "BTC strike unavailable");
+      }
+      return result;
+    },
     refetchInterval: 1_500,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
