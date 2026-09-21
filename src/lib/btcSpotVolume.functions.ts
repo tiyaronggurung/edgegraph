@@ -31,6 +31,8 @@ export interface BtcSpotVolume {
   m15: SpotVolumeLeg | null;
   /** Current 15m Kalshi-aligned window (since :00/:15/:30/:45). */
   window: SpotVolumeLeg | null;
+  /** Epoch ms of the window the `window` leg belongs to. */
+  windowStart: number | null;
   lastCloseTime: number | null;
   error: string | null;
 }
@@ -39,7 +41,7 @@ export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
   async (): Promise<BtcSpotVolume> => {
     const empty: BtcSpotVolume = {
       ok: false, source: "binance", m1: null, m3: null, m15: null, window: null,
-      lastCloseTime: null, error: null,
+      windowStart: null, lastCloseTime: null, error: null,
     };
 
     const leg = (rows: number[][]): SpotVolumeLeg | null => {
@@ -91,6 +93,7 @@ export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
         m3: leg(closed.slice(-3)),
         m15: leg(rows.slice(-15)),
         window: leg(winRows),
+        windowStart: winStart,
         lastCloseTime: last ? last[6] : null,
         error: null,
       };

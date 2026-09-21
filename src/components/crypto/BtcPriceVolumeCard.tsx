@@ -105,7 +105,10 @@ export function BtcPriceVolumeCard() {
   // Lean uses the last 3 closed minutes (the leg that carried edge in the
   // study); window imbalance is shown as context.
   const imbM3 = win?.m3?.imbalance ?? null;
-  const imbWin = win?.window?.imbalance ?? null;
+  // Only trust the window leg when the payload belongs to the window on screen,
+  // so a kept-previous snapshot can't show last window's totals after rollover.
+  const winLeg = win?.windowStart === winStart ? (win?.window ?? null) : null;
+  const imbWin = winLeg?.imbalance ?? null;
   const lean = computeFlowLean(imbM3);
   const winRate = flowLeanWinRate(lean, secondsToClose);
 
@@ -161,9 +164,9 @@ export function BtcPriceVolumeCard() {
         lean,
         imbM3,
         imbWindow: imbWin,
-        volWindowBtc: win?.window?.total ?? null,
-        buyWindowBtc: win?.window?.buy ?? null,
-        sellWindowBtc: win?.window?.sell ?? null,
+        volWindowBtc: winLeg?.total ?? null,
+        buyWindowBtc: winLeg?.buy ?? null,
+        sellWindowBtc: winLeg?.sell ?? null,
         spot: price,
         expectedWinRate: winRate,
       },
@@ -335,17 +338,17 @@ export function BtcPriceVolumeCard() {
         <div className="rounded border border-border/60 bg-muted/10 px-2 py-1.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-muted-foreground">BTC volume this 15m window</span>
-            {win?.window && (
+            {winLeg && (
               <span className="text-[10px] font-mono">
-                <span className="text-emerald-400">{win.window.buy.toFixed(1)}↑</span>
+                <span className="text-emerald-400">{winLeg.buy.toFixed(1)}↑</span>
                 {" / "}
-                <span className="text-rose-400">{win.window.sell.toFixed(1)}↓</span>
+                <span className="text-rose-400">{winLeg.sell.toFixed(1)}↓</span>
               </span>
             )}
           </div>
           <div className="font-mono font-semibold">
-            {win?.window != null
-              ? `${win.window.total.toLocaleString(undefined, { maximumFractionDigits: 1 })} BTC`
+            {winLeg != null
+              ? `${winLeg.total.toLocaleString(undefined, { maximumFractionDigits: 1 })} BTC`
               : "—"}
           </div>
         </div>
