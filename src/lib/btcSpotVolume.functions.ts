@@ -93,6 +93,7 @@ export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
         m3: leg(closed.slice(-3)),
         m15: leg(rows.slice(-15)),
         window: leg(winRows),
+        windowStart: winStart,
         lastCloseTime: last ? last[6] : null,
         error: null,
       };
