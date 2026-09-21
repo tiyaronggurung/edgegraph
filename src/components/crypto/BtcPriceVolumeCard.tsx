@@ -335,17 +335,17 @@ export function BtcPriceVolumeCard() {
         <div className="rounded border border-border/60 bg-muted/10 px-2 py-1.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-muted-foreground">BTC volume this 15m window</span>
-            {win?.window && (
+            {winLeg && (
               <span className="text-[10px] font-mono">
-                <span className="text-emerald-400">{win.window.buy.toFixed(1)}↑</span>
+                <span className="text-emerald-400">{winLeg.buy.toFixed(1)}↑</span>
                 {" / "}
-                <span className="text-rose-400">{win.window.sell.toFixed(1)}↓</span>
+                <span className="text-rose-400">{winLeg.sell.toFixed(1)}↓</span>
               </span>
             )}
           </div>
           <div className="font-mono font-semibold">
-            {win?.window != null
-              ? `${win.window.total.toLocaleString(undefined, { maximumFractionDigits: 1 })} BTC`
+            {winLeg != null
+              ? `${winLeg.total.toLocaleString(undefined, { maximumFractionDigits: 1 })} BTC`
               : "—"}
           </div>
         </div>
