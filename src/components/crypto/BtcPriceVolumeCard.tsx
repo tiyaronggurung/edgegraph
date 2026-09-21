@@ -401,6 +401,32 @@ export function BtcPriceVolumeCard() {
               )}
             </div>
           )}
+          {multi?.ok && multi.windowStart === winStart && (
+            <div className="mt-1 border-t border-border/40 pt-1 font-mono text-[10px]">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">all markets this window</span>
+                <span className="font-semibold">
+                  {multi.totalBtc.toLocaleString(undefined, { maximumFractionDigits: 1 })} BTC
+                </span>
+              </div>
+              <div className="mt-0.5 flex flex-wrap gap-x-2 text-muted-foreground">
+                {multi.venues.map((v) => (
+                  <span key={v.venue}>
+                    {v.venue}{" "}
+                    <span className={v.btc == null ? "text-muted-foreground/60" : "text-foreground"}>
+                      {v.btc != null ? v.btc.toLocaleString(undefined, { maximumFractionDigits: 1 }) : "—"}
+                    </span>
+                  </span>
+                ))}
+                {multi.binanceShare != null && (
+                  <span>· Binance {(multi.binanceShare * 100).toFixed(0)}% of total</span>
+                )}
+              </div>
+              <div className="mt-0.5 text-muted-foreground/70">
+                in/out split stays Binance-only (only free taker-side feed)
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2">
