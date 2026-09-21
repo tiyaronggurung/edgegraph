@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getBtcPriceVolume } from "@/lib/btcPriceVolume.functions";
 import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
+import { getBtcMultiVenueVolume } from "@/lib/btcMultiVenueVolume.functions";
 import {
   computeFlowLean,
   flowLeanWinRate,
