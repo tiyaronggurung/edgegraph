@@ -59,22 +59,25 @@ export function BtcPriceVolumeCard() {
   });
   const { data: essential } = useQuery({
     queryKey: ["btc-essential-snapshot", winStart],
-    queryFn: async () => {
-      const result = await essentialFn();
-      if (!result.strike.ok || result.strike.strike == null) {
-        throw new Error(result.strike.error ?? "BTC strike unavailable");
-      }
-      if (!result.volume.ok || result.volume.windowStart == null || result.volume.window == null) {
-        throw new Error(result.volume.error ?? "BTC window volume unavailable");
-      }
-      return result;
+    queryFn: () => essentialFn(),
+    // A miss from one upstream must never discard the other successful leg.
+    // Retry partial snapshots quickly; settle back to the normal cadence once
+    // both current-window values are present.
+    refetchInterval: (query) => {
+      const snapshot = query.state.data;
+      const complete =
+        snapshot?.strike.ok === true &&
+        snapshot.strike.strike != null &&
+        snapshot.volume.ok === true &&
+        snapshot.volume.windowStart === winStart &&
+        snapshot.volume.window != null;
+      return complete ? 5_000 : 1_000;
     },
-    refetchInterval: 5_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
-    retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
+    retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
     placeholderData: keepPreviousData,
   });
   const win = essential?.volume;
