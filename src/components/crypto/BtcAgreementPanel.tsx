@@ -119,12 +119,16 @@ export function BtcAgreementPanel() {
   // 2. Volume in vs out — this 15m window's running taker totals (dead zone ±5%).
   // Primary source is the public Binance window feed (same as the price card);
   // the logged history row is only a fallback.
-  const buy = win?.window?.buy ?? currentRow?.buyBtc ?? null;
-  const sell = win?.window?.sell ?? currentRow?.sellBtc ?? null;
+  // Take buy AND sell from the same snapshot, and only when that snapshot
+  // belongs to the window we're showing — a stale (previous-window) payload
+  // would otherwise blend big old totals with fresh ones.
+  const fresh = win?.windowStart === winStart ? (win?.window ?? null) : null;
+  const buy = fresh?.buy ?? (fresh ? null : (currentRow?.buyBtc ?? null));
+  const sell = fresh?.sell ?? (fresh ? null : (currentRow?.sellBtc ?? null));
   const imbWin =
     buy != null && sell != null && buy + sell > 0
       ? (buy - sell) / (buy + sell)
-      : (currentRow?.imbWindow ?? null);
+      : (fresh ? null : (currentRow?.imbWindow ?? null));
   const volDir: Dir = imbWin == null ? null : imbWin > 0.05 ? "UP" : imbWin < -0.05 ? "DOWN" : null;
   const volDetail =
     buy == null || sell == null
