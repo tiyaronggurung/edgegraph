@@ -354,9 +354,9 @@ export function BtcPriceVolumeCard() {
             <span className="text-[10px] text-muted-foreground">BTC volume this 15m window</span>
             {winLeg && (
               <span className="text-[10px] font-mono">
-                <span className="text-emerald-400">{winLeg.buy.toFixed(1)}↑</span>
+                <span className="text-emerald-400">in {winLeg.buy.toFixed(1)} BTC↑</span>
                 {" / "}
-                <span className="text-rose-400">{winLeg.sell.toFixed(1)}↓</span>
+                <span className="text-rose-400">out {winLeg.sell.toFixed(1)} BTC↓</span>
               </span>
             )}
           </div>

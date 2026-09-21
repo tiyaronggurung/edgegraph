@@ -139,7 +139,7 @@ export function BtcAgreementPanel() {
   const volDetail =
     buy == null || sell == null
       ? "—"
-      : `${buy.toFixed(1)}↑ / ${sell.toFixed(1)}↓ · ${(buy + sell).toFixed(1)} BTC${imbWin != null ? ` · ${(imbWin * 100).toFixed(0)}%` : ""}${avgTxt}`;
+      : `total in ${buy.toFixed(1)} BTC↑ / total out ${sell.toFixed(1)} BTC↓ · ${(buy + sell).toFixed(1)} BTC${imbWin != null ? ` · ${(imbWin * 100).toFixed(0)}%` : ""}${avgTxt}`;
 
   // 3 & 4. Model + study picks
   const sideOf = (s: "YES" | "NO" | null | undefined): Dir =>
