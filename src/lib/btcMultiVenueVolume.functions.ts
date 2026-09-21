@@ -190,6 +190,7 @@ export const getBtcMultiVenueVolume = createServerFn({ method: "GET" }).handler(
       venues,
       totalBtc: Number(totalBtc.toFixed(3)),
       binanceShare: bin != null && totalBtc > 0 ? Number((bin / totalBtc).toFixed(3)) : null,
+      coinbaseFlow: cbFlow,
     };
   },
 );
