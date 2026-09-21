@@ -400,6 +400,21 @@ export function BtcPriceVolumeCard() {
             const co = winLeg.sell + multi.coinbaseFlow.outBtc;
             const ct = ci + co;
             const cImb = ct > 0 ? (ci - co) / ct : null;
+            // volume-weighted composite avg in/out across venues that report one
+            const inLegs: Array<[number, number]> = [];
+            if (winLeg.avgBuyPrice != null && winLeg.buy > 0) inLegs.push([winLeg.buy, winLeg.avgBuyPrice]);
+            if (multi.coinbaseFlow.avgIn != null && multi.coinbaseFlow.inBtc > 0)
+              inLegs.push([multi.coinbaseFlow.inBtc, multi.coinbaseFlow.avgIn]);
+            const outLegs: Array<[number, number]> = [];
+            if (winLeg.avgSellPrice != null && winLeg.sell > 0) outLegs.push([winLeg.sell, winLeg.avgSellPrice]);
+            if (multi.coinbaseFlow.avgOut != null && multi.coinbaseFlow.outBtc > 0)
+              outLegs.push([multi.coinbaseFlow.outBtc, multi.coinbaseFlow.avgOut]);
+            const wavg = (legs: Array<[number, number]>) => {
+              const v = legs.reduce((s, [b]) => s + b, 0);
+              return v > 0 ? legs.reduce((s, [b, p]) => s + b * p, 0) / v : null;
+            };
+            const cAvgIn = wavg(inLegs);
+            const cAvgOut = wavg(outLegs);
             return (
               <div className="mt-1 rounded border border-border/60 bg-muted/20 px-1.5 py-1 font-mono text-[10px]">
                 <div className="flex flex-wrap items-center justify-between gap-x-2">
@@ -423,6 +438,35 @@ export function BtcPriceVolumeCard() {
                     </span>
                   )}
                 </div>
+                {(cAvgIn != null || cAvgOut != null) && (
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-muted-foreground">
+                    <span>
+                      composite avg in{" "}
+                      <span className="text-emerald-400">
+                        {cAvgIn != null ? `$${cAvgIn.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+                      </span>
+                    </span>
+                    <span>
+                      avg out{" "}
+                      <span className="text-rose-400">
+                        {cAvgOut != null ? `$${cAvgOut.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+                      </span>
+                    </span>
+                    {price != null && cAvgIn != null && (
+                      <span>
+                        now vs avg in{" "}
+                        <span className={price >= cAvgIn ? "text-emerald-400" : "text-rose-400"}>
+                          {price >= cAvgIn ? "+" : "−"}${Math.abs(price - cAvgIn).toFixed(0)}
+                        </span>
+                      </span>
+                    )}
+                    {cAvgIn != null && cAvgOut != null && (
+                      <span className={cAvgIn >= cAvgOut ? "text-emerald-400" : "text-rose-400"}>
+                        {cAvgIn >= cAvgOut ? "in-flow paying up" : "out-flow dumping"}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })()}
