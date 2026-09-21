@@ -33,6 +33,7 @@ function compact(x: number | null | undefined): string {
 export function BtcPriceVolumeCard() {
   const fn = useServerFn(getBtcPriceVolume);
   const spotVolFn = useServerFn(getBtcSpotVolume);
+  const multiVenueFn = useServerFn(getBtcMultiVenueVolume);
   const live = useLiveCompositeSpot();
   const { data } = useQuery({
     queryKey: ["btc-price-volume"],
