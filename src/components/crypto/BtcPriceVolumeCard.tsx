@@ -35,6 +35,17 @@ export function BtcPriceVolumeCard() {
   const spotVolFn = useServerFn(getBtcSpotVolume);
   const multiVenueFn = useServerFn(getBtcMultiVenueVolume);
   const live = useLiveCompositeSpot();
+
+  // Local 1s clock so the countdown and window rollover never wait on a feed.
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const now = Date.now();
+  const winStart = Math.floor(now / 900_000) * 900_000;
+  const secondsToClose = Math.max(0, Math.round((winStart + 900_000 - now) / 1000));
+
   const { data } = useQuery({
     queryKey: ["btc-price-volume"],
     queryFn: () => fn(),
@@ -43,12 +54,18 @@ export function BtcPriceVolumeCard() {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
-    retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
+    retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
     placeholderData: keepPreviousData,
   });
   const { data: win } = useQuery({
-    queryKey: ["btc-price-volume-15m-window"],
-    queryFn: () => spotVolFn(),
+    queryKey: ["btc-price-volume-15m-window", winStart],
+    queryFn: async () => {
+      const result = await spotVolFn();
+      if (!result.ok || result.windowStart == null || result.window == null) {
+        throw new Error(result.error ?? "BTC window volume unavailable");
+      }
+      return result;
+    },
     refetchInterval: 3_000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
@@ -72,16 +89,6 @@ export function BtcPriceVolumeCard() {
 
   const price = live.spot ?? data?.price ?? null;
 
-  // Local 1s clock so the countdown and window rollover never wait on a feed.
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
-  const now = Date.now();
-  const winStart = Math.floor(now / 900_000) * 900_000;
-  const secondsToClose = Math.max(0, Math.round((winStart + 900_000 - now) / 1000));
-
   // Current 15m strike (read-only) + our own fast quote off it.
   // Keyed by window so a rollover forces a fresh fetch instead of reusing the
   // previous window's strike, and polled fast so a new strike lands right away.
@@ -89,13 +96,19 @@ export function BtcPriceVolumeCard() {
   const qc = useQueryClient();
   const { data: kalshi } = useQuery({
     queryKey: ["btc-card-strike", winStart],
-    queryFn: () => strikeFn(),
+    queryFn: async () => {
+      const result = await strikeFn();
+      if (!result.ok || result.strike == null) {
+        throw new Error(result.error ?? "BTC strike unavailable");
+      }
+      return result;
+    },
     refetchInterval: 1_500,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
-    retryDelay: (a) => Math.min(750 * 2 ** a, 5_000),
+    retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
     staleTime: 0,
     gcTime: 60_000,
   });

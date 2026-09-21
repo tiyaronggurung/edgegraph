@@ -54,13 +54,19 @@ export function BtcAgreementPanel() {
   const strikeFn = useServerFn(getKalshiCurrentStrike);
   const { data: kalshi } = useQuery({
     queryKey: ["btc-card-strike", winStart],
-    queryFn: () => strikeFn(),
+    queryFn: async () => {
+      const result = await strikeFn();
+      if (!result.ok || result.strike == null) {
+        throw new Error(result.error ?? "BTC strike unavailable");
+      }
+      return result;
+    },
     refetchInterval: 1_500,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
-    retryDelay: (a) => Math.min(750 * 2 ** a, 5_000),
+    retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
     staleTime: 0,
     gcTime: 60_000,
   });
@@ -69,14 +75,20 @@ export function BtcAgreementPanel() {
   // the buy/sell totals are identical on both cards and never blank out.
   const volFn = useServerFn(getBtcSpotVolume);
   const { data: win } = useQuery({
-    queryKey: ["btc-price-volume-15m-window"],
-    queryFn: () => volFn(),
+    queryKey: ["btc-price-volume-15m-window", winStart],
+    queryFn: async () => {
+      const result = await volFn();
+      if (!result.ok || result.windowStart == null || result.window == null) {
+        throw new Error(result.error ?? "BTC window volume unavailable");
+      }
+      return result;
+    },
     refetchInterval: 3_000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
-    retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
+    retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
     placeholderData: keepPreviousData,
   });
 

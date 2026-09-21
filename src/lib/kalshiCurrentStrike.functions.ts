@@ -16,6 +16,7 @@ export interface KalshiCurrentStrike {
 let cache: { at: number; value: KalshiCurrentStrike } | null = null;
 let inFlight: Promise<KalshiCurrentStrike> | null = null;
 const CACHE_MS = 1_000;
+const FETCH_TIMEOUT_MS = 2_500;
 
 async function fetchCurrentStrike(): Promise<KalshiCurrentStrike> {
   const empty: KalshiCurrentStrike = {
@@ -27,10 +28,12 @@ async function fetchCurrentStrike(): Promise<KalshiCurrentStrike> {
   };
 
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     const res = await fetch(
       `${KALSHI}/events?status=open&with_nested_markets=true&series_ticker=KXBTC15M&limit=25`,
-      { headers: { accept: "application/json" } },
-    );
+      { headers: { accept: "application/json" }, signal: controller.signal },
+    ).finally(() => clearTimeout(timer));
     if (!res.ok) return { ...empty, error: `kalshi ${res.status}` };
 
     const json = (await res.json()) as {
@@ -48,7 +51,11 @@ async function fetchCurrentStrike(): Promise<KalshiCurrentStrike> {
     let best: { ticker: string; strike: number; secondsToClose: number } | null = null;
     for (const event of json.events ?? []) {
       for (const market of event.markets ?? []) {
-        if (market.status && market.status !== "active") continue;
+        // Around the exact 15-minute rollover Kalshi can expose the new open
+        // market a few seconds before changing its nested status to "active".
+        // close_time is the reliable boundary here; accepting that upcoming row
+        // prevents a blank strike while the status label catches up.
+        if (market.status === "closed" || market.status === "settled") continue;
         const secondsToClose = Math.floor((Date.parse(market.close_time) - now) / 1000);
         const strike = Number(market.floor_strike);
         if (secondsToClose <= 0 || !Number.isFinite(strike)) continue;

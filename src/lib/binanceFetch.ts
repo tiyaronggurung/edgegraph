@@ -15,26 +15,45 @@ const HOSTS = [
 /** Remembers the host that last worked so we don't retry a blocked one. */
 let preferred = 0;
 
+const HOST_TIMEOUT_MS = 1_800;
+
+async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), HOST_TIMEOUT_MS);
+  const upstreamSignal = init?.signal;
+  const abortFromUpstream = () => controller.abort();
+  upstreamSignal?.addEventListener("abort", abortFromUpstream, { once: true });
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+    upstreamSignal?.removeEventListener("abort", abortFromUpstream);
+  }
+}
+
 export async function binanceFetch(path: string, init?: RequestInit): Promise<Response> {
-  const order = [preferred, ...HOSTS.map((_, i) => i).filter((i) => i !== preferred)];
-  let last: Response | null = null;
-  let lastErr: unknown = null;
-  for (const i of order) {
+  const globalOrder = [preferred, 0, 1].filter((i, pos, arr) => i < 2 && arr.indexOf(i) === pos);
+  const attempts = globalOrder.map(async (i) => {
     try {
-      const res = await fetch(`${HOSTS[i]}${path}`, init);
+      const res = await fetchWithTimeout(`${HOSTS[i]}${path}`, init);
       if (res.ok) {
         preferred = i;
         return res;
       }
-      // 451/403/418/429 => region block or throttle: try the next host.
-      last = res;
-      if (res.status < 400) return res;
-    } catch (e) {
-      lastErr = e;
+      throw new Error(`binance ${res.status}`);
+    } catch (error) {
+      throw error instanceof Error ? error : new Error("binance unreachable");
     }
+  });
+  try {
+    // Race equivalent global mirrors so a blocked host never delays a healthy one.
+    // Binance US has different liquidity and is only a last-resort fallback.
+    return await Promise.any(attempts);
+  } catch {
+    const fallback = await fetchWithTimeout(`${HOSTS[2]}${path}`, init);
+    if (fallback.ok) return fallback;
+    throw new Error(`binance ${fallback.status}`);
   }
-  if (last) return last;
-  throw (lastErr instanceof Error ? lastErr : new Error("binance unreachable"));
 }
 
 /** Convenience: JSON body or throw with the failing status. */
