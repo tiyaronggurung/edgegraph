@@ -14,6 +14,16 @@ export interface VenueVolume {
   error: string | null;
 }
 
+/** Taker-side split sampled from Coinbase raw trades for the current window. */
+export interface CoinbaseFlow {
+  inBtc: number;
+  outBtc: number;
+  avgIn: number | null;
+  avgOut: number | null;
+  /** True when the window was not fully covered within the page budget. */
+  partial: boolean;
+}
+
 export interface BtcMultiVenueVolume {
   ok: boolean;
   windowStart: number;
@@ -22,6 +32,8 @@ export interface BtcMultiVenueVolume {
   totalBtc: number;
   /** Binance share of the answered total, 0..1. */
   binanceShare: number | null;
+  /** Coinbase taker buy/sell split, null when the trades feed failed. */
+  coinbaseFlow: CoinbaseFlow | null;
 }
 
 const TIMEOUT = 3500;
