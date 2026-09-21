@@ -171,7 +171,10 @@ export const getBtcMultiVenueVolume = createServerFn({ method: "GET" }).handler(
       { venue: "Bitstamp", run: bitstamp },
     ];
 
-    const settled = await Promise.allSettled(defs.map((d) => d.run()));
+    const [settled, cbFlow] = await Promise.all([
+      Promise.allSettled(defs.map((d) => d.run())),
+      coinbaseFlowRun().catch(() => null),
+    ]);
     const venues: VenueVolume[] = settled.map((s, i) => ({
       venue: defs[i]!.venue,
       btc: s.status === "fulfilled" ? Number(s.value.toFixed(3)) : null,
