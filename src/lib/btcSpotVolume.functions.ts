@@ -31,6 +31,8 @@ export interface BtcSpotVolume {
   m15: SpotVolumeLeg | null;
   /** Current 15m Kalshi-aligned window (since :00/:15/:30/:45). */
   window: SpotVolumeLeg | null;
+  /** Epoch ms of the window the `window` leg belongs to. */
+  windowStart: number | null;
   lastCloseTime: number | null;
   error: string | null;
 }
