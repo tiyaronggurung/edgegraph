@@ -83,8 +83,7 @@ async function fetchCurrentStrike(): Promise<KalshiCurrentStrike> {
   }
 }
 
-export const getKalshiCurrentStrike = createServerFn({ method: "GET" }).handler(
-  async (): Promise<KalshiCurrentStrike> => {
+export async function loadKalshiCurrentStrike(): Promise<KalshiCurrentStrike> {
     const now = Date.now();
     const fresh = cachedValue(now);
     if (fresh != null) return fresh;
@@ -108,5 +107,8 @@ export const getKalshiCurrentStrike = createServerFn({ method: "GET" }).handler(
         inFlight = null;
       });
     return inFlight;
-  },
+}
+
+export const getKalshiCurrentStrike = createServerFn({ method: "GET" }).handler(
+  async (): Promise<KalshiCurrentStrike> => loadKalshiCurrentStrike(),
 );

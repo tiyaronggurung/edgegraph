@@ -9,9 +9,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
+import { getBtcEssentialSnapshot } from "@/lib/btcEssentialSnapshot.functions";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
-import { getKalshiCurrentStrike } from "@/lib/kalshiCurrentStrike.functions";
 import { getBtcConsensusView } from "@/lib/btcConsensusView.functions";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
@@ -52,13 +51,16 @@ export function BtcAgreementPanel() {
 
   // Share the price card's fast strike query (same key) so the strike — and
   // therefore our odds — is already warm instead of refetched separately.
-  const strikeFn = useServerFn(getKalshiCurrentStrike);
-  const { data: kalshi } = useQuery({
-    queryKey: ["btc-card-strike", winStart],
+  const essentialFn = useServerFn(getBtcEssentialSnapshot);
+  const { data: essential } = useQuery({
+    queryKey: ["btc-essential-snapshot", winStart],
     queryFn: async () => {
-      const result = await strikeFn();
-      if (!result.ok || result.strike == null) {
-        throw new Error(result.error ?? "BTC strike unavailable");
+      const result = await essentialFn();
+      if (!result.strike.ok || result.strike.strike == null) {
+        throw new Error(result.strike.error ?? "BTC strike unavailable");
+      }
+      if (!result.volume.ok || result.volume.windowStart == null || result.volume.window == null) {
+        throw new Error(result.volume.error ?? "BTC window volume unavailable");
       }
       return result;
     },
@@ -71,27 +73,8 @@ export function BtcAgreementPanel() {
     staleTime: 0,
     gcTime: 60_000,
   });
-
-  // Same public Binance window feed the price card uses — no auth, no RLS, so
-  // the buy/sell totals are identical on both cards and never blank out.
-  const volFn = useServerFn(getBtcSpotVolume);
-  const { data: win } = useQuery({
-    queryKey: ["btc-price-volume-15m-window", winStart],
-    queryFn: async () => {
-      const result = await volFn();
-      if (!result.ok || result.windowStart == null || result.window == null) {
-        throw new Error(result.error ?? "BTC window volume unavailable");
-      }
-      return result;
-    },
-    refetchInterval: 3_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    retry: 3,
-    retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
-    placeholderData: keepPreviousData,
-  });
+  const kalshi = essential?.strike;
+  const win = essential?.volume;
 
   const histFn = useServerFn(getBtcFlowLeanHistory);
   const { data: hist } = useQuery({

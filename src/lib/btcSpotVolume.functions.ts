@@ -122,8 +122,7 @@ async function fetchBtcSpotVolume(): Promise<BtcSpotVolume> {
     }
 }
 
-export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
-  async (): Promise<BtcSpotVolume> => {
+export async function loadBtcSpotVolume(): Promise<BtcSpotVolume> {
     const now = Date.now();
     const currentWindow = Math.floor(now / 900_000) * 900_000;
     if (
@@ -149,5 +148,8 @@ export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
         inFlight = null;
       });
     return inFlight;
-  },
+}
+
+export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
+  async (): Promise<BtcSpotVolume> => loadBtcSpotVolume(),
 );

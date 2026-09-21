@@ -6,8 +6,8 @@ import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-quer
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getBtcPriceVolume } from "@/lib/btcPriceVolume.functions";
-import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
 import { getBtcMultiVenueVolume } from "@/lib/btcMultiVenueVolume.functions";
+import { getBtcEssentialSnapshot } from "@/lib/btcEssentialSnapshot.functions";
 import {
   computeFlowLean,
   flowLeanWinRate,
@@ -15,7 +15,6 @@ import {
 } from "@/lib/btcFlowLean.functions";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useStrikeOdds } from "@/hooks/useStrikeOdds";
-import { getKalshiCurrentStrike } from "@/lib/kalshiCurrentStrike.functions";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
 
@@ -33,7 +32,7 @@ function compact(x: number | null | undefined): string {
 
 export function BtcPriceVolumeCard() {
   const fn = useServerFn(getBtcPriceVolume);
-  const spotVolFn = useServerFn(getBtcSpotVolume);
+  const essentialFn = useServerFn(getBtcEssentialSnapshot);
   const multiVenueFn = useServerFn(getBtcMultiVenueVolume);
   const live = useLiveCompositeSpot();
 
@@ -58,16 +57,19 @@ export function BtcPriceVolumeCard() {
     retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
     placeholderData: keepPreviousData,
   });
-  const { data: win } = useQuery({
-    queryKey: ["btc-price-volume-15m-window", winStart],
+  const { data: essential } = useQuery({
+    queryKey: ["btc-essential-snapshot", winStart],
     queryFn: async () => {
-      const result = await spotVolFn();
-      if (!result.ok || result.windowStart == null || result.window == null) {
-        throw new Error(result.error ?? "BTC window volume unavailable");
+      const result = await essentialFn();
+      if (!result.strike.ok || result.strike.strike == null) {
+        throw new Error(result.strike.error ?? "BTC strike unavailable");
+      }
+      if (!result.volume.ok || result.volume.windowStart == null || result.volume.window == null) {
+        throw new Error(result.volume.error ?? "BTC window volume unavailable");
       }
       return result;
     },
-    refetchInterval: 3_000,
+    refetchInterval: 5_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
@@ -75,6 +77,7 @@ export function BtcPriceVolumeCard() {
     retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
     placeholderData: keepPreviousData,
   });
+  const win = essential?.volume;
 
   // Context-only multi-exchange totals; separate query so it can never
   // delay price, volume or odds.
@@ -93,27 +96,9 @@ export function BtcPriceVolumeCard() {
   // Current 15m strike (read-only) + our own fast quote off it.
   // Keyed by window so a rollover forces a fresh fetch instead of reusing the
   // previous window's strike, and polled fast so a new strike lands right away.
-  const strikeFn = useServerFn(getKalshiCurrentStrike);
   const marketsFn = useServerFn(getBtcMarkets);
   const qc = useQueryClient();
-  const { data: kalshi } = useQuery({
-    queryKey: ["btc-card-strike", winStart],
-    queryFn: async () => {
-      const result = await strikeFn();
-      if (!result.ok || result.strike == null) {
-        throw new Error(result.error ?? "BTC strike unavailable");
-      }
-      return result;
-    },
-    refetchInterval: 5_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    retry: 3,
-    retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
-    staleTime: 0,
-    gcTime: 60_000,
-  });
+  const kalshi = essential?.strike;
   // The page already owns this query. Subscribing with the identical key adds
   // no extra request and gives the card a warm strike when the lightweight
   // Kalshi endpoint is temporarily rate-limited during a fresh sign-in.
@@ -126,7 +111,7 @@ export function BtcPriceVolumeCard() {
   });
   // Drop any strike cached against an earlier window the moment we roll over.
   useEffect(() => {
-    void qc.invalidateQueries({ queryKey: ["btc-card-strike"] });
+    void qc.invalidateQueries({ queryKey: ["btc-essential-snapshot"] });
   }, [winStart, qc]);
 
   // Only reuse a held strike inside the same window; never across a rollover.
