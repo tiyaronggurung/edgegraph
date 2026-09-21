@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
-import { getKalshiImpliedSpot } from "@/lib/kalshiImpliedSpot.functions";
+import { getKalshiCurrentStrike } from "@/lib/kalshiCurrentStrike.functions";
 import { getBtcConsensusView } from "@/lib/btcConsensusView.functions";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useStrikeOdds } from "@/hooks/useStrikeOdds";
@@ -49,23 +49,34 @@ export function BtcAgreementPanel() {
   const winStart = Math.floor(now / 900_000) * 900_000;
   const secondsToClose = Math.max(0, Math.round((winStart + 900_000 - now) / 1000));
 
-  const strikeFn = useServerFn(getKalshiImpliedSpot);
+  // Share the price card's fast strike query (same key) so the strike — and
+  // therefore our odds — is already warm instead of refetched separately.
+  const strikeFn = useServerFn(getKalshiCurrentStrike);
   const { data: kalshi } = useQuery({
-    queryKey: ["btc-agreement-strike", winStart],
+    queryKey: ["btc-card-strike", winStart],
     queryFn: () => strikeFn(),
+    refetchInterval: 1_500,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    retry: 3,
+    retryDelay: (a) => Math.min(750 * 2 ** a, 5_000),
+    staleTime: 0,
+    gcTime: 60_000,
+  });
+
+  // Same public Binance window feed the price card uses — no auth, no RLS, so
+  // the buy/sell totals are identical on both cards and never blank out.
+  const volFn = useServerFn(getBtcSpotVolume);
+  const { data: win } = useQuery({
+    queryKey: ["btc-price-volume-15m-window"],
+    queryFn: () => volFn(),
     refetchInterval: 3_000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    staleTime: 0,
-  });
-
-  const volFn = useServerFn(getBtcSpotVolume);
-  const { data: win } = useQuery({
-    queryKey: ["btc-agreement-volume"],
-    queryFn: () => volFn(),
-    refetchInterval: 5_000,
-    refetchIntervalInBackground: true,
+    retry: 3,
+    retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
     placeholderData: keepPreviousData,
   });
 
@@ -105,11 +116,16 @@ export function BtcAgreementPanel() {
   const oddsDir: Dir = odds.pUp == null ? null : odds.pUp >= 0.5 ? "UP" : "DOWN";
   const oddsDetail = odds.pUp == null ? "—" : `${(odds.pUp * 100).toFixed(1)}%`;
 
-  // 2. Volume in vs out — this 15m window's running taker totals (dead zone ±5%)
-  const imbWin = currentRow?.imbWindow ?? null;
+  // 2. Volume in vs out — this 15m window's running taker totals (dead zone ±5%).
+  // Primary source is the public Binance window feed (same as the price card);
+  // the logged history row is only a fallback.
+  const buy = win?.window?.buy ?? currentRow?.buyBtc ?? null;
+  const sell = win?.window?.sell ?? currentRow?.sellBtc ?? null;
+  const imbWin =
+    buy != null && sell != null && buy + sell > 0
+      ? (buy - sell) / (buy + sell)
+      : (currentRow?.imbWindow ?? null);
   const volDir: Dir = imbWin == null ? null : imbWin > 0.05 ? "UP" : imbWin < -0.05 ? "DOWN" : null;
-  const buy = currentRow?.buyBtc ?? null;
-  const sell = currentRow?.sellBtc ?? null;
   const volDetail =
     buy == null || sell == null
       ? "—"
