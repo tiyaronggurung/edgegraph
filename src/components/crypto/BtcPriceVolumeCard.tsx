@@ -47,7 +47,7 @@ export function BtcPriceVolumeCard() {
     placeholderData: keepPreviousData,
   });
   const { data: win } = useQuery({
-    queryKey: ["btc-price-volume-15m-window"],
+    queryKey: ["btc-price-volume-15m-window", winStart],
     queryFn: async () => {
       const result = await spotVolFn();
       if (!result.ok || result.windowStart == null || result.window == null) {

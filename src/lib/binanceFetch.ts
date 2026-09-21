@@ -33,24 +33,24 @@ async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Respon
 
 export async function binanceFetch(path: string, init?: RequestInit): Promise<Response> {
   const order = [preferred, ...HOSTS.map((_, i) => i).filter((i) => i !== preferred)];
-  let last: Response | null = null;
-  let lastErr: unknown = null;
-  for (const i of order) {
+  const attempts = order.map(async (i) => {
     try {
       const res = await fetchWithTimeout(`${HOSTS[i]}${path}`, init);
       if (res.ok) {
         preferred = i;
         return res;
       }
-      // 451/403/418/429 => region block or throttle: try the next host.
-      last = res;
-      if (res.status < 400) return res;
-    } catch (e) {
-      lastErr = e;
+      throw new Error(`binance ${res.status}`);
+    } catch (error) {
+      throw error instanceof Error ? error : new Error("binance unreachable");
     }
+  });
+  try {
+    // Race all public mirrors so a blocked or slow host never delays a healthy one.
+    return await Promise.any(attempts);
+  } catch (error) {
+    throw error instanceof Error ? error : new Error("binance unreachable");
   }
-  if (last) return last;
-  throw (lastErr instanceof Error ? lastErr : new Error("binance unreachable"));
 }
 
 /** Convenience: JSON body or throw with the failing status. */

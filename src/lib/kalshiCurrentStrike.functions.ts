@@ -51,7 +51,11 @@ async function fetchCurrentStrike(): Promise<KalshiCurrentStrike> {
     let best: { ticker: string; strike: number; secondsToClose: number } | null = null;
     for (const event of json.events ?? []) {
       for (const market of event.markets ?? []) {
-        if (market.status && market.status !== "active") continue;
+        // Around the exact 15-minute rollover Kalshi can expose the new open
+        // market a few seconds before changing its nested status to "active".
+        // close_time is the reliable boundary here; accepting that upcoming row
+        // prevents a blank strike while the status label catches up.
+        if (market.status === "closed" || market.status === "settled") continue;
         const secondsToClose = Math.floor((Date.parse(market.close_time) - now) / 1000);
         const strike = Number(market.floor_strike);
         if (secondsToClose <= 0 || !Number.isFinite(strike)) continue;

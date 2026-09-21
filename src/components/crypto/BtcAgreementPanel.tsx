@@ -75,7 +75,7 @@ export function BtcAgreementPanel() {
   // the buy/sell totals are identical on both cards and never blank out.
   const volFn = useServerFn(getBtcSpotVolume);
   const { data: win } = useQuery({
-    queryKey: ["btc-price-volume-15m-window"],
+    queryKey: ["btc-price-volume-15m-window", winStart],
     queryFn: async () => {
       const result = await volFn();
       if (!result.ok || result.windowStart == null || result.window == null) {
