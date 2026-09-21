@@ -23,6 +23,7 @@ import { OurOddsLiveHunterPanel } from "@/components/crypto/OurOddsLiveHunterPan
 import { VolumeFlowPanel } from "@/components/crypto/VolumeFlowPanel";
 import { BtcPriceVolumeCard } from "@/components/crypto/BtcPriceVolumeCard";
 import { BtcAgreementPanel } from "@/components/crypto/BtcAgreementPanel";
+import { getBtcEssentialSnapshot } from "@/lib/btcEssentialSnapshot.functions";
 import { diagnoseRecentMisses, studyMissesWithAI, getLatestStudy, setRecommendationFeedback, type StudyRecommendation } from "@/lib/cryptoMisses.functions";
 import { recomputeShadowSim, getShadowSimReport, type ShadowSimGateStat } from "@/lib/cryptoShadowSim.functions";
 import { useBinanceBtcSpot } from "@/hooks/useBinanceBtcSpot";
@@ -112,6 +113,12 @@ export const Route = createFileRoute("/_authenticated/crypto")({
     context.queryClient.prefetchQuery({ queryKey: ["crypto-trades"], queryFn: () => listMyCryptoTrades() }).catch(() => {});
     context.queryClient.prefetchQuery({ queryKey: ["btc-markets"], queryFn: () => getBtcMarkets() }).catch(() => {});
     context.queryClient.prefetchQuery({ queryKey: ["btc-pred-stats"], queryFn: () => getPredictionStats() }).catch(() => {});
+    const winStart = Math.floor(Date.now() / 900_000) * 900_000;
+    context.queryClient.prefetchQuery({
+      queryKey: ["btc-essential-snapshot", winStart],
+      queryFn: () => getBtcEssentialSnapshot(),
+      staleTime: 1_000,
+    }).catch(() => {});
     // Prefetch the trendline/candle snapshot so the chart is warm before the
     // lazy panel scrolls into view. 25s staleTime matches the panel's config.
     import("@/lib/trendlineShadow.functions").then(({ evalTrendlineShadow }) =>
