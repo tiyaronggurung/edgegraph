@@ -483,30 +483,6 @@ export function BtcPriceVolumeCard() {
                   <span>· Binance {(multi.binanceShare * 100).toFixed(0)}% of total</span>
                 )}
               </div>
-              {multi.coinbaseFlow && winLeg && (
-                <div className="mt-0.5 flex flex-wrap items-center gap-x-2">
-                  <span className="text-muted-foreground">combined in/out</span>
-                  <span className="text-emerald-400">
-                    in {(winLeg.buy + multi.coinbaseFlow.inBtc).toFixed(1)} BTC↑
-                  </span>
-                  <span className="text-muted-foreground">/</span>
-                  <span className="text-rose-400">
-                    out {(winLeg.sell + multi.coinbaseFlow.outBtc).toFixed(1)} BTC↓
-                  </span>
-                  {(() => {
-                    const i = winLeg.buy + multi.coinbaseFlow.inBtc;
-                    const o = winLeg.sell + multi.coinbaseFlow.outBtc;
-                    const t = i + o;
-                    if (t <= 0) return null;
-                    const imb = (i - o) / t;
-                    return (
-                      <span className={imb >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                        {(imb * 100).toFixed(0)}%
-                      </span>
-                    );
-                  })()}
-                </div>
-              )}
               <div className="mt-0.5 text-muted-foreground/70">
                 Kraken + Bitstamp stay totals-only (no free taker-side feed)
               </div>
