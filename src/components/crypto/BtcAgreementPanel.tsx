@@ -49,23 +49,34 @@ export function BtcAgreementPanel() {
   const winStart = Math.floor(now / 900_000) * 900_000;
   const secondsToClose = Math.max(0, Math.round((winStart + 900_000 - now) / 1000));
 
-  const strikeFn = useServerFn(getKalshiImpliedSpot);
+  // Share the price card's fast strike query (same key) so the strike — and
+  // therefore our odds — is already warm instead of refetched separately.
+  const strikeFn = useServerFn(getKalshiCurrentStrike);
   const { data: kalshi } = useQuery({
-    queryKey: ["btc-agreement-strike", winStart],
+    queryKey: ["btc-card-strike", winStart],
     queryFn: () => strikeFn(),
+    refetchInterval: 1_500,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    retry: 3,
+    retryDelay: (a) => Math.min(750 * 2 ** a, 5_000),
+    staleTime: 0,
+    gcTime: 60_000,
+  });
+
+  // Same public Binance window feed the price card uses — no auth, no RLS, so
+  // the buy/sell totals are identical on both cards and never blank out.
+  const volFn = useServerFn(getBtcSpotVolume);
+  const { data: win } = useQuery({
+    queryKey: ["btc-price-volume-15m-window"],
+    queryFn: () => volFn(),
     refetchInterval: 3_000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    staleTime: 0,
-  });
-
-  const volFn = useServerFn(getBtcSpotVolume);
-  const { data: win } = useQuery({
-    queryKey: ["btc-agreement-volume"],
-    queryFn: () => volFn(),
-    refetchInterval: 5_000,
-    refetchIntervalInBackground: true,
+    retry: 3,
+    retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
     placeholderData: keepPreviousData,
   });
 
