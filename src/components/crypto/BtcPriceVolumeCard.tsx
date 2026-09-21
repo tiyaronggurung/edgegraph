@@ -35,6 +35,17 @@ export function BtcPriceVolumeCard() {
   const spotVolFn = useServerFn(getBtcSpotVolume);
   const multiVenueFn = useServerFn(getBtcMultiVenueVolume);
   const live = useLiveCompositeSpot();
+
+  // Local 1s clock so the countdown and window rollover never wait on a feed.
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const now = Date.now();
+  const winStart = Math.floor(now / 900_000) * 900_000;
+  const secondsToClose = Math.max(0, Math.round((winStart + 900_000 - now) / 1000));
+
   const { data } = useQuery({
     queryKey: ["btc-price-volume"],
     queryFn: () => fn(),
@@ -77,16 +88,6 @@ export function BtcPriceVolumeCard() {
   });
 
   const price = live.spot ?? data?.price ?? null;
-
-  // Local 1s clock so the countdown and window rollover never wait on a feed.
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
-  const now = Date.now();
-  const winStart = Math.floor(now / 900_000) * 900_000;
-  const secondsToClose = Math.max(0, Math.round((winStart + 900_000 - now) / 1000));
 
   // Current 15m strike (read-only) + our own fast quote off it.
   // Keyed by window so a rollover forces a fresh fetch instead of reusing the
