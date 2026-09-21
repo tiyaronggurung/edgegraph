@@ -112,7 +112,8 @@ export async function getPolymarketBtcVolume(
     closeSecs.map((s) => conditionIdForSlug(`btc-updown-5m-${s}`)),
   );
   if (!conds[0]) {
-    cache = { at: nowMs, data: null };
+    // Do not retain a transient Gamma miss across the next refresh. This is
+    // common for a few seconds at a five-minute market rollover.
     return null;
   }
   const tradeLists = await Promise.all(

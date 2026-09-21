@@ -17,6 +17,7 @@ import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useStrikeOdds } from "@/hooks/useStrikeOdds";
 import { getKalshiCurrentStrike } from "@/lib/kalshiCurrentStrike.functions";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
+import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
 
 function fmtUsd(x: number | null | undefined): string {
   if (x == null || !Number.isFinite(x)) return "—";
@@ -50,7 +51,7 @@ export function BtcPriceVolumeCard() {
     queryKey: ["btc-price-volume"],
     queryFn: () => fn(),
     refetchInterval: 10_000,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
@@ -67,7 +68,7 @@ export function BtcPriceVolumeCard() {
       return result;
     },
     refetchInterval: 3_000,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
@@ -81,7 +82,7 @@ export function BtcPriceVolumeCard() {
     queryKey: ["btc-multi-venue-volume"],
     queryFn: () => multiVenueFn(),
     refetchInterval: 10_000,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
     retry: 2,
     retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
     placeholderData: keepPreviousData,
@@ -93,6 +94,7 @@ export function BtcPriceVolumeCard() {
   // Keyed by window so a rollover forces a fresh fetch instead of reusing the
   // previous window's strike, and polled fast so a new strike lands right away.
   const strikeFn = useServerFn(getKalshiCurrentStrike);
+  const marketsFn = useServerFn(getBtcMarkets);
   const qc = useQueryClient();
   const { data: kalshi } = useQuery({
     queryKey: ["btc-card-strike", winStart],
@@ -103,14 +105,24 @@ export function BtcPriceVolumeCard() {
       }
       return result;
     },
-    refetchInterval: 1_500,
-    refetchIntervalInBackground: true,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
     retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
     staleTime: 0,
     gcTime: 60_000,
+  });
+  // The page already owns this query. Subscribing with the identical key adds
+  // no extra request and gives the card a warm strike when the lightweight
+  // Kalshi endpoint is temporarily rate-limited during a fresh sign-in.
+  const { data: sharedMarkets } = useQuery({
+    queryKey: ["btc-markets"],
+    queryFn: () => marketsFn(),
+    refetchInterval: 2_000,
+    staleTime: 1_000,
+    placeholderData: keepPreviousData,
   });
   // Drop any strike cached against an earlier window the moment we roll over.
   useEffect(() => {
@@ -123,8 +135,11 @@ export function BtcPriceVolumeCard() {
     lastStrikeRef.current = { winStart, strike: kalshi.strike };
   }
   const held = lastStrikeRef.current;
+  const sharedStrike = sharedMarkets?.markets
+    ?.filter((market) => market.secondsToClose > 0)
+    .sort((a, b) => a.secondsToClose - b.secondsToClose)[0]?.strike ?? null;
   const strike =
-    kalshi?.strike ?? (held != null && held.winStart === winStart ? held.strike : null);
+    kalshi?.strike ?? sharedStrike ?? (held != null && held.winStart === winStart ? held.strike : null);
   const chg = data?.change24hPct ?? null;
   const up = (chg ?? 0) >= 0;
 

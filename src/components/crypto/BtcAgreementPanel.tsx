@@ -13,6 +13,7 @@ import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
 import { getKalshiCurrentStrike } from "@/lib/kalshiCurrentStrike.functions";
 import { getBtcConsensusView } from "@/lib/btcConsensusView.functions";
+import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useStrikeOdds } from "@/hooks/useStrikeOdds";
 
@@ -61,8 +62,8 @@ export function BtcAgreementPanel() {
       }
       return result;
     },
-    refetchInterval: 1_500,
-    refetchIntervalInBackground: true,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
@@ -84,7 +85,7 @@ export function BtcAgreementPanel() {
       return result;
     },
     refetchInterval: 3_000,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
@@ -110,7 +111,19 @@ export function BtcAgreementPanel() {
     placeholderData: keepPreviousData,
   });
 
-  const strike = kalshi?.strike ?? cons?.strike ?? null;
+  const marketsFn = useServerFn(getBtcMarkets);
+  const { data: sharedMarkets } = useQuery({
+    queryKey: ["btc-markets"],
+    queryFn: () => marketsFn(),
+    refetchInterval: 2_000,
+    staleTime: 1_000,
+    placeholderData: keepPreviousData,
+  });
+
+  const sharedStrike = sharedMarkets?.markets
+    ?.filter((market) => market.secondsToClose > 0)
+    .sort((a, b) => a.secondsToClose - b.secondsToClose)[0]?.strike ?? null;
+  const strike = kalshi?.strike ?? sharedStrike ?? cons?.strike ?? null;
   const spot = live.targetSpot ?? live.spot ?? cons?.spot ?? null;
   const currentRow = hist?.rows?.find((r) => r.result == null) ?? hist?.rows?.[0] ?? null;
   const imbM3 = win?.m3?.imbalance ?? null;
