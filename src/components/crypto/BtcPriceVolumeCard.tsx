@@ -378,6 +378,23 @@ export function BtcPriceVolumeCard() {
               ? `${winLeg.total.toLocaleString(undefined, { maximumFractionDigits: 1 })} BTC`
               : "—"}
           </div>
+          {multi?.ok && multi.windowStart === winStart && multi.coinbaseFlow && (
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 font-mono text-[10px]">
+              <span className="text-muted-foreground">Coinbase in/out</span>
+              <span className="text-emerald-400">in {multi.coinbaseFlow.inBtc.toFixed(1)} BTC↑</span>
+              <span className="text-muted-foreground">/</span>
+              <span className="text-rose-400">out {multi.coinbaseFlow.outBtc.toFixed(1)} BTC↓</span>
+              {multi.coinbaseFlow.avgIn != null && multi.coinbaseFlow.avgOut != null && (
+                <span className="text-muted-foreground">
+                  avg in ${multi.coinbaseFlow.avgIn.toLocaleString(undefined, { maximumFractionDigits: 0 })} / out $
+                  {multi.coinbaseFlow.avgOut.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </span>
+              )}
+              {multi.coinbaseFlow.partial && (
+                <span className="text-amber-400/80">partial sample</span>
+              )}
+            </div>
+          )}
           {winLeg != null && (winLeg.avgBuyPrice != null || winLeg.avgSellPrice != null) && (
             <div className="mt-0.5 space-y-0.5 font-mono text-[10px]">
               <div className="flex items-center justify-between">
