@@ -89,8 +89,8 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
   const { data: composite } = useQuery({
     queryKey: ["composite-spot"],
     queryFn: () => compositeFn(),
-    refetchInterval: 1_000,
-    staleTime: 800,
+    refetchInterval: 3_000,
+    staleTime: 2_500,
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
     refetchIntervalInBackground: false,

@@ -61,8 +61,8 @@ export function BtcAgreementPanel() {
       }
       return result;
     },
-    refetchInterval: 1_500,
-    refetchIntervalInBackground: true,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
@@ -84,7 +84,7 @@ export function BtcAgreementPanel() {
       return result;
     },
     refetchInterval: 3_000,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,

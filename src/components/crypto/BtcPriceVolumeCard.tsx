@@ -50,7 +50,7 @@ export function BtcPriceVolumeCard() {
     queryKey: ["btc-price-volume"],
     queryFn: () => fn(),
     refetchInterval: 10_000,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
@@ -67,7 +67,7 @@ export function BtcPriceVolumeCard() {
       return result;
     },
     refetchInterval: 3_000,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
@@ -81,7 +81,7 @@ export function BtcPriceVolumeCard() {
     queryKey: ["btc-multi-venue-volume"],
     queryFn: () => multiVenueFn(),
     refetchInterval: 10_000,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
     retry: 2,
     retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
     placeholderData: keepPreviousData,
@@ -103,8 +103,8 @@ export function BtcPriceVolumeCard() {
       }
       return result;
     },
-    refetchInterval: 1_500,
-    refetchIntervalInBackground: true,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,

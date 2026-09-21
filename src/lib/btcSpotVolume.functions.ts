@@ -45,8 +45,11 @@ export interface BtcSpotVolume {
   error: string | null;
 }
 
-export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
-  async (): Promise<BtcSpotVolume> => {
+let cache: { at: number; value: BtcSpotVolume } | null = null;
+let inFlight: Promise<BtcSpotVolume> | null = null;
+const CACHE_MS = 2_000;
+
+async function fetchBtcSpotVolume(): Promise<BtcSpotVolume> {
     const empty: BtcSpotVolume = {
       ok: false, source: "binance", m1: null, m3: null, m15: null, window: null,
       windowStart: null, lastCloseTime: null, error: null,
@@ -117,5 +120,34 @@ export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
     } catch (e) {
       return { ...empty, error: (e as Error).message };
     }
+}
+
+export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
+  async (): Promise<BtcSpotVolume> => {
+    const now = Date.now();
+    const currentWindow = Math.floor(now / 900_000) * 900_000;
+    if (
+      cache != null &&
+      cache.value.windowStart === currentWindow &&
+      now - cache.at < CACHE_MS
+    ) {
+      return cache.value;
+    }
+    if (inFlight != null) return inFlight;
+    inFlight = fetchBtcSpotVolume()
+      .then((value) => {
+        if (value.ok && value.windowStart === currentWindow) {
+          cache = { at: Date.now(), value };
+          return value;
+        }
+        // A temporary mirror failure must not blank an already-populated card.
+        // Only reuse data from the same 15-minute window.
+        if (cache?.value.windowStart === currentWindow) return cache.value;
+        return value;
+      })
+      .finally(() => {
+        inFlight = null;
+      });
+    return inFlight;
   },
 );

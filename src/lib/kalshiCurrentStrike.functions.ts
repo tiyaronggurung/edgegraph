@@ -15,8 +15,18 @@ export interface KalshiCurrentStrike {
 
 let cache: { at: number; value: KalshiCurrentStrike } | null = null;
 let inFlight: Promise<KalshiCurrentStrike> | null = null;
-const CACHE_MS = 1_000;
+// The strike does not change inside a 15-minute market. A longer shared cache
+// prevents several mounted panels from repeatedly hitting the same Kalshi
+// events endpoint, while the remaining-time check below still rolls promptly.
+const CACHE_MS = 5_000;
 const FETCH_TIMEOUT_MS = 2_500;
+
+function cachedValue(now: number): KalshiCurrentStrike | null {
+  if (cache == null || now - cache.at >= CACHE_MS) return null;
+  const elapsed = Math.floor((now - cache.at) / 1000);
+  const remaining = Math.max(0, (cache.value.secondsToClose ?? 0) - elapsed);
+  return remaining > 0 ? { ...cache.value, secondsToClose: remaining } : null;
+}
 
 async function fetchCurrentStrike(): Promise<KalshiCurrentStrike> {
   const empty: KalshiCurrentStrike = {
@@ -76,11 +86,22 @@ async function fetchCurrentStrike(): Promise<KalshiCurrentStrike> {
 export const getKalshiCurrentStrike = createServerFn({ method: "GET" }).handler(
   async (): Promise<KalshiCurrentStrike> => {
     const now = Date.now();
-    if (cache != null && now - cache.at < CACHE_MS) return cache.value;
+    const fresh = cachedValue(now);
+    if (fresh != null) return fresh;
     if (inFlight != null) return inFlight;
     inFlight = fetchCurrentStrike()
       .then((value) => {
-        if (value.ok) cache = { at: Date.now(), value };
+        if (value.ok) {
+          cache = { at: Date.now(), value };
+          return value;
+        }
+        // Keep a still-open last-known strike through a brief 429/outage. Never
+        // carry it across the market close into the next 15-minute window.
+        if (cache != null) {
+          const elapsed = Math.floor((Date.now() - cache.at) / 1000);
+          const remaining = Math.max(0, (cache.value.secondsToClose ?? 0) - elapsed);
+          if (remaining > 0) return { ...cache.value, secondsToClose: remaining };
+        }
         return value;
       })
       .finally(() => {
