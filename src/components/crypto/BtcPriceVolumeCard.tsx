@@ -58,6 +58,18 @@ export function BtcPriceVolumeCard() {
     placeholderData: keepPreviousData,
   });
 
+  // Context-only multi-exchange totals; separate query so it can never
+  // delay price, volume or odds.
+  const { data: multi } = useQuery({
+    queryKey: ["btc-multi-venue-volume"],
+    queryFn: () => multiVenueFn(),
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
+    retry: 2,
+    retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
+    placeholderData: keepPreviousData,
+  });
+
   const price = live.spot ?? data?.price ?? null;
 
   // Local 1s clock so the countdown and window rollover never wait on a feed.
