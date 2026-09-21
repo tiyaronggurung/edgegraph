@@ -105,7 +105,10 @@ export function BtcPriceVolumeCard() {
   // Lean uses the last 3 closed minutes (the leg that carried edge in the
   // study); window imbalance is shown as context.
   const imbM3 = win?.m3?.imbalance ?? null;
-  const imbWin = win?.window?.imbalance ?? null;
+  // Only trust the window leg when the payload belongs to the window on screen,
+  // so a kept-previous snapshot can't show last window's totals after rollover.
+  const winLeg = win?.windowStart === winStart ? (win?.window ?? null) : null;
+  const imbWin = winLeg?.imbalance ?? null;
   const lean = computeFlowLean(imbM3);
   const winRate = flowLeanWinRate(lean, secondsToClose);
 
