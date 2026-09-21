@@ -41,7 +41,7 @@ export const getBtcSpotVolume = createServerFn({ method: "GET" }).handler(
   async (): Promise<BtcSpotVolume> => {
     const empty: BtcSpotVolume = {
       ok: false, source: "binance", m1: null, m3: null, m15: null, window: null,
-      lastCloseTime: null, error: null,
+      windowStart: null, lastCloseTime: null, error: null,
     };
 
     const leg = (rows: number[][]): SpotVolumeLeg | null => {
