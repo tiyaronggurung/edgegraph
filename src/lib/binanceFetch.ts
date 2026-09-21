@@ -32,8 +32,8 @@ async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Respon
 }
 
 export async function binanceFetch(path: string, init?: RequestInit): Promise<Response> {
-  const order = [preferred, ...HOSTS.map((_, i) => i).filter((i) => i !== preferred)];
-  const attempts = order.map(async (i) => {
+  const globalOrder = [preferred, 0, 1].filter((i, pos, arr) => i < 2 && arr.indexOf(i) === pos);
+  const attempts = globalOrder.map(async (i) => {
     try {
       const res = await fetchWithTimeout(`${HOSTS[i]}${path}`, init);
       if (res.ok) {
@@ -46,10 +46,13 @@ export async function binanceFetch(path: string, init?: RequestInit): Promise<Re
     }
   });
   try {
-    // Race all public mirrors so a blocked or slow host never delays a healthy one.
+    // Race equivalent global mirrors so a blocked host never delays a healthy one.
+    // Binance US has different liquidity and is only a last-resort fallback.
     return await Promise.any(attempts);
-  } catch (error) {
-    throw error instanceof Error ? error : new Error("binance unreachable");
+  } catch {
+    const fallback = await fetchWithTimeout(`${HOSTS[2]}${path}`, init);
+    if (fallback.ok) return fallback;
+    throw new Error(`binance ${fallback.status}`);
   }
 }
 

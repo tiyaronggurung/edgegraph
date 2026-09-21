@@ -5,4 +5,4 @@
 - [x] Show the most likely hourly “BTC price or above” contract and its confirmation state on the Crypto screen.
 - [x] Track and display actual ABOVE/DOWN hit rates for hourly probability bands from 50% through 98%.
 - [x] Upgrade the isolated hourly ladder to v2 with trendline geometry, full chart confluence, directional volatility, volume confirmation, target barriers, and separate ABOVE/BELOW confirmations.
-- [ ] Harden BTC strike and live 15-minute volume loading, then verify repeated signed-in reloads.
+- [x] Harden BTC strike and live 15-minute volume loading, then verify repeated signed-in reloads.

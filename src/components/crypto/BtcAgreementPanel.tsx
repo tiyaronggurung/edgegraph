@@ -66,7 +66,7 @@ export function BtcAgreementPanel() {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
-    retryDelay: (a) => Math.min(750 * 2 ** a, 5_000),
+    retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
     staleTime: 0,
     gcTime: 60_000,
   });
@@ -88,7 +88,7 @@ export function BtcAgreementPanel() {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
-    retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
+    retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
     placeholderData: keepPreviousData,
   });
 
