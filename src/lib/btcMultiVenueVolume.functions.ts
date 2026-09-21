@@ -105,6 +105,65 @@ export const getBtcMultiVenueVolume = createServerFn({ method: "GET" }).handler(
         .reduce((s, r) => s + (Number.isFinite(Number(r.volume)) ? Number(r.volume) : 0), 0);
     };
 
+    // Coinbase raw trades: `side` is the MAKER side, so side="sell" means the
+    // taker bought (in-flow) and side="buy" means the taker sold (out-flow).
+    const coinbaseFlowRun = async (): Promise<CoinbaseFlow> => {
+      let after: string | null = null;
+      let inBtc = 0,
+        outBtc = 0,
+        inQ = 0,
+        outQ = 0;
+      let reachedStart = false;
+      for (let page = 0; page < 8; page++) {
+        const url = `https://api.exchange.coinbase.com/products/BTC-USD/trades?limit=1000${after ? `&after=${after}` : ""}`;
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), TIMEOUT);
+        let rows: { side: string; size: string; price: string; time: string }[];
+        let next: string | null;
+        try {
+          const r = await fetch(url, {
+            signal: ctl.signal,
+            headers: { accept: "application/json", "user-agent": "Mozilla/5.0" },
+          });
+          if (!r.ok) throw new Error(`coinbase trades ${r.status}`);
+          rows = (await r.json()) as typeof rows;
+          next = r.headers.get("cb-after");
+        } finally {
+          clearTimeout(t);
+        }
+        if (!rows.length) {
+          reachedStart = true;
+          break;
+        }
+        for (const tr of rows) {
+          const ts = new Date(tr.time).getTime();
+          if (!Number.isFinite(ts) || ts < winStart) {
+            reachedStart = true;
+            continue;
+          }
+          const sz = Number(tr.size);
+          const px = Number(tr.price);
+          if (!Number.isFinite(sz) || !Number.isFinite(px)) continue;
+          if (tr.side === "sell") {
+            inBtc += sz;
+            inQ += sz * px;
+          } else {
+            outBtc += sz;
+            outQ += sz * px;
+          }
+        }
+        if (reachedStart || !next) break;
+        after = next;
+      }
+      return {
+        inBtc: Number(inBtc.toFixed(3)),
+        outBtc: Number(outBtc.toFixed(3)),
+        avgIn: inBtc > 0 ? Number((inQ / inBtc).toFixed(2)) : null,
+        avgOut: outBtc > 0 ? Number((outQ / outBtc).toFixed(2)) : null,
+        partial: !reachedStart,
+      };
+    };
+
     const defs: { venue: string; run: () => Promise<number> }[] = [
       { venue: "Binance", run: binance },
       { venue: "Coinbase", run: coinbase },
