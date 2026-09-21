@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getBtcPriceVolume } from "@/lib/btcPriceVolume.functions";
 import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
+import { getBtcMultiVenueVolume } from "@/lib/btcMultiVenueVolume.functions";
 import {
   computeFlowLean,
   flowLeanWinRate,
@@ -32,6 +33,7 @@ function compact(x: number | null | undefined): string {
 export function BtcPriceVolumeCard() {
   const fn = useServerFn(getBtcPriceVolume);
   const spotVolFn = useServerFn(getBtcSpotVolume);
+  const multiVenueFn = useServerFn(getBtcMultiVenueVolume);
   const live = useLiveCompositeSpot();
   const { data } = useQuery({
     queryKey: ["btc-price-volume"],
@@ -52,6 +54,18 @@ export function BtcPriceVolumeCard() {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
+    retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
+    placeholderData: keepPreviousData,
+  });
+
+  // Context-only multi-exchange totals; separate query so it can never
+  // delay price, volume or odds.
+  const { data: multi } = useQuery({
+    queryKey: ["btc-multi-venue-volume"],
+    queryFn: () => multiVenueFn(),
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
+    retry: 2,
     retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
     placeholderData: keepPreviousData,
   });
@@ -385,6 +399,32 @@ export function BtcPriceVolumeCard() {
                   </span>
                 </div>
               )}
+            </div>
+          )}
+          {multi?.ok && multi.windowStart === winStart && (
+            <div className="mt-1 border-t border-border/40 pt-1 font-mono text-[10px]">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">all markets this window</span>
+                <span className="font-semibold">
+                  {multi.totalBtc.toLocaleString(undefined, { maximumFractionDigits: 1 })} BTC
+                </span>
+              </div>
+              <div className="mt-0.5 flex flex-wrap gap-x-2 text-muted-foreground">
+                {multi.venues.map((v) => (
+                  <span key={v.venue}>
+                    {v.venue}{" "}
+                    <span className={v.btc == null ? "text-muted-foreground/60" : "text-foreground"}>
+                      {v.btc != null ? v.btc.toLocaleString(undefined, { maximumFractionDigits: 1 }) : "—"}
+                    </span>
+                  </span>
+                ))}
+                {multi.binanceShare != null && (
+                  <span>· Binance {(multi.binanceShare * 100).toFixed(0)}% of total</span>
+                )}
+              </div>
+              <div className="mt-0.5 text-muted-foreground/70">
+                in/out split stays Binance-only (only free taker-side feed)
+              </div>
             </div>
           )}
         </div>
