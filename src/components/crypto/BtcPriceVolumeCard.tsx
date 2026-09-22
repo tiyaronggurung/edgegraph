@@ -59,6 +59,17 @@ export function BtcPriceVolumeCard() {
     retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
     placeholderData: keepPreviousData,
   });
+  // Day-to-date composite totals (since New York midnight), from the stored
+  // 15m rows. Display only — refreshed once a minute.
+  const { data: dayTotals } = useQuery({
+    queryKey: ["composite-day-totals"],
+    queryFn: () => dayTotalsFn(),
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
   const { data: essential } = useQuery({
     queryKey: ["btc-essential-snapshot", winStart],
     queryFn: () => essentialFn(),
