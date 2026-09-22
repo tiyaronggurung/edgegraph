@@ -13,6 +13,8 @@ import { getBtcEssentialSnapshot } from "@/lib/btcEssentialSnapshot.functions";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
 import { getBtcConsensusView } from "@/lib/btcConsensusView.functions";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
+import { getBtcMultiVenueVolume } from "@/lib/btcMultiVenueVolume.functions";
+import { BtcVerdictBanner } from "@/components/crypto/BtcVerdictBanner";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useStrikeOdds } from "@/hooks/useStrikeOdds";
 
@@ -189,6 +191,15 @@ export function BtcAgreementPanel() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-1 text-xs">
+        <BtcVerdictBanner
+          spot={spot}
+          strike={strike}
+          avgIn={compAvgIn}
+          avgOut={compAvgOut}
+          inBtc={compIn}
+          outBtc={compOut}
+          oddsSide={oddsDir}
+        />
         <Row label="Our odds on this strike" dir={oddsDir} detail={`p(up) ${oddsDetail}`} />
         <Row label="BTC volume in vs out (this 15m window)" dir={volDir} detail={volDetail} />
         <Row label="Model pick" dir={modelDir} detail={pct(cons?.modelConfidence)} />
