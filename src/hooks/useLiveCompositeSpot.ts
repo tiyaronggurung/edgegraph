@@ -87,10 +87,15 @@ export function useLiveCompositeSpot(): LiveCompositeSpot {
     if (bfx.price != null && Number.isFinite(bfx.price)) samples.push({ venue: "bitfinex", price: bfx.price });
 
     if (samples.length) {
+      // Prefer CF constituents; fall back to the other venues only if no CF
+      // venue is currently quoting (keeps the composite from ever blanking).
+      const cfSamples = samples.filter(s => CF_VENUES.has(s.venue));
+      const pool = cfSamples.length ? cfSamples : samples;
+
       // Outlier trim vs cross-venue median (only meaningful with ≥3 venues).
-      let kept = samples;
-      if (samples.length >= 3) {
-        const med = medianOf(samples.map(s => s.price));
+      let kept = pool;
+      if (pool.length >= 3) {
+        const med = medianOf(pool.map(s => s.price));
         const maxDev = med * (OUTLIER_BPS / 10_000);
         const trimmed = samples.filter(s => Math.abs(s.price - med) <= maxDev);
         if (trimmed.length >= 2) kept = trimmed;
