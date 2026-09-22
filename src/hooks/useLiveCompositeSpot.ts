@@ -37,12 +37,24 @@ const SNAP_EPSILON = 0.01;
 // Trim venues that deviate > 25 bps from cross-venue median (outlier guard).
 const OUTLIER_BPS = 25;
 
+// Settlement-aligned weights. Measured 2026-09-22 (270 samples): Binance ran
+// +$11.5 and Bitfinex +$14.7 above the CF-style settlement reference, while
+// Coinbase/Bitstamp/Kraken/Gemini all sat within ±$2.50 of it. Those two
+// venues were 30% of the old composite and produced a persistent ~+$4 bias,
+// which is enough to flip a call when spot sits on the strike.
+//
+// So the composite is now built from CF constituents only (Coinbase,
+// Bitstamp). Binance/Bitfinex stay connected purely as a liveness fallback:
+// they are used only when no CF venue has a price, so the composite can
+// never blank out.
 const VENUE_WEIGHTS = {
-  coinbase: 0.50,
-  bitstamp: 0.20,
+  coinbase: 0.70,
+  bitstamp: 0.30,
   binance:  0.20,
   bitfinex: 0.10,
 } as const;
+
+const CF_VENUES = new Set<keyof typeof VENUE_WEIGHTS>(["coinbase", "bitstamp"]);
 
 interface Sample { venue: keyof typeof VENUE_WEIGHTS; price: number }
 
