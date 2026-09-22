@@ -110,6 +110,23 @@ export async function recordCompositeFlow(): Promise<CompositeFlowSnapshot & { w
   const venueBtc = (name: string) =>
     multi?.venues.find((x) => x.venue === name)?.btc ?? null;
 
+  // Never store a partial composite: without the Binance leg the totals and
+  // averages would be Coinbase-only and silently wrong.
+  if (binIn == null || binOut == null) {
+    return {
+      windowStart,
+      secondsToClose,
+      spot,
+      strike,
+      compositeIn,
+      compositeOut,
+      compositeAvgIn,
+      compositeAvgOut,
+      verdict: v.verdict,
+      written: false,
+    };
+  }
+
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { error } = await supabaseAdmin.from("btc_composite_flow_log").insert({
     window_start: new Date(windowStart).toISOString(),
