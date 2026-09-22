@@ -11,11 +11,12 @@
 //                  (Coinbase, Bitstamp, Kraken, Gemini, LMAX n/a)
 // buffer_usd     = our_composite - cf_reference
 
+// Mirrors src/hooks/useLiveCompositeSpot.ts. Binance/Bitfinex were dropped on
+// 2026-09-22 after 270 measured samples showed them running +$11.5 / +$14.7
+// above the settlement reference, biasing our composite ~+$4.
 const OUR_WEIGHTS: Record<string, number> = {
-  coinbase: 0.5,
-  bitstamp: 0.2,
-  binance: 0.2,
-  bitfinex: 0.1,
+  coinbase: 0.7,
+  bitstamp: 0.3,
 };
 const CF_VENUES = ["coinbase", "bitstamp", "kraken", "gemini"] as const;
 
