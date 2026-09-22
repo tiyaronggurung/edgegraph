@@ -17,6 +17,7 @@ import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useStrikeOdds } from "@/hooks/useStrikeOdds";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
+import { getCompositeDayTotals } from "@/lib/compositeDayTotals.functions";
 
 function fmtUsd(x: number | null | undefined): string {
   if (x == null || !Number.isFinite(x)) return "—";
