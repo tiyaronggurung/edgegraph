@@ -97,7 +97,7 @@ export function useLiveCompositeSpot(): LiveCompositeSpot {
       if (pool.length >= 3) {
         const med = medianOf(pool.map(s => s.price));
         const maxDev = med * (OUTLIER_BPS / 10_000);
-        const trimmed = samples.filter(s => Math.abs(s.price - med) <= maxDev);
+        const trimmed = pool.filter(s => Math.abs(s.price - med) <= maxDev);
         if (trimmed.length >= 2) kept = trimmed;
       }
 
