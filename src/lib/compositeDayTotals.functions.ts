@@ -136,4 +136,5 @@ function finalize(
       avgIn: inBtc > 0 && inNotional > 0 ? inNotional / inBtc : null,
       avgOut: outBtc > 0 && outNotional > 0 ? outNotional / outBtc : null,
     };
-  });
+  }
+}
