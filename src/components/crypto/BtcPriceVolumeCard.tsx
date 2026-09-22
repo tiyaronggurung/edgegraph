@@ -17,6 +17,7 @@ import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useStrikeOdds } from "@/hooks/useStrikeOdds";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
+import { getCompositeDayTotals } from "@/lib/compositeDayTotals.functions";
 
 function fmtUsd(x: number | null | undefined): string {
   if (x == null || !Number.isFinite(x)) return "—";
@@ -34,6 +35,7 @@ export function BtcPriceVolumeCard() {
   const fn = useServerFn(getBtcPriceVolume);
   const essentialFn = useServerFn(getBtcEssentialSnapshot);
   const multiVenueFn = useServerFn(getBtcMultiVenueVolume);
+  const dayTotalsFn = useServerFn(getCompositeDayTotals);
   const live = useLiveCompositeSpot();
 
   // Local 1s clock so the countdown and window rollover never wait on a feed.
@@ -56,6 +58,17 @@ export function BtcPriceVolumeCard() {
     retry: 3,
     retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
     placeholderData: keepPreviousData,
+  });
+  // Day-to-date composite totals (since New York midnight), from the stored
+  // 15m rows. Display only — refreshed once a minute.
+  const { data: dayTotals } = useQuery({
+    queryKey: ["composite-day-totals"],
+    queryFn: () => dayTotalsFn(),
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
   });
   const { data: essential } = useQuery({
     queryKey: ["btc-essential-snapshot", winStart],
@@ -473,6 +486,63 @@ export function BtcPriceVolumeCard() {
               </div>
             );
           })()}
+          {dayTotals?.ok && (
+            <div className="mt-1 rounded border border-border/60 bg-muted/20 px-1.5 py-1 font-mono text-[10px]">
+              <div className="flex flex-wrap items-center justify-between gap-x-2">
+                <span className="text-muted-foreground">
+                  today so far · {dayTotals.windows} window{dayTotals.windows === 1 ? "" : "s"} (NY day)
+                </span>
+                {dayTotals.imbalance != null && (
+                  <span
+                    className={`font-semibold ${dayTotals.imbalance >= 0 ? "text-emerald-400" : "text-rose-400"}`}
+                  >
+                    {(dayTotals.imbalance * 100).toFixed(0)}%{" "}
+                    {dayTotals.imbalance >= 0 ? "buy-side" : "sell-side"}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-x-2">
+                <span className="text-emerald-400 font-semibold">
+                  in {dayTotals.inBtc.toFixed(1)} BTC↑
+                </span>
+                <span className="text-muted-foreground">/</span>
+                <span className="text-rose-400 font-semibold">
+                  out {dayTotals.outBtc.toFixed(1)} BTC↓
+                </span>
+                <span className="text-muted-foreground">
+                  net {dayTotals.netBtc >= 0 ? "+" : "−"}
+                  {Math.abs(dayTotals.netBtc).toFixed(1)} BTC
+                </span>
+              </div>
+              {(dayTotals.avgIn != null || dayTotals.avgOut != null) && (
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-muted-foreground">
+                  <span>
+                    avg in{" "}
+                    <span className="text-emerald-400">
+                      {dayTotals.avgIn != null
+                        ? `$${dayTotals.avgIn.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                        : "—"}
+                    </span>
+                  </span>
+                  <span>
+                    avg out{" "}
+                    <span className="text-rose-400">
+                      {dayTotals.avgOut != null
+                        ? `$${dayTotals.avgOut.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                        : "—"}
+                    </span>
+                  </span>
+                  {dayTotals.avgIn != null && dayTotals.avgOut != null && (
+                    <span
+                      className={dayTotals.avgIn >= dayTotals.avgOut ? "text-emerald-400" : "text-rose-400"}
+                    >
+                      {dayTotals.avgIn >= dayTotals.avgOut ? "buyers paying up" : "sellers dumping"}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {winLeg != null && (winLeg.avgBuyPrice != null || winLeg.avgSellPrice != null) && (
             <div className="mt-0.5 space-y-0.5 font-mono text-[10px]">
               <div className="flex items-center justify-between">
