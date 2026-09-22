@@ -486,6 +486,63 @@ export function BtcPriceVolumeCard() {
               </div>
             );
           })()}
+          {dayTotals?.ok && (
+            <div className="mt-1 rounded border border-border/60 bg-muted/20 px-1.5 py-1 font-mono text-[10px]">
+              <div className="flex flex-wrap items-center justify-between gap-x-2">
+                <span className="text-muted-foreground">
+                  today so far · {dayTotals.windows} window{dayTotals.windows === 1 ? "" : "s"} (NY day)
+                </span>
+                {dayTotals.imbalance != null && (
+                  <span
+                    className={`font-semibold ${dayTotals.imbalance >= 0 ? "text-emerald-400" : "text-rose-400"}`}
+                  >
+                    {(dayTotals.imbalance * 100).toFixed(0)}%{" "}
+                    {dayTotals.imbalance >= 0 ? "buy-side" : "sell-side"}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-x-2">
+                <span className="text-emerald-400 font-semibold">
+                  in {dayTotals.inBtc.toFixed(1)} BTC↑
+                </span>
+                <span className="text-muted-foreground">/</span>
+                <span className="text-rose-400 font-semibold">
+                  out {dayTotals.outBtc.toFixed(1)} BTC↓
+                </span>
+                <span className="text-muted-foreground">
+                  net {dayTotals.netBtc >= 0 ? "+" : "−"}
+                  {Math.abs(dayTotals.netBtc).toFixed(1)} BTC
+                </span>
+              </div>
+              {(dayTotals.avgIn != null || dayTotals.avgOut != null) && (
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-muted-foreground">
+                  <span>
+                    avg in{" "}
+                    <span className="text-emerald-400">
+                      {dayTotals.avgIn != null
+                        ? `$${dayTotals.avgIn.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                        : "—"}
+                    </span>
+                  </span>
+                  <span>
+                    avg out{" "}
+                    <span className="text-rose-400">
+                      {dayTotals.avgOut != null
+                        ? `$${dayTotals.avgOut.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                        : "—"}
+                    </span>
+                  </span>
+                  {dayTotals.avgIn != null && dayTotals.avgOut != null && (
+                    <span
+                      className={dayTotals.avgIn >= dayTotals.avgOut ? "text-emerald-400" : "text-rose-400"}
+                    >
+                      {dayTotals.avgIn >= dayTotals.avgOut ? "buyers paying up" : "sellers dumping"}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {winLeg != null && (winLeg.avgBuyPrice != null || winLeg.avgSellPrice != null) && (
             <div className="mt-0.5 space-y-0.5 font-mono text-[10px]">
               <div className="flex items-center justify-between">
