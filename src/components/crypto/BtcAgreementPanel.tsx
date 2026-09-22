@@ -151,6 +151,30 @@ export function BtcAgreementPanel() {
       ? "—"
       : `total in ${buy.toFixed(1)} BTC↑ / total out ${sell.toFixed(1)} BTC↓ · ${(buy + sell).toFixed(1)} BTC${imbWin != null ? ` · ${(imbWin * 100).toFixed(0)}%` : ""}${avgTxt}`;
 
+  // Composite (Binance + Coinbase) in/out for the verdict banner. Separate
+  // feed, 10s cadence — never on the odds path.
+  const multiFn = useServerFn(getBtcMultiVenueVolume);
+  const { data: multi } = useQuery({
+    queryKey: ["btc-multi-venue-volume"],
+    queryFn: () => multiFn(),
+    refetchInterval: 10_000,
+    retry: 2,
+    placeholderData: keepPreviousData,
+  });
+  const cbFlow = multi?.windowStart === winStart ? (multi?.coinbaseFlow ?? null) : null;
+  const sumOrNull = (a: number | null, b: number | null) =>
+    a == null && b == null ? null : (a ?? 0) + (b ?? 0);
+  const vwap2 = (aQ: number | null, aP: number | null, bQ: number | null, bP: number | null) => {
+    let q = 0, n = 0;
+    if (aQ != null && aP != null) { q += aQ; n += aQ * aP; }
+    if (bQ != null && bP != null) { q += bQ; n += bQ * bP; }
+    return q > 0 ? n / q : null;
+  };
+  const compIn = sumOrNull(buy, cbFlow?.inBtc ?? null);
+  const compOut = sumOrNull(sell, cbFlow?.outBtc ?? null);
+  const compAvgIn = vwap2(buy, avgIn, cbFlow?.inBtc ?? null, cbFlow?.avgIn ?? null);
+  const compAvgOut = vwap2(sell, avgOut, cbFlow?.outBtc ?? null, cbFlow?.avgOut ?? null);
+
   // 3 & 4. Model + study picks
   const sideOf = (s: "YES" | "NO" | null | undefined): Dir =>
     s === "YES" ? "UP" : s === "NO" ? "DOWN" : null;
