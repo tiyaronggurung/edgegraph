@@ -50,6 +50,7 @@ import { Route as ApiPublicHooksBtcSnapshotTickRouteImport } from './routes/api/
 import { Route as ApiPublicHooksCandlesIngestRouteImport } from './routes/api/public/hooks/candles-ingest'
 import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
 import { Route as ApiPublicHooksCheapEntryTickRouteImport } from './routes/api/public/hooks/cheap-entry-tick'
+import { Route as ApiPublicHooksCompositeFlowWriterRouteImport } from './routes/api/public/hooks/composite-flow-writer'
 import { Route as ApiPublicHooksCryptoStudyRouteImport } from './routes/api/public/hooks/crypto-study'
 import { Route as ApiPublicHooksFlowLeanWriterRouteImport } from './routes/api/public/hooks/flow-lean-writer'
 import { Route as ApiPublicHooksHourlyForecastTickRouteImport } from './routes/api/public/hooks/hourly-forecast-tick'
@@ -69,6 +70,7 @@ import { Route as ApiPublicHooksSpotTickWriterRouteImport } from './routes/api/p
 import { Route as ApiPublicHooksStudyAutoLiveTickRouteImport } from './routes/api/public/hooks/study-auto-live-tick'
 import { Route as ApiPublicHooksStudyLockTickRouteImport } from './routes/api/public/hooks/study-lock-tick'
 import { Route as ApiPublicHooksTripleWindowTickRouteImport } from './routes/api/public/hooks/triple-window-tick'
+import { Route as ApiPublicHooksVerdictBetTickRouteImport } from './routes/api/public/hooks/verdict-bet-tick'
 import { Route as ApiPublicHooksWindowSnapshotTickRouteImport } from './routes/api/public/hooks/window-snapshot-tick'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
@@ -294,6 +296,12 @@ const ApiPublicHooksCheapEntryTickRoute =
     path: '/api/public/hooks/cheap-entry-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksCompositeFlowWriterRoute =
+  ApiPublicHooksCompositeFlowWriterRouteImport.update({
+    id: '/api/public/hooks/composite-flow-writer',
+    path: '/api/public/hooks/composite-flow-writer',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksCryptoStudyRoute =
   ApiPublicHooksCryptoStudyRouteImport.update({
     id: '/api/public/hooks/crypto-study',
@@ -408,6 +416,12 @@ const ApiPublicHooksTripleWindowTickRoute =
     path: '/api/public/hooks/triple-window-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksVerdictBetTickRoute =
+  ApiPublicHooksVerdictBetTickRouteImport.update({
+    id: '/api/public/hooks/verdict-bet-tick',
+    path: '/api/public/hooks/verdict-bet-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksWindowSnapshotTickRoute =
   ApiPublicHooksWindowSnapshotTickRouteImport.update({
     id: '/api/public/hooks/window-snapshot-tick',
@@ -480,6 +494,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/cheap-entry-tick': typeof ApiPublicHooksCheapEntryTickRoute
+  '/api/public/hooks/composite-flow-writer': typeof ApiPublicHooksCompositeFlowWriterRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/flow-lean-writer': typeof ApiPublicHooksFlowLeanWriterRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
@@ -499,6 +514,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
   '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
+  '/api/public/hooks/verdict-bet-tick': typeof ApiPublicHooksVerdictBetTickRoute
   '/api/public/hooks/window-snapshot-tick': typeof ApiPublicHooksWindowSnapshotTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -546,6 +562,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/cheap-entry-tick': typeof ApiPublicHooksCheapEntryTickRoute
+  '/api/public/hooks/composite-flow-writer': typeof ApiPublicHooksCompositeFlowWriterRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/flow-lean-writer': typeof ApiPublicHooksFlowLeanWriterRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
@@ -565,6 +582,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
   '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
+  '/api/public/hooks/verdict-bet-tick': typeof ApiPublicHooksVerdictBetTickRoute
   '/api/public/hooks/window-snapshot-tick': typeof ApiPublicHooksWindowSnapshotTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -614,6 +632,7 @@ export interface FileRoutesById {
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/cheap-entry-tick': typeof ApiPublicHooksCheapEntryTickRoute
+  '/api/public/hooks/composite-flow-writer': typeof ApiPublicHooksCompositeFlowWriterRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/flow-lean-writer': typeof ApiPublicHooksFlowLeanWriterRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
@@ -633,6 +652,7 @@ export interface FileRoutesById {
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
   '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
+  '/api/public/hooks/verdict-bet-tick': typeof ApiPublicHooksVerdictBetTickRoute
   '/api/public/hooks/window-snapshot-tick': typeof ApiPublicHooksWindowSnapshotTickRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
@@ -682,6 +702,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/cheap-entry-tick'
+    | '/api/public/hooks/composite-flow-writer'
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/flow-lean-writer'
     | '/api/public/hooks/hourly-forecast-tick'
@@ -701,6 +722,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/study-auto-live-tick'
     | '/api/public/hooks/study-lock-tick'
     | '/api/public/hooks/triple-window-tick'
+    | '/api/public/hooks/verdict-bet-tick'
     | '/api/public/hooks/window-snapshot-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
@@ -748,6 +770,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/cheap-entry-tick'
+    | '/api/public/hooks/composite-flow-writer'
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/flow-lean-writer'
     | '/api/public/hooks/hourly-forecast-tick'
@@ -767,6 +790,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/study-auto-live-tick'
     | '/api/public/hooks/study-lock-tick'
     | '/api/public/hooks/triple-window-tick'
+    | '/api/public/hooks/verdict-bet-tick'
     | '/api/public/hooks/window-snapshot-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
@@ -815,6 +839,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/cheap-entry-tick'
+    | '/api/public/hooks/composite-flow-writer'
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/flow-lean-writer'
     | '/api/public/hooks/hourly-forecast-tick'
@@ -834,6 +859,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/study-auto-live-tick'
     | '/api/public/hooks/study-lock-tick'
     | '/api/public/hooks/triple-window-tick'
+    | '/api/public/hooks/verdict-bet-tick'
     | '/api/public/hooks/window-snapshot-tick'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
@@ -866,6 +892,7 @@ export interface RootRouteChildren {
   ApiPublicHooksCandlesIngestRoute: typeof ApiPublicHooksCandlesIngestRoute
   ApiPublicHooksCaptureClosingOddsRoute: typeof ApiPublicHooksCaptureClosingOddsRoute
   ApiPublicHooksCheapEntryTickRoute: typeof ApiPublicHooksCheapEntryTickRoute
+  ApiPublicHooksCompositeFlowWriterRoute: typeof ApiPublicHooksCompositeFlowWriterRoute
   ApiPublicHooksCryptoStudyRoute: typeof ApiPublicHooksCryptoStudyRoute
   ApiPublicHooksFlowLeanWriterRoute: typeof ApiPublicHooksFlowLeanWriterRoute
   ApiPublicHooksHourlyForecastTickRoute: typeof ApiPublicHooksHourlyForecastTickRoute
@@ -885,6 +912,7 @@ export interface RootRouteChildren {
   ApiPublicHooksStudyAutoLiveTickRoute: typeof ApiPublicHooksStudyAutoLiveTickRoute
   ApiPublicHooksStudyLockTickRoute: typeof ApiPublicHooksStudyLockTickRoute
   ApiPublicHooksTripleWindowTickRoute: typeof ApiPublicHooksTripleWindowTickRoute
+  ApiPublicHooksVerdictBetTickRoute: typeof ApiPublicHooksVerdictBetTickRoute
   ApiPublicHooksWindowSnapshotTickRoute: typeof ApiPublicHooksWindowSnapshotTickRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
@@ -1180,6 +1208,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCheapEntryTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/composite-flow-writer': {
+      id: '/api/public/hooks/composite-flow-writer'
+      path: '/api/public/hooks/composite-flow-writer'
+      fullPath: '/api/public/hooks/composite-flow-writer'
+      preLoaderRoute: typeof ApiPublicHooksCompositeFlowWriterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/crypto-study': {
       id: '/api/public/hooks/crypto-study'
       path: '/api/public/hooks/crypto-study'
@@ -1313,6 +1348,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksTripleWindowTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/verdict-bet-tick': {
+      id: '/api/public/hooks/verdict-bet-tick'
+      path: '/api/public/hooks/verdict-bet-tick'
+      fullPath: '/api/public/hooks/verdict-bet-tick'
+      preLoaderRoute: typeof ApiPublicHooksVerdictBetTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/window-snapshot-tick': {
       id: '/api/public/hooks/window-snapshot-tick'
       path: '/api/public/hooks/window-snapshot-tick'
@@ -1434,6 +1476,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksCandlesIngestRoute: ApiPublicHooksCandlesIngestRoute,
   ApiPublicHooksCaptureClosingOddsRoute: ApiPublicHooksCaptureClosingOddsRoute,
   ApiPublicHooksCheapEntryTickRoute: ApiPublicHooksCheapEntryTickRoute,
+  ApiPublicHooksCompositeFlowWriterRoute:
+    ApiPublicHooksCompositeFlowWriterRoute,
   ApiPublicHooksCryptoStudyRoute: ApiPublicHooksCryptoStudyRoute,
   ApiPublicHooksFlowLeanWriterRoute: ApiPublicHooksFlowLeanWriterRoute,
   ApiPublicHooksHourlyForecastTickRoute: ApiPublicHooksHourlyForecastTickRoute,
@@ -1455,6 +1499,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksStudyAutoLiveTickRoute: ApiPublicHooksStudyAutoLiveTickRoute,
   ApiPublicHooksStudyLockTickRoute: ApiPublicHooksStudyLockTickRoute,
   ApiPublicHooksTripleWindowTickRoute: ApiPublicHooksTripleWindowTickRoute,
+  ApiPublicHooksVerdictBetTickRoute: ApiPublicHooksVerdictBetTickRoute,
   ApiPublicHooksWindowSnapshotTickRoute: ApiPublicHooksWindowSnapshotTickRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,

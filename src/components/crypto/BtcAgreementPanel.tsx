@@ -13,6 +13,8 @@ import { getBtcEssentialSnapshot } from "@/lib/btcEssentialSnapshot.functions";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
 import { getBtcConsensusView } from "@/lib/btcConsensusView.functions";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
+import { getBtcMultiVenueVolume } from "@/lib/btcMultiVenueVolume.functions";
+import { BtcVerdictBanner } from "@/components/crypto/BtcVerdictBanner";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useStrikeOdds } from "@/hooks/useStrikeOdds";
 
@@ -149,6 +151,30 @@ export function BtcAgreementPanel() {
       ? "—"
       : `total in ${buy.toFixed(1)} BTC↑ / total out ${sell.toFixed(1)} BTC↓ · ${(buy + sell).toFixed(1)} BTC${imbWin != null ? ` · ${(imbWin * 100).toFixed(0)}%` : ""}${avgTxt}`;
 
+  // Composite (Binance + Coinbase) in/out for the verdict banner. Separate
+  // feed, 10s cadence — never on the odds path.
+  const multiFn = useServerFn(getBtcMultiVenueVolume);
+  const { data: multi } = useQuery({
+    queryKey: ["btc-multi-venue-volume"],
+    queryFn: () => multiFn(),
+    refetchInterval: 10_000,
+    retry: 2,
+    placeholderData: keepPreviousData,
+  });
+  const cbFlow = multi?.windowStart === winStart ? (multi?.coinbaseFlow ?? null) : null;
+  const sumOrNull = (a: number | null, b: number | null) =>
+    a == null && b == null ? null : (a ?? 0) + (b ?? 0);
+  const vwap2 = (aQ: number | null, aP: number | null, bQ: number | null, bP: number | null) => {
+    let q = 0, n = 0;
+    if (aQ != null && aP != null) { q += aQ; n += aQ * aP; }
+    if (bQ != null && bP != null) { q += bQ; n += bQ * bP; }
+    return q > 0 ? n / q : null;
+  };
+  const compIn = sumOrNull(buy, cbFlow?.inBtc ?? null);
+  const compOut = sumOrNull(sell, cbFlow?.outBtc ?? null);
+  const compAvgIn = vwap2(buy, avgIn, cbFlow?.inBtc ?? null, cbFlow?.avgIn ?? null);
+  const compAvgOut = vwap2(sell, avgOut, cbFlow?.outBtc ?? null, cbFlow?.avgOut ?? null);
+
   // 3 & 4. Model + study picks
   const sideOf = (s: "YES" | "NO" | null | undefined): Dir =>
     s === "YES" ? "UP" : s === "NO" ? "DOWN" : null;
@@ -189,6 +215,15 @@ export function BtcAgreementPanel() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-1 text-xs">
+        <BtcVerdictBanner
+          spot={spot}
+          strike={strike}
+          avgIn={compAvgIn}
+          avgOut={compAvgOut}
+          inBtc={compIn}
+          outBtc={compOut}
+          oddsSide={oddsDir}
+        />
         <Row label="Our odds on this strike" dir={oddsDir} detail={`p(up) ${oddsDetail}`} />
         <Row label="BTC volume in vs out (this 15m window)" dir={volDir} detail={volDetail} />
         <Row label="Model pick" dir={modelDir} detail={pct(cons?.modelConfidence)} />

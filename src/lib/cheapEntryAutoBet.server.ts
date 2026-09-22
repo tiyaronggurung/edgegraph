@@ -159,9 +159,17 @@ export async function driveCheapEntry(): Promise<CheapEntryTickResult> {
       .select("user_id, ticker")
       .in("ticker", tickers)
       .filter("inputs_snapshot->>source", "eq", "cheap_entry");
+    // The verdict engine buys real money on the same windows — one engine per
+    // window, whichever gets there first.
+    const { data: existingVerdict } = await supabaseAdmin
+      .from("crypto_trades")
+      .select("user_id, ticker")
+      .in("ticker", tickers)
+      .filter("inputs_snapshot->>source", "eq", "verdict_bet");
     const already = new Set([
       ...((existing ?? []) as any[]).map((r) => `${r.user_id}|${r.ticker}`),
       ...((existingLive ?? []) as any[]).map((r) => `${r.user_id}|${r.ticker}`),
+      ...((existingVerdict ?? []) as any[]).map((r) => `${r.user_id}|${r.ticker}`),
     ]);
 
     // Ask price per (ticker, side) — fetched once, shared across users.
