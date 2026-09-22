@@ -50,6 +50,7 @@ import { Route as ApiPublicHooksBtcSnapshotTickRouteImport } from './routes/api/
 import { Route as ApiPublicHooksCandlesIngestRouteImport } from './routes/api/public/hooks/candles-ingest'
 import { Route as ApiPublicHooksCaptureClosingOddsRouteImport } from './routes/api/public/hooks/capture-closing-odds'
 import { Route as ApiPublicHooksCheapEntryTickRouteImport } from './routes/api/public/hooks/cheap-entry-tick'
+import { Route as ApiPublicHooksCompositeFlowWriterRouteImport } from './routes/api/public/hooks/composite-flow-writer'
 import { Route as ApiPublicHooksCryptoStudyRouteImport } from './routes/api/public/hooks/crypto-study'
 import { Route as ApiPublicHooksFlowLeanWriterRouteImport } from './routes/api/public/hooks/flow-lean-writer'
 import { Route as ApiPublicHooksHourlyForecastTickRouteImport } from './routes/api/public/hooks/hourly-forecast-tick'
@@ -294,6 +295,12 @@ const ApiPublicHooksCheapEntryTickRoute =
     path: '/api/public/hooks/cheap-entry-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksCompositeFlowWriterRoute =
+  ApiPublicHooksCompositeFlowWriterRouteImport.update({
+    id: '/api/public/hooks/composite-flow-writer',
+    path: '/api/public/hooks/composite-flow-writer',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksCryptoStudyRoute =
   ApiPublicHooksCryptoStudyRouteImport.update({
     id: '/api/public/hooks/crypto-study',
@@ -480,6 +487,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/cheap-entry-tick': typeof ApiPublicHooksCheapEntryTickRoute
+  '/api/public/hooks/composite-flow-writer': typeof ApiPublicHooksCompositeFlowWriterRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/flow-lean-writer': typeof ApiPublicHooksFlowLeanWriterRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
@@ -546,6 +554,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/cheap-entry-tick': typeof ApiPublicHooksCheapEntryTickRoute
+  '/api/public/hooks/composite-flow-writer': typeof ApiPublicHooksCompositeFlowWriterRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/flow-lean-writer': typeof ApiPublicHooksFlowLeanWriterRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
@@ -614,6 +623,7 @@ export interface FileRoutesById {
   '/api/public/hooks/candles-ingest': typeof ApiPublicHooksCandlesIngestRoute
   '/api/public/hooks/capture-closing-odds': typeof ApiPublicHooksCaptureClosingOddsRoute
   '/api/public/hooks/cheap-entry-tick': typeof ApiPublicHooksCheapEntryTickRoute
+  '/api/public/hooks/composite-flow-writer': typeof ApiPublicHooksCompositeFlowWriterRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/flow-lean-writer': typeof ApiPublicHooksFlowLeanWriterRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
@@ -682,6 +692,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/cheap-entry-tick'
+    | '/api/public/hooks/composite-flow-writer'
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/flow-lean-writer'
     | '/api/public/hooks/hourly-forecast-tick'
@@ -748,6 +759,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/cheap-entry-tick'
+    | '/api/public/hooks/composite-flow-writer'
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/flow-lean-writer'
     | '/api/public/hooks/hourly-forecast-tick'
@@ -815,6 +827,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/candles-ingest'
     | '/api/public/hooks/capture-closing-odds'
     | '/api/public/hooks/cheap-entry-tick'
+    | '/api/public/hooks/composite-flow-writer'
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/flow-lean-writer'
     | '/api/public/hooks/hourly-forecast-tick'
@@ -866,6 +879,7 @@ export interface RootRouteChildren {
   ApiPublicHooksCandlesIngestRoute: typeof ApiPublicHooksCandlesIngestRoute
   ApiPublicHooksCaptureClosingOddsRoute: typeof ApiPublicHooksCaptureClosingOddsRoute
   ApiPublicHooksCheapEntryTickRoute: typeof ApiPublicHooksCheapEntryTickRoute
+  ApiPublicHooksCompositeFlowWriterRoute: typeof ApiPublicHooksCompositeFlowWriterRoute
   ApiPublicHooksCryptoStudyRoute: typeof ApiPublicHooksCryptoStudyRoute
   ApiPublicHooksFlowLeanWriterRoute: typeof ApiPublicHooksFlowLeanWriterRoute
   ApiPublicHooksHourlyForecastTickRoute: typeof ApiPublicHooksHourlyForecastTickRoute
@@ -1180,6 +1194,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCheapEntryTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/composite-flow-writer': {
+      id: '/api/public/hooks/composite-flow-writer'
+      path: '/api/public/hooks/composite-flow-writer'
+      fullPath: '/api/public/hooks/composite-flow-writer'
+      preLoaderRoute: typeof ApiPublicHooksCompositeFlowWriterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/crypto-study': {
       id: '/api/public/hooks/crypto-study'
       path: '/api/public/hooks/crypto-study'
@@ -1434,6 +1455,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksCandlesIngestRoute: ApiPublicHooksCandlesIngestRoute,
   ApiPublicHooksCaptureClosingOddsRoute: ApiPublicHooksCaptureClosingOddsRoute,
   ApiPublicHooksCheapEntryTickRoute: ApiPublicHooksCheapEntryTickRoute,
+  ApiPublicHooksCompositeFlowWriterRoute:
+    ApiPublicHooksCompositeFlowWriterRoute,
   ApiPublicHooksCryptoStudyRoute: ApiPublicHooksCryptoStudyRoute,
   ApiPublicHooksFlowLeanWriterRoute: ApiPublicHooksFlowLeanWriterRoute,
   ApiPublicHooksHourlyForecastTickRoute: ApiPublicHooksHourlyForecastTickRoute,
