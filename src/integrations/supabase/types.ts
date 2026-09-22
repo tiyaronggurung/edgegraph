@@ -1874,6 +1874,105 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_composite_flow_log: {
+        Row: {
+          binance_avg_in: number | null
+          binance_avg_out: number | null
+          binance_in_btc: number | null
+          binance_out_btc: number | null
+          bitstamp_btc: number | null
+          coinbase_avg_in: number | null
+          coinbase_avg_out: number | null
+          coinbase_in_btc: number | null
+          coinbase_out_btc: number | null
+          coinbase_partial: boolean | null
+          composite_avg_in: number | null
+          composite_avg_out: number | null
+          composite_imbalance: number | null
+          composite_in_btc: number | null
+          composite_net_btc: number | null
+          composite_out_btc: number | null
+          created_at: string
+          id: string
+          kraken_btc: number | null
+          leg_avgs: string | null
+          leg_flow: string | null
+          leg_now_vs_avg: string | null
+          now_vs_avg_in: number | null
+          recorded_at: string
+          seconds_to_close: number | null
+          spot: number | null
+          strike: number | null
+          total_btc: number | null
+          verdict: string | null
+          window_start: string
+        }
+        Insert: {
+          binance_avg_in?: number | null
+          binance_avg_out?: number | null
+          binance_in_btc?: number | null
+          binance_out_btc?: number | null
+          bitstamp_btc?: number | null
+          coinbase_avg_in?: number | null
+          coinbase_avg_out?: number | null
+          coinbase_in_btc?: number | null
+          coinbase_out_btc?: number | null
+          coinbase_partial?: boolean | null
+          composite_avg_in?: number | null
+          composite_avg_out?: number | null
+          composite_imbalance?: number | null
+          composite_in_btc?: number | null
+          composite_net_btc?: number | null
+          composite_out_btc?: number | null
+          created_at?: string
+          id?: string
+          kraken_btc?: number | null
+          leg_avgs?: string | null
+          leg_flow?: string | null
+          leg_now_vs_avg?: string | null
+          now_vs_avg_in?: number | null
+          recorded_at?: string
+          seconds_to_close?: number | null
+          spot?: number | null
+          strike?: number | null
+          total_btc?: number | null
+          verdict?: string | null
+          window_start: string
+        }
+        Update: {
+          binance_avg_in?: number | null
+          binance_avg_out?: number | null
+          binance_in_btc?: number | null
+          binance_out_btc?: number | null
+          bitstamp_btc?: number | null
+          coinbase_avg_in?: number | null
+          coinbase_avg_out?: number | null
+          coinbase_in_btc?: number | null
+          coinbase_out_btc?: number | null
+          coinbase_partial?: boolean | null
+          composite_avg_in?: number | null
+          composite_avg_out?: number | null
+          composite_imbalance?: number | null
+          composite_in_btc?: number | null
+          composite_net_btc?: number | null
+          composite_out_btc?: number | null
+          created_at?: string
+          id?: string
+          kraken_btc?: number | null
+          leg_avgs?: string | null
+          leg_flow?: string | null
+          leg_now_vs_avg?: string | null
+          now_vs_avg_in?: number | null
+          recorded_at?: string
+          seconds_to_close?: number | null
+          spot?: number | null
+          strike?: number | null
+          total_btc?: number | null
+          verdict?: string | null
+          window_start?: string
+        }
+        Relationships: []
+      }
       btc_cross_exit_shadow: {
         Row: {
           close_time: string
@@ -5891,6 +5990,10 @@ export type Database = {
           study_auto_stake_cents: number
           subscription_status: string
           subscription_tier: string
+          verdict_bet_enabled: boolean
+          verdict_bet_enabled_at: string | null
+          verdict_bet_live_enabled: boolean
+          verdict_bet_stake_cents: number
         }
         Insert: {
           alert_frequency?: string
@@ -5919,6 +6022,10 @@ export type Database = {
           study_auto_stake_cents?: number
           subscription_status?: string
           subscription_tier?: string
+          verdict_bet_enabled?: boolean
+          verdict_bet_enabled_at?: string | null
+          verdict_bet_live_enabled?: boolean
+          verdict_bet_stake_cents?: number
         }
         Update: {
           alert_frequency?: string
@@ -5947,6 +6054,10 @@ export type Database = {
           study_auto_stake_cents?: number
           subscription_status?: string
           subscription_tier?: string
+          verdict_bet_enabled?: boolean
+          verdict_bet_enabled_at?: string | null
+          verdict_bet_live_enabled?: boolean
+          verdict_bet_stake_cents?: number
         }
         Relationships: []
       }
