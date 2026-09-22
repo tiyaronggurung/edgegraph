@@ -35,6 +35,7 @@ export function BtcPriceVolumeCard() {
   const fn = useServerFn(getBtcPriceVolume);
   const essentialFn = useServerFn(getBtcEssentialSnapshot);
   const multiVenueFn = useServerFn(getBtcMultiVenueVolume);
+  const dayTotalsFn = useServerFn(getCompositeDayTotals);
   const live = useLiveCompositeSpot();
 
   // Local 1s clock so the countdown and window rollover never wait on a feed.
