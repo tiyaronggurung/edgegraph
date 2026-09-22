@@ -42,12 +42,19 @@ export async function recordCompositeFlow(): Promise<CompositeFlowSnapshot & { w
   const windowStart = Math.floor(now / 900_000) * 900_000;
   const secondsToClose = Math.max(0, Math.round((windowStart + 900_000 - now) / 1000));
 
-  const [vol, multi, strikeRes, spotPrice] = await Promise.all([
+  let [vol, multi, strikeRes, spotPrice] = await Promise.all([
     loadBtcSpotVolume().catch(() => null),
     getBtcMultiVenueVolume().catch(() => null),
     loadKalshiCurrentStrike().catch(() => null),
     fetchSpot(),
   ]);
+
+  // The Binance leg used to fail silently and still write a row, which made
+  // the stored "composite" Coinbase-only. Retry once, then skip the row
+  // rather than recording a half-composite as if it were whole.
+  if (vol?.windowStart !== windowStart || !vol?.window) {
+    vol = await loadBtcSpotVolume().catch(() => null);
+  }
 
   const binWin = vol?.windowStart === windowStart ? (vol?.window ?? null) : null;
   const cb = multi?.windowStart === windowStart ? (multi?.coinbaseFlow ?? null) : null;
