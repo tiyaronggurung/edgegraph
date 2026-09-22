@@ -57,19 +57,53 @@ export const getCompositeDayTotals = createServerFn({ method: "GET" })
       avgOut: null,
     };
 
-    const { data, error } = await context.supabase
-      .from("btc_composite_flow_log")
-      .select(
-        "window_start, recorded_at, composite_in_btc, composite_out_btc, composite_avg_in, composite_avg_out",
-      )
-      .gte("window_start", dayStartIso)
-      .order("recorded_at", { ascending: true })
-      .limit(5000);
-    if (error || !data) return empty;
+    // PostgREST caps a single response at 1000 rows, so page through the day
+    // newest-first. Newest row per window wins (rows are cumulative inside a
+    // window), which is why the first row seen for a window is the keeper.
+    type Row = {
+      window_start: string;
+      recorded_at: string | null;
+      composite_in_btc: number | null;
+      composite_out_btc: number | null;
+      composite_avg_in: number | null;
+      composite_avg_out: number | null;
+    };
+    const last = new Map<string, Row>();
+    const PAGE = 1000;
+    for (let page = 0; page < 12; page++) {
+      const { data, error } = await context.supabase
+        .from("btc_composite_flow_log")
+        .select(
+          "window_start, recorded_at, composite_in_btc, composite_out_btc, composite_avg_in, composite_avg_out",
+        )
+        .gte("window_start", dayStartIso)
+        .order("recorded_at", { ascending: false })
+        .range(page * PAGE, page * PAGE + PAGE - 1);
+      if (error) return last.size > 0 ? finalize(last, dayStartIso) : empty;
+      const rows = (data ?? []) as Row[];
+      for (const r of rows) {
+        const key = String(r.window_start);
+        if (!last.has(key)) last.set(key, r);
+      }
+      if (rows.length < PAGE) break;
+    }
+    if (last.size === 0) return empty;
+    return finalize(last, dayStartIso);
+  });
 
-    // Last row wins per window (rows are cumulative inside a window).
-    const last = new Map<string, (typeof data)[number]>();
-    for (const r of data) last.set(String(r.window_start), r);
+function finalize(
+  last: Map<
+    string,
+    {
+      composite_in_btc: number | null;
+      composite_out_btc: number | null;
+      composite_avg_in: number | null;
+      composite_avg_out: number | null;
+    }
+  >,
+  dayStartIso: string,
+): CompositeDayTotals {
+  {
 
     let inBtc = 0;
     let outBtc = 0;
