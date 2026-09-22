@@ -66,6 +66,7 @@ import { Route as ApiPublicHooksPinRiskShadowTickRouteImport } from './routes/ap
 import { Route as ApiPublicHooksPredictionRowTickRouteImport } from './routes/api/public/hooks/prediction-row-tick'
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
 import { Route as ApiPublicHooksSettleBtcPredictionsRouteImport } from './routes/api/public/hooks/settle-btc-predictions'
+import { Route as ApiPublicHooksSpotBufferWriterRouteImport } from './routes/api/public/hooks/spot-buffer-writer'
 import { Route as ApiPublicHooksSpotTickWriterRouteImport } from './routes/api/public/hooks/spot-tick-writer'
 import { Route as ApiPublicHooksStudyAutoLiveTickRouteImport } from './routes/api/public/hooks/study-auto-live-tick'
 import { Route as ApiPublicHooksStudyLockTickRouteImport } from './routes/api/public/hooks/study-lock-tick'
@@ -392,6 +393,12 @@ const ApiPublicHooksSettleBtcPredictionsRoute =
     path: '/api/public/hooks/settle-btc-predictions',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksSpotBufferWriterRoute =
+  ApiPublicHooksSpotBufferWriterRouteImport.update({
+    id: '/api/public/hooks/spot-buffer-writer',
+    path: '/api/public/hooks/spot-buffer-writer',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksSpotTickWriterRoute =
   ApiPublicHooksSpotTickWriterRouteImport.update({
     id: '/api/public/hooks/spot-tick-writer',
@@ -510,6 +517,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
+  '/api/public/hooks/spot-buffer-writer': typeof ApiPublicHooksSpotBufferWriterRoute
   '/api/public/hooks/spot-tick-writer': typeof ApiPublicHooksSpotTickWriterRoute
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
   '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
@@ -578,6 +586,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
+  '/api/public/hooks/spot-buffer-writer': typeof ApiPublicHooksSpotBufferWriterRoute
   '/api/public/hooks/spot-tick-writer': typeof ApiPublicHooksSpotTickWriterRoute
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
   '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
@@ -648,6 +657,7 @@ export interface FileRoutesById {
   '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
+  '/api/public/hooks/spot-buffer-writer': typeof ApiPublicHooksSpotBufferWriterRoute
   '/api/public/hooks/spot-tick-writer': typeof ApiPublicHooksSpotTickWriterRoute
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
   '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
@@ -718,6 +728,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/prediction-row-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
+    | '/api/public/hooks/spot-buffer-writer'
     | '/api/public/hooks/spot-tick-writer'
     | '/api/public/hooks/study-auto-live-tick'
     | '/api/public/hooks/study-lock-tick'
@@ -786,6 +797,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/prediction-row-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
+    | '/api/public/hooks/spot-buffer-writer'
     | '/api/public/hooks/spot-tick-writer'
     | '/api/public/hooks/study-auto-live-tick'
     | '/api/public/hooks/study-lock-tick'
@@ -855,6 +867,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/prediction-row-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
+    | '/api/public/hooks/spot-buffer-writer'
     | '/api/public/hooks/spot-tick-writer'
     | '/api/public/hooks/study-auto-live-tick'
     | '/api/public/hooks/study-lock-tick'
@@ -908,6 +921,7 @@ export interface RootRouteChildren {
   ApiPublicHooksPredictionRowTickRoute: typeof ApiPublicHooksPredictionRowTickRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
   ApiPublicHooksSettleBtcPredictionsRoute: typeof ApiPublicHooksSettleBtcPredictionsRoute
+  ApiPublicHooksSpotBufferWriterRoute: typeof ApiPublicHooksSpotBufferWriterRoute
   ApiPublicHooksSpotTickWriterRoute: typeof ApiPublicHooksSpotTickWriterRoute
   ApiPublicHooksStudyAutoLiveTickRoute: typeof ApiPublicHooksStudyAutoLiveTickRoute
   ApiPublicHooksStudyLockTickRoute: typeof ApiPublicHooksStudyLockTickRoute
@@ -1320,6 +1334,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksSettleBtcPredictionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/spot-buffer-writer': {
+      id: '/api/public/hooks/spot-buffer-writer'
+      path: '/api/public/hooks/spot-buffer-writer'
+      fullPath: '/api/public/hooks/spot-buffer-writer'
+      preLoaderRoute: typeof ApiPublicHooksSpotBufferWriterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/spot-tick-writer': {
       id: '/api/public/hooks/spot-tick-writer'
       path: '/api/public/hooks/spot-tick-writer'
@@ -1495,6 +1516,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHooksRecomputePredictionsRoute,
   ApiPublicHooksSettleBtcPredictionsRoute:
     ApiPublicHooksSettleBtcPredictionsRoute,
+  ApiPublicHooksSpotBufferWriterRoute: ApiPublicHooksSpotBufferWriterRoute,
   ApiPublicHooksSpotTickWriterRoute: ApiPublicHooksSpotTickWriterRoute,
   ApiPublicHooksStudyAutoLiveTickRoute: ApiPublicHooksStudyAutoLiveTickRoute,
   ApiPublicHooksStudyLockTickRoute: ApiPublicHooksStudyLockTickRoute,

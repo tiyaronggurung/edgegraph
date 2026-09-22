@@ -3639,6 +3639,63 @@ export type Database = {
         }
         Relationships: []
       }
+      btc_spot_buffer_log: {
+        Row: {
+          binance_px: number | null
+          bitfinex_px: number | null
+          bitstamp_px: number | null
+          buffer_bps: number | null
+          buffer_usd: number | null
+          cf_reference: number | null
+          coinbase_px: number | null
+          created_at: string
+          gemini_px: number | null
+          id: string
+          kraken_px: number | null
+          our_composite: number | null
+          seconds_to_close: number | null
+          strike: number | null
+          venues_used: number | null
+          window_start: string
+        }
+        Insert: {
+          binance_px?: number | null
+          bitfinex_px?: number | null
+          bitstamp_px?: number | null
+          buffer_bps?: number | null
+          buffer_usd?: number | null
+          cf_reference?: number | null
+          coinbase_px?: number | null
+          created_at?: string
+          gemini_px?: number | null
+          id?: string
+          kraken_px?: number | null
+          our_composite?: number | null
+          seconds_to_close?: number | null
+          strike?: number | null
+          venues_used?: number | null
+          window_start: string
+        }
+        Update: {
+          binance_px?: number | null
+          bitfinex_px?: number | null
+          bitstamp_px?: number | null
+          buffer_bps?: number | null
+          buffer_usd?: number | null
+          cf_reference?: number | null
+          coinbase_px?: number | null
+          created_at?: string
+          gemini_px?: number | null
+          id?: string
+          kraken_px?: number | null
+          our_composite?: number | null
+          seconds_to_close?: number | null
+          strike?: number | null
+          venues_used?: number | null
+          window_start?: string
+        }
+        Relationships: []
+      }
       btc_spot_ticks: {
         Row: {
           aggressor_side: string | null
