@@ -350,6 +350,27 @@ async function fetchKlines(interval: string, limit: number): Promise<number[][]>
   }
 }
 
+/**
+ * Live indicator context only (m1 / m15 / SMA stack) — no database, no auth.
+ * Same computation the history handler does for its `live` field, exposed so
+ * the server-side agreement recorder can build the odds context without a
+ * browser. Additive: the handler below is unchanged.
+ */
+export async function loadBtcFlowLeanLive(): Promise<{
+  m1: IndicatorSnap;
+  m15: IndicatorSnap;
+  stack: SmaStack;
+}> {
+  const [k15, k1m] = await Promise.all([fetchKlines("15m", 250), fetchKlines("1m", 250)]);
+  const ind15 = indicatorSeries(k15.map((k) => Number(k[4]) || 0));
+  const ind1m = indicatorSeries(k1m.map((k) => Number(k[4]) || 0));
+  return {
+    m1: ind1m[ind1m.length - 1] ?? EMPTY_IND,
+    m15: ind15[ind15.length - 1] ?? EMPTY_IND,
+    stack: smaStack(k1m.map((k) => Number(k[4]) || 0)),
+  };
+}
+
 export const getBtcFlowLeanHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<FlowLeanHistoryResult> => {
