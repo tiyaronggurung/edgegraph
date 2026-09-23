@@ -6090,6 +6090,10 @@ export type Database = {
       }
       profiles: {
         Row: {
+          agreement_bet_enabled: boolean
+          agreement_bet_enabled_at: string | null
+          agreement_bet_live_enabled: boolean
+          agreement_bet_stake_cents: number
           alert_frequency: string
           alert_min_confidence: number
           alert_sport_filters: string[]
@@ -6122,6 +6126,10 @@ export type Database = {
           verdict_bet_stake_cents: number
         }
         Insert: {
+          agreement_bet_enabled?: boolean
+          agreement_bet_enabled_at?: string | null
+          agreement_bet_live_enabled?: boolean
+          agreement_bet_stake_cents?: number
           alert_frequency?: string
           alert_min_confidence?: number
           alert_sport_filters?: string[]
@@ -6154,6 +6162,10 @@ export type Database = {
           verdict_bet_stake_cents?: number
         }
         Update: {
+          agreement_bet_enabled?: boolean
+          agreement_bet_enabled_at?: string | null
+          agreement_bet_live_enabled?: boolean
+          agreement_bet_stake_cents?: number
           alert_frequency?: string
           alert_min_confidence?: number
           alert_sport_filters?: string[]
