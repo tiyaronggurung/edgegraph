@@ -39,6 +39,7 @@ import { Route as ApiPublicSendDailyDigestsRouteImport } from './routes/api/publ
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
 import { Route as ApiPublicBtcConsensusRouteImport } from './routes/api/public/btc/consensus'
 import { Route as ApiPublicBtcLevelsRouteImport } from './routes/api/public/btc/levels'
+import { Route as ApiPublicHooksAgreementBetTickRouteImport } from './routes/api/public/hooks/agreement-bet-tick'
 import { Route as ApiPublicHooksAutoModelBetTickRouteImport } from './routes/api/public/hooks/auto-model-bet-tick'
 import { Route as ApiPublicHooksAutoOddsTickRouteImport } from './routes/api/public/hooks/auto-odds-tick'
 import { Route as ApiPublicHooksAutoTradeRouteImport } from './routes/api/public/hooks/auto-trade'
@@ -232,6 +233,12 @@ const ApiPublicBtcLevelsRoute = ApiPublicBtcLevelsRouteImport.update({
   path: '/api/public/btc/levels',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksAgreementBetTickRoute =
+  ApiPublicHooksAgreementBetTickRouteImport.update({
+    id: '/api/public/hooks/agreement-bet-tick',
+    path: '/api/public/hooks/agreement-bet-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksAutoModelBetTickRoute =
   ApiPublicHooksAutoModelBetTickRouteImport.update({
     id: '/api/public/hooks/auto-model-bet-tick',
@@ -490,6 +497,7 @@ export interface FileRoutesByFullPath {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/api/public/btc/consensus': typeof ApiPublicBtcConsensusRouteWithChildren
   '/api/public/btc/levels': typeof ApiPublicBtcLevelsRoute
+  '/api/public/hooks/agreement-bet-tick': typeof ApiPublicHooksAgreementBetTickRoute
   '/api/public/hooks/auto-model-bet-tick': typeof ApiPublicHooksAutoModelBetTickRoute
   '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
@@ -559,6 +567,7 @@ export interface FileRoutesByTo {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/api/public/btc/consensus': typeof ApiPublicBtcConsensusRouteWithChildren
   '/api/public/btc/levels': typeof ApiPublicBtcLevelsRoute
+  '/api/public/hooks/agreement-bet-tick': typeof ApiPublicHooksAgreementBetTickRoute
   '/api/public/hooks/auto-model-bet-tick': typeof ApiPublicHooksAutoModelBetTickRoute
   '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
@@ -630,6 +639,7 @@ export interface FileRoutesById {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/api/public/btc/consensus': typeof ApiPublicBtcConsensusRouteWithChildren
   '/api/public/btc/levels': typeof ApiPublicBtcLevelsRoute
+  '/api/public/hooks/agreement-bet-tick': typeof ApiPublicHooksAgreementBetTickRoute
   '/api/public/hooks/auto-model-bet-tick': typeof ApiPublicHooksAutoModelBetTickRoute
   '/api/public/hooks/auto-odds-tick': typeof ApiPublicHooksAutoOddsTickRoute
   '/api/public/hooks/auto-trade': typeof ApiPublicHooksAutoTradeRoute
@@ -701,6 +711,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/api/public/btc/consensus'
     | '/api/public/btc/levels'
+    | '/api/public/hooks/agreement-bet-tick'
     | '/api/public/hooks/auto-model-bet-tick'
     | '/api/public/hooks/auto-odds-tick'
     | '/api/public/hooks/auto-trade'
@@ -770,6 +781,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/api/public/btc/consensus'
     | '/api/public/btc/levels'
+    | '/api/public/hooks/agreement-bet-tick'
     | '/api/public/hooks/auto-model-bet-tick'
     | '/api/public/hooks/auto-odds-tick'
     | '/api/public/hooks/auto-trade'
@@ -840,6 +852,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/api/public/btc/consensus'
     | '/api/public/btc/levels'
+    | '/api/public/hooks/agreement-bet-tick'
     | '/api/public/hooks/auto-model-bet-tick'
     | '/api/public/hooks/auto-odds-tick'
     | '/api/public/hooks/auto-trade'
@@ -894,6 +907,7 @@ export interface RootRouteChildren {
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
   ApiPublicBtcConsensusRoute: typeof ApiPublicBtcConsensusRouteWithChildren
   ApiPublicBtcLevelsRoute: typeof ApiPublicBtcLevelsRoute
+  ApiPublicHooksAgreementBetTickRoute: typeof ApiPublicHooksAgreementBetTickRoute
   ApiPublicHooksAutoModelBetTickRoute: typeof ApiPublicHooksAutoModelBetTickRoute
   ApiPublicHooksAutoOddsTickRoute: typeof ApiPublicHooksAutoOddsTickRoute
   ApiPublicHooksAutoTradeRoute: typeof ApiPublicHooksAutoTradeRoute
@@ -1143,6 +1157,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/btc/levels'
       fullPath: '/api/public/btc/levels'
       preLoaderRoute: typeof ApiPublicBtcLevelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/agreement-bet-tick': {
+      id: '/api/public/hooks/agreement-bet-tick'
+      path: '/api/public/hooks/agreement-bet-tick'
+      fullPath: '/api/public/hooks/agreement-bet-tick'
+      preLoaderRoute: typeof ApiPublicHooksAgreementBetTickRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/auto-model-bet-tick': {
@@ -1485,6 +1506,7 @@ const rootRouteChildren: RootRouteChildren = {
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
   ApiPublicBtcConsensusRoute: ApiPublicBtcConsensusRouteWithChildren,
   ApiPublicBtcLevelsRoute: ApiPublicBtcLevelsRoute,
+  ApiPublicHooksAgreementBetTickRoute: ApiPublicHooksAgreementBetTickRoute,
   ApiPublicHooksAutoModelBetTickRoute: ApiPublicHooksAutoModelBetTickRoute,
   ApiPublicHooksAutoOddsTickRoute: ApiPublicHooksAutoOddsTickRoute,
   ApiPublicHooksAutoTradeRoute: ApiPublicHooksAutoTradeRoute,
