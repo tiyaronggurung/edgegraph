@@ -61,6 +61,7 @@ async function fetchKalshiAskCents(ticker: string, side: "YES" | "NO"): Promise<
 
 export interface AgreementTickResult {
   side: Side | null;
+  tier: "four" | "three" | null;
   heldSeconds: number;
   held: boolean;
   capCents: number | null;
@@ -68,6 +69,24 @@ export interface AgreementTickResult {
   users: number;
   fired: number;
   results: Array<{ userId: string; reason: string; fired: boolean; askCents?: number | null }>;
+}
+
+type Sample = {
+  bucket_sec: number;
+  all_four: boolean | null;
+  agreed_side: Side | null;
+  odds_side: string | null;
+  vol_side: string | null;
+  model_side: string | null;
+  study_side: string | null;
+  created_at: string;
+};
+
+// Strong 3/4: odds + volume + model all on the same side and the study simply
+// has not locked this window (absent, not disagreeing).
+function threeQualifies(s: Sample, side: Side): boolean {
+  if (s.study_side) return false;
+  return s.odds_side === side && s.vol_side === side && s.model_side === side;
 }
 
 export async function driveAgreementBet(): Promise<AgreementTickResult> {
@@ -80,6 +99,7 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
 
   const out: AgreementTickResult = {
     side: null,
+    tier: null,
     heldSeconds: 0,
     held: false,
     capCents: null,
@@ -94,34 +114,46 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
   // Recent agreement samples for this window, newest first.
   const { data: rows } = await supabaseAdmin
     .from("btc_agreement_log")
-    .select("bucket_sec, all_four, agreed_side, created_at")
+    .select("bucket_sec, all_four, agreed_side, odds_side, vol_side, model_side, study_side, created_at")
     .eq("window_start", new Date(windowStart).toISOString())
     .order("bucket_sec", { ascending: false })
     .limit(40);
-  const samples = (rows ?? []) as Array<{
-    bucket_sec: number;
-    all_four: boolean | null;
-    agreed_side: Side | null;
-    created_at: string;
-  }>;
+  const samples = (rows ?? []) as Sample[];
   const latest = samples[0];
-  if (!latest || !latest.all_four || !latest.agreed_side) return out;
+  if (!latest) return out;
 
   // The log must be fresh — a stale page leaves old rows behind.
   const ageSec = (nowMs - new Date(latest.created_at).getTime()) / 1000;
   if (ageSec > MAX_SAMPLE_AGE_SEC) return out;
 
-  const side: Side = latest.agreed_side;
+  let side: Side | null = null;
+  let tier: "four" | "three" | null = null;
+  if (latest.all_four && latest.agreed_side) {
+    side = latest.agreed_side;
+    tier = "four";
+  } else if (latest.odds_side === "UP" || latest.odds_side === "DOWN") {
+    const cand = latest.odds_side as Side;
+    if (threeQualifies(latest, cand)) {
+      side = cand;
+      tier = "three";
+    }
+  }
+  if (!side || !tier) return out;
   out.side = side;
+  out.tier = tier;
 
-  // Walk back while the samples stay 4/4 on the same side and the 10s buckets
-  // are contiguous; that span is the server-confirmed hold.
+  // Walk back while the samples stay on the same side at the same tier and the
+  // 10s buckets are contiguous; that span is the server-confirmed hold.
   let holdStart = latest.bucket_sec;
   for (let i = 1; i < samples.length; i++) {
     const s = samples[i]!;
     const prev = samples[i - 1]!;
     if (prev.bucket_sec - s.bucket_sec > 20) break; // gap in recording
-    if (!s.all_four || s.agreed_side !== side) break;
+    const ok =
+      tier === "four"
+        ? Boolean(s.all_four) && s.agreed_side === side
+        : threeQualifies(s, side) || (Boolean(s.all_four) && s.agreed_side === side);
+    if (!ok) break;
     holdStart = s.bucket_sec;
   }
   const heldSeconds = Math.max(0, latest.bucket_sec - holdStart) + Math.floor(ageSec);
@@ -130,8 +162,14 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
   if (!out.held) return out;
 
   const kalshiSide: "YES" | "NO" = side === "UP" ? "YES" : "NO";
-  const capCents = secondsToClose <= LATE_SECONDS ? LATE_MAX_ASK_CENTS : EARLY_MAX_ASK_CENTS;
+  const capCents =
+    tier === "three"
+      ? THREE_MAX_ASK_CENTS
+      : secondsToClose <= LATE_SECONDS
+        ? LATE_MAX_ASK_CENTS
+        : EARLY_MAX_ASK_CENTS;
   out.capCents = capCents;
+
 
   // The open window this agreement belongs to.
   const { data: winRow } = await supabaseAdmin
