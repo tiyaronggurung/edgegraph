@@ -60,9 +60,8 @@ export function useAgreementRecorder(input: AgreementInput, enabled = true): num
     const id = setInterval(() => {
       if (!enabledRef.current) return;
       const v = inputRef.current;
-      // Only log samples where all four legs are readable — a partial read
-      // tells us nothing about agreement.
-      if (v.agreeCount < 4) return;
+      // Skip only empty reads; partial rows show which leg was missing.
+      if (v.agreeCount < 2) return;
       const bucketSec = Math.floor(Date.now() / BUCKET_MS) * (BUCKET_MS / 1000);
       const key = `${v.windowStart}:${bucketSec}`;
       if (sentRef.current.has(key)) return;
