@@ -140,7 +140,7 @@ export interface StrikeOdds {
   stackFlip: number;
 }
 
-interface Tick { t: number; p: number }
+export interface Tick { t: number; p: number }
 
 const EMPTY_PARTS: StrikeOddsParts = { sma: null, rsi: null, macd: null, cost: null, flow: null, brk: null, stk: null };
 
@@ -165,7 +165,21 @@ export function useStrikeOdds(
     bump((n) => n + 1);
   }, [spot]);
 
-  const tape = tapeRef.current;
+  return computeStrikeOdds(spot, strike, secondsToClose, ctx, tapeRef.current);
+}
+
+/**
+ * Pure odds core — identical math to the hook, with the price tape passed in.
+ * Lets the server recorder produce the exact same odds leg with no browser.
+ */
+export function computeStrikeOdds(
+  spot: number | null,
+  strike: number | null,
+  secondsToClose: number,
+  ctx: StrikeOddsContext | undefined,
+  tape: Tick[],
+): StrikeOdds {
+
 
   // Vol is measured on ~1s spaced samples, not raw ticks. The composite feed
   // interpolates between exchange updates, so sub-second returns are mostly
