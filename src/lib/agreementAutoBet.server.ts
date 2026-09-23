@@ -20,7 +20,13 @@ const EARLY_MAX_ASK_CENTS = 70;
 const LATE_MAX_ASK_CENTS = 90;
 const MAX_SAMPLE_AGE_SEC = 45; // the log is written every 10s by the live page
 
+// Strong 3/4 tier: odds + volume + model on the same side while the study
+// simply hasn't locked this window. Cheaper cap, smaller stake than true 4/4.
+const THREE_MAX_ASK_CENTS = 65;
+const THREE_STAKE_CENTS = 1000; // $10 flat
+
 type Side = "UP" | "DOWN";
+
 
 async function fetchKalshiAskCents(ticker: string, side: "YES" | "NO"): Promise<number | null> {
   try {
