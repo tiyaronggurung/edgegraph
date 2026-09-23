@@ -147,7 +147,7 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
   if (ageSec > MAX_SAMPLE_AGE_SEC) return out;
 
   let side: Side | null = null;
-  let tier: "four" | "three" | null = null;
+  let tier: "four" | "three" | "pair" | null = null;
   if (latest.all_four && latest.agreed_side) {
     side = latest.agreed_side;
     tier = "four";
@@ -156,6 +156,13 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
     if (threeQualifies(latest, cand)) {
       side = cand;
       tier = "three";
+    }
+  }
+  if (!side && (latest.study_side === "UP" || latest.study_side === "DOWN")) {
+    const cand = latest.study_side as Side;
+    if (pairQualifies(latest, cand)) {
+      side = cand;
+      tier = "pair";
     }
   }
   if (!side || !tier) return out;
