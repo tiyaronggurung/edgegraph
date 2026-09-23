@@ -176,11 +176,7 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
     const s = samples[i]!;
     const prev = samples[i - 1]!;
     if (prev.bucket_sec - s.bucket_sec > 20) break; // gap in recording
-    const ok =
-      tier === "four"
-        ? Boolean(s.all_four) && s.agreed_side === side
-        : threeQualifies(s, side) || (Boolean(s.all_four) && s.agreed_side === side);
-    if (!ok) break;
+    if (!sampleMatchesTier(s, tier, side)) break;
     holdStart = s.bucket_sec;
   }
   const heldSeconds = Math.max(0, latest.bucket_sec - holdStart) + Math.floor(ageSec);
@@ -192,9 +188,11 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
   const capCents =
     tier === "three"
       ? THREE_MAX_ASK_CENTS
-      : secondsToClose <= LATE_SECONDS
-        ? LATE_MAX_ASK_CENTS
-        : EARLY_MAX_ASK_CENTS;
+      : tier === "pair"
+        ? PAIR_MAX_ASK_CENTS
+        : secondsToClose <= LATE_SECONDS
+          ? LATE_MAX_ASK_CENTS
+          : EARLY_MAX_ASK_CENTS;
   out.capCents = capCents;
 
 
