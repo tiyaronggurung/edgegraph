@@ -252,10 +252,10 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
       continue;
     }
 
-    const stakeCents = Math.max(
-      100,
-      Math.min(50000, Number(u.agreement_bet_stake_cents) || DEFAULT_STAKE_CENTS),
-    );
+    const stakeCents =
+      tier === "three"
+        ? THREE_STAKE_CENTS
+        : Math.max(100, Math.min(50000, Number(u.agreement_bet_stake_cents) || DEFAULT_STAKE_CENTS));
     const contracts = Math.max(1, Math.floor(stakeCents / askCents));
     try {
       const { submitKalshiBuy } = await import("./cryptoTrades.functions");
@@ -268,9 +268,11 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
         closeTime: w.close_time,
         stakeUsd: stakeCents / 100,
         inputsSnapshot: {
-          source: "agreement_bet",
+          source: tier === "three" ? "agreement_bet_3of4" : "agreement_bet",
+          tier,
           agreed_side: side,
           held_seconds: heldSeconds,
+
           ask_cents: askCents,
           cap_cents: capCents,
           stake_cents: stakeCents,
