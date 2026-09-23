@@ -123,6 +123,10 @@ export async function driveVerdictBet(): Promise<VerdictTickResult> {
   out.users = userRows.length;
   if (!userRows.length) return out;
 
+  // Daily loss stop: 3 settled real-money losses today (NY day) = done for the day.
+  const { getDailyLossCounts, dailyLossStopHit } = await import("./dailyLossGuard.server");
+  const lossCounts = await getDailyLossCounts(supabaseAdmin as never);
+
   // Any engine that already bought this window blocks another buy.
   const { data: live } = await supabaseAdmin
     .from("crypto_trades")
@@ -142,6 +146,10 @@ export async function driveVerdictBet(): Promise<VerdictTickResult> {
   for (const u of userRows) {
     if (already.has(u.id)) {
       out.results.push({ userId: u.id, reason: "window_already_bought", fired: false });
+      continue;
+    }
+    if (dailyLossStopHit(lossCounts, u.id)) {
+      out.results.push({ userId: u.id, reason: "daily_loss_stop", fired: false });
       continue;
     }
     if (u.verdict_bet_enabled_at && windowStart < new Date(u.verdict_bet_enabled_at).getTime()) {
