@@ -17,6 +17,7 @@ import { getBtcMultiVenueVolume } from "@/lib/btcMultiVenueVolume.functions";
 import { BtcVerdictBanner } from "@/components/crypto/BtcVerdictBanner";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useStrikeOdds } from "@/hooks/useStrikeOdds";
+import { useAgreementRecorder } from "@/hooks/useAgreementRecorder";
 
 type Dir = "UP" | "DOWN" | null;
 
@@ -190,8 +191,28 @@ export function BtcAgreementPanel() {
   const allFour = known.length === 4 && (ups === 4 || downs === 4);
   const agreedSide: Dir = ups > downs ? "UP" : downs > ups ? "DOWN" : null;
 
+  // Log every agreement moment (with time left + how long it has held) so the
+  // 4/4 signal can be acted on live instead of replayed after the fact.
+  const heldSeconds = useAgreementRecorder({
+    windowStart: winStart,
+    secondsToClose,
+    spot,
+    strike,
+    oddsSide: oddsDir,
+    oddsPUp: odds.pUp ?? null,
+    volSide: volDir,
+    volImbalance: imbWin,
+    modelSide: modelDir,
+    modelConfidence: cons?.modelConfidence ?? null,
+    studySide: studyDir,
+    studyConfidence: cons?.studyConfidence ?? null,
+    agreeCount: known.length,
+    agreedSide,
+    allFour,
+  });
+
   const headline = allFour
-    ? `ALL 4 AGREE · ${agreedSide}`
+    ? `ALL 4 AGREE · ${agreedSide} · held ${heldSeconds}s`
     : known.length === 0
       ? "NO DATA"
       : `${Math.max(ups, downs)}/4 ${agreedSide ?? "SPLIT"}`;

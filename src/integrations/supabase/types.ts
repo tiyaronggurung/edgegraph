@@ -1790,6 +1790,75 @@ export type Database = {
           },
         ]
       }
+      btc_agreement_log: {
+        Row: {
+          agree_count: number | null
+          agreed_side: string | null
+          all_four: boolean
+          bucket_sec: number
+          created_at: string
+          held_seconds: number | null
+          id: string
+          model_confidence: number | null
+          model_side: string | null
+          odds_p_up: number | null
+          odds_side: string | null
+          seconds_to_close: number | null
+          spot: number | null
+          strike: number | null
+          study_confidence: number | null
+          study_side: string | null
+          updated_at: string
+          vol_imbalance: number | null
+          vol_side: string | null
+          window_start: string
+        }
+        Insert: {
+          agree_count?: number | null
+          agreed_side?: string | null
+          all_four?: boolean
+          bucket_sec: number
+          created_at?: string
+          held_seconds?: number | null
+          id?: string
+          model_confidence?: number | null
+          model_side?: string | null
+          odds_p_up?: number | null
+          odds_side?: string | null
+          seconds_to_close?: number | null
+          spot?: number | null
+          strike?: number | null
+          study_confidence?: number | null
+          study_side?: string | null
+          updated_at?: string
+          vol_imbalance?: number | null
+          vol_side?: string | null
+          window_start: string
+        }
+        Update: {
+          agree_count?: number | null
+          agreed_side?: string | null
+          all_four?: boolean
+          bucket_sec?: number
+          created_at?: string
+          held_seconds?: number | null
+          id?: string
+          model_confidence?: number | null
+          model_side?: string | null
+          odds_p_up?: number | null
+          odds_side?: string | null
+          seconds_to_close?: number | null
+          spot?: number | null
+          strike?: number | null
+          study_confidence?: number | null
+          study_side?: string | null
+          updated_at?: string
+          vol_imbalance?: number | null
+          vol_side?: string | null
+          window_start?: string
+        }
+        Relationships: []
+      }
       btc_calibration: {
         Row: {
           actual_rate: number | null
