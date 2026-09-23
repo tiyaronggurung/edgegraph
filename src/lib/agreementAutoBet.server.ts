@@ -94,6 +94,21 @@ function threeQualifies(s: Sample, side: Side): boolean {
   return s.odds_side === side && s.vol_side === side && s.model_side === side;
 }
 
+// 2-vs-2 pair: study and model locked together on `side` while both odds and
+// volume point the opposite way.
+function pairQualifies(s: Sample, side: Side): boolean {
+  const other: Side = side === "UP" ? "DOWN" : "UP";
+  return s.study_side === side && s.model_side === side && s.odds_side === other && s.vol_side === other;
+}
+
+function sampleMatchesTier(s: Sample, tier: "four" | "three" | "pair", side: Side): boolean {
+  if (tier === "four") return Boolean(s.all_four) && s.agreed_side === side;
+  if (tier === "three") return threeQualifies(s, side) || (Boolean(s.all_four) && s.agreed_side === side);
+  // A pair that grows into 3/4 or 4/4 on the same side still counts as the
+  // pair holding — the bet is on the study+model side either way.
+  return pairQualifies(s, side) || (Boolean(s.all_four) && s.agreed_side === side);
+}
+
 export async function driveAgreementBet(): Promise<AgreementTickResult> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
