@@ -25,6 +25,11 @@ const MAX_SAMPLE_AGE_SEC = 45; // the log is written every 10s by the live page
 const THREE_MAX_ASK_CENTS = 65;
 const THREE_STAKE_CENTS = 1000; // $10 flat
 
+// 2-vs-2 pair tier: study and model on the same side while odds and volume
+// both point the other way. Bets the study+model side, $10 at the 65c cap.
+const PAIR_MAX_ASK_CENTS = 65;
+const PAIR_STAKE_CENTS = 1000; // $10 flat
+
 type Side = "UP" | "DOWN";
 
 
@@ -61,7 +66,7 @@ async function fetchKalshiAskCents(ticker: string, side: "YES" | "NO"): Promise<
 
 export interface AgreementTickResult {
   side: Side | null;
-  tier: "four" | "three" | null;
+  tier: "four" | "three" | "pair" | null;
   heldSeconds: number;
   held: boolean;
   capCents: number | null;
@@ -87,6 +92,21 @@ type Sample = {
 function threeQualifies(s: Sample, side: Side): boolean {
   if (s.study_side) return false;
   return s.odds_side === side && s.vol_side === side && s.model_side === side;
+}
+
+// 2-vs-2 pair: study and model locked together on `side` while both odds and
+// volume point the opposite way.
+function pairQualifies(s: Sample, side: Side): boolean {
+  const other: Side = side === "UP" ? "DOWN" : "UP";
+  return s.study_side === side && s.model_side === side && s.odds_side === other && s.vol_side === other;
+}
+
+function sampleMatchesTier(s: Sample, tier: "four" | "three" | "pair", side: Side): boolean {
+  if (tier === "four") return Boolean(s.all_four) && s.agreed_side === side;
+  if (tier === "three") return threeQualifies(s, side) || (Boolean(s.all_four) && s.agreed_side === side);
+  // A pair that grows into 3/4 or 4/4 on the same side still counts as the
+  // pair holding — the bet is on the study+model side either way.
+  return pairQualifies(s, side) || (Boolean(s.all_four) && s.agreed_side === side);
 }
 
 export async function driveAgreementBet(): Promise<AgreementTickResult> {
@@ -127,7 +147,7 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
   if (ageSec > MAX_SAMPLE_AGE_SEC) return out;
 
   let side: Side | null = null;
-  let tier: "four" | "three" | null = null;
+  let tier: "four" | "three" | "pair" | null = null;
   if (latest.all_four && latest.agreed_side) {
     side = latest.agreed_side;
     tier = "four";
@@ -136,6 +156,13 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
     if (threeQualifies(latest, cand)) {
       side = cand;
       tier = "three";
+    }
+  }
+  if (!side && (latest.study_side === "UP" || latest.study_side === "DOWN")) {
+    const cand = latest.study_side as Side;
+    if (pairQualifies(latest, cand)) {
+      side = cand;
+      tier = "pair";
     }
   }
   if (!side || !tier) return out;
@@ -149,11 +176,7 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
     const s = samples[i]!;
     const prev = samples[i - 1]!;
     if (prev.bucket_sec - s.bucket_sec > 20) break; // gap in recording
-    const ok =
-      tier === "four"
-        ? Boolean(s.all_four) && s.agreed_side === side
-        : threeQualifies(s, side) || (Boolean(s.all_four) && s.agreed_side === side);
-    if (!ok) break;
+    if (!sampleMatchesTier(s, tier, side)) break;
     holdStart = s.bucket_sec;
   }
   const heldSeconds = Math.max(0, latest.bucket_sec - holdStart) + Math.floor(ageSec);
@@ -165,9 +188,11 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
   const capCents =
     tier === "three"
       ? THREE_MAX_ASK_CENTS
-      : secondsToClose <= LATE_SECONDS
-        ? LATE_MAX_ASK_CENTS
-        : EARLY_MAX_ASK_CENTS;
+      : tier === "pair"
+        ? PAIR_MAX_ASK_CENTS
+        : secondsToClose <= LATE_SECONDS
+          ? LATE_MAX_ASK_CENTS
+          : EARLY_MAX_ASK_CENTS;
   out.capCents = capCents;
 
 
@@ -255,7 +280,9 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
     const stakeCents =
       tier === "three"
         ? THREE_STAKE_CENTS
-        : Math.max(100, Math.min(50000, Number(u.agreement_bet_stake_cents) || DEFAULT_STAKE_CENTS));
+        : tier === "pair"
+          ? PAIR_STAKE_CENTS
+          : Math.max(100, Math.min(50000, Number(u.agreement_bet_stake_cents) || DEFAULT_STAKE_CENTS));
     const contracts = Math.max(1, Math.floor(stakeCents / askCents));
     try {
       const { submitKalshiBuy } = await import("./cryptoTrades.functions");
@@ -268,7 +295,7 @@ export async function driveAgreementBet(): Promise<AgreementTickResult> {
         closeTime: w.close_time,
         stakeUsd: stakeCents / 100,
         inputsSnapshot: {
-          source: tier === "three" ? "agreement_bet_3of4" : "agreement_bet",
+          source: tier === "three" ? "agreement_bet_3of4" : tier === "pair" ? "agreement_bet_pair" : "agreement_bet",
           tier,
           agreed_side: side,
           held_seconds: heldSeconds,
