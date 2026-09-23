@@ -25,6 +25,11 @@ const MAX_SAMPLE_AGE_SEC = 45; // the log is written every 10s by the live page
 const THREE_MAX_ASK_CENTS = 65;
 const THREE_STAKE_CENTS = 1000; // $10 flat
 
+// 2-vs-2 pair tier: study and model on the same side while odds and volume
+// both point the other way. Bets the study+model side, $10 at the 65c cap.
+const PAIR_MAX_ASK_CENTS = 65;
+const PAIR_STAKE_CENTS = 1000; // $10 flat
+
 type Side = "UP" | "DOWN";
 
 
@@ -61,7 +66,7 @@ async function fetchKalshiAskCents(ticker: string, side: "YES" | "NO"): Promise<
 
 export interface AgreementTickResult {
   side: Side | null;
-  tier: "four" | "three" | null;
+  tier: "four" | "three" | "pair" | null;
   heldSeconds: number;
   held: boolean;
   capCents: number | null;
