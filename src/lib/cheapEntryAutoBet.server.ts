@@ -145,6 +145,10 @@ export async function driveCheapEntry(): Promise<CheapEntryTickResult> {
   };
 
   if (userRows.length && openWindows.length) {
+    // Daily loss stop: 3 settled real-money losses today (NY day) = done for the day.
+    const { getDailyLossCounts, dailyLossStopHit } = await import("./dailyLossGuard.server");
+    const lossCounts = await getDailyLossCounts(supabaseAdmin as never);
+
     // Already-fired markers for these tickers (idempotency, one query).
     const tickers = openWindows.map((w) => w.ticker);
     const { data: existing } = await supabaseAdmin
@@ -212,6 +216,10 @@ export async function driveCheapEntry(): Promise<CheapEntryTickResult> {
 
         // ---- LIVE (real money) path ----
         if (u.cheap_entry_live_enabled) {
+          if (dailyLossStopHit(lossCounts, u.id)) {
+            out.results.push({ userId: u.id, ticker: w.ticker, reason: "daily_loss_stop", fired: false, askCents });
+            continue;
+          }
           if (!u.kalshi_api_key_id || !u.kalshi_private_key_pem) {
             await logSkip(supabaseAdmin, u.id, w.ticker, w.close_time, w.strike, target.side, askCents, secondsToClose, "live_no_keys");
             out.results.push({ userId: u.id, ticker: w.ticker, reason: "live_no_keys", fired: false, askCents });
