@@ -25,6 +25,7 @@ import { BtcPriceVolumeCard } from "@/components/crypto/BtcPriceVolumeCard";
 import { BtcAgreementPanel } from "@/components/crypto/BtcAgreementPanel";
 import { VerdictBetPanel } from "@/components/crypto/VerdictBetPanel";
 import { AgreementBetPanel } from "@/components/crypto/AgreementBetPanel";
+import { LogisticModelPanel } from "@/components/crypto/LogisticModelPanel";
 import { getBtcEssentialSnapshot } from "@/lib/btcEssentialSnapshot.functions";
 import { diagnoseRecentMisses, studyMissesWithAI, getLatestStudy, setRecommendationFeedback, type StudyRecommendation } from "@/lib/cryptoMisses.functions";
 import { recomputeShadowSim, getShadowSimReport, type ShadowSimGateStat } from "@/lib/cryptoShadowSim.functions";
@@ -4075,6 +4076,7 @@ function CryptoPage() {
 
 
       <BtcAgreementPanel />
+      <LogisticModelPanel />
       <AgreementBetPanel />
       <VerdictBetPanel />
 
