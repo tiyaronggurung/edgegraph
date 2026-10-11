@@ -1,3 +1,4 @@
+import { fetchLiveAskCents } from "@/lib/kalshiLiveQuote.server";
 // Cheap Entry Auto-Bet — PAPER ONLY.
 //
 // Separate from studyAutoLive (real money, fires once at the T-7 lock).
@@ -26,6 +27,8 @@ export type CheapEntrySource = "study" | "model";
 
 async function fetchKalshiAskCents(ticker: string, side: "YES" | "NO"): Promise<number | null> {
   try {
+    const live = await fetchLiveAskCents(ticker, side);
+    if (live != null) return live;
     const res = await fetch(`${KALSHI}/markets/${encodeURIComponent(ticker)}`, {
       headers: { accept: "application/json" },
     });

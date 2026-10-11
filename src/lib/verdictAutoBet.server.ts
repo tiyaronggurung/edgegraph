@@ -1,3 +1,4 @@
+import { fetchLiveAskCents } from "@/lib/kalshiLiveQuote.server";
 // Verdict Auto-Bet — REAL MONEY only, driven by the 3-signal verdict.
 //
 // Fires only when the two most recent composite-flow rows for the CURRENT 15m
@@ -18,6 +19,8 @@ const MAX_ASK_CENTS = 90; // never pay a near-certainty price
 
 async function fetchKalshiAskCents(ticker: string, side: "YES" | "NO"): Promise<number | null> {
   try {
+    const live = await fetchLiveAskCents(ticker, side);
+    if (live != null) return live;
     const res = await fetch(`${KALSHI}/markets/${encodeURIComponent(ticker)}`, {
       headers: { accept: "application/json" },
     });
