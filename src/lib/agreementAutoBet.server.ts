@@ -1,3 +1,4 @@
+import { fetchLiveAskCents } from "@/lib/kalshiLiveQuote.server";
 // 4/4 Agreement Auto-Bet — REAL MONEY.
 //
 // Fires only when all four legs (odds · volume · model · study) have agreed on
@@ -35,6 +36,8 @@ type Side = "UP" | "DOWN";
 
 async function fetchKalshiAskCents(ticker: string, side: "YES" | "NO"): Promise<number | null> {
   try {
+    const live = await fetchLiveAskCents(ticker, side);
+    if (live != null) return live;
     const res = await fetch(`${KALSHI}/markets/${encodeURIComponent(ticker)}`, {
       headers: { accept: "application/json" },
     });
