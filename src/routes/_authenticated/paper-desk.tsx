@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useRef, useState } from "react";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
-import { useBinanceBtcTicks } from "@/hooks/useBinanceBtcTicks";
-import { computeUpProbability, effectiveVol, momentumTilt } from "@/lib/ourOdds";
+import { useStrikeOdds } from "@/hooks/useStrikeOdds";
+import { getBtcEssentialSnapshot } from "@/lib/btcEssentialSnapshot.functions";
+import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
+import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,34 +78,78 @@ function PaperDesk() {
   const s = summary.data;
   const live = s?.last_tick_at && Date.now() - Date.parse(s.last_tick_at) < 30_000;
 
-  // Live feeds: composite spot (4-exchange WS) + 1s window clock + our odds.
+  // Live feeds — the exact same data path as the crypto page: 4-exchange
+  // composite spot, 1s window clock, Kalshi strike, window volume and the
+  // shared strike-odds engine. Nothing here waits on logged DB rows.
   const liveSpot = useLiveCompositeSpot();
-  const { ticks } = useBinanceBtcTicks();
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 1_000);
     return () => clearInterval(id);
   }, []);
-  const liveSecsLeft = 900 - Math.floor((nowMs % 900_000) / 1000);
-  const windowStartIso = new Date(Math.floor(nowMs / 900_000) * 900_000).toISOString();
-  const oddsRow = useRows<any>("our-odds", () =>
-    db.from("btc_agreement_log").select("bucket_sec, odds_p_up, spot, strike")
-      .not("odds_p_up", "is", null).order("bucket_sec", { ascending: false }).limit(1).maybeSingle());
-  const flow = useRows<any>(`flow-${windowStartIso}`, () =>
-    db.from("btc_composite_flow_log").select("composite_in_btc, composite_out_btc, composite_imbalance, recorded_at")
-      .eq("window_start", windowStartIso).order("recorded_at", { ascending: false }).limit(1).maybeSingle());
-  const o = oddsRow.data;
-  const strike = o?.strike != null ? Number(o.strike) : null;
-  const spot = liveSpot.spot ?? (o?.spot != null ? Number(o.spot) : null);
-  const livePUp = (() => {
-    if (spot == null || strike == null) return null;
-    const tape = ticks.map((t) => ({ t: t.t, p: t.p }));
-    const sigma = effectiveVol(tape, [], liveSecsLeft) ?? 0.5;
-    const base = computeUpProbability({ spot, strike, secondsToClose: liveSecsLeft, sigmaAnnualized: sigma });
-    if (base == null) return null;
-    return Math.min(0.995, Math.max(0.005, base + momentumTilt(tape, 60_000, liveSecsLeft)));
-  })();
-  const pUp = livePUp ?? (o?.odds_p_up != null ? Number(o.odds_p_up) : null);
+  const winStart = Math.floor(nowMs / 900_000) * 900_000;
+  const liveSecsLeft = Math.max(0, Math.round((winStart + 900_000 - nowMs) / 1000));
+
+  const essentialFn = useServerFn(getBtcEssentialSnapshot);
+  const marketsFn = useServerFn(getBtcMarkets);
+  const histFn = useServerFn(getBtcFlowLeanHistory);
+  const { data: essential } = useQuery({
+    queryKey: ["btc-essential-snapshot", winStart],
+    queryFn: () => essentialFn(),
+    refetchInterval: 5_000,
+    refetchOnWindowFocus: true,
+    retry: 3,
+    retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
+    placeholderData: keepPreviousData,
+  });
+  const { data: markets } = useQuery({
+    queryKey: ["btc-markets"],
+    queryFn: () => marketsFn(),
+    refetchInterval: 2_000,
+    staleTime: 1_000,
+    placeholderData: keepPreviousData,
+  });
+  const { data: hist } = useQuery({
+    queryKey: ["btc-flow-lean-history"],
+    queryFn: () => histFn(),
+    refetchInterval: 5_000,
+    placeholderData: keepPreviousData,
+    retry: 2,
+  });
+
+  // Kalshi's own live market (current 15m window) — yes bid/ask straight
+  // from the same feed the crypto page reads.
+  const kalshiMarket = markets?.markets
+    ?.filter((m: any) => m.secondsToClose > 0)
+    .sort((a: any, b: any) => a.secondsToClose - b.secondsToClose)[0] ?? null;
+
+  // Strike: same priority chain as the crypto page, held only within its window.
+  const lastStrikeRef = useRef<{ winStart: number; strike: number } | null>(null);
+  const kalshiStrike = essential?.strike;
+  if (kalshiStrike?.ok && kalshiStrike.strike != null) {
+    lastStrikeRef.current = { winStart, strike: kalshiStrike.strike };
+  }
+  const held = lastStrikeRef.current;
+  const strike =
+    kalshiStrike?.strike ?? kalshiMarket?.strike ?? (held != null && held.winStart === winStart ? held.strike : null);
+
+  const spot = liveSpot.spot ?? null;
+  const win = essential?.volume;
+  const winLeg = win?.windowStart === winStart ? (win?.window ?? null) : null;
+  const imbM3 = win?.m3?.imbalance ?? null;
+  const currentRow = hist?.rows?.find((r: any) => r.result == null) ?? hist?.rows?.[0] ?? null;
+
+  // Our odds — identical engine and inputs to the crypto page card.
+  const oddsSpot = liveSpot.targetSpot ?? spot;
+  const odds = useStrikeOdds(oddsSpot, strike ?? null, liveSecsLeft, {
+    m1: hist?.live?.m1 ?? null,
+    m15: hist?.live?.m15 ?? null,
+    avgBuyPrice: currentRow?.avgBuyPrice ?? null,
+    avgSellPrice: currentRow?.avgSellPrice ?? null,
+    flowImbalance: imbM3,
+    stack: hist?.live?.stack ?? null,
+  });
+  const pUp = odds.pUp;
   const gap = spot != null && strike != null ? spot - strike : null;
   const pts = (curve.data ?? []).map((p) => ({ t: p.ts, pnl: Number(p.pnl) }));
   const rangePnl = range.s === 0 ? Number(s?.total_pnl ?? 0) : pts.length > 1 ? pts[pts.length - 1].pnl - pts[0].pnl : 0;
@@ -176,15 +223,26 @@ function PaperDesk() {
       </header>
       {s?.last_error && <p className="text-[11px] text-[color:var(--color-destructive)]">⚠ {s.last_error}</p>}
 
-      {/* Live data strip — our odds, composite price, window volume, clock */}
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Live data strip — identical feeds to the crypto page: our odds,
+          Kalshi prices, composite price vs strike, window volume, clock */}
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="border border-border rounded-lg p-3">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Our odds</div>
           <div className="mt-1 flex items-baseline gap-3">
             <span className="text-xl font-bold text-[color:var(--color-primary)]">UP {cents(pUp)}</span>
             <span className="text-xl font-bold text-[color:var(--color-destructive)]">DOWN {cents(pUp != null ? 1 - pUp : null)}</span>
           </div>
-          <div className="text-[10px] text-muted-foreground mt-1">{livePUp != null ? "live · recomputed every tick" : `updated ${ago(o ? new Date(Number(o.bucket_sec) * 1000).toISOString() : null)}`}</div>
+          <div className="text-[10px] text-muted-foreground mt-1">live · same engine as crypto page</div>
+        </div>
+        <div className="border border-border rounded-lg p-3">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Kalshi market</div>
+          <div className="mt-1 flex items-baseline gap-3">
+            <span className="text-xl font-bold text-[color:var(--color-primary)]">YES {kalshiMarket ? `${Math.round(Number(kalshiMarket.yesAsk) * 100)}¢` : "—"}</span>
+            <span className="text-xl font-bold text-[color:var(--color-destructive)]">NO {kalshiMarket?.yesBid != null ? `${Math.round((1 - Number(kalshiMarket.yesBid)) * 100)}¢` : "—"}</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-1">
+            {kalshiMarket ? `bid ${Math.round(Number(kalshiMarket.yesBid) * 100)}¢ / ask ${Math.round(Number(kalshiMarket.yesAsk) * 100)}¢ · 2s poll` : "waiting for Kalshi…"}
+          </div>
         </div>
         <div className="border border-border rounded-lg p-3">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Composite price vs strike</div>
@@ -196,10 +254,10 @@ function PaperDesk() {
         <div className="border border-border rounded-lg p-3">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Window volume (composite)</div>
           <div className="mt-1 text-sm font-bold">
-            in {flow.data ? Number(flow.data.composite_in_btc).toFixed(2) : "—"} / out {flow.data ? Number(flow.data.composite_out_btc).toFixed(2) : "—"} BTC
+            in {winLeg ? winLeg.buy.toFixed(2) : "—"} / out {winLeg ? winLeg.sell.toFixed(2) : "—"} BTC
           </div>
-          <div className={cn("text-[11px]", Number(flow.data?.composite_imbalance ?? 0) >= 0 ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>
-            imbalance {flow.data?.composite_imbalance != null ? `${(Number(flow.data.composite_imbalance) * 100).toFixed(0)}%` : "—"}
+          <div className={cn("text-[11px]", (winLeg?.imbalance ?? 0) >= 0 ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>
+            imbalance {winLeg ? `${(winLeg.imbalance * 100).toFixed(0)}%` : "—"} · 3m lean {imbM3 != null ? `${(imbM3 * 100).toFixed(0)}%` : "—"}
           </div>
         </div>
         <div className="border border-border rounded-lg p-3">
