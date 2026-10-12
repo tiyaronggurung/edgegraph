@@ -1,10 +1,19 @@
-// Daily loss stop — shared by every live betting engine.
+// Daily give-back stop — shared by every live betting engine.
 //
-// Rule: once a user has 3 settled real-money losses whose window closed today
-// (New York day), no live engine may place another buy for them until the next
-// New York midnight. Paper paths are untouched.
+// Rule: once a user's settled real-money losses today (New York day) reach
+// 50% of today's settled real-money gains, no live engine may place another
+// buy for them until the next New York midnight. The rule only arms once
+// there ARE gains today — with no gains on the board yet, there is nothing
+// to give back, so trading stays open. Paper paths are untouched.
 
-export const DAILY_LOSS_LIMIT = 3;
+export const DAILY_GIVEBACK_RATIO = 0.5;
+
+export interface DailyPnl {
+  /** Sum of today's positive settled P&L (USD). */
+  gains: number;
+  /** Sum of today's negative settled P&L, as a positive number (USD). */
+  losses: number;
+}
 
 /** UTC instant of the most recent New York midnight. */
 export function nyDayStartUtc(now: Date): Date {
@@ -16,40 +25,45 @@ export function nyDayStartUtc(now: Date): Date {
 }
 
 /**
- * Count today's settled losses per user in one query.
- * A loss = crypto_trades row with status='settled' and pnl_usd < 0, anchored
- * to the day by close_time (when the window closed).
+ * Sum today's settled gains and losses per user in one query.
+ * Anchored to the day by close_time (when the window closed).
  */
 export async function getDailyLossCounts(
   db: {
     from: (t: string) => {
       select: (c: string) => {
         eq: (c: string, v: string) => {
-          lt: (c: string, v: number) => {
-            gte: (c: string, v: string) => Promise<{ data: Array<{ user_id: string }> | null }>;
-          };
+          gte: (c: string, v: string) => Promise<{ data: Array<{ user_id: string; pnl_usd: number | null }> | null }>;
         };
       };
     };
   },
   now: Date = new Date(),
-): Promise<Map<string, number>> {
+): Promise<Map<string, DailyPnl>> {
   const since = nyDayStartUtc(now).toISOString();
   const { data } = await db
     .from("crypto_trades")
-    .select("user_id")
+    .select("user_id, pnl_usd")
     .eq("status", "settled")
-    .lt("pnl_usd", 0)
     .gte("close_time", since);
-  const counts = new Map<string, number>();
-  for (const r of (data ?? []) as Array<{ user_id: string }>) {
+  const totals = new Map<string, DailyPnl>();
+  for (const r of (data ?? []) as Array<{ user_id: string; pnl_usd: number | null }>) {
     const id = String(r.user_id);
-    counts.set(id, (counts.get(id) ?? 0) + 1);
+    const cur = totals.get(id) ?? { gains: 0, losses: 0 };
+    const pnl = Number(r.pnl_usd ?? 0);
+    if (pnl > 0) cur.gains += pnl;
+    else if (pnl < 0) cur.losses += -pnl;
+    totals.set(id, cur);
   }
-  return counts;
+  return totals;
 }
 
-/** True when this user has hit the daily loss stop. */
-export function dailyLossStopHit(counts: Map<string, number>, userId: string): boolean {
-  return (counts.get(userId) ?? 0) >= DAILY_LOSS_LIMIT;
+/**
+ * True when this user has given back half (or more) of today's gains.
+ * No gains today → not stopped (nothing to protect yet).
+ */
+export function dailyLossStopHit(totals: Map<string, DailyPnl>, userId: string): boolean {
+  const t = totals.get(userId);
+  if (!t || t.gains <= 0) return false;
+  return t.losses >= DAILY_GIVEBACK_RATIO * t.gains;
 }
