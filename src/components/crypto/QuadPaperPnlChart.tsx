@@ -21,7 +21,7 @@ function PnlTooltip({ active, payload, visible }: {
   if (!active || !point) return null;
   return (
     <div className="rounded-md border border-border bg-popover p-3 text-xs shadow-sm">
-      <div className="mb-2 text-muted-foreground">{new Date(point.time).toLocaleDateString()} · {clock(point.time)} UTC</div>
+      <div className="mb-2 text-muted-foreground">{new Date(point.time).toLocaleDateString()} · {clock(point.time)} local</div>
       <div className="grid grid-cols-[auto_auto_auto] gap-x-4 gap-y-1">
         <span /><span className="text-muted-foreground">Total P&L</span><span className="text-muted-foreground">15m P&L</span>
         {QUAD_STRATEGIES.filter((s) => visible[s]).map((s) => (
