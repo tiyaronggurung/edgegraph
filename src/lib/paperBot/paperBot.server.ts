@@ -77,6 +77,18 @@ async function indexPrice(eventTicker: string, coin: string): Promise<[number, n
   return null;
 }
 
+// Our own odds, read from the agreement log the server recorder already writes
+// every 10s (same math as the crypto page). No extra outside API calls.
+async function loadOurPUp(sb: any): Promise<number | null> {
+  const { data } = await sb.from("btc_agreement_log")
+    .select("bucket_sec, odds_p_up").not("odds_p_up", "is", null)
+    .order("bucket_sec", { ascending: false }).limit(1).maybeSingle();
+  if (!data) return null;
+  if (nowS() - Number(data.bucket_sec) > 90) return null; // stale
+  const p = Number(data.odds_p_up);
+  return Number.isFinite(p) && p > 0 && p < 1 ? p : null;
+}
+
 export async function runPaperBotTick() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const sb = supabaseAdmin as any;
@@ -127,6 +139,7 @@ export async function runPaperBotTick() {
       try {
         const open = (await Promise.all(series.map(openMarkets))).flat();
         const idxCache = new Map<string, [number, number] | null>();
+        let ourPUp: number | null | undefined = undefined;
 
         for (const m of open) {
           const ticker: string = m.ticker;
@@ -166,8 +179,21 @@ export async function runPaperBotTick() {
             last_buy_ts: sec(row.last_buy_ts),
           };
           const t = nowS();
-          const d = decide(cfg, pos, book, t, openTs, closeTs);
-          if (!d) continue;
+          // Decide from OUR odds (crypto page: price + volume), not Kalshi's prices.
+          // Kalshi's book is only used to price the paper fill realistically.
+          if (row.coin !== "btc") continue;
+          if (ourPUp === undefined) ourPUp = await loadOurPUp(sb);
+          if (ourPUp === null) { tickError = "waiting for our odds"; continue; }
+          const ourBook: Book = { ...book, yes_ask: r4(ourPUp), no_ask: r4(1 - ourPUp) };
+          const dOurs = decide(cfg, pos, ourBook, t, openTs, closeTs);
+          if (!dOurs) continue;
+          const fillPrice = dOurs.side === "yes" ? book.yes_ask : book.no_ask;
+          if (fillPrice === null || fillPrice <= 0 || fillPrice >= 1) continue;
+          const d = {
+            ...dOurs,
+            price: fillPrice,
+            reason: `${dOurs.reason} · our ${(ourPUp * 100).toFixed(0)}% up · fill ${fillPrice.toFixed(2)}`,
+          };
           const fee = kalshiTakerFee(d.contracts, d.price, feeRate);
           const cost = d.contracts * d.price + fee;
           if (cost > cash) continue;
