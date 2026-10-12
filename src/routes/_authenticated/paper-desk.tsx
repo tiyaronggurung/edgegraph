@@ -70,7 +70,6 @@ function PaperDesk() {
 
   const summary = useRows<any>("summary", () => db.from("pb_v_summary").select("*").maybeSingle());
   const idx = useRows<any[]>("idx", () => db.from("pb_index_prices").select("*"));
-  const curve = useRows<any[]>(`eq-${range.s}`, () => db.rpc("paper_bot_equity", { range_seconds: range.s }));
   const active = useRows<any[]>("active", () => db.from("pb_v_active_positions").select("*"));
   const closed = useRows<any[]>("closed", () => db.from("pb_v_closed_positions").select("*").limit(500));
   const activity = useRows<any[]>("activity", () => db.from("pb_v_activity").select("*").limit(500));
@@ -151,8 +150,26 @@ function PaperDesk() {
   });
   const pUp = odds.pUp;
   const gap = spot != null && strike != null ? spot - strike : null;
-  const pts = (curve.data ?? []).map((p) => ({ t: p.ts, pnl: Number(p.pnl) }));
-  const rangePnl = range.s === 0 ? Number(s?.total_pnl ?? 0) : pts.length > 1 ? pts[pts.length - 1].pnl - pts[0].pnl : 0;
+  // Real-money P&L only — Paper Desk's live Kalshi fills (source "paper_desk_live"),
+  // settled results from crypto_trades. Paper equity is no longer charted.
+  const realTrades = useRows<any[]>(
+    `real-${range.s}`,
+    () => {
+      let q = db
+        .from("crypto_trades")
+        .select("id, created_at, status, pnl_usd, raw")
+        .eq("status", "settled")
+        .filter("raw->inputs_snapshot->>source", "eq", "paper_desk_live");
+      if (range.s > 0) q = q.gte("created_at", new Date(Date.now() - range.s * 1000).toISOString());
+      return q.order("created_at", { ascending: true }).limit(2000) as never;
+    },
+  );
+  const pts = (realTrades.data ?? [])
+    .map((r) => ({ t: r.raw?.settle?.at ?? r.created_at, pnl: Number(r.pnl_usd ?? 0) }))
+    .sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+  let realAcc = 0;
+  const cum = pts.map((p) => { realAcc += p.pnl; return { t: p.t, pnl: realAcc }; });
+  const rangePnl = realAcc;
   const up = rangePnl >= 0;
   const winRate = s && s.settled_markets > 0 ? `${((s.winning_markets / s.settled_markets) * 100).toFixed(0)}%` : "—";
 
@@ -292,9 +309,9 @@ function PaperDesk() {
         <section className="border border-border rounded-lg p-4 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Profit/Loss</div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Real-money Profit/Loss</div>
               <div className={cn("text-3xl font-bold", up ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>{signed(rangePnl)}</div>
-              <div className="text-[11px] text-muted-foreground">{range.l}</div>
+              <div className="text-[11px] text-muted-foreground">{range.l} · settled Kalshi fills only</div>
             </div>
             <div className="flex border border-border rounded overflow-hidden text-[10px]">
               {RANGES.map((r) => (
@@ -303,11 +320,11 @@ function PaperDesk() {
             </div>
           </div>
           <div className="h-56">
-            {pts.length < 2 ? (
-              <div className="h-full grid place-items-center text-xs text-muted-foreground">The chart fills in as the bot runs.</div>
+            {cum.length < 2 ? (
+              <div className="h-full grid place-items-center text-xs text-muted-foreground">The chart fills in as real-money trades settle.</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={pts} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+                <AreaChart data={cum} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="pbFill" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={up ? "var(--color-primary)" : "var(--color-destructive)"} stopOpacity={0.35} />
@@ -319,7 +336,7 @@ function PaperDesk() {
                     tickFormatter={(t: string) => new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} />
                   <YAxis orientation="right" tickCount={3} tick={{ fontSize: 10 }} width={60} stroke="currentColor" className="text-muted-foreground" tickFormatter={(v: number) => usd(v, 0)} />
                   <Tooltip contentStyle={{ fontSize: 11, background: "var(--color-card)", border: "1px solid var(--color-border)" }}
-                    formatter={(v: number) => [signed(v), "P&L"]} labelFormatter={(t: string) => new Date(t).toLocaleString()} />
+                    formatter={(v: number) => [signed(v), "Real P&L"]} labelFormatter={(t: string) => new Date(t).toLocaleString()} />
                   <ReferenceLine y={0} stroke="currentColor" className="text-muted-foreground" strokeDasharray="3 3" />
                   <Area type="monotone" dataKey="pnl" stroke={up ? "var(--color-primary)" : "var(--color-destructive)"} strokeWidth={2} fill="url(#pbFill)" isAnimationActive={false} />
                 </AreaChart>
