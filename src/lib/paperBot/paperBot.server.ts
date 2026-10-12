@@ -106,6 +106,16 @@ export async function runPaperBotTick() {
     let cfg: StrategyConfig = { ...DEFAULT_CONFIG, ...(settings.strategy ?? {}) };
     let series: string[] = settings.series?.length ? settings.series : ["KXBTC15M"];
 
+    // LIVE mode: real Kalshi orders, real money. Guards: daily loss stop,
+    // one buy per window (shared with every other engine), no final-minute
+    // buys, and a hard cap on total open real exposure (default $10).
+    const liveMode = Boolean(settings.live_enabled) && !!settings.live_user_id;
+    const liveUserId = (settings.live_user_id as string | null) ?? null;
+    const liveMaxOpenCents = Math.max(100, Number(settings.live_max_open_cents) || 1000);
+    const liveCfg = (c: StrategyConfig): StrategyConfig =>
+      liveMode ? { ...c, no_new_buys_last_seconds: Math.max(60, c.no_new_buys_last_seconds) } : c;
+    cfg = liveCfg(cfg);
+
     const { data: openRows, error: rowsErr } = await sb.from("pb_markets").select("*").eq("settled", false);
     if (rowsErr) throw rowsErr;
     const markets = new Map<string, MarketRow>();
@@ -130,7 +140,7 @@ export async function runPaperBotTick() {
       const { data: s2 } = await sb.from("pb_settings")
         .select("running, reset_epoch, strategy, series").eq("id", 1).single();
       if (!s2 || !s2.running || s2.reset_epoch !== epoch) break;
-      cfg = { ...DEFAULT_CONFIG, ...(s2.strategy ?? {}) };
+      cfg = liveCfg({ ...DEFAULT_CONFIG, ...(s2.strategy ?? {}) });
       series = s2.series?.length ? s2.series : series;
 
       try {
@@ -139,6 +149,26 @@ export async function runPaperBotTick() {
         // Our odds (crypto page: price + volume) drive BOTH the decision and the
         // paper fill price. No Kalshi orderbook calls at all — they rate-limit us.
         const ourPUp = await loadOurPUp(sb);
+
+        // Live guards, refreshed every loop: daily loss stop, total open real
+        // exposure, and every ticker any engine already bought this window.
+        let liveOpenCents = 0;
+        let liveLossStop = false;
+        const liveWindowBought = new Set<string>();
+        if (liveMode && liveUserId) {
+          const { getDailyLossCounts, dailyLossStopHit } = await import("@/lib/dailyLossGuard.server");
+          liveLossStop = dailyLossStopHit(await getDailyLossCounts(sb as never), liveUserId);
+          const { data: openLive } = await sb.from("crypto_trades")
+            .select("ticker, stake_usd, inputs_snapshot")
+            .in("status", ["submitted", "pending"])
+            .gt("close_time", iso(nowS()));
+          for (const r of openLive ?? []) {
+            liveWindowBought.add(String(r.ticker));
+            if ((r.inputs_snapshot as any)?.source === "paper_desk_live") {
+              liveOpenCents += Math.round(Number(r.stake_usd ?? 0) * 100);
+            }
+          }
+        }
 
         for (const m of open) {
           const ticker: string = m.ticker;
@@ -191,6 +221,60 @@ export async function runPaperBotTick() {
             ...dOurs,
             reason: `${dOurs.reason} · our ${(ourPUp * 100).toFixed(0)}% up`,
           };
+          // ---- LIVE (real money) path ----
+          if (liveMode && liveUserId) {
+            if (liveLossStop) { tickError = "daily loss stop (3 settled losses today)"; continue; }
+            if (liveWindowBought.has(ticker)) continue; // one buy per window, shared across engines
+            const limitCents = Math.max(1, Math.min(99, Math.round(d.price * 100)));
+            const remaining = liveMaxOpenCents - liveOpenCents;
+            const n = Math.min(d.contracts, Math.floor(remaining / limitCents));
+            if (n <= 0) { tickError = `live cap reached ($${(liveMaxOpenCents / 100).toFixed(0)} open)`; continue; }
+            try {
+              const { submitKalshiBuy } = await import("@/lib/cryptoTrades.functions");
+              const r = await submitKalshiBuy(sb, liveUserId, {
+                ticker,
+                side: d.side === "yes" ? "YES" : "NO",
+                contracts: n,
+                limitPriceCents: limitCents,
+                strike: row.strike ?? undefined,
+                closeTime: row.close_ts,
+                stakeUsd: (n * limitCents) / 100,
+                inputsSnapshot: {
+                  source: "paper_desk_live",
+                  reason: d.reason,
+                  our_p_up: ourPUp,
+                  seconds_to_close: Math.round(closeTs - t),
+                },
+              } as never);
+              if (r.fillCount <= 0) { tickError = "live order unfilled"; continue; }
+              const realPrice = r.filledCents / 100;
+              const fee = kalshiTakerFee(n, realPrice, feeRate);
+              const cost = n * realPrice + fee;
+              cash -= cost;
+              if (d.side === "yes") { row.yes_ct += n; row.yes_cost += n * realPrice; }
+              else { row.no_ct += n; row.no_cost += n * realPrice; }
+              row.fees += fee;
+              row.fills += 1;
+              row.last_buy_ts = iso(t);
+              dirty.add(ticker);
+              fillsThisRun++;
+              liveWindowBought.add(ticker);
+              liveOpenCents += n * r.filledCents;
+              const p2: Position = { yes: { contracts: row.yes_ct, cost: row.yes_cost }, no: { contracts: row.no_ct, cost: row.no_cost }, last_buy_ts: t };
+              const gap = row.index_price !== null && row.strike !== null ? row.index_price - row.strike : null;
+              fillRows.push({
+                ts: iso(t), ticker, title: row.title, side: d.side, contracts: n, price: realPrice, fee,
+                reason: `LIVE ${d.reason} · filled ${r.fillCount} @ ${r.filledCents}¢`,
+                yes_ct: row.yes_ct, yes_avg: r4(avg(p2.yes)), no_ct: row.no_ct, no_avg: r4(avg(p2.no)),
+                pair_cost: r4(pairCost(p2)), index_price: row.index_price, strike: row.strike,
+                gap: gap === null ? null : Math.round(gap * 100) / 100,
+              });
+            } catch (e) {
+              tickError = `live error: ${String((e as Error)?.message ?? e).slice(0, 120)}`;
+            }
+            continue;
+          }
+
           const fee = kalshiTakerFee(d.contracts, d.price, feeRate);
           const cost = d.contracts * d.price + fee;
           if (cost > cash) continue;

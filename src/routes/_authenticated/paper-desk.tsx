@@ -115,6 +115,13 @@ function PaperDesk() {
     toast.success(running ? "Paper bot started" : "Paper bot paused");
     qc.invalidateQueries({ queryKey: ["paper-desk"] });
   };
+  const setLive = async (enabled: boolean) => {
+    if (enabled && !confirm("Turn on REAL MONEY trading on Kalshi? Max $10 open at once, one buy per window, daily loss stop stays on.")) return;
+    const { error } = await db.rpc("paper_bot_set_live", { p_enabled: enabled });
+    if (error) return toast.error(error.message);
+    toast.success(enabled ? "LIVE trading on — real money, $10 cap" : "Live trading off — back to paper");
+    qc.invalidateQueries({ queryKey: ["paper-desk"] });
+  };
   const reset = async () => {
     const v = prompt("New paper budget ($)", String(s?.start_cash ?? 3000));
     if (!v) return;
@@ -132,6 +139,9 @@ function PaperDesk() {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-lg font-bold tracking-widest neon-text">PAPER DESK</h1>
           <span className="text-[10px] px-2 py-0.5 rounded border border-[color:var(--color-primary)]/50 text-[color:var(--color-primary)] uppercase tracking-widest">Paper trading</span>
+          {s?.live_enabled && (
+            <span className="text-[10px] px-2 py-0.5 rounded border border-[color:var(--color-destructive)] text-[color:var(--color-destructive)] uppercase tracking-widest animate-pulse">LIVE · real money · $10 cap</span>
+          )}
           {(idx.data ?? []).map((r) => (
             <span key={r.coin} className="text-[11px] px-2 py-0.5 rounded bg-card border border-border">
               {String(r.coin).toUpperCase()} {usd(Number(r.price))} · {ago(r.ts)}
@@ -147,6 +157,17 @@ function PaperDesk() {
             <>
               <button onClick={() => control(!s.running)} className="px-2 py-1 border border-border rounded uppercase tracking-widest text-[10px] hover:bg-card">
                 {s.running ? "Pause" : "Start"}
+              </button>
+              <button
+                onClick={() => setLive(!s.live_enabled)}
+                className={cn(
+                  "px-2 py-1 border rounded uppercase tracking-widest text-[10px]",
+                  s.live_enabled
+                    ? "border-[color:var(--color-destructive)] text-[color:var(--color-destructive)] hover:bg-card"
+                    : "border-border hover:bg-card",
+                )}
+              >
+                {s.live_enabled ? "Stop live" : "Go live $10"}
               </button>
               <button onClick={reset} className="px-2 py-1 border border-border rounded uppercase tracking-widest text-[10px] hover:bg-card">Reset</button>
             </>

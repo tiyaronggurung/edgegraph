@@ -15,6 +15,13 @@
       "when": 1791776036258,
       "tag": "0001_hedge_desk_bot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791777325943,
+      "tag": "0002_paper_desk_live_mode",
+      "breakpoints": true
     }
   ]
 }

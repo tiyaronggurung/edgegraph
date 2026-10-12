@@ -6206,6 +6206,9 @@ export type Database = {
           last_equity_at: string | null
           last_error: string | null
           last_tick_at: string | null
+          live_enabled: boolean
+          live_max_open_cents: number
+          live_user_id: string | null
           lock_until: string | null
           open_value: number
           poll_seconds: number
@@ -6223,6 +6226,9 @@ export type Database = {
           last_equity_at?: string | null
           last_error?: string | null
           last_tick_at?: string | null
+          live_enabled?: boolean
+          live_max_open_cents?: number
+          live_user_id?: string | null
           lock_until?: string | null
           open_value?: number
           poll_seconds?: number
@@ -6240,6 +6246,9 @@ export type Database = {
           last_equity_at?: string | null
           last_error?: string | null
           last_tick_at?: string | null
+          live_enabled?: boolean
+          live_max_open_cents?: number
+          live_user_id?: string | null
           lock_until?: string | null
           open_value?: number
           poll_seconds?: number
@@ -7239,6 +7248,7 @@ export type Database = {
       }
       paper_bot_release_lock: { Args: never; Returns: undefined }
       paper_bot_reset: { Args: { new_budget: number }; Returns: undefined }
+      paper_bot_set_live: { Args: { p_enabled: boolean }; Returns: undefined }
       paper_bot_update_settings: {
         Args: {
           p_running: boolean
