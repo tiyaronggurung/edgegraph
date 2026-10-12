@@ -7,6 +7,9 @@ import { useStrikeOdds } from "@/hooks/useStrikeOdds";
 import { getBtcEssentialSnapshot } from "@/lib/btcEssentialSnapshot.functions";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
+import { getBtcMultiVenueVolume } from "@/lib/btcMultiVenueVolume.functions";
+import { getCompositeDayTotals } from "@/lib/compositeDayTotals.functions";
+import { DeskVolumeDetails } from "@/components/crypto/DeskVolumeDetails";
 import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -92,6 +95,26 @@ function PaperDesk() {
   const essentialFn = useServerFn(getBtcEssentialSnapshot);
   const marketsFn = useServerFn(getBtcMarkets);
   const histFn = useServerFn(getBtcFlowLeanHistory);
+  const multiVenueFn = useServerFn(getBtcMultiVenueVolume);
+  const dayTotalsFn = useServerFn(getCompositeDayTotals);
+  const { data: multi } = useQuery({
+    queryKey: ["btc-multi-venue-volume"],
+    queryFn: () => multiVenueFn(),
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
+    retry: 2,
+    retryDelay: (a) => Math.min(1000 * 2 ** a, 8_000),
+    placeholderData: keepPreviousData,
+  });
+  const { data: dayTotals } = useQuery({
+    queryKey: ["composite-day-totals"],
+    queryFn: () => dayTotalsFn(),
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
   const { data: essential } = useQuery({
     queryKey: ["btc-essential-snapshot", winStart],
     queryFn: () => essentialFn(),
@@ -244,7 +267,7 @@ function PaperDesk() {
 
       {/* Live data strip — identical feeds to the crypto page: our odds,
           Kalshi prices, composite price vs strike, window volume, clock */}
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="border border-border rounded-lg p-3">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Our odds</div>
           <div className="mt-1 flex items-baseline gap-3">
@@ -271,21 +294,17 @@ function PaperDesk() {
           </div>
         </div>
         <div className="border border-border rounded-lg p-3">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Window volume (composite)</div>
-          <div className="mt-1 text-sm font-bold">
-            in {winLeg ? winLeg.buy.toFixed(2) : "—"} / out {winLeg ? winLeg.sell.toFixed(2) : "—"} BTC
-          </div>
-          <div className={cn("text-[11px]", (winLeg?.imbalance ?? 0) >= 0 ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>
-            imbalance {winLeg ? `${(winLeg.imbalance * 100).toFixed(0)}%` : "—"} · 3m lean {imbM3 != null ? `${(imbM3 * 100).toFixed(0)}%` : "—"}
-          </div>
-        </div>
-        <div className="border border-border rounded-lg p-3">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Time left in window</div>
           <div className="mt-1 text-xl font-bold">{Math.floor(liveSecsLeft / 60)}m {liveSecsLeft % 60}s</div>
           <div className="text-[10px] text-muted-foreground">live 1s clock</div>
         </div>
       </section>
-
+      <DeskVolumeDetails
+        window={winLeg}
+        coinbase={multi?.ok && multi.windowStart === winStart ? multi.coinbaseFlow : null}
+        day={dayTotals?.ok ? dayTotals : null}
+        price={spot}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <section className="border border-border rounded-lg p-4 space-y-4">

@@ -1,5 +1,9 @@
 # Roadmap
 
+## Paper Desk volume mirror
+- [x] Replace abbreviated volume with Crypto's live window, Coinbase, combined volume, weighted averages, flow labels and NY day totals.
+- [x] Verify the signed-in display, current data, removed old volume label and absence of browser errors; trading paths unchanged.
+
 ## Hedge page (done this turn)
 - [x] Backtest two-sided combined-cost hedge rules on btc_agreement_log history (best: 45¢/45¢ → locked in 57 windows, +35.2¢/pair)
 - [x] /hedge page: our odds, window volume, composite price, position, P&L chart, activity
