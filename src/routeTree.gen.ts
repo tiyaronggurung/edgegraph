@@ -70,6 +70,7 @@ import { Route as ApiPublicHooksOpsDailyBacktestRouteImport } from './routes/api
 import { Route as ApiPublicHooksPaperBotTickRouteImport } from './routes/api/public/hooks/paper-bot-tick'
 import { Route as ApiPublicHooksPinRiskShadowTickRouteImport } from './routes/api/public/hooks/pin-risk-shadow-tick'
 import { Route as ApiPublicHooksPredictionRowTickRouteImport } from './routes/api/public/hooks/prediction-row-tick'
+import { Route as ApiPublicHooksQuadBotTickRouteImport } from './routes/api/public/hooks/quad-bot-tick'
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
 import { Route as ApiPublicHooksSettleBtcPredictionsRouteImport } from './routes/api/public/hooks/settle-btc-predictions'
 import { Route as ApiPublicHooksSpotBufferWriterRouteImport } from './routes/api/public/hooks/spot-buffer-writer'
@@ -421,6 +422,12 @@ const ApiPublicHooksPredictionRowTickRoute =
     path: '/api/public/hooks/prediction-row-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksQuadBotTickRoute =
+  ApiPublicHooksQuadBotTickRouteImport.update({
+    id: '/api/public/hooks/quad-bot-tick',
+    path: '/api/public/hooks/quad-bot-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksRecomputePredictionsRoute =
   ApiPublicHooksRecomputePredictionsRouteImport.update({
     id: '/api/public/hooks/recompute-predictions',
@@ -561,6 +568,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/paper-bot-tick': typeof ApiPublicHooksPaperBotTickRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
+  '/api/public/hooks/quad-bot-tick': typeof ApiPublicHooksQuadBotTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/spot-buffer-writer': typeof ApiPublicHooksSpotBufferWriterRoute
@@ -636,6 +644,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/paper-bot-tick': typeof ApiPublicHooksPaperBotTickRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
+  '/api/public/hooks/quad-bot-tick': typeof ApiPublicHooksQuadBotTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/spot-buffer-writer': typeof ApiPublicHooksSpotBufferWriterRoute
@@ -713,6 +722,7 @@ export interface FileRoutesById {
   '/api/public/hooks/paper-bot-tick': typeof ApiPublicHooksPaperBotTickRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
+  '/api/public/hooks/quad-bot-tick': typeof ApiPublicHooksQuadBotTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
   '/api/public/hooks/settle-btc-predictions': typeof ApiPublicHooksSettleBtcPredictionsRoute
   '/api/public/hooks/spot-buffer-writer': typeof ApiPublicHooksSpotBufferWriterRoute
@@ -790,6 +800,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/paper-bot-tick'
     | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/prediction-row-tick'
+    | '/api/public/hooks/quad-bot-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/spot-buffer-writer'
@@ -865,6 +876,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/paper-bot-tick'
     | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/prediction-row-tick'
+    | '/api/public/hooks/quad-bot-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/spot-buffer-writer'
@@ -941,6 +953,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/paper-bot-tick'
     | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/prediction-row-tick'
+    | '/api/public/hooks/quad-bot-tick'
     | '/api/public/hooks/recompute-predictions'
     | '/api/public/hooks/settle-btc-predictions'
     | '/api/public/hooks/spot-buffer-writer'
@@ -999,6 +1012,7 @@ export interface RootRouteChildren {
   ApiPublicHooksPaperBotTickRoute: typeof ApiPublicHooksPaperBotTickRoute
   ApiPublicHooksPinRiskShadowTickRoute: typeof ApiPublicHooksPinRiskShadowTickRoute
   ApiPublicHooksPredictionRowTickRoute: typeof ApiPublicHooksPredictionRowTickRoute
+  ApiPublicHooksQuadBotTickRoute: typeof ApiPublicHooksQuadBotTickRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
   ApiPublicHooksSettleBtcPredictionsRoute: typeof ApiPublicHooksSettleBtcPredictionsRoute
   ApiPublicHooksSpotBufferWriterRoute: typeof ApiPublicHooksSpotBufferWriterRoute
@@ -1442,6 +1456,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPredictionRowTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/quad-bot-tick': {
+      id: '/api/public/hooks/quad-bot-tick'
+      path: '/api/public/hooks/quad-bot-tick'
+      fullPath: '/api/public/hooks/quad-bot-tick'
+      preLoaderRoute: typeof ApiPublicHooksQuadBotTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/recompute-predictions': {
       id: '/api/public/hooks/recompute-predictions'
       path: '/api/public/hooks/recompute-predictions'
@@ -1642,6 +1663,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksPaperBotTickRoute: ApiPublicHooksPaperBotTickRoute,
   ApiPublicHooksPinRiskShadowTickRoute: ApiPublicHooksPinRiskShadowTickRoute,
   ApiPublicHooksPredictionRowTickRoute: ApiPublicHooksPredictionRowTickRoute,
+  ApiPublicHooksQuadBotTickRoute: ApiPublicHooksQuadBotTickRoute,
   ApiPublicHooksRecomputePredictionsRoute:
     ApiPublicHooksRecomputePredictionsRoute,
   ApiPublicHooksSettleBtcPredictionsRoute:
