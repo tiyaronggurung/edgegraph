@@ -13,6 +13,12 @@ import {
   kalshiTakerFee,
   pairCost,
 } from "./strategy";
+import {
+  type TapeSample,
+  computeUpProbability,
+  effectiveVol,
+  momentumTilt,
+} from "@/lib/ourOdds";
 
 const KALSHI = "https://api.elections.kalshi.com";
 const RUN_SECONDS = 8;
@@ -74,8 +80,40 @@ async function indexPrice(eventTicker: string, coin: string): Promise<[number, n
   return null;
 }
 
-// Our own odds, read from the agreement log the server recorder already writes
-// every 10s (same math as the crypto page). No extra outside API calls.
+// Live tape from the server-written spot ticks — the same source and the same
+// math the crypto page uses, so the bot sees the same odds with no extra lag.
+async function loadSpotTape(sb: any): Promise<TapeSample[]> {
+  const { data } = await sb.from("btc_spot_ticks")
+    .select("observed_at, spot, source")
+    .gte("observed_at", new Date(Date.now() - 5 * 60_000).toISOString())
+    .in("source", ["coinbase", "consolidated"])
+    .order("observed_at", { ascending: true })
+    .limit(2000);
+  const rows = (data ?? []) as Array<{ observed_at: string; spot: number | string; source: string }>;
+  const preferred = rows.filter((r) => r.source === "coinbase");
+  const pool = preferred.length >= 10 ? preferred : rows;
+  const tape: TapeSample[] = [];
+  for (const r of pool) {
+    const t = Date.parse(r.observed_at);
+    const p = Number(r.spot);
+    if (Number.isFinite(t) && Number.isFinite(p) && p > 0) tape.push({ t, p });
+  }
+  tape.sort((a, b) => a.t - b.t);
+  return tape;
+}
+
+// Identical formula to the crypto page: fair value + momentum tilt, clamped.
+function pUpFromTape(tape: TapeSample[], strike: number | null, secsToClose: number): number | null {
+  if (tape.length < 10 || !(strike != null && strike > 0)) return null;
+  const last = tape[tape.length - 1];
+  if (Date.now() - last.t > 30_000) return null; // feed stalled — don't trade stale odds
+  const sigma = effectiveVol(tape, [], secsToClose) ?? 0.5;
+  const base = computeUpProbability({ spot: last.p, strike, secondsToClose: secsToClose, sigmaAnnualized: sigma });
+  if (base == null) return null;
+  return Math.min(0.995, Math.max(0.005, base + momentumTilt(tape, 60_000, secsToClose)));
+}
+
+// Fallback: last odds row from the agreement log (used only if the tape is empty).
 async function loadOurPUp(sb: any): Promise<number | null> {
   const { data } = await sb.from("btc_agreement_log")
     .select("bucket_sec, odds_p_up").not("odds_p_up", "is", null)
@@ -102,7 +140,7 @@ export async function runPaperBotTick() {
     let cash = Number(settings.cash);
     const startCash = Number(settings.start_cash);
     const feeRate = Number(settings.taker_fee_rate);
-    const pollMs = Math.max(1000, Number(settings.poll_seconds) * 1000);
+    const pollMs = 1000; // poll every second — same cadence as the crypto page
     let cfg: StrategyConfig = { ...DEFAULT_CONFIG, ...(settings.strategy ?? {}) };
     let series: string[] = settings.series?.length ? settings.series : ["KXBTC15M"];
 
@@ -147,8 +185,10 @@ export async function runPaperBotTick() {
         const open = (await Promise.all(series.map(openMarkets))).flat();
         const idxCache = new Map<string, [number, number] | null>();
         // Our odds (crypto page: price + volume) drive BOTH the decision and the
-        // paper fill price. No Kalshi orderbook calls at all — they rate-limit us.
-        const ourPUp = await loadOurPUp(sb);
+        // fill price. Computed live from the spot tape every poll — same math as
+        // the crypto page, no waiting for logged rows. No Kalshi orderbook calls.
+        const tape = await loadSpotTape(sb);
+        const fallbackPUp = tape.length >= 10 ? null : await loadOurPUp(sb);
 
         // Live guards, refreshed every loop: daily loss stop, total open real
         // exposure, and every ticker any engine already bought this window.
@@ -197,9 +237,9 @@ export async function runPaperBotTick() {
             indexUpdates.set(key, { coin: key, price: idx[0], ts: iso(idx[1]) });
           }
 
-          // Our odds (crypto page: price + volume) drive BOTH the decision and the
-          // paper fill price. No Kalshi orderbook calls at all — they rate-limit us.
           if (row.coin !== "btc") continue;
+          const secsToClose = Math.max(0, closeTs - nowS());
+          const ourPUp = pUpFromTape(tape, row.strike, secsToClose) ?? fallbackPUp;
           if (ourPUp === null) { tickError = "waiting for our odds"; continue; }
           const book: Book = {
             yes_bid: r4(ourPUp), yes_ask: r4(ourPUp), yes_ask_size: 1e6,
