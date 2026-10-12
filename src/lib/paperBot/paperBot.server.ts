@@ -106,6 +106,16 @@ export async function runPaperBotTick() {
     let cfg: StrategyConfig = { ...DEFAULT_CONFIG, ...(settings.strategy ?? {}) };
     let series: string[] = settings.series?.length ? settings.series : ["KXBTC15M"];
 
+    // LIVE mode: real Kalshi orders, real money. Guards: daily loss stop,
+    // one buy per window (shared with every other engine), no final-minute
+    // buys, and a hard cap on total open real exposure (default $10).
+    const liveMode = Boolean(settings.live_enabled) && !!settings.live_user_id;
+    const liveUserId = (settings.live_user_id as string | null) ?? null;
+    const liveMaxOpenCents = Math.max(100, Number(settings.live_max_open_cents) || 1000);
+    const liveCfg = (c: StrategyConfig): StrategyConfig =>
+      liveMode ? { ...c, no_new_buys_last_seconds: Math.max(60, c.no_new_buys_last_seconds) } : c;
+    cfg = liveCfg(cfg);
+
     const { data: openRows, error: rowsErr } = await sb.from("pb_markets").select("*").eq("settled", false);
     if (rowsErr) throw rowsErr;
     const markets = new Map<string, MarketRow>();
