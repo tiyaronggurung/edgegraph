@@ -128,8 +128,8 @@ function HedgeDesk() {
     qc.invalidateQueries({ queryKey: ["hedge-desk"] });
   };
 
-  const secsLeft = o?.seconds_to_close != null ? Number(o.seconds_to_close) : null;
-  const gap = o?.spot != null && o?.strike != null ? Number(o.spot) - Number(o.strike) : null;
+  const secsLeft = liveSecsLeft;
+  const gap = spot != null && strike != null ? spot - strike : null;
 
   return (
     <div className="space-y-4 font-mono">
