@@ -3059,6 +3059,10 @@ export type Database = {
           spot_at_snapshot: number
           strike: number
           study_auto_live_fired_at: string | null
+          study_lean_at: string | null
+          study_lean_conf: number | null
+          study_lean_ratio: number | null
+          study_lean_side: string | null
           study_lock_confidence: number | null
           study_lock_kalshi_price_cents: number | null
           study_lock_seconds_to_close: number | null
@@ -3126,6 +3130,10 @@ export type Database = {
           spot_at_snapshot: number
           strike: number
           study_auto_live_fired_at?: string | null
+          study_lean_at?: string | null
+          study_lean_conf?: number | null
+          study_lean_ratio?: number | null
+          study_lean_side?: string | null
           study_lock_confidence?: number | null
           study_lock_kalshi_price_cents?: number | null
           study_lock_seconds_to_close?: number | null
@@ -3193,6 +3201,10 @@ export type Database = {
           spot_at_snapshot?: number
           strike?: number
           study_auto_live_fired_at?: string | null
+          study_lean_at?: string | null
+          study_lean_conf?: number | null
+          study_lean_ratio?: number | null
+          study_lean_side?: string | null
           study_lock_confidence?: number | null
           study_lock_kalshi_price_cents?: number | null
           study_lock_seconds_to_close?: number | null
