@@ -11,6 +11,7 @@ import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
 import { getBtcMultiVenueVolume } from "@/lib/btcMultiVenueVolume.functions";
 import { getCompositeDayTotals } from "@/lib/compositeDayTotals.functions";
 import { DeskVolumeDetails } from "@/components/crypto/DeskVolumeDetails";
+import { QuadPaperPanel } from "@/components/crypto/QuadPaperPanel";
 import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -314,6 +315,8 @@ function PaperDesk() {
         day={dayTotals?.ok ? dayTotals : null}
         price={spot}
       />
+      <QuadPaperPanel isAdmin={isAdmin} />
+
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <section className="border border-border rounded-lg p-4 space-y-4">
