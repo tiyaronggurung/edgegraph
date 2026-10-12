@@ -198,16 +198,19 @@ export async function runPaperBotTick() {
         // Desk's OWN windows are excluded so the live bot can still buy the
         // opposite hedge leg in a window it opened itself.
         const liveWindowBought = new Set<string>();
+        // Paper Desk's own open live trades, for the take-profit check below.
+        const liveOpenTrades: any[] = [];
         if (liveMode && liveUserId) {
           const { getDailyLossCounts, dailyLossStopHit } = await import("@/lib/dailyLossGuard.server");
           liveLossStop = dailyLossStopHit(await getDailyLossCounts(sb as never), liveUserId);
           const { data: openLive } = await sb.from("crypto_trades")
-            .select("ticker, stake_usd, inputs_snapshot")
+            .select("id, ticker, side, contracts, stake_usd, inputs_snapshot")
             .in("status", ["submitted", "pending"])
             .gt("close_time", iso(nowS()));
           for (const r of openLive ?? []) {
             if ((r.inputs_snapshot as any)?.source === "paper_desk_live") {
               liveOpenCents += Math.round(Number(r.stake_usd ?? 0) * 100);
+              liveOpenTrades.push(r);
             } else {
               liveWindowBought.add(String(r.ticker));
             }
