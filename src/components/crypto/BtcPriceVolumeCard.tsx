@@ -170,6 +170,13 @@ export function BtcPriceVolumeCard() {
   });
   const currentRow = hist?.rows?.find((r) => r.result == null) ?? hist?.rows?.[0] ?? null;
 
+  // Composite Binance+Coinbase window flow — the same blend shown in the
+  // volume section, fed into the odds as the flow + cost inputs.
+  const compFlow = compositeFlowBlend(
+    winLeg,
+    multi?.ok && multi.windowStart === winStart ? multi.coinbaseFlow : null,
+  );
+
   // Our own quote off the live composite vs the strike (display only).
   // Feed the RAW weighted target (not the smoothed display value) so the odds
   // react on the tick itself — the rAF lerp is for the eye, not the math.
@@ -180,6 +187,9 @@ export function BtcPriceVolumeCard() {
     avgBuyPrice: currentRow?.avgBuyPrice ?? null,
     avgSellPrice: currentRow?.avgSellPrice ?? null,
     flowImbalance: imbM3,
+    compFlowImbalance: compFlow?.imbalance ?? null,
+    compAvgIn: compFlow?.avgIn ?? null,
+    compAvgOut: compFlow?.avgOut ?? null,
     stack: hist?.live?.stack ?? null,
   });
   const cents = (v: number | null) => (v == null ? "—" : `${(v * 100).toFixed(1)}¢`);

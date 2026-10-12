@@ -161,7 +161,12 @@ function PaperDesk() {
   const imbM3 = win?.m3?.imbalance ?? null;
   const currentRow = hist?.rows?.find((r: any) => r.result == null) ?? hist?.rows?.[0] ?? null;
 
-  // Our odds — identical engine and inputs to the crypto page card.
+  // Our odds — identical engine and inputs to the crypto page card,
+  // including the composite Binance+Coinbase window flow blend.
+  const compFlow = compositeFlowBlend(
+    winLeg,
+    multi?.ok && multi.windowStart === winStart ? multi.coinbaseFlow : null,
+  );
   const oddsSpot = liveSpot.targetSpot ?? spot;
   const odds = useStrikeOdds(oddsSpot, strike ?? null, liveSecsLeft, {
     m1: hist?.live?.m1 ?? null,
@@ -169,6 +174,9 @@ function PaperDesk() {
     avgBuyPrice: currentRow?.avgBuyPrice ?? null,
     avgSellPrice: currentRow?.avgSellPrice ?? null,
     flowImbalance: imbM3,
+    compFlowImbalance: compFlow?.imbalance ?? null,
+    compAvgIn: compFlow?.avgIn ?? null,
+    compAvgOut: compFlow?.avgOut ?? null,
     stack: hist?.live?.stack ?? null,
   });
   const pUp = odds.pUp;
