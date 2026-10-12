@@ -57,7 +57,14 @@ async function liveSignals(sb: any, wStartMs: number, secsLeft: number) {
   const tape: TapeSample[] = (pref.length >= 10 ? pref : rows)
     .map((r) => ({ t: Date.parse(r.observed_at), p: Number(r.spot) }))
     .filter((x) => Number.isFinite(x.t) && x.p > 0).sort((a, b) => a.t - b.t);
-  const strike = led?.strike != null ? Number(led.strike) : null;
+  // Strike fallback: if this window's model row is missing, use the first logged spot at window open.
+  let strike = led?.strike != null ? Number(led.strike) : null;
+  if (strike == null) {
+    const { data: o } = await sb.from("btc_spot_ticks").select("spot").in("source", ["coinbase", "consolidated"])
+      .gte("observed_at", new Date(wStartMs).toISOString()).lte("observed_at", new Date(wStartMs + 15_000).toISOString())
+      .order("observed_at", { ascending: true }).limit(1).maybeSingle();
+    if (o?.spot) strike = Number(o.spot);
+  }
   let pUp: number | null = null;
   let tickAt: number | null = null;
   if (tape.length >= 10 && strike) {
@@ -78,8 +85,13 @@ async function liveSignals(sb: any, wStartMs: number, secsLeft: number) {
 export async function runQuadBotTick() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const sb = supabaseAdmin as any;
-  const { data: s } = await sb.from("qc_settings").select("*").eq("id", 1).single();
-  if (!s?.running) return { skipped: "paused" };
+  const { data: s0 } = await sb.from("qc_settings").select("*").eq("id", 1).single();
+  if (!s0?.running) return { skipped: "paused" };
+  // Atomic claim so overlapping cron calls can't double-buy or double-settle.
+  const { data: claimed } = await sb.from("qc_settings").update({ last_tick_at: new Date().toISOString() })
+    .eq("id", 1).lt("last_tick_at", new Date(Date.now() - 1500).toISOString()).select("*");
+  const s = claimed?.[0];
+  if (!s) return { busy: true };
 
   const leg1 = Number(s.leg1_usd), leg2 = Number(s.leg2_usd);
   const entryMax = Number(s.entry_max), pairMax = Number(s.pair_max);
@@ -110,7 +122,9 @@ export async function runQuadBotTick() {
       const result: Side = Number(last.spot) > Number(last.strike) ? "UP" : "DOWN";
       const payout = result === "UP" ? Number(p.up_ct) : Number(p.down_ct);
       const pnl = Math.round((payout - Number(p.up_cost) - Number(p.down_cost)) * 100) / 100;
-      await sb.from("qc_positions").update({ settled: true, result, payout, pnl, settled_at: new Date().toISOString() }).eq("id", p.id);
+      const { data: upd } = await sb.from("qc_positions").update({ settled: true, result, payout, pnl, settled_at: new Date().toISOString() })
+        .eq("id", p.id).eq("settled", false).select("id");
+      if (!upd?.length) continue;
       fills.push({ strategy: p.strategy, window_start: p.window_start, side: result, kind: "settle", amount: payout,
         reason: `settled ${result} · spot ${last.spot} vs strike ${last.strike} · P&L ${pnl}` });
     }
