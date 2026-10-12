@@ -221,6 +221,60 @@ export async function runPaperBotTick() {
             ...dOurs,
             reason: `${dOurs.reason} · our ${(ourPUp * 100).toFixed(0)}% up`,
           };
+          // ---- LIVE (real money) path ----
+          if (liveMode && liveUserId) {
+            if (liveLossStop) { tickError = "daily loss stop (3 settled losses today)"; continue; }
+            if (liveWindowBought.has(ticker)) continue; // one buy per window, shared across engines
+            const limitCents = Math.max(1, Math.min(99, Math.round(d.price * 100)));
+            const remaining = liveMaxOpenCents - liveOpenCents;
+            const n = Math.min(d.contracts, Math.floor(remaining / limitCents));
+            if (n <= 0) { tickError = `live cap reached ($${(liveMaxOpenCents / 100).toFixed(0)} open)`; continue; }
+            try {
+              const { submitKalshiBuy } = await import("@/lib/cryptoTrades.functions");
+              const r = await submitKalshiBuy(sb, liveUserId, {
+                ticker,
+                side: d.side === "yes" ? "YES" : "NO",
+                contracts: n,
+                limitPriceCents: limitCents,
+                strike: row.strike ?? undefined,
+                closeTime: row.close_ts,
+                stakeUsd: (n * limitCents) / 100,
+                inputsSnapshot: {
+                  source: "paper_desk_live",
+                  reason: d.reason,
+                  our_p_up: ourPUp,
+                  seconds_to_close: Math.round(closeTs - t),
+                },
+              } as never);
+              if (r.fillCount <= 0) { tickError = "live order unfilled"; continue; }
+              const realPrice = r.filledCents / 100;
+              const fee = kalshiTakerFee(n, realPrice, feeRate);
+              const cost = n * realPrice + fee;
+              cash -= cost;
+              if (d.side === "yes") { row.yes_ct += n; row.yes_cost += n * realPrice; }
+              else { row.no_ct += n; row.no_cost += n * realPrice; }
+              row.fees += fee;
+              row.fills += 1;
+              row.last_buy_ts = iso(t);
+              dirty.add(ticker);
+              fillsThisRun++;
+              liveWindowBought.add(ticker);
+              liveOpenCents += n * r.filledCents;
+              const p2: Position = { yes: { contracts: row.yes_ct, cost: row.yes_cost }, no: { contracts: row.no_ct, cost: row.no_cost }, last_buy_ts: t };
+              const gap = row.index_price !== null && row.strike !== null ? row.index_price - row.strike : null;
+              fillRows.push({
+                ts: iso(t), ticker, title: row.title, side: d.side, contracts: n, price: realPrice, fee,
+                reason: `LIVE ${d.reason} · filled ${r.fillCount} @ ${r.filledCents}¢`,
+                yes_ct: row.yes_ct, yes_avg: r4(avg(p2.yes)), no_ct: row.no_ct, no_avg: r4(avg(p2.no)),
+                pair_cost: r4(pairCost(p2)), index_price: row.index_price, strike: row.strike,
+                gap: gap === null ? null : Math.round(gap * 100) / 100,
+              });
+            } catch (e) {
+              tickError = `live error: ${String((e as Error)?.message ?? e).slice(0, 120)}`;
+            }
+            continue;
+          }
+
           const fee = kalshiTakerFee(d.contracts, d.price, feeRate);
           const cost = d.contracts * d.price + fee;
           if (cost > cash) continue;
