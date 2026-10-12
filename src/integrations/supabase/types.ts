@@ -4563,6 +4563,174 @@ export type Database = {
           },
         ]
       }
+      hd_equity: {
+        Row: {
+          cash: number
+          equity: number
+          id: number
+          open_value: number
+          pnl: number
+          ts: string
+        }
+        Insert: {
+          cash: number
+          equity: number
+          id?: never
+          open_value: number
+          pnl: number
+          ts?: string
+        }
+        Update: {
+          cash?: number
+          equity?: number
+          id?: never
+          open_value?: number
+          pnl?: number
+          ts?: string
+        }
+        Relationships: []
+      }
+      hd_fills: {
+        Row: {
+          amount: number
+          contracts: number
+          id: number
+          kind: string
+          our_p_up: number | null
+          pnl: number | null
+          price: number | null
+          reason: string | null
+          side: string
+          spot: number | null
+          strike: number | null
+          ts: string
+          window_start: string
+        }
+        Insert: {
+          amount?: number
+          contracts?: number
+          id?: never
+          kind: string
+          our_p_up?: number | null
+          pnl?: number | null
+          price?: number | null
+          reason?: string | null
+          side: string
+          spot?: number | null
+          strike?: number | null
+          ts?: string
+          window_start: string
+        }
+        Update: {
+          amount?: number
+          contracts?: number
+          id?: never
+          kind?: string
+          our_p_up?: number | null
+          pnl?: number | null
+          price?: number | null
+          reason?: string | null
+          side?: string
+          spot?: number | null
+          strike?: number | null
+          ts?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
+      hd_settings: {
+        Row: {
+          cash: number
+          contracts_per_leg: number
+          created_at: string
+          entry_max: number
+          hedge_max: number
+          id: number
+          last_equity_at: string | null
+          last_error: string | null
+          last_tick_at: string | null
+          reset_epoch: number
+          running: boolean
+          skip_final_seconds: number
+          start_cash: number
+        }
+        Insert: {
+          cash?: number
+          contracts_per_leg?: number
+          created_at?: string
+          entry_max?: number
+          hedge_max?: number
+          id?: number
+          last_equity_at?: string | null
+          last_error?: string | null
+          last_tick_at?: string | null
+          reset_epoch?: number
+          running?: boolean
+          skip_final_seconds?: number
+          start_cash?: number
+        }
+        Update: {
+          cash?: number
+          contracts_per_leg?: number
+          created_at?: string
+          entry_max?: number
+          hedge_max?: number
+          id?: number
+          last_equity_at?: string | null
+          last_error?: string | null
+          last_tick_at?: string | null
+          reset_epoch?: number
+          running?: boolean
+          skip_final_seconds?: number
+          start_cash?: number
+        }
+        Relationships: []
+      }
+      hd_windows: {
+        Row: {
+          created_at: string
+          down_cost: number
+          down_ct: number
+          locked: boolean
+          payout: number
+          pnl: number | null
+          result: string | null
+          settled: boolean
+          settled_at: string | null
+          up_cost: number
+          up_ct: number
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          down_cost?: number
+          down_ct?: number
+          locked?: boolean
+          payout?: number
+          pnl?: number | null
+          result?: string | null
+          settled?: boolean
+          settled_at?: string | null
+          up_cost?: number
+          up_ct?: number
+          window_start: string
+        }
+        Update: {
+          created_at?: string
+          down_cost?: number
+          down_ct?: number
+          locked?: boolean
+          payout?: number
+          pnl?: number | null
+          result?: string | null
+          settled?: boolean
+          settled_at?: string | null
+          up_cost?: number
+          up_ct?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
       kalshi_book_ledger: {
         Row: {
           close_time: string | null
@@ -7032,6 +7200,15 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      hd_equity_range: {
+        Args: { range_seconds?: number }
+        Returns: {
+          pnl: number
+          ts: string
+        }[]
+      }
+      hd_reset: { Args: { new_budget: number }; Returns: undefined }
+      hd_update_settings: { Args: { p_running: boolean }; Returns: undefined }
       is_ops_admin: { Args: { _user_id: string }; Returns: boolean }
       mid_support_study: {
         Args: { _days?: number }
