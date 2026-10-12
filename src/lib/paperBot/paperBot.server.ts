@@ -302,7 +302,8 @@ export async function runPaperBotTick() {
               row.last_buy_ts = iso(t);
               dirty.add(ticker);
               fillsThisRun++;
-              liveWindowBought.add(ticker);
+              // Do NOT lock the window here — the live bot may still buy the
+              // opposite hedge leg in its own window (cap + pair-cost rule gate it).
               liveOpenCents += n * r.filledCents;
               const p2: Position = { yes: { contracts: row.yes_ct, cost: row.yes_cost }, no: { contracts: row.no_ct, cost: row.no_cost }, last_buy_ts: t };
               const gap = row.index_price !== null && row.strike !== null ? row.index_price - row.strike : null;
