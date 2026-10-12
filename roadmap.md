@@ -11,7 +11,10 @@
 - [x] Nav link + admin-only Start/Pause/Reset
 - [x] Build verified OK
 
+## Published 2026-10-12 05:11 UTC
+- [x] Published to https://bettinggraph.app (site responds 200): paper-bot 1s odds + live two-sided hedge + take-profit, $50 daily stop, odds sync, composite Binance+Coinbase odds, Paper Desk volume mirror, real-money-only P&L graph.
+
 ## Deferred / open
-- [ ] Publish so the hedge bot's 10s timer runs on the live site, then press Start on /hedge
+- [ ] Press Start on /hedge (paper-only hedge bot still paused; needs an admin click on the live site)
+- [ ] Review 26 unresolved critical security findings in the Security view (RLS read-open on pb_*/hd_*/btc_* log tables)
 - [ ] "Waiting for our odds" gaps (recorder writes sparse rows) — user said forget Paper Desk for now
-- [ ] Publish pending paper-bot odds-only update
