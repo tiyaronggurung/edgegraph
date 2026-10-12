@@ -11,7 +11,14 @@
 - [x] Nav link + admin-only Start/Pause/Reset
 - [x] Build verified OK
 
+## Published 2026-10-12 05:11 UTC
+- [x] Published to https://bettinggraph.app (site responds 200): paper-bot 1s odds + live two-sided hedge + take-profit, $50 daily stop, odds sync, composite Binance+Coinbase odds, Paper Desk volume mirror, real-money-only P&L graph.
+
+## Verified live (deployed 05:11 UTC)
+- [x] bettinggraph.app serves 200; live Paper Desk page carries the −$50 daily stop and the old "3 settled losses" rule is gone; live crypto page carries the composite Binance+Coinbase feeds.
+- [x] Real-money Paper Desk bot: running, live on, $10 open cap, ticking every ~11s, no error. 8 settled real trades +$3.30, 43 unfilled orders, nothing open now.
+
 ## Deferred / open
-- [ ] Publish so the hedge bot's 10s timer runs on the live site, then press Start on /hedge
+- [ ] Paper hedge bot (hd_settings) runs but sits idle on "waiting for our odds" — it still reads odds from the sparse agreement log; point it at the same self-computed tape odds the Paper Desk bot uses (paper money only, awaiting go-ahead)
+- [ ] Review 26 unresolved critical security findings in the Security view (RLS read-open on pb_*/hd_*/btc_* log tables)
 - [ ] "Waiting for our odds" gaps (recorder writes sparse rows) — user said forget Paper Desk for now
-- [ ] Publish pending paper-bot odds-only update
