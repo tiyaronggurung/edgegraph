@@ -163,13 +163,13 @@ function HedgeDesk() {
             <span className="text-xl font-bold text-[color:var(--color-primary)]">UP {cents(pUp)}</span>
             <span className="text-xl font-bold text-[color:var(--color-destructive)]">DOWN {cents(pUp != null ? 1 - pUp : null)}</span>
           </div>
-          <div className="text-[10px] text-muted-foreground mt-1">updated {ago(o ? new Date(Number(o.bucket_sec) * 1000).toISOString() : null)}</div>
+          <div className="text-[10px] text-muted-foreground mt-1">{livePUp != null ? "live · recomputed every tick" : `updated ${ago(o ? new Date(Number(o.bucket_sec) * 1000).toISOString() : null)}`}</div>
         </div>
         <div className="border border-border rounded-lg p-3">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Composite price vs strike</div>
-          <div className="mt-1 text-xl font-bold">{o?.spot != null ? usd(Number(o.spot), 0) : "—"}</div>
+          <div className="mt-1 text-xl font-bold">{spot != null ? usd(spot, 0) : "—"}</div>
           <div className={cn("text-[11px]", (gap ?? 0) >= 0 ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>
-            strike {o?.strike != null ? usd(Number(o.strike), 0) : "—"} ({gap != null ? `${gap >= 0 ? "+" : ""}${gap.toFixed(0)}` : "—"})
+            strike {strike != null ? usd(strike, 0) : "—"} ({gap != null ? `${gap >= 0 ? "+" : ""}${gap.toFixed(0)}` : "—"})
           </div>
         </div>
         <div className="border border-border rounded-lg p-3">
