@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useRef, useState } from "react";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
-import { useBinanceBtcTicks } from "@/hooks/useBinanceBtcTicks";
-import { computeUpProbability, effectiveVol, momentumTilt } from "@/lib/ourOdds";
+import { useStrikeOdds } from "@/hooks/useStrikeOdds";
+import { getBtcEssentialSnapshot } from "@/lib/btcEssentialSnapshot.functions";
+import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
+import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
