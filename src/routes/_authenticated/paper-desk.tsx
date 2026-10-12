@@ -7,7 +7,7 @@ import { useStrikeOdds } from "@/hooks/useStrikeOdds";
 import { getBtcEssentialSnapshot } from "@/lib/btcEssentialSnapshot.functions";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
-import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlan } from "@/hooks/usePlan";
