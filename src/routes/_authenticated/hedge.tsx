@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
+import { useBinanceBtcTicks } from "@/hooks/useBinanceBtcTicks";
+import { computeUpProbability, effectiveVol, momentumTilt } from "@/lib/ourOdds";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -68,10 +71,33 @@ function HedgeDesk() {
     db.from("hd_fills").select("*").order("id", { ascending: false }).limit(100));
   const curve = useRows<any[]>("equity", () => db.rpc("hd_equity_range", { range_seconds: 0 }));
 
+  // Live feeds: composite spot (4-exchange WS) + 1s window clock.
+  const liveSpot = useLiveCompositeSpot();
+  const { ticks } = useBinanceBtcTicks();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => clearInterval(id);
+  }, []);
+
   const s = settings.data;
   const o = odds.data;
-  const pUp = o?.odds_p_up != null ? Number(o.odds_p_up) : null;
-  const oddsFresh = o && Date.now() / 1000 - Number(o.bucket_sec) <= 90;
+  const liveSecsLeft = 900 - Math.floor((nowMs % 900_000) / 1000);
+  const strike = o?.strike != null ? Number(o.strike) : null;
+  const spot = liveSpot.spot ?? (o?.spot != null ? Number(o.spot) : null);
+  // Live pUp from the same math as the crypto page; falls back to the last
+  // logged odds row when vol/spot aren't available yet.
+  const livePUp = (() => {
+    if (spot == null || strike == null) return null;
+    const tape = ticks.map((t) => ({ t: t.t, p: t.p }));
+    const sigma = effectiveVol(tape, [], liveSecsLeft) ?? 0.5;
+    const base = computeUpProbability({ spot, strike, secondsToClose: liveSecsLeft, sigmaAnnualized: sigma });
+    if (base == null) return null;
+    const tilt = momentumTilt(tape, 60_000, liveSecsLeft);
+    return Math.min(0.995, Math.max(0.005, base + tilt));
+  })();
+  const pUp = livePUp ?? (o?.odds_p_up != null ? Number(o.odds_p_up) : null);
+  const oddsFresh = livePUp != null || (o && Date.now() / 1000 - Number(o.bucket_sec) <= 90);
   const live = s?.last_tick_at && Date.now() - Date.parse(s.last_tick_at) < 30_000;
 
   const w = current.data;
@@ -102,8 +128,8 @@ function HedgeDesk() {
     qc.invalidateQueries({ queryKey: ["hedge-desk"] });
   };
 
-  const secsLeft = o?.seconds_to_close != null ? Number(o.seconds_to_close) : null;
-  const gap = o?.spot != null && o?.strike != null ? Number(o.spot) - Number(o.strike) : null;
+  const secsLeft = liveSecsLeft;
+  const gap = spot != null && strike != null ? spot - strike : null;
 
   return (
     <div className="space-y-4 font-mono">
@@ -137,13 +163,13 @@ function HedgeDesk() {
             <span className="text-xl font-bold text-[color:var(--color-primary)]">UP {cents(pUp)}</span>
             <span className="text-xl font-bold text-[color:var(--color-destructive)]">DOWN {cents(pUp != null ? 1 - pUp : null)}</span>
           </div>
-          <div className="text-[10px] text-muted-foreground mt-1">updated {ago(o ? new Date(Number(o.bucket_sec) * 1000).toISOString() : null)}</div>
+          <div className="text-[10px] text-muted-foreground mt-1">{livePUp != null ? "live · recomputed every tick" : `updated ${ago(o ? new Date(Number(o.bucket_sec) * 1000).toISOString() : null)}`}</div>
         </div>
         <div className="border border-border rounded-lg p-3">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Composite price vs strike</div>
-          <div className="mt-1 text-xl font-bold">{o?.spot != null ? usd(Number(o.spot), 0) : "—"}</div>
+          <div className="mt-1 text-xl font-bold">{spot != null ? usd(spot, 0) : "—"}</div>
           <div className={cn("text-[11px]", (gap ?? 0) >= 0 ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>
-            strike {o?.strike != null ? usd(Number(o.strike), 0) : "—"} ({gap != null ? `${gap >= 0 ? "+" : ""}${gap.toFixed(0)}` : "—"})
+            strike {strike != null ? usd(strike, 0) : "—"} ({gap != null ? `${gap >= 0 ? "+" : ""}${gap.toFixed(0)}` : "—"})
           </div>
         </div>
         <div className="border border-border rounded-lg p-3">
