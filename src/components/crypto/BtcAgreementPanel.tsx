@@ -114,12 +114,29 @@ export function BtcAgreementPanel() {
   const currentRow = hist?.rows?.find((r) => r.result == null) ?? hist?.rows?.[0] ?? null;
   const imbM3 = win?.m3?.imbalance ?? null;
 
+  // Composite (Binance + Coinbase) in/out — same blend the price card and
+  // Paper Desk feed into the odds, so this number matches them exactly.
+  const multiFn = useServerFn(getBtcMultiVenueVolume);
+  const { data: multi } = useQuery({
+    queryKey: ["btc-multi-venue-volume"],
+    queryFn: () => multiFn(),
+    refetchInterval: 10_000,
+    retry: 2,
+    placeholderData: keepPreviousData,
+  });
+  const freshWin = win?.windowStart === winStart ? (win?.window ?? null) : null;
+  const cbFlowOdds = multi?.windowStart === winStart ? (multi?.coinbaseFlow ?? null) : null;
+  const compFlow = compositeFlowBlend(freshWin, cbFlowOdds);
+
   const odds = useStrikeOdds(spot, strike, secondsToClose, {
     m1: hist?.live?.m1 ?? null,
     m15: hist?.live?.m15 ?? null,
     avgBuyPrice: currentRow?.avgBuyPrice ?? null,
     avgSellPrice: currentRow?.avgSellPrice ?? null,
     flowImbalance: imbM3,
+    compFlowImbalance: compFlow?.imbalance ?? null,
+    compAvgIn: compFlow?.avgIn ?? null,
+    compAvgOut: compFlow?.avgOut ?? null,
     stack: hist?.live?.stack ?? null,
   });
 
