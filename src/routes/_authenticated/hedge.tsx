@@ -71,10 +71,33 @@ function HedgeDesk() {
     db.from("hd_fills").select("*").order("id", { ascending: false }).limit(100));
   const curve = useRows<any[]>("equity", () => db.rpc("hd_equity_range", { range_seconds: 0 }));
 
+  // Live feeds: composite spot (4-exchange WS) + 1s window clock.
+  const liveSpot = useLiveCompositeSpot();
+  const { ticks } = useBinanceBtcTicks();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => clearInterval(id);
+  }, []);
+
   const s = settings.data;
   const o = odds.data;
-  const pUp = o?.odds_p_up != null ? Number(o.odds_p_up) : null;
-  const oddsFresh = o && Date.now() / 1000 - Number(o.bucket_sec) <= 90;
+  const liveSecsLeft = 900 - Math.floor((nowMs % 900_000) / 1000);
+  const strike = o?.strike != null ? Number(o.strike) : null;
+  const spot = liveSpot.spot ?? (o?.spot != null ? Number(o.spot) : null);
+  // Live pUp from the same math as the crypto page; falls back to the last
+  // logged odds row when vol/spot aren't available yet.
+  const livePUp = (() => {
+    if (spot == null || strike == null) return null;
+    const tape = ticks.map((t) => ({ t: t.t, p: t.p }));
+    const sigma = effectiveVol(tape, [], liveSecsLeft) ?? 0.5;
+    const base = computeUpProbability({ spot, strike, secondsToClose: liveSecsLeft, sigmaAnnualized: sigma });
+    if (base == null) return null;
+    const tilt = momentumTilt(tape, 60_000, liveSecsLeft);
+    return Math.min(0.995, Math.max(0.005, base + tilt));
+  })();
+  const pUp = livePUp ?? (o?.odds_p_up != null ? Number(o.odds_p_up) : null);
+  const oddsFresh = livePUp != null || (o && Date.now() / 1000 - Number(o.bucket_sec) <= 90);
   const live = s?.last_tick_at && Date.now() - Date.parse(s.last_tick_at) < 30_000;
 
   const w = current.data;
