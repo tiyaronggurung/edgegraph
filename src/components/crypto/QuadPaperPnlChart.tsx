@@ -10,7 +10,7 @@ const SERIES = {
   C: { color: "var(--chart-3)", text: "text-chart-3", dot: "bg-chart-3", name: "Quad + late + hedge" },
 };
 const money = (value: number) => `${value < 0 ? "−" : "+"}$${Math.abs(value).toFixed(2)}`;
-const clock = (time: number) => new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: "UTC", hour12: false });
+const clock = (time: number) => new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 
 function PnlTooltip({ active, payload, visible }: {
   active?: boolean;
