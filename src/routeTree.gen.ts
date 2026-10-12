@@ -23,6 +23,7 @@ import { Route as AuthenticatedCryptoRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedCryptoPaperRouteImport } from './routes/_authenticated/crypto-paper'
 import { Route as AuthenticatedCryptoSandboxRouteImport } from './routes/_authenticated/crypto-sandbox'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedHedgeRouteImport } from './routes/_authenticated/hedge'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
 import { Route as AuthenticatedModelValidationRouteImport } from './routes/_authenticated/model-validation'
@@ -56,6 +57,7 @@ import { Route as ApiPublicHooksCheapEntryTickRouteImport } from './routes/api/p
 import { Route as ApiPublicHooksCompositeFlowWriterRouteImport } from './routes/api/public/hooks/composite-flow-writer'
 import { Route as ApiPublicHooksCryptoStudyRouteImport } from './routes/api/public/hooks/crypto-study'
 import { Route as ApiPublicHooksFlowLeanWriterRouteImport } from './routes/api/public/hooks/flow-lean-writer'
+import { Route as ApiPublicHooksHedgeBotTickRouteImport } from './routes/api/public/hooks/hedge-bot-tick'
 import { Route as ApiPublicHooksHourlyForecastTickRouteImport } from './routes/api/public/hooks/hourly-forecast-tick'
 import { Route as ApiPublicHooksKalshiBookTickRouteImport } from './routes/api/public/hooks/kalshi-book-tick'
 import { Route as ApiPublicHooksMarketContextTickRouteImport } from './routes/api/public/hooks/market-context-tick'
@@ -151,6 +153,11 @@ const AuthenticatedCryptoSandboxRoute =
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedHedgeRoute = AuthenticatedHedgeRouteImport.update({
+  id: '/hedge',
+  path: '/hedge',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
@@ -336,6 +343,12 @@ const ApiPublicHooksFlowLeanWriterRoute =
     path: '/api/public/hooks/flow-lean-writer',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksHedgeBotTickRoute =
+  ApiPublicHooksHedgeBotTickRouteImport.update({
+    id: '/api/public/hooks/hedge-bot-tick',
+    path: '/api/public/hooks/hedge-bot-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksHourlyForecastTickRoute =
   ApiPublicHooksHourlyForecastTickRouteImport.update({
     id: '/api/public/hooks/hourly-forecast-tick',
@@ -501,6 +514,7 @@ export interface FileRoutesByFullPath {
   '/crypto-paper': typeof AuthenticatedCryptoPaperRoute
   '/crypto-sandbox': typeof AuthenticatedCryptoSandboxRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/hedge': typeof AuthenticatedHedgeRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
@@ -534,6 +548,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/composite-flow-writer': typeof ApiPublicHooksCompositeFlowWriterRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/flow-lean-writer': typeof ApiPublicHooksFlowLeanWriterRoute
+  '/api/public/hooks/hedge-bot-tick': typeof ApiPublicHooksHedgeBotTickRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
   '/api/public/hooks/kalshi-book-tick': typeof ApiPublicHooksKalshiBookTickRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
@@ -574,6 +589,7 @@ export interface FileRoutesByTo {
   '/crypto-paper': typeof AuthenticatedCryptoPaperRoute
   '/crypto-sandbox': typeof AuthenticatedCryptoSandboxRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/hedge': typeof AuthenticatedHedgeRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
@@ -607,6 +623,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/composite-flow-writer': typeof ApiPublicHooksCompositeFlowWriterRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/flow-lean-writer': typeof ApiPublicHooksFlowLeanWriterRoute
+  '/api/public/hooks/hedge-bot-tick': typeof ApiPublicHooksHedgeBotTickRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
   '/api/public/hooks/kalshi-book-tick': typeof ApiPublicHooksKalshiBookTickRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
@@ -649,6 +666,7 @@ export interface FileRoutesById {
   '/_authenticated/crypto-paper': typeof AuthenticatedCryptoPaperRoute
   '/_authenticated/crypto-sandbox': typeof AuthenticatedCryptoSandboxRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/hedge': typeof AuthenticatedHedgeRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/live': typeof AuthenticatedLiveRoute
   '/_authenticated/model-validation': typeof AuthenticatedModelValidationRoute
@@ -682,6 +700,7 @@ export interface FileRoutesById {
   '/api/public/hooks/composite-flow-writer': typeof ApiPublicHooksCompositeFlowWriterRoute
   '/api/public/hooks/crypto-study': typeof ApiPublicHooksCryptoStudyRoute
   '/api/public/hooks/flow-lean-writer': typeof ApiPublicHooksFlowLeanWriterRoute
+  '/api/public/hooks/hedge-bot-tick': typeof ApiPublicHooksHedgeBotTickRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
   '/api/public/hooks/kalshi-book-tick': typeof ApiPublicHooksKalshiBookTickRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
@@ -724,6 +743,7 @@ export interface FileRouteTypes {
     | '/crypto-paper'
     | '/crypto-sandbox'
     | '/dashboard'
+    | '/hedge'
     | '/history'
     | '/live'
     | '/model-validation'
@@ -757,6 +777,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/composite-flow-writer'
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/flow-lean-writer'
+    | '/api/public/hooks/hedge-bot-tick'
     | '/api/public/hooks/hourly-forecast-tick'
     | '/api/public/hooks/kalshi-book-tick'
     | '/api/public/hooks/market-context-tick'
@@ -797,6 +818,7 @@ export interface FileRouteTypes {
     | '/crypto-paper'
     | '/crypto-sandbox'
     | '/dashboard'
+    | '/hedge'
     | '/history'
     | '/live'
     | '/model-validation'
@@ -830,6 +852,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/composite-flow-writer'
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/flow-lean-writer'
+    | '/api/public/hooks/hedge-bot-tick'
     | '/api/public/hooks/hourly-forecast-tick'
     | '/api/public/hooks/kalshi-book-tick'
     | '/api/public/hooks/market-context-tick'
@@ -871,6 +894,7 @@ export interface FileRouteTypes {
     | '/_authenticated/crypto-paper'
     | '/_authenticated/crypto-sandbox'
     | '/_authenticated/dashboard'
+    | '/_authenticated/hedge'
     | '/_authenticated/history'
     | '/_authenticated/live'
     | '/_authenticated/model-validation'
@@ -904,6 +928,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/composite-flow-writer'
     | '/api/public/hooks/crypto-study'
     | '/api/public/hooks/flow-lean-writer'
+    | '/api/public/hooks/hedge-bot-tick'
     | '/api/public/hooks/hourly-forecast-tick'
     | '/api/public/hooks/kalshi-book-tick'
     | '/api/public/hooks/market-context-tick'
@@ -961,6 +986,7 @@ export interface RootRouteChildren {
   ApiPublicHooksCompositeFlowWriterRoute: typeof ApiPublicHooksCompositeFlowWriterRoute
   ApiPublicHooksCryptoStudyRoute: typeof ApiPublicHooksCryptoStudyRoute
   ApiPublicHooksFlowLeanWriterRoute: typeof ApiPublicHooksFlowLeanWriterRoute
+  ApiPublicHooksHedgeBotTickRoute: typeof ApiPublicHooksHedgeBotTickRoute
   ApiPublicHooksHourlyForecastTickRoute: typeof ApiPublicHooksHourlyForecastTickRoute
   ApiPublicHooksKalshiBookTickRoute: typeof ApiPublicHooksKalshiBookTickRoute
   ApiPublicHooksMarketContextTickRoute: typeof ApiPublicHooksMarketContextTickRoute
@@ -1085,6 +1111,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/hedge': {
+      id: '/_authenticated/hedge'
+      path: '/hedge'
+      fullPath: '/hedge'
+      preLoaderRoute: typeof AuthenticatedHedgeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/history': {
@@ -1318,6 +1351,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksFlowLeanWriterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/hedge-bot-tick': {
+      id: '/api/public/hooks/hedge-bot-tick'
+      path: '/api/public/hooks/hedge-bot-tick'
+      fullPath: '/api/public/hooks/hedge-bot-tick'
+      preLoaderRoute: typeof ApiPublicHooksHedgeBotTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/hourly-forecast-tick': {
       id: '/api/public/hooks/hourly-forecast-tick'
       path: '/api/public/hooks/hourly-forecast-tick'
@@ -1505,6 +1545,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCryptoPaperRoute: typeof AuthenticatedCryptoPaperRoute
   AuthenticatedCryptoSandboxRoute: typeof AuthenticatedCryptoSandboxRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedHedgeRoute: typeof AuthenticatedHedgeRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedLiveRoute: typeof AuthenticatedLiveRoute
   AuthenticatedModelValidationRoute: typeof AuthenticatedModelValidationRoute
@@ -1526,6 +1567,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCryptoPaperRoute: AuthenticatedCryptoPaperRoute,
   AuthenticatedCryptoSandboxRoute: AuthenticatedCryptoSandboxRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedHedgeRoute: AuthenticatedHedgeRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedLiveRoute: AuthenticatedLiveRoute,
   AuthenticatedModelValidationRoute: AuthenticatedModelValidationRoute,
@@ -1587,6 +1629,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHooksCompositeFlowWriterRoute,
   ApiPublicHooksCryptoStudyRoute: ApiPublicHooksCryptoStudyRoute,
   ApiPublicHooksFlowLeanWriterRoute: ApiPublicHooksFlowLeanWriterRoute,
+  ApiPublicHooksHedgeBotTickRoute: ApiPublicHooksHedgeBotTickRoute,
   ApiPublicHooksHourlyForecastTickRoute: ApiPublicHooksHourlyForecastTickRoute,
   ApiPublicHooksKalshiBookTickRoute: ApiPublicHooksKalshiBookTickRoute,
   ApiPublicHooksMarketContextTickRoute: ApiPublicHooksMarketContextTickRoute,
