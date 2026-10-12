@@ -68,6 +68,38 @@ async function sigmaPerSecond(supabaseAdmin: any): Promise<number> {
   }
 }
 
+/** Kalshi-format ticker for the window closing at closeMs, e.g. KXBTC15M-26OCT121100-00 (NY time). */
+function tickerFor(closeMs: number): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York", year: "2-digit", month: "short", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(new Date(closeMs)).map((p) => [p.type, p.value]),
+  );
+  const ev = `KXBTC15M-${parts.year}${String(parts.month).toUpperCase()}${parts.day}${parts.hour}${parts.minute}`;
+  return `${ev}-${parts.minute}`;
+}
+
+async function fallbackSnapshot(supabaseAdmin: any) {
+  const now = Date.now();
+  const openMs = Math.floor(now / QUARTER_MS) * QUARTER_MS;
+  const closeMs = openMs + QUARTER_MS;
+  const [{ data: open }, { data: last }] = await Promise.all([
+    supabaseAdmin.from("btc_spot_ticks").select("spot").in("source", ["coinbase", "consolidated"])
+      .gte("observed_at", new Date(openMs).toISOString()).lte("observed_at", new Date(openMs + 20_000).toISOString())
+      .order("observed_at", { ascending: true }).limit(1).maybeSingle(),
+    supabaseAdmin.from("btc_spot_ticks").select("spot, observed_at").in("source", ["coinbase", "consolidated"])
+      .gte("observed_at", new Date(now - 60_000).toISOString())
+      .order("observed_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  if (!open?.spot || !last?.spot) return null;
+  return {
+    ticker: tickerFor(closeMs), strike: Number(open.spot), snapped_at: new Date(now).toISOString(),
+    seconds_to_close: Math.round((closeMs - now) / 1000), kalshi_yes_bid: null, kalshi_yes_ask: null,
+    spot_composite: Number(last.spot),
+  };
+}
+
 export const Route = createFileRoute("/api/public/hooks/prediction-row-tick")({
   server: {
     handlers: {
@@ -78,15 +110,19 @@ export const Route = createFileRoute("/api/public/hooks/prediction-row-tick")({
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         // Most recent Kalshi snapshot (written every 30s by btc-snapshot-tick).
-        const { data: snap } = await supabaseAdmin
+        let { data: snap } = await supabaseAdmin
           .from("btc_kalshi_odds_snapshots")
           .select("ticker, strike, snapped_at, seconds_to_close, kalshi_yes_bid, kalshi_yes_ask, spot_composite")
           .order("snapped_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (!snap?.ticker || snap.strike == null || snap.seconds_to_close == null) {
-          return Response.json({ ok: true, created: false, reason: "no kalshi snapshot" });
+        const snapAge = snap?.snapped_at ? Date.now() - Date.parse(snap.snapped_at as string) : Infinity;
+        if (!snap?.ticker || snap.strike == null || snap.seconds_to_close == null || !(snapAge <= 120_000)) {
+          // Kalshi snapshots stalled (rate limits on the server). Build the row from our own
+          // spot tape so the window still gets a Model Pick: strike = spot at window open.
+          snap = (await fallbackSnapshot(supabaseAdmin)) as any;
+          if (!snap) return Response.json({ ok: true, created: false, reason: "no kalshi snapshot and no spot tape" });
         }
 
         const ageMs = Date.now() - Date.parse(snap.snapped_at as string);
