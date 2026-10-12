@@ -89,7 +89,7 @@ export function QuadPaperPanel({ isAdmin }: { isAdmin: boolean }) {
 
       <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
         <Pill label={`Whale ${w ? `${Math.round((w.share ?? 0) * 100)}%` : ""}`} v={w?.side} />
-        <Pill label="Study" v={sig.study} />
+        <Pill label={`Study${sig.study ? "" : sig.studyLean ? " (lean)" : ""}`} v={sig.study ?? sig.studyLean} />
         <Pill label="Model" v={sig.model} />
         <Pill label={`Odds ${sig.pUp != null ? `${Math.round(sig.pUp * 100)}% up` : ""}`} v={sig.oddsSide} />
         <Pill label="Quad" v={sig.quad} />

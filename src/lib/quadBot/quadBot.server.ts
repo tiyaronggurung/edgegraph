@@ -46,7 +46,7 @@ async function whaleSplit(windowStartMs: number) {
 async function liveSignals(sb: any, wStartMs: number, secsLeft: number) {
   const closeIso = new Date(wStartMs + WINDOW_MS).toISOString();
   const [{ data: led }, { data: ticks }] = await Promise.all([
-    sb.from("btc_model_predictions").select("ticker, strike, side, model_side_pre_study, model_prob, study_locked_side")
+    sb.from("btc_model_predictions").select("ticker, strike, side, model_side_pre_study, model_prob, study_locked_side, study_lean_side")
       .eq("close_time", closeIso).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     sb.from("btc_spot_ticks").select("observed_at, spot, source")
       .gte("observed_at", new Date(Date.now() - 5 * 60_000).toISOString())
@@ -79,7 +79,8 @@ async function liveSignals(sb: any, wStartMs: number, secsLeft: number) {
   const model: Side | null = yn(pr?.model_side_pre_study) ?? yn(pr?.side)
     ?? (pr?.model_prob != null ? (Number(pr.model_prob) >= 0.5 ? "UP" : "DOWN") : null);
   const study: Side | null = yn(pr?.study_locked_side);
-  return { pUp, tickAt, strike, spot: tape.length ? tape[tape.length - 1].p : null, ticker: led?.ticker ?? null, model, study };
+  const studyLean: Side | null = yn(pr?.study_lean_side);
+  return { pUp, tickAt, strike, spot: tape.length ? tape[tape.length - 1].p : null, ticker: led?.ticker ?? null, model, study, studyLean };
 }
 
 export async function runQuadBotTick() {
@@ -141,12 +142,13 @@ export async function runQuadBotTick() {
     const liveFresh = live.pUp != null && live.tickAt != null && Date.now() - live.tickAt <= STALE_SEC * 1000;
     const pUp = liveFresh ? live.pUp : agFresh && ag.odds_p_up != null ? Number(ag.odds_p_up) : null;
     const fresh = pUp != null && pUp > 0 && pUp < 1;
-    const study = live.study ?? (agFresh ? norm(ag.study_side) : null);
+    // Study: real lock first; the always-on lean fills every window the lock skipped.
+    const study = live.study ?? live.studyLean ?? (agFresh ? norm(ag.study_side) : null);
     const model = live.model ?? (agFresh ? norm(ag.model_side) : null);
     const oddsSide: Side | null = pUp == null ? null : pUp > 0.52 ? "UP" : pUp < 0.48 ? "DOWN" : null;
     const oddsFor = (side: Side) => (pUp == null ? 0 : side === "UP" ? pUp : 1 - pUp);
     const price = (side: Side) => (side === "UP" ? pUp! : 1 - pUp!);
-    signals = { pUp, fresh, study, model, oddsSide, whale, secsLeft, strike: live.strike, spot: live.spot, ticker: live.ticker, oddsSource: liveFresh ? "live" : agFresh ? "log" : null };
+    signals = { pUp, fresh, study, studyLocked: live.study, studyLean: live.studyLean, model, oddsSide, whale, secsLeft, strike: live.strike, spot: live.spot, ticker: live.ticker, oddsSource: liveFresh ? "live" : agFresh ? "log" : null };
 
     // Quad confirmation with NULL fallback.
     let quad: Side | null = null;
