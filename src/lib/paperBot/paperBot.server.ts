@@ -84,7 +84,7 @@ async function loadOurPUp(sb: any): Promise<number | null> {
     .select("bucket_sec, odds_p_up").not("odds_p_up", "is", null)
     .order("bucket_sec", { ascending: false }).limit(1).maybeSingle();
   if (!data) return null;
-  if (nowS() - Number(data.bucket_sec) > 45) return null; // stale
+  if (nowS() - Number(data.bucket_sec) > 90) return null; // stale
   const p = Number(data.odds_p_up);
   return Number.isFinite(p) && p > 0 && p < 1 ? p : null;
 }
