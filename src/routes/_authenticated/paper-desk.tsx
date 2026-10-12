@@ -74,6 +74,36 @@ function PaperDesk() {
 
   const s = summary.data;
   const live = s?.last_tick_at && Date.now() - Date.parse(s.last_tick_at) < 30_000;
+
+  // Live feeds: composite spot (4-exchange WS) + 1s window clock + our odds.
+  const liveSpot = useLiveCompositeSpot();
+  const { ticks } = useBinanceBtcTicks();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => clearInterval(id);
+  }, []);
+  const liveSecsLeft = 900 - Math.floor((nowMs % 900_000) / 1000);
+  const windowStartIso = new Date(Math.floor(nowMs / 900_000) * 900_000).toISOString();
+  const oddsRow = useRows<any>("our-odds", () =>
+    db.from("btc_agreement_log").select("bucket_sec, odds_p_up, spot, strike")
+      .not("odds_p_up", "is", null).order("bucket_sec", { ascending: false }).limit(1).maybeSingle());
+  const flow = useRows<any>(`flow-${windowStartIso}`, () =>
+    db.from("btc_composite_flow_log").select("composite_in_btc, composite_out_btc, composite_imbalance, recorded_at")
+      .eq("window_start", windowStartIso).order("recorded_at", { ascending: false }).limit(1).maybeSingle());
+  const o = oddsRow.data;
+  const strike = o?.strike != null ? Number(o.strike) : null;
+  const spot = liveSpot.spot ?? (o?.spot != null ? Number(o.spot) : null);
+  const livePUp = (() => {
+    if (spot == null || strike == null) return null;
+    const tape = ticks.map((t) => ({ t: t.t, p: t.p }));
+    const sigma = effectiveVol(tape, [], liveSecsLeft) ?? 0.5;
+    const base = computeUpProbability({ spot, strike, secondsToClose: liveSecsLeft, sigmaAnnualized: sigma });
+    if (base == null) return null;
+    return Math.min(0.995, Math.max(0.005, base + momentumTilt(tape, 60_000, liveSecsLeft)));
+  })();
+  const pUp = livePUp ?? (o?.odds_p_up != null ? Number(o.odds_p_up) : null);
+  const gap = spot != null && strike != null ? spot - strike : null;
   const pts = (curve.data ?? []).map((p) => ({ t: p.ts, pnl: Number(p.pnl) }));
   const rangePnl = range.s === 0 ? Number(s?.total_pnl ?? 0) : pts.length > 1 ? pts[pts.length - 1].pnl - pts[0].pnl : 0;
   const up = rangePnl >= 0;
