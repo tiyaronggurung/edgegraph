@@ -577,6 +577,70 @@ export const sellKalshiOrder = createServerFn({ method: "POST" })
     return { ok: true, realizedPnl, exitCents, entryCents, closeOrderId };
   });
 
+// ── Partial take-profit sell (used by the Paper Desk live bot) ────────────
+// Sells `contracts` of an open position at a limit price and shrinks the
+// trade row so the remainder still settles normally. The realized P&L of the
+// sold part is logged in raw.partials; when nothing remains, the row closes
+// with the summed partial P&L.
+export async function sellKalshiContracts(
+  sb: any,
+  userId: string,
+  args: { tradeId: string; contracts: number; limitPriceCents: number },
+): Promise<{ ok: boolean; error?: string; realizedPnl?: number }> {
+  const { data: trade } = await sb
+    .from("crypto_trades")
+    .select("*")
+    .eq("id", args.tradeId)
+    .eq("user_id", userId)
+    .single();
+  if (!trade || trade.status !== "submitted") return { ok: false, error: "trade not open" };
+  const total = Number(trade.contracts ?? 0);
+  const n = Math.min(args.contracts, total);
+  if (n <= 0) return { ok: false, error: "nothing to sell" };
+
+  const path = "/portfolio/events/orders";
+  const headers = await signKalshi("POST", path, userId);
+  const priceDollars = (trade.side === "YES" ? args.limitPriceCents : 100 - args.limitPriceCents) / 100;
+  const body = {
+    ticker: trade.ticker,
+    action: "sell",
+    side: trade.side === "YES" ? "ask" : "bid",
+    type: "limit",
+    count: String(n),
+    price: priceDollars.toFixed(4),
+    time_in_force: "immediate_or_cancel",
+    self_trade_prevention_type: "taker_at_cross",
+    client_order_id: `tp-${trade.id}-${Date.now()}`,
+  };
+  const res = await fetch(`${KALSHI_BASE}${path}`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  const json: any = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, error: json?.error?.message ?? json?.message ?? `Kalshi ${res.status}` };
+  }
+
+  const entryCents = Math.round((Number(trade.stake_usd) / total) * 100);
+  const realizedPnl = ((args.limitPriceCents - entryCents) / 100) * n;
+  const prevRaw = (trade.raw as any) ?? {};
+  const partials = [
+    ...(prevRaw.partials ?? []),
+    { at: new Date().toISOString(), contracts: n, exit_cents: args.limitPriceCents, entry_cents: entryCents, pnl: realizedPnl, reason: "take_profit_50pct" },
+  ];
+  const remaining = total - n;
+  await sb.from("crypto_trades").update({
+    contracts: remaining,
+    stake_usd: (remaining * entryCents) / 100,
+    status: remaining > 0 ? "submitted" : "closed",
+    pnl_usd: remaining > 0 ? null : partials.reduce((s: number, p: any) => s + Number(p.pnl), 0),
+    raw: { ...prevRaw, partials },
+  }).eq("id", trade.id);
+
+  return { ok: true, realizedPnl };
+}
+
 // ── STEP 8 · Auto-Settle Expired Trades ───────────────────────────────────
 // 10s after close_time, fetch the resolved market from Kalshi and stamp the
 // trade with the realized P&L. YES wins → 1.00, NO wins → 0.00. P&L =

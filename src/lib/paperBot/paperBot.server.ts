@@ -198,16 +198,19 @@ export async function runPaperBotTick() {
         // Desk's OWN windows are excluded so the live bot can still buy the
         // opposite hedge leg in a window it opened itself.
         const liveWindowBought = new Set<string>();
+        // Paper Desk's own open live trades, for the take-profit check below.
+        const liveOpenTrades: any[] = [];
         if (liveMode && liveUserId) {
           const { getDailyLossCounts, dailyLossStopHit } = await import("@/lib/dailyLossGuard.server");
           liveLossStop = dailyLossStopHit(await getDailyLossCounts(sb as never), liveUserId);
           const { data: openLive } = await sb.from("crypto_trades")
-            .select("ticker, stake_usd, inputs_snapshot")
+            .select("id, ticker, side, contracts, stake_usd, inputs_snapshot")
             .in("status", ["submitted", "pending"])
             .gt("close_time", iso(nowS()));
           for (const r of openLive ?? []) {
             if ((r.inputs_snapshot as any)?.source === "paper_desk_live") {
               liveOpenCents += Math.round(Number(r.stake_usd ?? 0) * 100);
+              liveOpenTrades.push(r);
             } else {
               liveWindowBought.add(String(r.ticker));
             }
@@ -252,6 +255,48 @@ export async function runPaperBotTick() {
           row.yes_bid = book.yes_bid;
           row.no_bid = book.no_bid;
           if (row.fills > 0) dirty.add(ticker);
+
+          // ---- LIVE take-profit: bid ≥ 1.5× entry → sell 90%, let 10% ride ----
+          if (liveMode && liveUserId) {
+            for (const tr of liveOpenTrades) {
+              if (String(tr.ticker) !== ticker) continue;
+              const ct = Number(tr.contracts ?? 0);
+              if (ct < 2) continue;
+              const entryCents = Math.round((Number(tr.stake_usd) / ct) * 100);
+              if (entryCents <= 0) continue;
+              const bidCents = Math.round((tr.side === "YES" ? ourPUp : 1 - ourPUp) * 100);
+              if (bidCents < entryCents * 1.5) continue;
+              const sellN = Math.floor(ct * 0.9);
+              if (sellN < 1) continue;
+              try {
+                const { sellKalshiContracts } = await import("@/lib/cryptoTrades.functions");
+                const tp = await sellKalshiContracts(sb, liveUserId, {
+                  tradeId: String(tr.id),
+                  contracts: sellN,
+                  limitPriceCents: Math.max(1, Math.min(99, bidCents)),
+                });
+                if (tp.ok) {
+                  tr.contracts = ct - sellN;
+                  tr.stake_usd = ((ct - sellN) * entryCents) / 100;
+                  liveOpenCents -= sellN * entryCents;
+                  fillsThisRun++;
+                  fillRows.push({
+                    ticker,
+                    side: tr.side === "YES" ? "yes" : "no",
+                    contracts: sellN,
+                    price: bidCents / 100,
+                    fee: 0,
+                    reason: `LIVE take-profit +50% · sold ${sellN}/${ct} @ ${bidCents}¢ (entry ${entryCents}¢)`,
+                    ts: iso(nowS()),
+                  });
+                } else {
+                  tickError = `take-profit error: ${String(tp.error).slice(0, 100)}`;
+                }
+              } catch (e) {
+                tickError = `take-profit error: ${String((e as Error)?.message ?? e).slice(0, 100)}`;
+              }
+            }
+          }
 
           const pos: Position = {
             yes: { contracts: row.yes_ct, cost: row.yes_cost },
