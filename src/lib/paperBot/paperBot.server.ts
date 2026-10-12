@@ -194,6 +194,9 @@ export async function runPaperBotTick() {
         // exposure, and every ticker any engine already bought this window.
         let liveOpenCents = 0;
         let liveLossStop = false;
+        // Windows another engine already bought (shared one-buy guard). Paper
+        // Desk's OWN windows are excluded so the live bot can still buy the
+        // opposite hedge leg in a window it opened itself.
         const liveWindowBought = new Set<string>();
         if (liveMode && liveUserId) {
           const { getDailyLossCounts, dailyLossStopHit } = await import("@/lib/dailyLossGuard.server");
@@ -203,9 +206,10 @@ export async function runPaperBotTick() {
             .in("status", ["submitted", "pending"])
             .gt("close_time", iso(nowS()));
           for (const r of openLive ?? []) {
-            liveWindowBought.add(String(r.ticker));
             if ((r.inputs_snapshot as any)?.source === "paper_desk_live") {
               liveOpenCents += Math.round(Number(r.stake_usd ?? 0) * 100);
+            } else {
+              liveWindowBought.add(String(r.ticker));
             }
           }
         }
