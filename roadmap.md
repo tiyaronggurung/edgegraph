@@ -1,5 +1,9 @@
 # Roadmap
 
+## Quad paper P&L graph
+- [x] Add combined cumulative A/B/C lines at 15-minute closes with independently clickable legends.
+- [x] Verify aggregation (3 passing tests) and signed-in graph with existing paper results, A-only view, all-hidden state and restored lines; no browser errors, trading logic unchanged.
+
 ## Paper Desk volume mirror
 - [x] Replace abbreviated volume with Crypto's live window, Coinbase, combined volume, weighted averages, flow labels and NY day totals.
 - [x] Verify the signed-in display, current data, removed old volume label and absence of browser errors; trading paths unchanged.

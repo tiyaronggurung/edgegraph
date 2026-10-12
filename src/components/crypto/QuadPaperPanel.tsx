@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { QuadPaperPnlChart } from "./QuadPaperPnlChart";
 
 const db = supabase as any;
 const usd = (v: number) => `${v < 0 ? "-" : "+"}$${Math.abs(v).toFixed(2)}`;
@@ -107,6 +108,8 @@ export function QuadPaperPanel({ isAdmin }: { isAdmin: boolean }) {
           </div>
         ))}
       </div>
+
+      <QuadPaperPnlChart positions={pos} />
 
       <div>
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Month by month (real paper results from this engine)</div>
