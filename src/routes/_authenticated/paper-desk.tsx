@@ -70,7 +70,6 @@ function PaperDesk() {
 
   const summary = useRows<any>("summary", () => db.from("pb_v_summary").select("*").maybeSingle());
   const idx = useRows<any[]>("idx", () => db.from("pb_index_prices").select("*"));
-  const curve = useRows<any[]>(`eq-${range.s}`, () => db.rpc("paper_bot_equity", { range_seconds: range.s }));
   const active = useRows<any[]>("active", () => db.from("pb_v_active_positions").select("*"));
   const closed = useRows<any[]>("closed", () => db.from("pb_v_closed_positions").select("*").limit(500));
   const activity = useRows<any[]>("activity", () => db.from("pb_v_activity").select("*").limit(500));
