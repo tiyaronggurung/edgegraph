@@ -13,6 +13,12 @@ import {
   kalshiTakerFee,
   pairCost,
 } from "./strategy";
+import {
+  type TapeSample,
+  computeUpProbability,
+  effectiveVol,
+  momentumTilt,
+} from "@/lib/ourOdds";
 
 const KALSHI = "https://api.elections.kalshi.com";
 const RUN_SECONDS = 8;
