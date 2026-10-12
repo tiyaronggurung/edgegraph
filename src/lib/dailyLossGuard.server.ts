@@ -1,10 +1,10 @@
 // Daily loss stop — shared by every live betting engine.
 //
 // Rule: once a user's settled real-money losses today (New York day) reach
-// $50, no live engine may place another buy for them until the next New York
+// $500, no live engine may place another buy for them until the next New York
 // midnight. Paper paths are untouched.
 
-export const DAILY_LOSS_LIMIT_USD = 50;
+export const DAILY_LOSS_LIMIT_USD = 500;
 
 export interface DailyPnl {
   /** Sum of today's positive settled P&L (USD). */
