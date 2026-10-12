@@ -12,7 +12,6 @@ import {
   DEFAULT_CONFIG,
   kalshiTakerFee,
   pairCost,
-  parseOrderbook,
 } from "./strategy";
 
 const KALSHI = "https://api.elections.kalshi.com";
@@ -54,8 +53,6 @@ async function kget(path: string, params: Record<string, string | number> = {}):
 const openMarkets = async (series: string) =>
   ((await kget("/trade-api/v2/markets", { series_ticker: series, status: "open", limit: 50 })).markets ?? []) as any[];
 const marketInfo = async (ticker: string) => (await kget(`/trade-api/v2/markets/${ticker}`)).market ?? {};
-const orderbook = async (ticker: string): Promise<Book> =>
-  parseOrderbook(await kget(`/trade-api/v2/markets/${ticker}/orderbook`, { depth: 5 }));
 
 async function indexPrice(eventTicker: string, coin: string): Promise<[number, number] | null> {
   try {
