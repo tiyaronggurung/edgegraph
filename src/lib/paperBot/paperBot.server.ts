@@ -12,7 +12,6 @@ import {
   DEFAULT_CONFIG,
   kalshiTakerFee,
   pairCost,
-  parseOrderbook,
 } from "./strategy";
 
 const KALSHI = "https://api.elections.kalshi.com";
@@ -54,8 +53,6 @@ async function kget(path: string, params: Record<string, string | number> = {}):
 const openMarkets = async (series: string) =>
   ((await kget("/trade-api/v2/markets", { series_ticker: series, status: "open", limit: 50 })).markets ?? []) as any[];
 const marketInfo = async (ticker: string) => (await kget(`/trade-api/v2/markets/${ticker}`)).market ?? {};
-const orderbook = async (ticker: string): Promise<Book> =>
-  parseOrderbook(await kget(`/trade-api/v2/markets/${ticker}/orderbook`, { depth: 5 }));
 
 async function indexPrice(eventTicker: string, coin: string): Promise<[number, number] | null> {
   try {
@@ -139,7 +136,9 @@ export async function runPaperBotTick() {
       try {
         const open = (await Promise.all(series.map(openMarkets))).flat();
         const idxCache = new Map<string, [number, number] | null>();
-        let ourPUp: number | null | undefined = undefined;
+        // Our odds (crypto page: price + volume) drive BOTH the decision and the
+        // paper fill price. No Kalshi orderbook calls at all — they rate-limit us.
+        const ourPUp = await loadOurPUp(sb);
 
         for (const m of open) {
           const ticker: string = m.ticker;
@@ -168,7 +167,14 @@ export async function runPaperBotTick() {
             indexUpdates.set(key, { coin: key, price: idx[0], ts: iso(idx[1]) });
           }
 
-          const book = await orderbook(ticker);
+          // Our odds (crypto page: price + volume) drive BOTH the decision and the
+          // paper fill price. No Kalshi orderbook calls at all — they rate-limit us.
+          if (row.coin !== "btc") continue;
+          if (ourPUp === null) { tickError = "waiting for our odds"; continue; }
+          const book: Book = {
+            yes_bid: r4(ourPUp), yes_ask: r4(ourPUp), yes_ask_size: 1e6,
+            no_bid: r4(1 - ourPUp), no_ask: r4(1 - ourPUp), no_ask_size: 1e6,
+          };
           row.yes_bid = book.yes_bid;
           row.no_bid = book.no_bid;
           if (row.fills > 0) dirty.add(ticker);
@@ -179,20 +185,11 @@ export async function runPaperBotTick() {
             last_buy_ts: sec(row.last_buy_ts),
           };
           const t = nowS();
-          // Decide from OUR odds (crypto page: price + volume), not Kalshi's prices.
-          // Kalshi's book is only used to price the paper fill realistically.
-          if (row.coin !== "btc") continue;
-          if (ourPUp === undefined) ourPUp = await loadOurPUp(sb);
-          if (ourPUp === null) { tickError = "waiting for our odds"; continue; }
-          const ourBook: Book = { ...book, yes_ask: r4(ourPUp), no_ask: r4(1 - ourPUp) };
-          const dOurs = decide(cfg, pos, ourBook, t, openTs, closeTs);
+          const dOurs = decide(cfg, pos, book, t, openTs, closeTs);
           if (!dOurs) continue;
-          const fillPrice = dOurs.side === "yes" ? book.yes_ask : book.no_ask;
-          if (fillPrice === null || fillPrice <= 0 || fillPrice >= 1) continue;
           const d = {
             ...dOurs,
-            price: fillPrice,
-            reason: `${dOurs.reason} · our ${(ourPUp * 100).toFixed(0)}% up · fill ${fillPrice.toFixed(2)}`,
+            reason: `${dOurs.reason} · our ${(ourPUp * 100).toFixed(0)}% up`,
           };
           const fee = kalshiTakerFee(d.contracts, d.price, feeRate);
           const cost = d.contracts * d.price + fee;
