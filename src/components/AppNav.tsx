@@ -29,6 +29,7 @@ const NAV: NavItem[] = [
       { to: "/history", label: "P&L / History" },
       { to: "/strategies", label: "Strategies" },
       { to: "/paper-desk", label: "Paper Desk" },
+      { to: "/hedge", label: "Hedge" },
     ],
   },
   { to: "/settings", label: "Settings" },
