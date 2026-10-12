@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
+import { useBinanceBtcTicks } from "@/hooks/useBinanceBtcTicks";
+import { computeUpProbability, effectiveVol, momentumTilt } from "@/lib/ourOdds";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -71,6 +74,36 @@ function PaperDesk() {
 
   const s = summary.data;
   const live = s?.last_tick_at && Date.now() - Date.parse(s.last_tick_at) < 30_000;
+
+  // Live feeds: composite spot (4-exchange WS) + 1s window clock + our odds.
+  const liveSpot = useLiveCompositeSpot();
+  const { ticks } = useBinanceBtcTicks();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => clearInterval(id);
+  }, []);
+  const liveSecsLeft = 900 - Math.floor((nowMs % 900_000) / 1000);
+  const windowStartIso = new Date(Math.floor(nowMs / 900_000) * 900_000).toISOString();
+  const oddsRow = useRows<any>("our-odds", () =>
+    db.from("btc_agreement_log").select("bucket_sec, odds_p_up, spot, strike")
+      .not("odds_p_up", "is", null).order("bucket_sec", { ascending: false }).limit(1).maybeSingle());
+  const flow = useRows<any>(`flow-${windowStartIso}`, () =>
+    db.from("btc_composite_flow_log").select("composite_in_btc, composite_out_btc, composite_imbalance, recorded_at")
+      .eq("window_start", windowStartIso).order("recorded_at", { ascending: false }).limit(1).maybeSingle());
+  const o = oddsRow.data;
+  const strike = o?.strike != null ? Number(o.strike) : null;
+  const spot = liveSpot.spot ?? (o?.spot != null ? Number(o.spot) : null);
+  const livePUp = (() => {
+    if (spot == null || strike == null) return null;
+    const tape = ticks.map((t) => ({ t: t.t, p: t.p }));
+    const sigma = effectiveVol(tape, [], liveSecsLeft) ?? 0.5;
+    const base = computeUpProbability({ spot, strike, secondsToClose: liveSecsLeft, sigmaAnnualized: sigma });
+    if (base == null) return null;
+    return Math.min(0.995, Math.max(0.005, base + momentumTilt(tape, 60_000, liveSecsLeft)));
+  })();
+  const pUp = livePUp ?? (o?.odds_p_up != null ? Number(o.odds_p_up) : null);
+  const gap = spot != null && strike != null ? spot - strike : null;
   const pts = (curve.data ?? []).map((p) => ({ t: p.ts, pnl: Number(p.pnl) }));
   const rangePnl = range.s === 0 ? Number(s?.total_pnl ?? 0) : pts.length > 1 ? pts[pts.length - 1].pnl - pts[0].pnl : 0;
   const up = rangePnl >= 0;
@@ -121,6 +154,40 @@ function PaperDesk() {
         </div>
       </header>
       {s?.last_error && <p className="text-[11px] text-[color:var(--color-destructive)]">⚠ {s.last_error}</p>}
+
+      {/* Live data strip — our odds, composite price, window volume, clock */}
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="border border-border rounded-lg p-3">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Our odds</div>
+          <div className="mt-1 flex items-baseline gap-3">
+            <span className="text-xl font-bold text-[color:var(--color-primary)]">UP {cents(pUp)}</span>
+            <span className="text-xl font-bold text-[color:var(--color-destructive)]">DOWN {cents(pUp != null ? 1 - pUp : null)}</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-1">{livePUp != null ? "live · recomputed every tick" : `updated ${ago(o ? new Date(Number(o.bucket_sec) * 1000).toISOString() : null)}`}</div>
+        </div>
+        <div className="border border-border rounded-lg p-3">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Composite price vs strike</div>
+          <div className="mt-1 text-xl font-bold">{spot != null ? usd(spot, 0) : "—"}</div>
+          <div className={cn("text-[11px]", (gap ?? 0) >= 0 ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>
+            strike {strike != null ? usd(strike, 0) : "—"} ({gap != null ? `${gap >= 0 ? "+" : ""}${gap.toFixed(0)}` : "—"})
+          </div>
+        </div>
+        <div className="border border-border rounded-lg p-3">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Window volume (composite)</div>
+          <div className="mt-1 text-sm font-bold">
+            in {flow.data ? Number(flow.data.composite_in_btc).toFixed(2) : "—"} / out {flow.data ? Number(flow.data.composite_out_btc).toFixed(2) : "—"} BTC
+          </div>
+          <div className={cn("text-[11px]", Number(flow.data?.composite_imbalance ?? 0) >= 0 ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>
+            imbalance {flow.data?.composite_imbalance != null ? `${(Number(flow.data.composite_imbalance) * 100).toFixed(0)}%` : "—"}
+          </div>
+        </div>
+        <div className="border border-border rounded-lg p-3">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Time left in window</div>
+          <div className="mt-1 text-xl font-bold">{Math.floor(liveSecsLeft / 60)}m {liveSecsLeft % 60}s</div>
+          <div className="text-[10px] text-muted-foreground">live 1s clock</div>
+        </div>
+      </section>
+
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <section className="border border-border rounded-lg p-4 space-y-4">
