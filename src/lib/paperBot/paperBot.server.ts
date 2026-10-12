@@ -150,6 +150,26 @@ export async function runPaperBotTick() {
         // paper fill price. No Kalshi orderbook calls at all — they rate-limit us.
         const ourPUp = await loadOurPUp(sb);
 
+        // Live guards, refreshed every loop: daily loss stop, total open real
+        // exposure, and every ticker any engine already bought this window.
+        let liveOpenCents = 0;
+        let liveLossStop = false;
+        const liveWindowBought = new Set<string>();
+        if (liveMode && liveUserId) {
+          const { getDailyLossCounts, dailyLossStopHit } = await import("@/lib/dailyLossGuard.server");
+          liveLossStop = dailyLossStopHit(await getDailyLossCounts(sb as never), liveUserId);
+          const { data: openLive } = await sb.from("crypto_trades")
+            .select("ticker, stake_usd, inputs_snapshot")
+            .in("status", ["submitted", "pending"])
+            .gt("close_time", iso(nowS()));
+          for (const r of openLive ?? []) {
+            liveWindowBought.add(String(r.ticker));
+            if ((r.inputs_snapshot as any)?.source === "paper_desk_live") {
+              liveOpenCents += Math.round(Number(r.stake_usd ?? 0) * 100);
+            }
+          }
+        }
+
         for (const m of open) {
           const ticker: string = m.ticker;
           let row = markets.get(ticker);
