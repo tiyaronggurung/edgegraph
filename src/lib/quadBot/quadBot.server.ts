@@ -187,7 +187,9 @@ export async function runQuadBotTick() {
           if (!canEnter) continue;
           if (strat === "A" && quad && price(quad) <= entryMax) await buy(quad, leg1, "entry", `quad: ${quadWhy}`);
           if (strat === "B") {
-            const cheap: Side | null = pUp! <= 0.45 ? "UP" : 1 - pUp! <= 0.45 ? "DOWN" : null;
+            // 15–45¢ only: below 15¢ is a near-dead side, not a realistic hedge setup.
+            const ok = (x: number) => x >= 0.15 && x <= 0.45;
+            const cheap: Side | null = ok(pUp!) ? "UP" : ok(1 - pUp!) ? "DOWN" : null;
             if (cheap) await buy(cheap, leg1, "entry", `cheap side ≤45¢`);
           }
           if (strat === "C") {
