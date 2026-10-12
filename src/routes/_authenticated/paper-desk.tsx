@@ -169,6 +169,8 @@ function PaperDesk() {
     .sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
   let realAcc = 0;
   const cum = pts.map((p) => { realAcc += p.pnl; return { t: p.t, pnl: realAcc }; });
+  // Seed a zero point just before the first settle so a single trade still draws a line.
+  if (cum.length === 1) cum.unshift({ t: new Date(Date.parse(cum[0].t) - 60_000).toISOString(), pnl: 0 });
   const rangePnl = realAcc;
   const up = rangePnl >= 0;
   const winRate = s && s.settled_markets > 0 ? `${((s.winning_markets / s.settled_markets) * 100).toFixed(0)}%` : "—";
