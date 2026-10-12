@@ -40,14 +40,14 @@ async function whaleSplit(windowStartMs: number) {
 }
 
 // Live signals read directly from their sources (not the agreement log, which can stall):
-//  strike + ticker  → kalshi_book_ledger (window close_time)
+//  strike + ticker  → btc_model_predictions row for this window (close_time)
 //  odds             → spot tape (btc_spot_ticks) with the same math as /crypto
-//  model / study    → btc_model_predictions row for this window's ticker
+//  model / study    → same row
 async function liveSignals(sb: any, wStartMs: number, secsLeft: number) {
   const closeIso = new Date(wStartMs + WINDOW_MS).toISOString();
   const [{ data: led }, { data: ticks }] = await Promise.all([
-    sb.from("kalshi_book_ledger").select("ticker, strike").eq("close_time", closeIso)
-      .not("strike", "is", null).order("last_seen_at", { ascending: false }).limit(1).maybeSingle(),
+    sb.from("btc_model_predictions").select("ticker, strike, side, model_side_pre_study, model_prob, study_locked_side")
+      .eq("close_time", closeIso).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     sb.from("btc_spot_ticks").select("observed_at, spot, source")
       .gte("observed_at", new Date(Date.now() - 5 * 60_000).toISOString())
       .in("source", ["coinbase", "consolidated"]).order("observed_at", { ascending: true }).limit(2000),
@@ -67,16 +67,11 @@ async function liveSignals(sb: any, wStartMs: number, secsLeft: number) {
     const base = computeUpProbability({ spot: last.p, strike, secondsToClose: secsLeft, sigmaAnnualized: sigma });
     if (base != null) pUp = Math.min(0.995, Math.max(0.005, base + momentumTilt(tape, 60_000, secsLeft)));
   }
-  let model: Side | null = null, study: Side | null = null;
-  if (led?.ticker) {
-    const { data: pr } = await sb.from("btc_model_predictions")
-      .select("side, model_side_pre_study, model_prob, study_locked_side")
-      .eq("ticker", led.ticker).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    const yn = (v: any): Side | null => (v === "YES" ? "UP" : v === "NO" ? "DOWN" : null);
-    model = yn(pr?.model_side_pre_study) ?? yn(pr?.side)
-      ?? (pr?.model_prob != null ? (Number(pr.model_prob) >= 0.5 ? "UP" : "DOWN") : null);
-    study = yn(pr?.study_locked_side);
-  }
+  const yn = (v: any): Side | null => (v === "YES" ? "UP" : v === "NO" ? "DOWN" : null);
+  const pr = led;
+  const model: Side | null = yn(pr?.model_side_pre_study) ?? yn(pr?.side)
+    ?? (pr?.model_prob != null ? (Number(pr.model_prob) >= 0.5 ? "UP" : "DOWN") : null);
+  const study: Side | null = yn(pr?.study_locked_side);
   return { pUp, tickAt, strike, spot: tape.length ? tape[tape.length - 1].p : null, ticker: led?.ticker ?? null, model, study };
 }
 
@@ -103,8 +98,8 @@ export async function runQuadBotTick() {
     for (const p of open ?? []) {
       const closeMs = Date.parse(p.window_start) + WINDOW_MS;
       const [{ data: led }, { data: tk }] = await Promise.all([
-        sb.from("kalshi_book_ledger").select("strike").eq("close_time", new Date(closeMs).toISOString())
-          .not("strike", "is", null).limit(1).maybeSingle(),
+        sb.from("btc_model_predictions").select("strike").eq("close_time", new Date(closeMs).toISOString())
+          .not("strike", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         sb.from("btc_spot_ticks").select("spot").in("source", ["coinbase", "consolidated"])
           .lte("observed_at", new Date(closeMs).toISOString())
           .gte("observed_at", new Date(closeMs - 60_000).toISOString())
