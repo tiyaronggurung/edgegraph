@@ -140,7 +140,7 @@ export async function runPaperBotTick() {
       const { data: s2 } = await sb.from("pb_settings")
         .select("running, reset_epoch, strategy, series").eq("id", 1).single();
       if (!s2 || !s2.running || s2.reset_epoch !== epoch) break;
-      cfg = { ...DEFAULT_CONFIG, ...(s2.strategy ?? {}) };
+      cfg = liveCfg({ ...DEFAULT_CONFIG, ...(s2.strategy ?? {}) });
       series = s2.series?.length ? s2.series : series;
 
       try {
