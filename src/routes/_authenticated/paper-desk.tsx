@@ -325,7 +325,7 @@ function PaperDesk() {
               <div className="h-full grid place-items-center text-xs text-muted-foreground">The chart fills in as real-money trades settle.</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={pts} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+                <AreaChart data={cum} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="pbFill" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={up ? "var(--color-primary)" : "var(--color-destructive)"} stopOpacity={0.35} />
