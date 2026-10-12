@@ -66,6 +66,11 @@ export interface StrikeOddsContext {
   avgSellPrice?: number | null;
   /** Taker flow imbalance (in - out) / total, -1..1. */
   flowImbalance?: number | null;
+  /** Composite Binance+Coinbase window imbalance, -1..1 — preferred over flowImbalance when present. */
+  compFlowImbalance?: number | null;
+  /** Composite volume-weighted avg in/out prices — preferred over avgBuyPrice/avgSellPrice when present. */
+  compAvgIn?: number | null;
+  compAvgOut?: number | null;
   /** Multi-SMA stack read (10/50/200 on 1m closes) from the flow log feed. */
   stack?: SmaStack | null;
 }
@@ -246,14 +251,18 @@ export function computeStrikeOdds(
     a == null && b == null ? null : a == null ? b : b == null ? a : fastW * a + (1 - fastW) * b;
 
   // Average taker cost basis: price above the blended VWAP = buyers in profit.
-  const avgBuy = nz(ctx?.avgBuyPrice);
-  const avgSell = nz(ctx?.avgSellPrice);
+  // Composite (Binance+Coinbase) avg in/out is preferred when available.
+  const avgBuy = nz(ctx?.compAvgIn) ?? nz(ctx?.avgBuyPrice);
+  const avgSell = nz(ctx?.compAvgOut) ?? nz(ctx?.avgSellPrice);
   let cost: number | null = null;
   if (spot != null && spot > 0 && (avgBuy != null || avgSell != null)) {
     const vwap = avgBuy != null && avgSell != null ? (avgBuy + avgSell) / 2 : (avgBuy ?? avgSell) as number;
     if (vwap > 0) cost = clamp((spot - vwap) / vwap / 0.0015, -1, 1);
   }
-  const flow = nz(ctx?.flowImbalance) == null ? null : clamp((ctx?.flowImbalance as number) / 0.25, -1, 1);
+  // Flow leg: composite Binance+Coinbase window imbalance when available,
+  // else the Binance-only trailing 3m imbalance.
+  const flowRaw = nz(ctx?.compFlowImbalance) ?? nz(ctx?.flowImbalance);
+  const flow = flowRaw == null ? null : clamp(flowRaw / 0.25, -1, 1);
 
   // --- SMA stack (10 / 50 / 200 on 1m closes) ------------------------------
   // Alignment = which trend frames are with us. Fast-line slope and its
