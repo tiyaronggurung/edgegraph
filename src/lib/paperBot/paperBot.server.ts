@@ -237,9 +237,9 @@ export async function runPaperBotTick() {
             indexUpdates.set(key, { coin: key, price: idx[0], ts: iso(idx[1]) });
           }
 
-          // Our odds (crypto page: price + volume) drive BOTH the decision and the
-          // paper fill price. No Kalshi orderbook calls at all — they rate-limit us.
           if (row.coin !== "btc") continue;
+          const secsToClose = Math.max(0, closeTs - nowS());
+          const ourPUp = pUpFromTape(tape, row.strike, secsToClose) ?? fallbackPUp;
           if (ourPUp === null) { tickError = "waiting for our odds"; continue; }
           const book: Book = {
             yes_bid: r4(ourPUp), yes_ask: r4(ourPUp), yes_ask_size: 1e6,
