@@ -10,7 +10,7 @@ const SERIES = {
   C: { color: "var(--chart-3)", text: "text-chart-3", dot: "bg-chart-3", name: "Quad + late + hedge" },
 };
 const money = (value: number) => `${value < 0 ? "−" : "+"}$${Math.abs(value).toFixed(2)}`;
-const clock = (time: number) => new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: "UTC", hour12: false });
+const clock = (time: number) => new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 
 function PnlTooltip({ active, payload, visible }: {
   active?: boolean;
@@ -21,7 +21,7 @@ function PnlTooltip({ active, payload, visible }: {
   if (!active || !point) return null;
   return (
     <div className="rounded-md border border-border bg-popover p-3 text-xs shadow-sm">
-      <div className="mb-2 text-muted-foreground">{new Date(point.time).toLocaleDateString()} · {clock(point.time)} UTC</div>
+      <div className="mb-2 text-muted-foreground">{new Date(point.time).toLocaleDateString()} · {clock(point.time)} local</div>
       <div className="grid grid-cols-[auto_auto_auto] gap-x-4 gap-y-1">
         <span /><span className="text-muted-foreground">Total P&L</span><span className="text-muted-foreground">15m P&L</span>
         {QUAD_STRATEGIES.filter((s) => visible[s]).map((s) => (
@@ -44,7 +44,7 @@ export function QuadPaperPnlChart({ positions }: { positions: QuadPnlPosition[] 
     <div className="min-w-0 space-y-3 border-t border-border pt-4" aria-label="Quad paper P&L chart">
       <div>
         <h3 className="text-sm font-semibold">A/B/C paper profit & loss</h3>
-        <p className="text-[11px] text-muted-foreground">Cumulative settled paper P&L · 15-minute window closes · UTC · most recent 1,000 positions</p>
+        <p className="text-[11px] text-muted-foreground">Cumulative settled paper P&L · 15-minute window closes · your local time · most recent 1,000 positions</p>
       </div>
       <div className="flex flex-wrap gap-2" aria-label="Strategy legends">
         {QUAD_STRATEGIES.map((s) => (
