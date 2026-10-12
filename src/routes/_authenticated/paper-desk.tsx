@@ -321,8 +321,8 @@ function PaperDesk() {
             </div>
           </div>
           <div className="h-56">
-            {pts.length < 2 ? (
-              <div className="h-full grid place-items-center text-xs text-muted-foreground">The chart fills in as the bot runs.</div>
+            {cum.length < 2 ? (
+              <div className="h-full grid place-items-center text-xs text-muted-foreground">The chart fills in as real-money trades settle.</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={pts} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
