@@ -337,7 +337,7 @@ function PaperDesk() {
                     tickFormatter={(t: string) => new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} />
                   <YAxis orientation="right" tickCount={3} tick={{ fontSize: 10 }} width={60} stroke="currentColor" className="text-muted-foreground" tickFormatter={(v: number) => usd(v, 0)} />
                   <Tooltip contentStyle={{ fontSize: 11, background: "var(--color-card)", border: "1px solid var(--color-border)" }}
-                    formatter={(v: number) => [signed(v), "P&L"]} labelFormatter={(t: string) => new Date(t).toLocaleString()} />
+                    formatter={(v: number) => [signed(v), "Real P&L"]} labelFormatter={(t: string) => new Date(t).toLocaleString()} />
                   <ReferenceLine y={0} stroke="currentColor" className="text-muted-foreground" strokeDasharray="3 3" />
                   <Area type="monotone" dataKey="pnl" stroke={up ? "var(--color-primary)" : "var(--color-destructive)"} strokeWidth={2} fill="url(#pbFill)" isAnimationActive={false} />
                 </AreaChart>
