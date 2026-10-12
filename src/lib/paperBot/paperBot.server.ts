@@ -194,6 +194,9 @@ export async function runPaperBotTick() {
         // exposure, and every ticker any engine already bought this window.
         let liveOpenCents = 0;
         let liveLossStop = false;
+        // Windows another engine already bought (shared one-buy guard). Paper
+        // Desk's OWN windows are excluded so the live bot can still buy the
+        // opposite hedge leg in a window it opened itself.
         const liveWindowBought = new Set<string>();
         if (liveMode && liveUserId) {
           const { getDailyLossCounts, dailyLossStopHit } = await import("@/lib/dailyLossGuard.server");
@@ -203,9 +206,10 @@ export async function runPaperBotTick() {
             .in("status", ["submitted", "pending"])
             .gt("close_time", iso(nowS()));
           for (const r of openLive ?? []) {
-            liveWindowBought.add(String(r.ticker));
             if ((r.inputs_snapshot as any)?.source === "paper_desk_live") {
               liveOpenCents += Math.round(Number(r.stake_usd ?? 0) * 100);
+            } else {
+              liveWindowBought.add(String(r.ticker));
             }
           }
         }
@@ -298,7 +302,8 @@ export async function runPaperBotTick() {
               row.last_buy_ts = iso(t);
               dirty.add(ticker);
               fillsThisRun++;
-              liveWindowBought.add(ticker);
+              // Do NOT lock the window here — the live bot may still buy the
+              // opposite hedge leg in its own window (cap + pair-cost rule gate it).
               liveOpenCents += n * r.filledCents;
               const p2: Position = { yes: { contracts: row.yes_ct, cost: row.yes_cost }, no: { contracts: row.no_ct, cost: row.no_cost }, last_buy_ts: t };
               const gap = row.index_price !== null && row.strike !== null ? row.index_price - row.strike : null;
