@@ -139,7 +139,9 @@ export async function runPaperBotTick() {
       try {
         const open = (await Promise.all(series.map(openMarkets))).flat();
         const idxCache = new Map<string, [number, number] | null>();
-        let ourPUp: number | null | undefined = undefined;
+        // Our odds (crypto page: price + volume) drive BOTH the decision and the
+        // paper fill price. No Kalshi orderbook calls at all — they rate-limit us.
+        const ourPUp = await loadOurPUp(sb);
 
         for (const m of open) {
           const ticker: string = m.ticker;
