@@ -159,7 +159,7 @@ function PaperDesk() {
         .from("crypto_trades")
         .select("id, created_at, status, pnl_usd, raw")
         .eq("status", "settled")
-        .filter("raw->inputs_snapshot->>source", "eq", "paper_desk_live");
+        .filter("inputs_snapshot->>source", "eq", "paper_desk_live");
       if (range.s > 0) q = q.gte("created_at", new Date(Date.now() - range.s * 1000).toISOString());
       return q.order("created_at", { ascending: true }).limit(2000) as never;
     },
