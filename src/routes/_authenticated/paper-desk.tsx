@@ -115,6 +115,13 @@ function PaperDesk() {
     toast.success(running ? "Paper bot started" : "Paper bot paused");
     qc.invalidateQueries({ queryKey: ["paper-desk"] });
   };
+  const setLive = async (enabled: boolean) => {
+    if (enabled && !confirm("Turn on REAL MONEY trading on Kalshi? Max $10 open at once, one buy per window, daily loss stop stays on.")) return;
+    const { error } = await db.rpc("paper_bot_set_live", { p_enabled: enabled });
+    if (error) return toast.error(error.message);
+    toast.success(enabled ? "LIVE trading on — real money, $10 cap" : "Live trading off — back to paper");
+    qc.invalidateQueries({ queryKey: ["paper-desk"] });
+  };
   const reset = async () => {
     const v = prompt("New paper budget ($)", String(s?.start_cash ?? 3000));
     if (!v) return;
