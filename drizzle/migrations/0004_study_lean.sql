@@ -9,7 +9,7 @@ ALTER TABLE public.btc_model_predictions
 SELECT cron.unschedule('study-lean-tick-60s');
 SELECT cron.schedule(
   'study-lean-tick-60s',
-  '60 seconds',
+  '59 seconds',
   $$
   SELECT net.http_post(
     url := 'https://project--921f21f3-4144-4400-a0a1-781603e22b1b.lovable.app/api/public/hooks/study-lean-tick',
