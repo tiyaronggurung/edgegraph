@@ -1,7 +1,7 @@
 // Quad-Confirmation paper engine (PAPER ONLY — never places real orders).
 // Runs three strategies side by side on the same live signals:
 //   A  Quad entry: whale (rn1 ≥70% one side) + Study + Model + our odds >52% agree → $leg1, ride to settle.
-//   B  Pair-lock: buy whichever side our odds price ≤45¢, then the opposite side when pair ≤ pair_max.
+//   B  Whale ride: rn1 ≥65% one side + our odds ≥55% same side, entry 50–68¢, $leg1, no hedge.
 //   C  Hybrid: A's entry (plus late tiebreaker) with a hedge reserve that locks at ≤ pair_max.
 // NULL fallback: if Study OR Model is missing, the other plus odds ≥60% stands in.
 // If both are missing, or odds are stale, no new entries (open legs may still hedge).
@@ -188,17 +188,19 @@ export async function runQuadBotTick() {
         if (empty) {
           if (!canEnter) continue;
           if (strat === "A" && quad && price(quad) <= entryMax) await buy(quad, leg1, "entry", `quad: ${quadWhy}`);
-          if (strat === "B") {
-            // 15–45¢ only: below 15¢ is a near-dead side, not a realistic hedge setup.
-            const ok = (x: number) => x >= 0.15 && x <= 0.45;
-            const cheap: Side | null = ok(pUp!) ? "UP" : ok(1 - pUp!) ? "DOWN" : null;
-            if (cheap) await buy(cheap, leg1, "entry", `cheap side ≤45¢`);
+          if (strat === "B" && whale?.side && whale.share >= 0.65) {
+            // Whale ≥65% + our odds ≥55% same side, entry 50–68¢, flat stake, ride (no hedge).
+            const side = whale.side;
+            const px = price(side);
+            if (oddsFor(side) >= 0.55 && px >= 0.5 && px <= 0.68) {
+              await buy(side, leg1, "entry", `whale ${(whale.share * 100).toFixed(0)}% + odds ${(oddsFor(side) * 100).toFixed(0)}%`);
+            }
           }
           if (strat === "C") {
             const side = quad ?? late;
             if (side && price(side) <= entryMax) await buy(side, leg1, "entry", quad ? `quad: ${quadWhy}` : "late tiebreaker (Study≠Model, odds >55%)");
           }
-        } else if ((strat === "B" || strat === "C") && !pos.locked) {
+        } else if (strat === "C" && !pos.locked) {
           const have: Side = Number(pos.up_ct) > 0 ? "UP" : "DOWN";
           const opp: Side = have === "UP" ? "DOWN" : "UP";
           const avg = have === "UP" ? Number(pos.up_cost) / Number(pos.up_ct) : Number(pos.down_cost) / Number(pos.down_ct);
