@@ -155,6 +155,40 @@ function PaperDesk() {
       </header>
       {s?.last_error && <p className="text-[11px] text-[color:var(--color-destructive)]">⚠ {s.last_error}</p>}
 
+      {/* Live data strip — our odds, composite price, window volume, clock */}
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="border border-border rounded-lg p-3">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Our odds</div>
+          <div className="mt-1 flex items-baseline gap-3">
+            <span className="text-xl font-bold text-[color:var(--color-primary)]">UP {cents(pUp)}</span>
+            <span className="text-xl font-bold text-[color:var(--color-destructive)]">DOWN {cents(pUp != null ? 1 - pUp : null)}</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-1">{livePUp != null ? "live · recomputed every tick" : `updated ${ago(o ? new Date(Number(o.bucket_sec) * 1000).toISOString() : null)}`}</div>
+        </div>
+        <div className="border border-border rounded-lg p-3">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Composite price vs strike</div>
+          <div className="mt-1 text-xl font-bold">{spot != null ? usd(spot, 0) : "—"}</div>
+          <div className={cn("text-[11px]", (gap ?? 0) >= 0 ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>
+            strike {strike != null ? usd(strike, 0) : "—"} ({gap != null ? `${gap >= 0 ? "+" : ""}${gap.toFixed(0)}` : "—"})
+          </div>
+        </div>
+        <div className="border border-border rounded-lg p-3">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Window volume (composite)</div>
+          <div className="mt-1 text-sm font-bold">
+            in {flow.data ? Number(flow.data.composite_in_btc).toFixed(2) : "—"} / out {flow.data ? Number(flow.data.composite_out_btc).toFixed(2) : "—"} BTC
+          </div>
+          <div className={cn("text-[11px]", Number(flow.data?.composite_imbalance ?? 0) >= 0 ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>
+            imbalance {flow.data?.composite_imbalance != null ? `${(Number(flow.data.composite_imbalance) * 100).toFixed(0)}%` : "—"}
+          </div>
+        </div>
+        <div className="border border-border rounded-lg p-3">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Time left in window</div>
+          <div className="mt-1 text-xl font-bold">{Math.floor(liveSecsLeft / 60)}m {liveSecsLeft % 60}s</div>
+          <div className="text-[10px] text-muted-foreground">live 1s clock</div>
+        </div>
+      </section>
+
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <section className="border border-border rounded-lg p-4 space-y-4">
           <div className="flex items-center gap-3">
