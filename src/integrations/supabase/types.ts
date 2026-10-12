@@ -6616,6 +6616,138 @@ export type Database = {
         }
         Relationships: []
       }
+      qc_fills: {
+        Row: {
+          amount: number | null
+          contracts: number | null
+          created_at: string
+          id: number
+          kind: string
+          ms_from_start: number | null
+          price: number | null
+          reason: string | null
+          side: string
+          signals: Json | null
+          strategy: string
+          window_start: string
+        }
+        Insert: {
+          amount?: number | null
+          contracts?: number | null
+          created_at?: string
+          id?: number
+          kind: string
+          ms_from_start?: number | null
+          price?: number | null
+          reason?: string | null
+          side: string
+          signals?: Json | null
+          strategy: string
+          window_start: string
+        }
+        Update: {
+          amount?: number | null
+          contracts?: number | null
+          created_at?: string
+          id?: number
+          kind?: string
+          ms_from_start?: number | null
+          price?: number | null
+          reason?: string | null
+          side?: string
+          signals?: Json | null
+          strategy?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
+      qc_positions: {
+        Row: {
+          created_at: string
+          down_cost: number
+          down_ct: number
+          id: number
+          locked: boolean
+          payout: number | null
+          pnl: number | null
+          result: string | null
+          settled: boolean
+          settled_at: string | null
+          strategy: string
+          up_cost: number
+          up_ct: number
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          down_cost?: number
+          down_ct?: number
+          id?: number
+          locked?: boolean
+          payout?: number | null
+          pnl?: number | null
+          result?: string | null
+          settled?: boolean
+          settled_at?: string | null
+          strategy: string
+          up_cost?: number
+          up_ct?: number
+          window_start: string
+        }
+        Update: {
+          created_at?: string
+          down_cost?: number
+          down_ct?: number
+          id?: number
+          locked?: boolean
+          payout?: number | null
+          pnl?: number | null
+          result?: string | null
+          settled?: boolean
+          settled_at?: string | null
+          strategy?: string
+          up_cost?: number
+          up_ct?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
+      qc_settings: {
+        Row: {
+          entry_max: number
+          id: number
+          last_error: string | null
+          last_signals: Json | null
+          last_tick_at: string | null
+          leg1_usd: number
+          leg2_usd: number
+          pair_max: number
+          running: boolean
+        }
+        Insert: {
+          entry_max?: number
+          id?: number
+          last_error?: string | null
+          last_signals?: Json | null
+          last_tick_at?: string | null
+          leg1_usd?: number
+          leg2_usd?: number
+          pair_max?: number
+          running?: boolean
+        }
+        Update: {
+          entry_max?: number
+          id?: number
+          last_error?: string | null
+          last_signals?: Json | null
+          last_tick_at?: string | null
+          leg1_usd?: number
+          leg2_usd?: number
+          pair_max?: number
+          running?: boolean
+        }
+        Relationships: []
+      }
       strategies: {
         Row: {
           active: boolean
@@ -7259,6 +7391,7 @@ export type Database = {
         Returns: undefined
       }
       prune_btc_candles: { Args: never; Returns: undefined }
+      qc_set_running: { Args: { p_running: boolean }; Returns: undefined }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
