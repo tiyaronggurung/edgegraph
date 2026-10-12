@@ -140,7 +140,7 @@ export async function runPaperBotTick() {
     let cash = Number(settings.cash);
     const startCash = Number(settings.start_cash);
     const feeRate = Number(settings.taker_fee_rate);
-    const pollMs = Math.max(1000, Number(settings.poll_seconds) * 1000);
+    const pollMs = 1000; // poll every second — same cadence as the crypto page
     let cfg: StrategyConfig = { ...DEFAULT_CONFIG, ...(settings.strategy ?? {}) };
     let series: string[] = settings.series?.length ? settings.series : ["KXBTC15M"];
 
