@@ -312,7 +312,7 @@ export async function runPaperBotTick() {
           };
           // ---- LIVE (real money) path ----
           if (liveMode && liveUserId) {
-            if (liveLossStop) { tickError = "daily loss stop (3 settled losses today)"; continue; }
+            if (liveLossStop) { tickError = "daily give-back stop (losses ≥ 50% of today's gains)"; continue; }
             if (liveWindowBought.has(ticker)) continue; // one buy per window, shared across engines
             const limitCents = Math.max(1, Math.min(99, Math.round(d.price * 100)));
             const remaining = liveMaxOpenCents - liveOpenCents;
