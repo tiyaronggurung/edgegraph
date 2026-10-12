@@ -7,6 +7,8 @@
 // If both are missing, or odds are stale, no new entries (open legs may still hedge).
 // Fills priced at our odds (YES = p_up, NO = 1 − p_up); settled on logged spot vs strike.
 
+import { type TapeSample, computeUpProbability, effectiveVol, momentumTilt } from "@/lib/ourOdds";
+
 const WINDOW_MS = 900_000;
 const STALE_SEC = 30;
 const RN1 = "0xb55fa1296e6ec55d0ce53d93b9237389f11764d4";
@@ -37,6 +39,42 @@ async function whaleSplit(windowStartMs: number) {
   }
 }
 
+// Live signals read directly from their sources (not the agreement log, which can stall):
+//  strike + ticker  → btc_model_predictions row for this window (close_time)
+//  odds             → spot tape (btc_spot_ticks) with the same math as /crypto
+//  model / study    → same row
+async function liveSignals(sb: any, wStartMs: number, secsLeft: number) {
+  const closeIso = new Date(wStartMs + WINDOW_MS).toISOString();
+  const [{ data: led }, { data: ticks }] = await Promise.all([
+    sb.from("btc_model_predictions").select("ticker, strike, side, model_side_pre_study, model_prob, study_locked_side")
+      .eq("close_time", closeIso).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    sb.from("btc_spot_ticks").select("observed_at, spot, source")
+      .gte("observed_at", new Date(Date.now() - 5 * 60_000).toISOString())
+      .in("source", ["coinbase", "consolidated"]).order("observed_at", { ascending: true }).limit(2000),
+  ]);
+  const rows = (ticks ?? []) as any[];
+  const pref = rows.filter((r) => r.source === "coinbase");
+  const tape: TapeSample[] = (pref.length >= 10 ? pref : rows)
+    .map((r) => ({ t: Date.parse(r.observed_at), p: Number(r.spot) }))
+    .filter((x) => Number.isFinite(x.t) && x.p > 0).sort((a, b) => a.t - b.t);
+  const strike = led?.strike != null ? Number(led.strike) : null;
+  let pUp: number | null = null;
+  let tickAt: number | null = null;
+  if (tape.length >= 10 && strike) {
+    const last = tape[tape.length - 1];
+    tickAt = last.t;
+    const sigma = effectiveVol(tape, [], secsLeft) ?? 0.5;
+    const base = computeUpProbability({ spot: last.p, strike, secondsToClose: secsLeft, sigmaAnnualized: sigma });
+    if (base != null) pUp = Math.min(0.995, Math.max(0.005, base + momentumTilt(tape, 60_000, secsLeft)));
+  }
+  const yn = (v: any): Side | null => (v === "YES" ? "UP" : v === "NO" ? "DOWN" : null);
+  const pr = led;
+  const model: Side | null = yn(pr?.model_side_pre_study) ?? yn(pr?.side)
+    ?? (pr?.model_prob != null ? (Number(pr.model_prob) >= 0.5 ? "UP" : "DOWN") : null);
+  const study: Side | null = yn(pr?.study_locked_side);
+  return { pUp, tickAt, strike, spot: tape.length ? tape[tape.length - 1].p : null, ticker: led?.ticker ?? null, model, study };
+}
+
 export async function runQuadBotTick() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const sb = supabaseAdmin as any;
@@ -58,9 +96,16 @@ export async function runQuadBotTick() {
     // 1. Settle closed windows.
     const { data: open } = await sb.from("qc_positions").select("*").eq("settled", false).lt("window_start", wIso);
     for (const p of open ?? []) {
-      const { data: last } = await sb.from("btc_agreement_log").select("spot, strike")
-        .eq("window_start", p.window_start).not("spot", "is", null).not("strike", "is", null)
-        .order("bucket_sec", { ascending: false }).limit(1).maybeSingle();
+      const closeMs = Date.parse(p.window_start) + WINDOW_MS;
+      const [{ data: led }, { data: tk }] = await Promise.all([
+        sb.from("btc_model_predictions").select("strike").eq("close_time", new Date(closeMs).toISOString())
+          .not("strike", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        sb.from("btc_spot_ticks").select("spot").in("source", ["coinbase", "consolidated"])
+          .lte("observed_at", new Date(closeMs).toISOString())
+          .gte("observed_at", new Date(closeMs - 60_000).toISOString())
+          .order("observed_at", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      const last = led && tk ? { spot: Number(tk.spot), strike: Number(led.strike) } : null;
       if (!last || Number(last.spot) === Number(last.strike)) continue;
       const result: Side = Number(last.spot) > Number(last.strike) ? "UP" : "DOWN";
       const payout = result === "UP" ? Number(p.up_ct) : Number(p.down_ct);
@@ -70,24 +115,24 @@ export async function runQuadBotTick() {
         reason: `settled ${result} · spot ${last.spot} vs strike ${last.strike} · P&L ${pnl}` });
     }
 
-    // 2. Signals.
-    const [{ data: ag }, whale] = await Promise.all([
-      sb.from("btc_agreement_log").select("bucket_sec, odds_p_up, model_side, study_side, spot, strike")
-        .eq("window_start", wIso).order("bucket_sec", { ascending: false }).limit(1).maybeSingle(),
+    // 2. Signals — live sources first, agreement log only as a fallback.
+    const [live, whale, { data: ag }] = await Promise.all([
+      liveSignals(sb, wStartMs, secsLeft),
       whaleSplit(wStartMs),
+      sb.from("btc_agreement_log").select("bucket_sec, odds_p_up, model_side, study_side")
+        .eq("window_start", wIso).order("bucket_sec", { ascending: false }).limit(1).maybeSingle(),
     ]);
-    // Latest non-null study/model in this window (they can blink to null).
-    const { data: lastStudy } = await sb.from("btc_agreement_log").select("study_side")
-      .eq("window_start", wIso).not("study_side", "is", null).order("bucket_sec", { ascending: false }).limit(1).maybeSingle();
-    const pUp = ag?.odds_p_up != null ? Number(ag.odds_p_up) : null;
-    const fresh = ag && pUp != null && pUp > 0 && pUp < 1 && Date.now() / 1000 - Number(ag.bucket_sec) <= STALE_SEC;
     const norm = (v: any): Side | null => (v ? (String(v).toUpperCase().startsWith("U") ? "UP" : "DOWN") : null);
-    const study = norm(lastStudy?.study_side);
-    const model = norm(ag?.model_side);
+    const agFresh = ag && Date.now() / 1000 - Number(ag.bucket_sec) <= STALE_SEC;
+    const liveFresh = live.pUp != null && live.tickAt != null && Date.now() - live.tickAt <= STALE_SEC * 1000;
+    const pUp = liveFresh ? live.pUp : agFresh && ag.odds_p_up != null ? Number(ag.odds_p_up) : null;
+    const fresh = pUp != null && pUp > 0 && pUp < 1;
+    const study = live.study ?? (agFresh ? norm(ag.study_side) : null);
+    const model = live.model ?? (agFresh ? norm(ag.model_side) : null);
     const oddsSide: Side | null = pUp == null ? null : pUp > 0.52 ? "UP" : pUp < 0.48 ? "DOWN" : null;
     const oddsFor = (side: Side) => (pUp == null ? 0 : side === "UP" ? pUp : 1 - pUp);
     const price = (side: Side) => (side === "UP" ? pUp! : 1 - pUp!);
-    signals = { pUp, fresh: !!fresh, study, model, oddsSide, whale, secsLeft };
+    signals = { pUp, fresh, study, model, oddsSide, whale, secsLeft, strike: live.strike, spot: live.spot, ticker: live.ticker, oddsSource: liveFresh ? "live" : agFresh ? "log" : null };
 
     // Quad confirmation with NULL fallback.
     let quad: Side | null = null;
