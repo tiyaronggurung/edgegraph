@@ -7,7 +7,7 @@ import { useStrikeOdds } from "@/hooks/useStrikeOdds";
 import { getBtcEssentialSnapshot } from "@/lib/btcEssentialSnapshot.functions";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
-import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlan } from "@/hooks/usePlan";
@@ -324,21 +324,22 @@ function PaperDesk() {
               <div className="h-full grid place-items-center text-xs text-muted-foreground">The chart fills in as real-money trades settle.</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={cum} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+                <AreaChart data={cum} margin={{ top: 10, right: 4, left: 4, bottom: 0 }}>
                   <defs>
                     <linearGradient id="pbFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={up ? "var(--color-primary)" : "var(--color-destructive)"} stopOpacity={0.35} />
+                      <stop offset="0%" stopColor={up ? "var(--color-primary)" : "var(--color-destructive)"} stopOpacity={0.28} />
                       <stop offset="100%" stopColor={up ? "var(--color-primary)" : "var(--color-destructive)"} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="2 4" stroke="currentColor" className="text-border" vertical={false} />
-                  <XAxis dataKey="t" tick={{ fontSize: 10 }} minTickGap={60} stroke="currentColor" className="text-muted-foreground"
+                  <XAxis dataKey="t" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} minTickGap={80} dy={6}
                     tickFormatter={(t: string) => new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} />
-                  <YAxis orientation="right" tickCount={3} tick={{ fontSize: 10 }} width={60} stroke="currentColor" className="text-muted-foreground" tickFormatter={(v: number) => usd(v, 0)} />
-                  <Tooltip contentStyle={{ fontSize: 11, background: "var(--color-card)", border: "1px solid var(--color-border)" }}
+                  <YAxis orientation="right" axisLine={false} tickLine={false} tickCount={4} tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} width={52} tickFormatter={(v: number) => usd(v, 0)} domain={["auto", "auto"]} />
+                  <Tooltip cursor={{ stroke: "var(--color-muted-foreground)", strokeOpacity: 0.3, strokeDasharray: "3 3" }}
+                    contentStyle={{ fontSize: 11, background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 8, boxShadow: "0 8px 24px -8px rgba(0,0,0,0.5)" }}
                     formatter={(v: number) => [signed(v), "Real P&L"]} labelFormatter={(t: string) => new Date(t).toLocaleString()} />
-                  <ReferenceLine y={0} stroke="currentColor" className="text-muted-foreground" strokeDasharray="3 3" />
-                  <Area type="monotone" dataKey="pnl" stroke={up ? "var(--color-primary)" : "var(--color-destructive)"} strokeWidth={2} fill="url(#pbFill)" isAnimationActive={false} />
+                  <ReferenceLine y={0} stroke="var(--color-border)" strokeDasharray="4 4" />
+                  <Area type="monotone" dataKey="pnl" stroke={up ? "var(--color-primary)" : "var(--color-destructive)"} strokeWidth={2.5} fill="url(#pbFill)" isAnimationActive={false}
+                    dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: up ? "var(--color-primary)" : "var(--color-destructive)" }} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
