@@ -23,6 +23,7 @@ import { Route as AuthenticatedCryptoRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedCryptoPaperRouteImport } from './routes/_authenticated/crypto-paper'
 import { Route as AuthenticatedCryptoSandboxRouteImport } from './routes/_authenticated/crypto-sandbox'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedHedgeRouteImport } from './routes/_authenticated/hedge'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
 import { Route as AuthenticatedModelValidationRouteImport } from './routes/_authenticated/model-validation'
@@ -152,6 +153,11 @@ const AuthenticatedCryptoSandboxRoute =
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedHedgeRoute = AuthenticatedHedgeRouteImport.update({
+  id: '/hedge',
+  path: '/hedge',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
@@ -508,6 +514,7 @@ export interface FileRoutesByFullPath {
   '/crypto-paper': typeof AuthenticatedCryptoPaperRoute
   '/crypto-sandbox': typeof AuthenticatedCryptoSandboxRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/hedge': typeof AuthenticatedHedgeRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
@@ -582,6 +589,7 @@ export interface FileRoutesByTo {
   '/crypto-paper': typeof AuthenticatedCryptoPaperRoute
   '/crypto-sandbox': typeof AuthenticatedCryptoSandboxRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/hedge': typeof AuthenticatedHedgeRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
@@ -658,6 +666,7 @@ export interface FileRoutesById {
   '/_authenticated/crypto-paper': typeof AuthenticatedCryptoPaperRoute
   '/_authenticated/crypto-sandbox': typeof AuthenticatedCryptoSandboxRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/hedge': typeof AuthenticatedHedgeRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/live': typeof AuthenticatedLiveRoute
   '/_authenticated/model-validation': typeof AuthenticatedModelValidationRoute
@@ -734,6 +743,7 @@ export interface FileRouteTypes {
     | '/crypto-paper'
     | '/crypto-sandbox'
     | '/dashboard'
+    | '/hedge'
     | '/history'
     | '/live'
     | '/model-validation'
@@ -808,6 +818,7 @@ export interface FileRouteTypes {
     | '/crypto-paper'
     | '/crypto-sandbox'
     | '/dashboard'
+    | '/hedge'
     | '/history'
     | '/live'
     | '/model-validation'
@@ -883,6 +894,7 @@ export interface FileRouteTypes {
     | '/_authenticated/crypto-paper'
     | '/_authenticated/crypto-sandbox'
     | '/_authenticated/dashboard'
+    | '/_authenticated/hedge'
     | '/_authenticated/history'
     | '/_authenticated/live'
     | '/_authenticated/model-validation'
@@ -1099,6 +1111,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/hedge': {
+      id: '/_authenticated/hedge'
+      path: '/hedge'
+      fullPath: '/hedge'
+      preLoaderRoute: typeof AuthenticatedHedgeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/history': {
@@ -1526,6 +1545,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCryptoPaperRoute: typeof AuthenticatedCryptoPaperRoute
   AuthenticatedCryptoSandboxRoute: typeof AuthenticatedCryptoSandboxRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedHedgeRoute: typeof AuthenticatedHedgeRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedLiveRoute: typeof AuthenticatedLiveRoute
   AuthenticatedModelValidationRoute: typeof AuthenticatedModelValidationRoute
@@ -1547,6 +1567,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCryptoPaperRoute: AuthenticatedCryptoPaperRoute,
   AuthenticatedCryptoSandboxRoute: AuthenticatedCryptoSandboxRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedHedgeRoute: AuthenticatedHedgeRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedLiveRoute: AuthenticatedLiveRoute,
   AuthenticatedModelValidationRoute: AuthenticatedModelValidationRoute,
