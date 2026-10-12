@@ -185,8 +185,10 @@ export async function runPaperBotTick() {
         const open = (await Promise.all(series.map(openMarkets))).flat();
         const idxCache = new Map<string, [number, number] | null>();
         // Our odds (crypto page: price + volume) drive BOTH the decision and the
-        // paper fill price. No Kalshi orderbook calls at all — they rate-limit us.
-        const ourPUp = await loadOurPUp(sb);
+        // fill price. Computed live from the spot tape every poll — same math as
+        // the crypto page, no waiting for logged rows. No Kalshi orderbook calls.
+        const tape = await loadSpotTape(sb);
+        const fallbackPUp = tape.length >= 10 ? null : await loadOurPUp(sb);
 
         // Live guards, refreshed every loop: daily loss stop, total open real
         // exposure, and every ticker any engine already bought this window.
