@@ -310,9 +310,9 @@ function PaperDesk() {
         <section className="border border-border rounded-lg p-4 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Profit/Loss</div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Real-money Profit/Loss</div>
               <div className={cn("text-3xl font-bold", up ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>{signed(rangePnl)}</div>
-              <div className="text-[11px] text-muted-foreground">{range.l}</div>
+              <div className="text-[11px] text-muted-foreground">{range.l} · settled Kalshi fills only</div>
             </div>
             <div className="flex border border-border rounded overflow-hidden text-[10px]">
               {RANGES.map((r) => (
