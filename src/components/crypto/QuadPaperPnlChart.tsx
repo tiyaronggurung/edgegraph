@@ -44,7 +44,7 @@ export function QuadPaperPnlChart({ positions }: { positions: QuadPnlPosition[] 
     <div className="min-w-0 space-y-3 border-t border-border pt-4" aria-label="Quad paper P&L chart">
       <div>
         <h3 className="text-sm font-semibold">A/B/C paper profit & loss</h3>
-        <p className="text-[11px] text-muted-foreground">Cumulative settled paper P&L · 15-minute window closes · UTC · most recent 1,000 positions</p>
+        <p className="text-[11px] text-muted-foreground">Cumulative settled paper P&L · 15-minute window closes · your local time · most recent 1,000 positions</p>
       </div>
       <div className="flex flex-wrap gap-2" aria-label="Strategy legends">
         {QUAD_STRATEGIES.map((s) => (
