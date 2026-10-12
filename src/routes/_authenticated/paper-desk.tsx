@@ -151,8 +151,26 @@ function PaperDesk() {
   });
   const pUp = odds.pUp;
   const gap = spot != null && strike != null ? spot - strike : null;
-  const pts = (curve.data ?? []).map((p) => ({ t: p.ts, pnl: Number(p.pnl) }));
-  const rangePnl = range.s === 0 ? Number(s?.total_pnl ?? 0) : pts.length > 1 ? pts[pts.length - 1].pnl - pts[0].pnl : 0;
+  // Real-money P&L only — Paper Desk's live Kalshi fills (source "paper_desk_live"),
+  // settled results from crypto_trades. Paper equity is no longer charted.
+  const realTrades = useRows<any[]>(
+    `real-${range.s}`,
+    () => {
+      let q = db
+        .from("crypto_trades")
+        .select("id, created_at, status, pnl_usd, raw")
+        .eq("status", "settled")
+        .filter("raw->inputs_snapshot->>source", "eq", "paper_desk_live");
+      if (range.s > 0) q = q.gte("created_at", new Date(Date.now() - range.s * 1000).toISOString());
+      return q.order("created_at", { ascending: true }).limit(2000) as never;
+    },
+  );
+  const pts = (realTrades.data ?? [])
+    .map((r) => ({ t: r.raw?.settle?.at ?? r.created_at, pnl: Number(r.pnl_usd ?? 0) }))
+    .sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+  let realAcc = 0;
+  const cum = pts.map((p) => { realAcc += p.pnl; return { t: p.t, pnl: realAcc }; });
+  const rangePnl = realAcc;
   const up = rangePnl >= 0;
   const winRate = s && s.settled_markets > 0 ? `${((s.winning_markets / s.settled_markets) * 100).toFixed(0)}%` : "—";
 
