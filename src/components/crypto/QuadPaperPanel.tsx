@@ -14,7 +14,7 @@ const NAMES: Record<string, string> = {
 };
 
 function Pill({ label, v }: { label: string; v: string | null | undefined }) {
-  const tone = v === "UP" ? "text-[color:var(--color-success,theme(colors.emerald.500))]" : v === "DOWN" ? "text-destructive" : "text-muted-foreground";
+  const tone = v === "UP" ? "text-primary" : v === "DOWN" ? "text-destructive" : "text-muted-foreground";
   return (
     <div className="border border-border rounded-md px-2 py-1">
       <div className="text-[9px] uppercase tracking-widest text-muted-foreground">{label}</div>
