@@ -5845,6 +5845,246 @@ export type Database = {
         }
         Relationships: []
       }
+      pb_equity: {
+        Row: {
+          cash: number
+          equity: number
+          id: number
+          open_value: number
+          pnl: number
+          ts: string
+        }
+        Insert: {
+          cash: number
+          equity: number
+          id?: number
+          open_value: number
+          pnl: number
+          ts: string
+        }
+        Update: {
+          cash?: number
+          equity?: number
+          id?: number
+          open_value?: number
+          pnl?: number
+          ts?: string
+        }
+        Relationships: []
+      }
+      pb_fills: {
+        Row: {
+          contracts: number
+          fee: number
+          gap: number | null
+          id: number
+          index_price: number | null
+          no_avg: number | null
+          no_ct: number | null
+          pair_cost: number | null
+          price: number
+          reason: string
+          side: string
+          strike: number | null
+          ticker: string
+          title: string
+          ts: string
+          yes_avg: number | null
+          yes_ct: number | null
+        }
+        Insert: {
+          contracts: number
+          fee: number
+          gap?: number | null
+          id?: number
+          index_price?: number | null
+          no_avg?: number | null
+          no_ct?: number | null
+          pair_cost?: number | null
+          price: number
+          reason?: string
+          side: string
+          strike?: number | null
+          ticker: string
+          title?: string
+          ts: string
+          yes_avg?: number | null
+          yes_ct?: number | null
+        }
+        Update: {
+          contracts?: number
+          fee?: number
+          gap?: number | null
+          id?: number
+          index_price?: number | null
+          no_avg?: number | null
+          no_ct?: number | null
+          pair_cost?: number | null
+          price?: number
+          reason?: string
+          side?: string
+          strike?: number | null
+          ticker?: string
+          title?: string
+          ts?: string
+          yes_avg?: number | null
+          yes_ct?: number | null
+        }
+        Relationships: []
+      }
+      pb_index_prices: {
+        Row: {
+          coin: string
+          price: number
+          ts: string
+        }
+        Insert: {
+          coin: string
+          price: number
+          ts: string
+        }
+        Update: {
+          coin?: string
+          price?: number
+          ts?: string
+        }
+        Relationships: []
+      }
+      pb_markets: {
+        Row: {
+          close_ts: string
+          coin: string
+          created_at: string
+          event_ticker: string
+          fees: number
+          fills: number
+          index_price: number | null
+          index_ts: string | null
+          last_buy_ts: string | null
+          no_bid: number | null
+          no_cost: number
+          no_ct: number
+          open_ts: string
+          payout: number
+          pnl: number | null
+          result: string | null
+          settled: boolean
+          settled_at: string | null
+          strike: number | null
+          ticker: string
+          title: string
+          yes_bid: number | null
+          yes_cost: number
+          yes_ct: number
+        }
+        Insert: {
+          close_ts: string
+          coin?: string
+          created_at?: string
+          event_ticker: string
+          fees?: number
+          fills?: number
+          index_price?: number | null
+          index_ts?: string | null
+          last_buy_ts?: string | null
+          no_bid?: number | null
+          no_cost?: number
+          no_ct?: number
+          open_ts: string
+          payout?: number
+          pnl?: number | null
+          result?: string | null
+          settled?: boolean
+          settled_at?: string | null
+          strike?: number | null
+          ticker: string
+          title?: string
+          yes_bid?: number | null
+          yes_cost?: number
+          yes_ct?: number
+        }
+        Update: {
+          close_ts?: string
+          coin?: string
+          created_at?: string
+          event_ticker?: string
+          fees?: number
+          fills?: number
+          index_price?: number | null
+          index_ts?: string | null
+          last_buy_ts?: string | null
+          no_bid?: number | null
+          no_cost?: number
+          no_ct?: number
+          open_ts?: string
+          payout?: number
+          pnl?: number | null
+          result?: string | null
+          settled?: boolean
+          settled_at?: string | null
+          strike?: number | null
+          ticker?: string
+          title?: string
+          yes_bid?: number | null
+          yes_cost?: number
+          yes_ct?: number
+        }
+        Relationships: []
+      }
+      pb_settings: {
+        Row: {
+          cash: number
+          id: number
+          last_equity_at: string | null
+          last_error: string | null
+          last_tick_at: string | null
+          lock_until: string | null
+          open_value: number
+          poll_seconds: number
+          reset_epoch: number
+          running: boolean
+          series: string[]
+          start_cash: number
+          strategy: Json
+          taker_fee_rate: number
+          updated_at: string
+        }
+        Insert: {
+          cash?: number
+          id?: number
+          last_equity_at?: string | null
+          last_error?: string | null
+          last_tick_at?: string | null
+          lock_until?: string | null
+          open_value?: number
+          poll_seconds?: number
+          reset_epoch?: number
+          running?: boolean
+          series?: string[]
+          start_cash?: number
+          strategy?: Json
+          taker_fee_rate?: number
+          updated_at?: string
+        }
+        Update: {
+          cash?: number
+          id?: number
+          last_equity_at?: string | null
+          last_error?: string | null
+          last_tick_at?: string | null
+          lock_until?: string | null
+          open_value?: number
+          poll_seconds?: number
+          reset_epoch?: number
+          running?: boolean
+          series?: string[]
+          start_cash?: number
+          strategy?: Json
+          taker_fee_rate?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pending_digest_alerts: {
         Row: {
           alert_date: string
@@ -6425,6 +6665,199 @@ export type Database = {
         }
         Relationships: []
       }
+      pb_v_active_positions: {
+        Row: {
+          close_ts: string | null
+          coin: string | null
+          cost: number | null
+          gap: number | null
+          index_price: number | null
+          index_ts: string | null
+          no_avg: number | null
+          no_bid: number | null
+          no_ct: number | null
+          open_ts: string | null
+          pnl: number | null
+          strike: number | null
+          ticker: string | null
+          title: string | null
+          value: number | null
+          yes_avg: number | null
+          yes_bid: number | null
+          yes_ct: number | null
+        }
+        Insert: {
+          close_ts?: string | null
+          coin?: string | null
+          cost?: never
+          gap?: never
+          index_price?: number | null
+          index_ts?: string | null
+          no_avg?: never
+          no_bid?: number | null
+          no_ct?: number | null
+          open_ts?: string | null
+          pnl?: never
+          strike?: number | null
+          ticker?: string | null
+          title?: string | null
+          value?: never
+          yes_avg?: never
+          yes_bid?: number | null
+          yes_ct?: number | null
+        }
+        Update: {
+          close_ts?: string | null
+          coin?: string | null
+          cost?: never
+          gap?: never
+          index_price?: number | null
+          index_ts?: string | null
+          no_avg?: never
+          no_bid?: number | null
+          no_ct?: number | null
+          open_ts?: string | null
+          pnl?: never
+          strike?: number | null
+          ticker?: string | null
+          title?: string | null
+          value?: never
+          yes_avg?: never
+          yes_bid?: number | null
+          yes_ct?: number | null
+        }
+        Relationships: []
+      }
+      pb_v_activity: {
+        Row: {
+          amount: number | null
+          contracts: number | null
+          gap: number | null
+          pnl: number | null
+          price: number | null
+          reason: string | null
+          side: string | null
+          ticker: string | null
+          title: string | null
+          ts: string | null
+          type: string | null
+        }
+        Relationships: []
+      }
+      pb_v_closed_positions: {
+        Row: {
+          close_ts: string | null
+          coin: string | null
+          cost: number | null
+          fees: number | null
+          no_avg: number | null
+          no_ct: number | null
+          payout: number | null
+          pnl: number | null
+          result: string | null
+          settled_at: string | null
+          strike: number | null
+          ticker: string | null
+          title: string | null
+          yes_avg: number | null
+          yes_ct: number | null
+        }
+        Insert: {
+          close_ts?: string | null
+          coin?: string | null
+          cost?: never
+          fees?: number | null
+          no_avg?: never
+          no_ct?: number | null
+          payout?: number | null
+          pnl?: number | null
+          result?: string | null
+          settled_at?: string | null
+          strike?: number | null
+          ticker?: string | null
+          title?: string | null
+          yes_avg?: never
+          yes_ct?: number | null
+        }
+        Update: {
+          close_ts?: string | null
+          coin?: string | null
+          cost?: never
+          fees?: number | null
+          no_avg?: never
+          no_ct?: number | null
+          payout?: number | null
+          pnl?: number | null
+          result?: string | null
+          settled_at?: string | null
+          strike?: number | null
+          ticker?: string | null
+          title?: string | null
+          yes_avg?: never
+          yes_ct?: number | null
+        }
+        Relationships: []
+      }
+      pb_v_summary: {
+        Row: {
+          biggest_loss: number | null
+          biggest_win: number | null
+          cash: number | null
+          equity: number | null
+          fees: number | null
+          last_error: string | null
+          last_tick_at: string | null
+          markets_traded: number | null
+          positions_value: number | null
+          realized_pnl: number | null
+          running: boolean | null
+          series: string[] | null
+          settled_markets: number | null
+          start_cash: number | null
+          total_pnl: number | null
+          volume: number | null
+          winning_markets: number | null
+        }
+        Insert: {
+          biggest_loss?: never
+          biggest_win?: never
+          cash?: number | null
+          equity?: never
+          fees?: never
+          last_error?: string | null
+          last_tick_at?: string | null
+          markets_traded?: never
+          positions_value?: number | null
+          realized_pnl?: never
+          running?: boolean | null
+          series?: string[] | null
+          settled_markets?: never
+          start_cash?: number | null
+          total_pnl?: never
+          volume?: never
+          winning_markets?: never
+        }
+        Update: {
+          biggest_loss?: never
+          biggest_win?: never
+          cash?: number | null
+          equity?: never
+          fees?: never
+          last_error?: string | null
+          last_tick_at?: string | null
+          markets_traded?: never
+          positions_value?: number | null
+          realized_pnl?: never
+          running?: boolean | null
+          series?: string[] | null
+          settled_markets?: never
+          start_cash?: number | null
+          total_pnl?: never
+          volume?: never
+          winning_markets?: never
+        }
+        Relationships: []
+      }
       v_market_intel_alerts: {
         Row: {
           alert_cadence_high: boolean | null
@@ -6618,6 +7051,25 @@ export type Database = {
           source_queue: string
         }
         Returns: number
+      }
+      paper_bot_acquire_lock: { Args: { seconds: number }; Returns: boolean }
+      paper_bot_equity: {
+        Args: { range_seconds?: number }
+        Returns: {
+          pnl: number
+          ts: string
+        }[]
+      }
+      paper_bot_release_lock: { Args: never; Returns: undefined }
+      paper_bot_reset: { Args: { new_budget: number }; Returns: undefined }
+      paper_bot_update_settings: {
+        Args: {
+          p_running: boolean
+          p_series: string[]
+          p_strategy: Json
+          p_taker_fee_rate: number
+        }
+        Returns: undefined
       }
       prune_btc_candles: { Args: never; Returns: undefined }
       read_email_batch: {

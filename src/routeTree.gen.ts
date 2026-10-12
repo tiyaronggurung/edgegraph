@@ -27,6 +27,7 @@ import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
 import { Route as AuthenticatedModelValidationRouteImport } from './routes/_authenticated/model-validation'
 import { Route as AuthenticatedOpsManualRouteImport } from './routes/_authenticated/ops-manual'
+import { Route as AuthenticatedPaperDeskRouteImport } from './routes/_authenticated/paper-desk'
 import { Route as AuthenticatedPatternPerformanceRouteImport } from './routes/_authenticated/pattern-performance'
 import { Route as AuthenticatedPatternsRouteImport } from './routes/_authenticated/patterns'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -64,6 +65,7 @@ import { Route as ApiPublicHooksMultiTfShadowRouteImport } from './routes/api/pu
 import { Route as ApiPublicHooksOddsShadowTickRouteImport } from './routes/api/public/hooks/odds-shadow-tick'
 import { Route as ApiPublicHooksOpsAutoTradeTickRouteImport } from './routes/api/public/hooks/ops-auto-trade-tick'
 import { Route as ApiPublicHooksOpsDailyBacktestRouteImport } from './routes/api/public/hooks/ops-daily-backtest'
+import { Route as ApiPublicHooksPaperBotTickRouteImport } from './routes/api/public/hooks/paper-bot-tick'
 import { Route as ApiPublicHooksPinRiskShadowTickRouteImport } from './routes/api/public/hooks/pin-risk-shadow-tick'
 import { Route as ApiPublicHooksPredictionRowTickRouteImport } from './routes/api/public/hooks/prediction-row-tick'
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
@@ -170,6 +172,11 @@ const AuthenticatedModelValidationRoute =
 const AuthenticatedOpsManualRoute = AuthenticatedOpsManualRouteImport.update({
   id: '/ops-manual',
   path: '/ops-manual',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPaperDeskRoute = AuthenticatedPaperDeskRouteImport.update({
+  id: '/paper-desk',
+  path: '/paper-desk',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedPatternPerformanceRoute =
@@ -383,6 +390,12 @@ const ApiPublicHooksOpsDailyBacktestRoute =
     path: '/api/public/hooks/ops-daily-backtest',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksPaperBotTickRoute =
+  ApiPublicHooksPaperBotTickRouteImport.update({
+    id: '/api/public/hooks/paper-bot-tick',
+    path: '/api/public/hooks/paper-bot-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPinRiskShadowTickRoute =
   ApiPublicHooksPinRiskShadowTickRouteImport.update({
     id: '/api/public/hooks/pin-risk-shadow-tick',
@@ -492,6 +505,7 @@ export interface FileRoutesByFullPath {
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
   '/ops-manual': typeof AuthenticatedOpsManualRoute
+  '/paper-desk': typeof AuthenticatedPaperDeskRoute
   '/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
   '/patterns': typeof AuthenticatedPatternsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -529,6 +543,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/ops-auto-trade-tick': typeof ApiPublicHooksOpsAutoTradeTickRoute
   '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
+  '/api/public/hooks/paper-bot-tick': typeof ApiPublicHooksPaperBotTickRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -563,6 +578,7 @@ export interface FileRoutesByTo {
   '/live': typeof AuthenticatedLiveRoute
   '/model-validation': typeof AuthenticatedModelValidationRoute
   '/ops-manual': typeof AuthenticatedOpsManualRoute
+  '/paper-desk': typeof AuthenticatedPaperDeskRoute
   '/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
   '/patterns': typeof AuthenticatedPatternsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -600,6 +616,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/ops-auto-trade-tick': typeof ApiPublicHooksOpsAutoTradeTickRoute
   '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
+  '/api/public/hooks/paper-bot-tick': typeof ApiPublicHooksPaperBotTickRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -636,6 +653,7 @@ export interface FileRoutesById {
   '/_authenticated/live': typeof AuthenticatedLiveRoute
   '/_authenticated/model-validation': typeof AuthenticatedModelValidationRoute
   '/_authenticated/ops-manual': typeof AuthenticatedOpsManualRoute
+  '/_authenticated/paper-desk': typeof AuthenticatedPaperDeskRoute
   '/_authenticated/pattern-performance': typeof AuthenticatedPatternPerformanceRoute
   '/_authenticated/patterns': typeof AuthenticatedPatternsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -673,6 +691,7 @@ export interface FileRoutesById {
   '/api/public/hooks/odds-shadow-tick': typeof ApiPublicHooksOddsShadowTickRoute
   '/api/public/hooks/ops-auto-trade-tick': typeof ApiPublicHooksOpsAutoTradeTickRoute
   '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
+  '/api/public/hooks/paper-bot-tick': typeof ApiPublicHooksPaperBotTickRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
   '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -709,6 +728,7 @@ export interface FileRouteTypes {
     | '/live'
     | '/model-validation'
     | '/ops-manual'
+    | '/paper-desk'
     | '/pattern-performance'
     | '/patterns'
     | '/settings'
@@ -746,6 +766,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/ops-auto-trade-tick'
     | '/api/public/hooks/ops-daily-backtest'
+    | '/api/public/hooks/paper-bot-tick'
     | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/prediction-row-tick'
     | '/api/public/hooks/recompute-predictions'
@@ -780,6 +801,7 @@ export interface FileRouteTypes {
     | '/live'
     | '/model-validation'
     | '/ops-manual'
+    | '/paper-desk'
     | '/pattern-performance'
     | '/patterns'
     | '/settings'
@@ -817,6 +839,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/ops-auto-trade-tick'
     | '/api/public/hooks/ops-daily-backtest'
+    | '/api/public/hooks/paper-bot-tick'
     | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/prediction-row-tick'
     | '/api/public/hooks/recompute-predictions'
@@ -852,6 +875,7 @@ export interface FileRouteTypes {
     | '/_authenticated/live'
     | '/_authenticated/model-validation'
     | '/_authenticated/ops-manual'
+    | '/_authenticated/paper-desk'
     | '/_authenticated/pattern-performance'
     | '/_authenticated/patterns'
     | '/_authenticated/settings'
@@ -889,6 +913,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/odds-shadow-tick'
     | '/api/public/hooks/ops-auto-trade-tick'
     | '/api/public/hooks/ops-daily-backtest'
+    | '/api/public/hooks/paper-bot-tick'
     | '/api/public/hooks/pin-risk-shadow-tick'
     | '/api/public/hooks/prediction-row-tick'
     | '/api/public/hooks/recompute-predictions'
@@ -945,6 +970,7 @@ export interface RootRouteChildren {
   ApiPublicHooksOddsShadowTickRoute: typeof ApiPublicHooksOddsShadowTickRoute
   ApiPublicHooksOpsAutoTradeTickRoute: typeof ApiPublicHooksOpsAutoTradeTickRoute
   ApiPublicHooksOpsDailyBacktestRoute: typeof ApiPublicHooksOpsDailyBacktestRoute
+  ApiPublicHooksPaperBotTickRoute: typeof ApiPublicHooksPaperBotTickRoute
   ApiPublicHooksPinRiskShadowTickRoute: typeof ApiPublicHooksPinRiskShadowTickRoute
   ApiPublicHooksPredictionRowTickRoute: typeof ApiPublicHooksPredictionRowTickRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
@@ -1087,6 +1113,13 @@ declare module '@tanstack/react-router' {
       path: '/ops-manual'
       fullPath: '/ops-manual'
       preLoaderRoute: typeof AuthenticatedOpsManualRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/paper-desk': {
+      id: '/_authenticated/paper-desk'
+      path: '/paper-desk'
+      fullPath: '/paper-desk'
+      preLoaderRoute: typeof AuthenticatedPaperDeskRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/pattern-performance': {
@@ -1348,6 +1381,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksOpsDailyBacktestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/paper-bot-tick': {
+      id: '/api/public/hooks/paper-bot-tick'
+      path: '/api/public/hooks/paper-bot-tick'
+      fullPath: '/api/public/hooks/paper-bot-tick'
+      preLoaderRoute: typeof ApiPublicHooksPaperBotTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/pin-risk-shadow-tick': {
       id: '/api/public/hooks/pin-risk-shadow-tick'
       path: '/api/public/hooks/pin-risk-shadow-tick'
@@ -1469,6 +1509,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedLiveRoute: typeof AuthenticatedLiveRoute
   AuthenticatedModelValidationRoute: typeof AuthenticatedModelValidationRoute
   AuthenticatedOpsManualRoute: typeof AuthenticatedOpsManualRoute
+  AuthenticatedPaperDeskRoute: typeof AuthenticatedPaperDeskRoute
   AuthenticatedPatternPerformanceRoute: typeof AuthenticatedPatternPerformanceRoute
   AuthenticatedPatternsRoute: typeof AuthenticatedPatternsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -1489,6 +1530,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedLiveRoute: AuthenticatedLiveRoute,
   AuthenticatedModelValidationRoute: AuthenticatedModelValidationRoute,
   AuthenticatedOpsManualRoute: AuthenticatedOpsManualRoute,
+  AuthenticatedPaperDeskRoute: AuthenticatedPaperDeskRoute,
   AuthenticatedPatternPerformanceRoute: AuthenticatedPatternPerformanceRoute,
   AuthenticatedPatternsRoute: AuthenticatedPatternsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
@@ -1554,6 +1596,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksOddsShadowTickRoute: ApiPublicHooksOddsShadowTickRoute,
   ApiPublicHooksOpsAutoTradeTickRoute: ApiPublicHooksOpsAutoTradeTickRoute,
   ApiPublicHooksOpsDailyBacktestRoute: ApiPublicHooksOpsDailyBacktestRoute,
+  ApiPublicHooksPaperBotTickRoute: ApiPublicHooksPaperBotTickRoute,
   ApiPublicHooksPinRiskShadowTickRoute: ApiPublicHooksPinRiskShadowTickRoute,
   ApiPublicHooksPredictionRowTickRoute: ApiPublicHooksPredictionRowTickRoute,
   ApiPublicHooksRecomputePredictionsRoute:

@@ -28,6 +28,7 @@ const NAV: NavItem[] = [
     children: [
       { to: "/history", label: "P&L / History" },
       { to: "/strategies", label: "Strategies" },
+      { to: "/paper-desk", label: "Paper Desk" },
     ],
   },
   { to: "/settings", label: "Settings" },
