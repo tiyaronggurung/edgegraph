@@ -1,12 +1,10 @@
-// Daily give-back stop — shared by every live betting engine.
+// Daily loss stop — shared by every live betting engine.
 //
 // Rule: once a user's settled real-money losses today (New York day) reach
-// 50% of today's settled real-money gains, no live engine may place another
-// buy for them until the next New York midnight. The rule only arms once
-// there ARE gains today — with no gains on the board yet, there is nothing
-// to give back, so trading stays open. Paper paths are untouched.
+// $50, no live engine may place another buy for them until the next New York
+// midnight. Paper paths are untouched.
 
-export const DAILY_GIVEBACK_RATIO = 0.5;
+export const DAILY_LOSS_LIMIT_USD = 50;
 
 export interface DailyPnl {
   /** Sum of today's positive settled P&L (USD). */
@@ -58,12 +56,9 @@ export async function getDailyLossCounts(
   return totals;
 }
 
-/**
- * True when this user has given back half (or more) of today's gains.
- * No gains today → not stopped (nothing to protect yet).
- */
+/** True when this user's settled losses today have reached the $50 daily stop. */
 export function dailyLossStopHit(totals: Map<string, DailyPnl>, userId: string): boolean {
   const t = totals.get(userId);
-  if (!t || t.gains <= 0) return false;
-  return t.losses >= DAILY_GIVEBACK_RATIO * t.gains;
+  if (!t) return false;
+  return t.losses >= DAILY_LOSS_LIMIT_USD;
 }
