@@ -76,6 +76,7 @@ import { Route as ApiPublicHooksSettleBtcPredictionsRouteImport } from './routes
 import { Route as ApiPublicHooksSpotBufferWriterRouteImport } from './routes/api/public/hooks/spot-buffer-writer'
 import { Route as ApiPublicHooksSpotTickWriterRouteImport } from './routes/api/public/hooks/spot-tick-writer'
 import { Route as ApiPublicHooksStudyAutoLiveTickRouteImport } from './routes/api/public/hooks/study-auto-live-tick'
+import { Route as ApiPublicHooksStudyLeanTickRouteImport } from './routes/api/public/hooks/study-lean-tick'
 import { Route as ApiPublicHooksStudyLockTickRouteImport } from './routes/api/public/hooks/study-lock-tick'
 import { Route as ApiPublicHooksTripleWindowTickRouteImport } from './routes/api/public/hooks/triple-window-tick'
 import { Route as ApiPublicHooksVerdictBetTickRouteImport } from './routes/api/public/hooks/verdict-bet-tick'
@@ -458,6 +459,12 @@ const ApiPublicHooksStudyAutoLiveTickRoute =
     path: '/api/public/hooks/study-auto-live-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksStudyLeanTickRoute =
+  ApiPublicHooksStudyLeanTickRouteImport.update({
+    id: '/api/public/hooks/study-lean-tick',
+    path: '/api/public/hooks/study-lean-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksStudyLockTickRoute =
   ApiPublicHooksStudyLockTickRouteImport.update({
     id: '/api/public/hooks/study-lock-tick',
@@ -574,6 +581,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/spot-buffer-writer': typeof ApiPublicHooksSpotBufferWriterRoute
   '/api/public/hooks/spot-tick-writer': typeof ApiPublicHooksSpotTickWriterRoute
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
+  '/api/public/hooks/study-lean-tick': typeof ApiPublicHooksStudyLeanTickRoute
   '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
   '/api/public/hooks/verdict-bet-tick': typeof ApiPublicHooksVerdictBetTickRoute
@@ -650,6 +658,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/spot-buffer-writer': typeof ApiPublicHooksSpotBufferWriterRoute
   '/api/public/hooks/spot-tick-writer': typeof ApiPublicHooksSpotTickWriterRoute
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
+  '/api/public/hooks/study-lean-tick': typeof ApiPublicHooksStudyLeanTickRoute
   '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
   '/api/public/hooks/verdict-bet-tick': typeof ApiPublicHooksVerdictBetTickRoute
@@ -728,6 +737,7 @@ export interface FileRoutesById {
   '/api/public/hooks/spot-buffer-writer': typeof ApiPublicHooksSpotBufferWriterRoute
   '/api/public/hooks/spot-tick-writer': typeof ApiPublicHooksSpotTickWriterRoute
   '/api/public/hooks/study-auto-live-tick': typeof ApiPublicHooksStudyAutoLiveTickRoute
+  '/api/public/hooks/study-lean-tick': typeof ApiPublicHooksStudyLeanTickRoute
   '/api/public/hooks/study-lock-tick': typeof ApiPublicHooksStudyLockTickRoute
   '/api/public/hooks/triple-window-tick': typeof ApiPublicHooksTripleWindowTickRoute
   '/api/public/hooks/verdict-bet-tick': typeof ApiPublicHooksVerdictBetTickRoute
@@ -806,6 +816,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/spot-buffer-writer'
     | '/api/public/hooks/spot-tick-writer'
     | '/api/public/hooks/study-auto-live-tick'
+    | '/api/public/hooks/study-lean-tick'
     | '/api/public/hooks/study-lock-tick'
     | '/api/public/hooks/triple-window-tick'
     | '/api/public/hooks/verdict-bet-tick'
@@ -882,6 +893,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/spot-buffer-writer'
     | '/api/public/hooks/spot-tick-writer'
     | '/api/public/hooks/study-auto-live-tick'
+    | '/api/public/hooks/study-lean-tick'
     | '/api/public/hooks/study-lock-tick'
     | '/api/public/hooks/triple-window-tick'
     | '/api/public/hooks/verdict-bet-tick'
@@ -959,6 +971,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/spot-buffer-writer'
     | '/api/public/hooks/spot-tick-writer'
     | '/api/public/hooks/study-auto-live-tick'
+    | '/api/public/hooks/study-lean-tick'
     | '/api/public/hooks/study-lock-tick'
     | '/api/public/hooks/triple-window-tick'
     | '/api/public/hooks/verdict-bet-tick'
@@ -1018,6 +1031,7 @@ export interface RootRouteChildren {
   ApiPublicHooksSpotBufferWriterRoute: typeof ApiPublicHooksSpotBufferWriterRoute
   ApiPublicHooksSpotTickWriterRoute: typeof ApiPublicHooksSpotTickWriterRoute
   ApiPublicHooksStudyAutoLiveTickRoute: typeof ApiPublicHooksStudyAutoLiveTickRoute
+  ApiPublicHooksStudyLeanTickRoute: typeof ApiPublicHooksStudyLeanTickRoute
   ApiPublicHooksStudyLockTickRoute: typeof ApiPublicHooksStudyLockTickRoute
   ApiPublicHooksTripleWindowTickRoute: typeof ApiPublicHooksTripleWindowTickRoute
   ApiPublicHooksVerdictBetTickRoute: typeof ApiPublicHooksVerdictBetTickRoute
@@ -1498,6 +1512,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksStudyAutoLiveTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/study-lean-tick': {
+      id: '/api/public/hooks/study-lean-tick'
+      path: '/api/public/hooks/study-lean-tick'
+      fullPath: '/api/public/hooks/study-lean-tick'
+      preLoaderRoute: typeof ApiPublicHooksStudyLeanTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/study-lock-tick': {
       id: '/api/public/hooks/study-lock-tick'
       path: '/api/public/hooks/study-lock-tick'
@@ -1671,6 +1692,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksSpotBufferWriterRoute: ApiPublicHooksSpotBufferWriterRoute,
   ApiPublicHooksSpotTickWriterRoute: ApiPublicHooksSpotTickWriterRoute,
   ApiPublicHooksStudyAutoLiveTickRoute: ApiPublicHooksStudyAutoLiveTickRoute,
+  ApiPublicHooksStudyLeanTickRoute: ApiPublicHooksStudyLeanTickRoute,
   ApiPublicHooksStudyLockTickRoute: ApiPublicHooksStudyLockTickRoute,
   ApiPublicHooksTripleWindowTickRoute: ApiPublicHooksTripleWindowTickRoute,
   ApiPublicHooksVerdictBetTickRoute: ApiPublicHooksVerdictBetTickRoute,
