@@ -29,4 +29,4 @@
 
 ## Crypto lower-page cleanup
 - [x] Remove lower research/report displays and sizing inputs after the Trade Log; retain upper sections, shared sizing values, confirmation modal, feed status and disclaimer.
-- [ ] Verify signed-in Crypto rendering, preserved Trade Log and upper sections, and removed lower displays.
+- [x] Verified signed-in Crypto with real data, preserved Trade Log and upper sections, absent lower displays, no browser errors, build OK and 33 prediction-gate tests passing.
