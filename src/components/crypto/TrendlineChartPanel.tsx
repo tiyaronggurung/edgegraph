@@ -262,6 +262,21 @@ export function TrendlineChartPanel({ embed = false }: { embed?: boolean } = {})
     volumeImbalance3m: volImb3m,
   });
 
+  // Display-only fallback for the odds pill so it never goes blank (warmup at a
+  // new window, a cold tape after returning to the tab). Uses plain spot-vs-strike
+  // physics, else the last shown quote. Never fed into locks, bets or recording.
+  const lastShownQuoteRef = useRef<typeof ourQuote>(null);
+  const displayQuote = useMemo(() => {
+    if (ourQuote) return ourQuote;
+    const k = liveStrike ?? shadowLive?.strike ?? null;
+    if (displaySpot != null && k != null && kalshiRemainingSec != null) {
+      const q = computeOurQuote({ spot: displaySpot, strike: k, secondsToClose: kalshiRemainingSec, sigmaAnnualized: 0.5 });
+      if (q) return q;
+    }
+    return lastShownQuoteRef.current;
+  }, [ourQuote, displaySpot, liveStrike, shadowLive?.strike, kalshiRemainingSec]);
+  if (displayQuote) lastShownQuoteRef.current = displayQuote;
+
   // --- BET UP/DOWN lock @ 75% within first 7 min (session-only W/L history) -------------------
   // Once the recommendation chip hits ≥75% conf inside the first 7 min of the
   // window, freeze that side for the rest of the window AND persist it to
