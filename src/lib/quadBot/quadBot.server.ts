@@ -106,21 +106,31 @@ export async function runQuadBotTick() {
   let signals: any = null;
 
   try {
-    // 1. Settle closed windows.
-    const { data: open } = await sb.from("qc_positions").select("*").eq("settled", false).lt("window_start", wIso);
+    // 1. Settle closed windows (wait 20s after close so the closing data lands).
+    // Sources, in order: logged window outcome → strike (window row, else 1m candle open)
+    // vs close (spot tick in last 60s, else 1m candle close). Spot ticks are pruned after
+    // ~25 min and the window row can be missing, so candles keep settlement from stalling.
+    const { data: open } = await sb.from("qc_positions").select("*").eq("settled", false)
+      .lt("window_start", new Date(wStartMs - (msIn < 20_000 ? WINDOW_MS : 0)).toISOString());
     for (const p of open ?? []) {
-      const closeMs = Date.parse(p.window_start) + WINDOW_MS;
-      const [{ data: led }, { data: tk }] = await Promise.all([
-        sb.from("btc_model_predictions").select("strike").eq("close_time", new Date(closeMs).toISOString())
-          .not("strike", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      const startMs = Date.parse(p.window_start);
+      const closeMs = startMs + WINDOW_MS;
+      const iso = (ms: number) => new Date(ms).toISOString();
+      const [{ data: led }, { data: tk }, { data: cOpen }, { data: cClose }] = await Promise.all([
+        sb.from("btc_model_predictions").select("strike, outcome").eq("close_time", iso(closeMs))
+          .order("created_at", { ascending: false }).limit(1).maybeSingle(),
         sb.from("btc_spot_ticks").select("spot").in("source", ["coinbase", "consolidated"])
-          .lte("observed_at", new Date(closeMs).toISOString())
-          .gte("observed_at", new Date(closeMs - 60_000).toISOString())
+          .lte("observed_at", iso(closeMs)).gte("observed_at", iso(closeMs - 60_000))
           .order("observed_at", { ascending: false }).limit(1).maybeSingle(),
+        sb.from("btc_candles").select("o").eq("tf", "1m").eq("bucket_start", iso(startMs)).limit(1).maybeSingle(),
+        sb.from("btc_candles").select("c").eq("tf", "1m").eq("bucket_start", iso(closeMs - 60_000)).limit(1).maybeSingle(),
       ]);
-      const last = led && tk ? { spot: Number(tk.spot), strike: Number(led.strike) } : null;
-      if (!last || Number(last.spot) === Number(last.strike)) continue;
-      const result: Side = Number(last.spot) > Number(last.strike) ? "UP" : "DOWN";
+      const strike = led?.strike != null ? Number(led.strike) : cOpen?.o != null ? Number(cOpen.o) : null;
+      const spot = tk?.spot != null ? Number(tk.spot) : cClose?.c != null ? Number(cClose.c) : null;
+      let result: Side | null = led?.outcome === "YES" ? "UP" : led?.outcome === "NO" ? "DOWN" : null;
+      if (!result && strike != null && spot != null && spot !== strike) result = spot > strike ? "UP" : "DOWN";
+      if (!result) continue;
+      const last = { spot: spot ?? "n/a", strike: strike ?? "n/a" };
       const payout = result === "UP" ? Number(p.up_ct) : Number(p.down_ct);
       const pnl = Math.round((payout - Number(p.up_cost) - Number(p.down_cost)) * 100) / 100;
       const { data: upd } = await sb.from("qc_positions").update({ settled: true, result, payout, pnl, settled_at: new Date().toISOString() })
