@@ -23,7 +23,7 @@ function PnlTooltip({ active, payload, visible }: {
     <div className="rounded-md border border-border bg-popover p-3 text-xs shadow-sm">
       <div className="mb-2 text-muted-foreground">{new Date(point.time).toLocaleDateString()} · {clock(point.time)} local</div>
       <div className="grid grid-cols-[auto_auto_auto] gap-x-4 gap-y-1">
-        <span /><span className="text-muted-foreground">Total P&L</span><span className="text-muted-foreground">15m P&L</span>
+        <span /><span className="text-muted-foreground">Total P&L</span><span className="text-muted-foreground">1m P&L</span>
         {QUAD_STRATEGIES.filter((s) => visible[s]).map((s) => (
           <div key={s} className="contents">
             <span className={SERIES[s].text}>{s}</span>
@@ -44,7 +44,7 @@ export function QuadPaperPnlChart({ positions }: { positions: QuadPnlPosition[] 
     <div className="min-w-0 space-y-3 border-t border-border pt-4" aria-label="Quad paper P&L chart">
       <div>
         <h3 className="text-sm font-semibold">A/B/C paper profit & loss</h3>
-        <p className="text-[11px] text-muted-foreground">Cumulative settled paper P&L · 15-minute window closes · your local time · most recent 1,000 positions</p>
+        <p className="text-[11px] text-muted-foreground">Cumulative settled paper P&L · 1-minute buckets · your local time · most recent 1,000 positions</p>
       </div>
       <div className="flex flex-wrap gap-2" aria-label="Strategy legends">
         {QUAD_STRATEGIES.map((s) => (
