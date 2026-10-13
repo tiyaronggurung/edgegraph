@@ -2,11 +2,13 @@
 // Runs three strategies side by side on the same live signals:
 //   A  Quad entry: whale (rn1 ≥70% one side) + Study + Model + our odds >52% agree → $leg1, ride to settle.
 //   B  Whale ride: rn1 ≥65% one side + our odds ≥55% same side, entry 50–68¢, $leg1, no hedge.
+//      B fills at Kalshi's real orderbook ask plus Kalshi's taker fee, so P&L is net of fees.
 //   C  Hybrid: A's entry (plus late tiebreaker) with a hedge reserve that locks at ≤ pair_max.
 // NULL fallback: if Study OR Model is missing, the other plus odds ≥60% stands in.
 // If both are missing, or odds are stale, no new entries (open legs may still hedge).
 // Fills priced at our odds (YES = p_up, NO = 1 − p_up); settled on logged spot vs strike.
 
+import { fetchLiveAskCents } from "@/lib/kalshiLiveQuote.server";
 import { type TapeSample, computeUpProbability, effectiveVol, momentumTilt } from "@/lib/ourOdds";
 
 const WINDOW_MS = 900_000;
@@ -182,11 +184,16 @@ export async function runQuadBotTick() {
       for (const strat of STRATS) {
         const { data: pos } = await sb.from("qc_positions").select("*").eq("strategy", strat).eq("window_start", wIso).maybeSingle();
         const empty = !pos || (Number(pos.up_ct) === 0 && Number(pos.down_ct) === 0);
-        const buy = async (side: Side, usd: number, kind: string, why: string, lock = false) => {
-          const px = price(side);
-          const ct = Math.floor(kind === "hedge" ? Number(side === "UP" ? pos.down_ct : pos.up_ct) : usd / px);
+        const buy = async (side: Side, usd: number, kind: string, why: string, lock = false, real?: { px: number }) => {
+          const px = real?.px ?? price(side);
+          // Real Kalshi fills: taker fee = ceil(0.07 × contracts × P × (1−P)) to the cent; fee counts in cost.
+          const feeOf = (n: number) => (real ? Math.ceil(0.07 * n * px * (1 - px) * 100 - 1e-9) / 100 : 0);
+          let ct = Math.floor(kind === "hedge" ? Number(side === "UP" ? pos.down_ct : pos.up_ct) : usd / px);
+          while (real && ct > 0 && ct * px + feeOf(ct) > usd) ct--;
           if (ct < 1) return;
-          const cost = Math.round(ct * px * 100) / 100;
+          const fee = feeOf(ct);
+          const cost = Math.round((ct * px + fee) * 100) / 100;
+          if (real) why += ` · Kalshi ask ${Math.round(px * 100)}¢ (our ${Math.round(price(side) * 100)}¢) · fee $${fee.toFixed(2)}`;
           const row: any = { strategy: strat, window_start: wIso };
           if (side === "UP") { row.up_ct = Number(pos?.up_ct ?? 0) + ct; row.up_cost = Number(pos?.up_cost ?? 0) + cost; }
           else { row.down_ct = Number(pos?.down_ct ?? 0) + ct; row.down_cost = Number(pos?.down_cost ?? 0) + cost; }
@@ -201,9 +208,11 @@ export async function runQuadBotTick() {
           if (strat === "B" && whale?.side && whale.share >= 0.65) {
             // Whale ≥65% + our odds ≥55% same side, entry 50–68¢, flat stake, ride (no hedge).
             const side = whale.side;
-            const px = price(side);
-            if (oddsFor(side) >= 0.55 && px >= 0.5 && px <= 0.68) {
-              await buy(side, leg1, "entry", `whale ${(whale.share * 100).toFixed(0)}% + odds ${(oddsFor(side) * 100).toFixed(0)}%`);
+            // Fill strictly at Kalshi's live ask; no ask = no fill.
+            const askC = oddsFor(side) >= 0.55 && live.ticker ? await fetchLiveAskCents(live.ticker, side === "UP" ? "YES" : "NO") : null;
+            const px = askC != null ? askC / 100 : null;
+            if (px != null && px >= 0.5 && px <= 0.68) {
+              await buy(side, leg1, "entry", `whale ${(whale.share * 100).toFixed(0)}% + odds ${(oddsFor(side) * 100).toFixed(0)}%`, false, { px });
             }
           }
           if (strat === "C") {
