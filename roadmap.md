@@ -26,3 +26,7 @@
 - [ ] Paper hedge bot (hd_settings) runs but sits idle on "waiting for our odds" — it still reads odds from the sparse agreement log; point it at the same self-computed tape odds the Paper Desk bot uses (paper money only, awaiting go-ahead)
 - [ ] Review 26 unresolved critical security findings in the Security view (RLS read-open on pb_*/hd_*/btc_* log tables)
 - [ ] "Waiting for our odds" gaps (recorder writes sparse rows) — user said forget Paper Desk for now
+
+## Crypto lower-page cleanup
+- [x] Remove lower research/report displays and sizing inputs after the Trade Log; retain upper sections, shared sizing values, confirmation modal, feed status and disclaimer.
+- [x] Verified signed-in Crypto with real data, preserved Trade Log and upper sections, absent lower displays, no browser errors, build OK and 33 prediction-gate tests passing.

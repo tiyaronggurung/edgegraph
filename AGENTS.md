@@ -4,3 +4,5 @@
 - The Quad-Confirmation paper engine (quadBot, qc_* tables) is paper-only and isolated from live trading code; it never places real orders, so experiments cannot change live orders.
 - Quad paper P&L charts reuse the panel's positions query and aggregate settled results at 15-minute window closes in a pure presentation helper; this avoids extra polling and changes to trading logic.
 - Quad paper settlement falls back from the window's logged outcome to strike/close from 1m candles when spot ticks or prediction rows are missing; spot ticks are pruned within ~25 minutes, so tick-only settlement stalls.
+
+- Crypto lower-page cleanup is presentation-only: preserve shared hooks, market query fields, manual sizing defaults and order confirmation even when research panels are unmounted, because upper trading controls depend on them.
