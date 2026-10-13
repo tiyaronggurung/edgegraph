@@ -6,7 +6,7 @@ import { buildQuadPnlPoints, QUAD_STRATEGIES, type QuadPnlPoint, type QuadPnlPos
 
 const SERIES = {
   A: { color: "var(--chart-1)", text: "text-chart-1", dot: "bg-chart-1", name: "Quad entry" },
-  B: { color: "var(--chart-2)", text: "text-chart-2", dot: "bg-chart-2", name: "Pair-lock" },
+  B: { color: "var(--chart-2)", text: "text-chart-2", dot: "bg-chart-2", name: "Whale ride" },
   C: { color: "var(--chart-3)", text: "text-chart-3", dot: "bg-chart-3", name: "Quad + late + hedge" },
 };
 const money = (value: number) => `${value < 0 ? "−" : "+"}$${Math.abs(value).toFixed(2)}`;
@@ -23,7 +23,7 @@ function PnlTooltip({ active, payload, visible }: {
     <div className="rounded-md border border-border bg-popover p-3 text-xs shadow-sm">
       <div className="mb-2 text-muted-foreground">{new Date(point.time).toLocaleDateString()} · {clock(point.time)} local</div>
       <div className="grid grid-cols-[auto_auto_auto] gap-x-4 gap-y-1">
-        <span /><span className="text-muted-foreground">Total P&L</span><span className="text-muted-foreground">1m P&L</span>
+        <span /><span className="text-muted-foreground">Total P&L</span><span className="text-muted-foreground">This trade</span>
         {QUAD_STRATEGIES.filter((s) => visible[s]).map((s) => (
           <div key={s} className="contents">
             <span className={SERIES[s].text}>{s}</span>
@@ -44,7 +44,7 @@ export function QuadPaperPnlChart({ positions }: { positions: QuadPnlPosition[] 
     <div className="min-w-0 space-y-3 border-t border-border pt-4" aria-label="Quad paper P&L chart">
       <div>
         <h3 className="text-sm font-semibold">A/B/C paper profit & loss</h3>
-        <p className="text-[11px] text-muted-foreground">Cumulative settled paper P&L · 1-minute buckets · your local time · most recent 1,000 positions</p>
+        <p className="text-[11px] text-muted-foreground">Cumulative settled paper P&L · one point per settled trade · your local time · most recent 1,000 positions</p>
       </div>
       <div className="flex flex-wrap gap-2" aria-label="Strategy legends">
         {QUAD_STRATEGIES.map((s) => (
@@ -73,8 +73,9 @@ export function QuadPaperPnlChart({ positions }: { positions: QuadPnlPosition[] 
               <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeDasharray="4 4" />
               <Tooltip content={<PnlTooltip visible={visible} />} />
               {QUAD_STRATEGIES.filter((s) => visible[s]).map((s) => (
-                <Line key={s} dataKey={s} name={s} type="stepAfter" stroke={SERIES[s].color}
-                  strokeWidth={2} dot={points.length < 3} activeDot={{ r: 4 }} isAnimationActive={false} />
+                <Line key={s} dataKey={s} name={s} type="monotone" stroke={SERIES[s].color}
+                  strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round"
+                  dot={points.length < 3} activeDot={{ r: 4 }} isAnimationActive={false} />
               ))}
             </LineChart>
           </ResponsiveContainer>
