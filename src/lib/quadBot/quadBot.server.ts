@@ -1,7 +1,8 @@
 // Quad-Confirmation paper engine (PAPER ONLY — never places real orders).
 // Runs three strategies side by side on the same live signals:
 //   A  Quad entry: whale (rn1 ≥70% one side) + Study + Model + our odds >52% agree → $leg1, ride to settle.
-//   B  Whale ride: rn1 ≥65% one side + our odds ≥55% same side, entry 50–68¢, $leg1, no hedge.
+//   B  Whale ride: rn1 ≥65% (≥$30) one side + our odds ≥55% same side, entry 50–68¢, $leg1, no hedge;
+//      sells 100% at the Kalshi bid once it reaches 88¢ (no stop loss).
 //      B fills at Kalshi's real orderbook ask plus Kalshi's taker fee, so P&L is net of fees.
 //   C  Hybrid: A's entry (plus late tiebreaker) with a hedge reserve that locks at ≤ pair_max.
 // NULL fallback: if Study OR Model is missing, the other plus odds ≥60% stands in.
