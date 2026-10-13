@@ -37,3 +37,24 @@ export async function fetchLiveAskCents(ticker: string, side: "YES" | "NO"): Pro
     return null;
   }
 }
+
+// Live Kalshi best bid for selling a side we hold (YES bid / NO bid). Null on any failure.
+export async function fetchLiveBidCents(ticker: string, side: "YES" | "NO"): Promise<number | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2_000);
+    const res = await fetch(`${KALSHI}/markets/${encodeURIComponent(ticker)}/orderbook?depth=5`, {
+      headers: { accept: "application/json" },
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timer));
+    if (!res.ok) return null;
+    const j = (await res.json()) as {
+      orderbook_fp?: { yes_dollars?: Level[]; no_dollars?: Level[] };
+    };
+    const ob = j.orderbook_fp;
+    if (!ob) return null;
+    return bestBidCents(side === "YES" ? ob.yes_dollars : ob.no_dollars);
+  } catch {
+    return null;
+  }
+}

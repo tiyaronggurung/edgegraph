@@ -1,14 +1,18 @@
 // Quad-Confirmation paper engine (PAPER ONLY — never places real orders).
 // Runs three strategies side by side on the same live signals:
 //   A  Quad entry: whale (rn1 ≥70% one side) + Study + Model + our odds >52% agree → $leg1, ride to settle.
-//   B  Whale ride: rn1 ≥65% one side + our odds ≥55% same side, entry 50–68¢, $leg1, no hedge.
+//   B  Whale ride: rn1 ≥65% (≥$30) one side + our odds ≥55% same side, entry 50–68¢, $leg1, no hedge;
+//      sells 100% at the Kalshi bid once it reaches 88¢ (no stop loss).
 //      B fills at Kalshi's real orderbook ask plus Kalshi's taker fee, so P&L is net of fees.
 //   C  Hybrid: A's entry (plus late tiebreaker) with a hedge reserve that locks at ≤ pair_max.
 // NULL fallback: if Study OR Model is missing, the other plus odds ≥60% stands in.
 // If both are missing, or odds are stale, no new entries (open legs may still hedge).
 // Fills priced at our odds (YES = p_up, NO = 1 − p_up); settled on logged spot vs strike.
 
-import { fetchLiveAskCents } from "@/lib/kalshiLiveQuote.server";
+import { fetchLiveAskCents, fetchLiveBidCents } from "@/lib/kalshiLiveQuote.server";
+
+const B_MIN_WHALE_USD = 30; // B needs at least this many dollars from the whale on its side
+const B_TAKE_PROFIT_CENTS = 88; // B sells everything once the Kalshi bid reaches this
 import { type TapeSample, computeUpProbability, effectiveVol, momentumTilt } from "@/lib/ourOdds";
 
 const WINDOW_MS = 900_000;
@@ -179,6 +183,32 @@ export async function runQuadBotTick() {
     }
     signals.quad = quad; signals.late = late;
 
+    // B take-profit: sell 100% at Kalshi's live bid once it reaches 88¢ (no stop loss).
+    // Runs regardless of our odds freshness; the position is closed and P&L banked immediately.
+    {
+      const { data: bp } = await sb.from("qc_positions").select("*").eq("strategy", "B").eq("window_start", wIso)
+        .eq("settled", false).maybeSingle();
+      const ct = bp ? Math.max(Number(bp.up_ct), Number(bp.down_ct)) : 0;
+      if (bp && ct > 0 && live.ticker && secsLeft > 5) {
+        const held: Side = Number(bp.up_ct) > 0 ? "UP" : "DOWN";
+        const bidC = await fetchLiveBidCents(live.ticker, held === "UP" ? "YES" : "NO");
+        if (bidC != null && bidC >= B_TAKE_PROFIT_CENTS) {
+          const px = bidC / 100;
+          const fee = Math.ceil(0.07 * ct * px * (1 - px) * 100 - 1e-9) / 100;
+          const proceeds = Math.round((ct * px - fee) * 100) / 100;
+          const pnl = Math.round((proceeds - Number(bp.up_cost) - Number(bp.down_cost)) * 100) / 100;
+          const { data: upd } = await sb.from("qc_positions")
+            .update({ settled: true, result: held, payout: proceeds, pnl, settled_at: new Date().toISOString() })
+            .eq("id", bp.id).eq("settled", false).select("id");
+          if (upd?.length) {
+            fills.push({ strategy: "B", window_start: wIso, side: held, kind: "exit", contracts: ct, price: px, amount: proceeds,
+              reason: `take profit at Kalshi bid ${bidC}¢ · fee $${fee.toFixed(2)} · banked P&L ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}`,
+              signals, ms_from_start: msIn });
+          }
+        }
+      }
+    }
+
     const canEnter = fresh && msIn >= 90_000 && secsLeft > 60;
     if (fresh && secsLeft > 60) {
       for (const strat of STRATS) {
@@ -205,14 +235,15 @@ export async function runQuadBotTick() {
         if (empty) {
           if (!canEnter) continue;
           if (strat === "A" && quad && price(quad) <= entryMax) await buy(quad, leg1, "entry", `quad: ${quadWhy}`);
-          if (strat === "B" && whale?.side && whale.share >= 0.65) {
-            // Whale ≥65% + our odds ≥55% same side, entry 50–68¢, flat stake, ride (no hedge).
+          const whaleSideUsd = whale?.side ? (whale.side === "UP" ? whale.up : whale.down) : 0;
+          if (strat === "B" && whale?.side && whale.share >= 0.65 && whaleSideUsd >= B_MIN_WHALE_USD) {
+            // Whale ≥65% with ≥$30 on that side + our odds ≥55% same side, entry 50–68¢, flat stake.
             const side = whale.side;
             // Fill strictly at Kalshi's live ask; no ask = no fill.
             const askC = oddsFor(side) >= 0.55 && live.ticker ? await fetchLiveAskCents(live.ticker, side === "UP" ? "YES" : "NO") : null;
             const px = askC != null ? askC / 100 : null;
             if (px != null && px >= 0.5 && px <= 0.68) {
-              await buy(side, leg1, "entry", `whale ${(whale.share * 100).toFixed(0)}% + odds ${(oddsFor(side) * 100).toFixed(0)}%`, false, { px });
+              await buy(side, leg1, "entry", `whale ${(whale.share * 100).toFixed(0)}% ($${whaleSideUsd.toFixed(0)}) + odds ${(oddsFor(side) * 100).toFixed(0)}%`, false, { px });
             }
           }
           if (strat === "C") {
