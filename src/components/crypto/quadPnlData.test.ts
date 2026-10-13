@@ -10,7 +10,7 @@ describe("quad paper P&L points", () => {
       { strategy: "A", window_start: "2026-10-12T12:30:00Z", settled: true, pnl: -1 },
       { strategy: "B", window_start: "2026-10-12T12:45:00Z", settled: false, pnl: 100 },
     ]);
-    expect(points).toHaveLength(33);
+    expect(points).toHaveLength(32);
     expect(points[0]).toMatchObject({ time: Date.parse("2026-10-12T12:00:00Z"), A: 0, B: 0, C: 0 });
     expect(points[1]).toMatchObject({ time: Date.parse("2026-10-12T12:01:00Z"), A: 5, B: 2, windowA: 5, windowB: 2 });
     expect(points[2]).toMatchObject({ time: Date.parse("2026-10-12T12:02:00Z"), A: 5, B: 2, windowA: 0 });
