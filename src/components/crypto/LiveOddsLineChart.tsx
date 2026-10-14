@@ -275,6 +275,16 @@ export function LiveOddsLineChart({
             </g>
           </>
         )}
+        {sel?.result && (
+          <g transform={`translate(${plotW - 14},${sel.result === "UP" ? PAD_T + 14 : PAD_T + plotH - 14})`}>
+            <circle r={11} fill={sel.result === "UP" ? "var(--color-primary)" : "var(--color-destructive)"} />
+            {sel.result === "UP" ? (
+              <path d="M-5 0 L-1.5 4 L5 -4" fill="none" stroke="var(--color-background)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+            ) : (
+              <path d="M-4 -4 L4 4 M-4 4 L4 -4" fill="none" stroke="var(--color-background)" strokeWidth={2.5} strokeLinecap="round" />
+            )}
+          </g>
+        )}
         {!viewPts.length && sel && (
           <text x={plotW / 2} y={H / 2} textAnchor="middle" fontSize="12" fill="var(--color-muted-foreground)">No line recorded for this window</text>
         )}
