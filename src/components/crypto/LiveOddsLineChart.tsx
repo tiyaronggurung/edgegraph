@@ -80,9 +80,18 @@ export function LiveOddsLineChart({
       points: [...merged.entries()].sort((a, b) => a[0] - b[0]),
     };
     if (k != null) row.strike = k;
-    if (final && k != null && s != null && !existing?.result) {
-      row.close_spot = s;
-      row.result = s >= k ? "UP" : "DOWN";
+    if (final && !existing?.result) {
+      // Kalshi's official settlement is the source of truth; our own spot can
+      // drift a few dollars from their expiration_value near the strike.
+      const ticker = tickerForWindowClose(ws + WIN_MS);
+      const ks = ticker ? await fetchKalshiSettlement(ticker) : null;
+      if (ks?.finalized && ks.result) {
+        row.result = ks.result === "yes" ? "UP" : "DOWN";
+        row.close_spot = ks.expirationValue ?? s;
+      } else if (k != null && s != null) {
+        row.close_spot = s;
+        row.result = s >= k ? "UP" : "DOWN";
+      }
     }
     await db.from("live_odds_windows").upsert(row, { onConflict: "window_start" });
   };
