@@ -13,6 +13,7 @@ import { getCompositeDayTotals } from "@/lib/compositeDayTotals.functions";
 import { DeskVolumeDetails } from "@/components/crypto/DeskVolumeDetails";
 import { BtcPriceVolumeCard } from "@/components/crypto/BtcPriceVolumeCard";
 import { QuadPaperPanel } from "@/components/crypto/QuadPaperPanel";
+import { LiveOddsLineChart } from "@/components/crypto/LiveOddsLineChart";
 import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -328,6 +329,7 @@ function PaperDesk() {
         day={dayTotals?.ok ? dayTotals : null}
         price={spot}
       />
+      <LiveOddsLineChart upAsk={odds.upAsk} winStart={winStart} />
       <QuadPaperPanel isAdmin={isAdmin} />
 
 
