@@ -1,5 +1,9 @@
 # Roadmap
 
+## Strategy C equal-dollar sizing
+- [x] Change only C's hedge to the same dollar budget as its entry; retain entry and pair-price gates, prevent repeat hedges, remove profit-lock claim.
+- [x] Seven sizing/chart tests pass, build OK; A/B trading branches unchanged. Signed-in display verified, but no actual C fill was available to verify end-to-end; unattended cron needs publishing.
+
 ## Quad paper P&L graph
 - [x] Add combined cumulative A/B/C lines at 15-minute closes with independently clickable legends.
 - [x] Verify aggregation (3 passing tests) and signed-in graph with existing paper results, A-only view, all-hidden state and restored lines; no browser errors, trading logic unchanged.
