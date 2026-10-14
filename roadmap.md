@@ -1,5 +1,9 @@
 # Roadmap
 
+## Strategy C settled profit
+- [ ] Verify C's settled profit against both recorded legs and expose its payout/cost breakdown; preserve A/B and historical fills.
+- [ ] Test calculation and verify signed-in Paper Desk with recorded settled C trades.
+
 ## Strategy C equal-dollar sizing
 - [x] Change only C's hedge to the same dollar budget as its entry; retain entry and pair-price gates, prevent repeat hedges, remove profit-lock claim.
 - [x] Seven sizing/chart tests pass, build OK; A/B trading branches unchanged. Signed-in display verified, but no actual C fill was available to verify end-to-end; unattended cron needs publishing.
