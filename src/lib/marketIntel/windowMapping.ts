@@ -117,6 +117,33 @@ export function parseKalshiBtcTicker(ticker: string | null | undefined): ParsedT
   };
 }
 
+const MONTH_ABBR = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+/**
+ * Inverse of parseKalshiBtcTicker: build the KXBTC15M ticker for the 15-min
+ * window whose close (ET wall clock) is `closeUtcMs`. Browser-safe, no I/O.
+ */
+export function tickerForWindowClose(closeUtcMs: number): string | null {
+  if (!Number.isFinite(closeUtcMs)) return null;
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour12: false,
+    year: "2-digit",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const parts = dtf.formatToParts(new Date(closeUtcMs));
+  const map: Record<string, string> = {};
+  for (const p of parts) if (p.type !== "literal") map[p.type] = p.value;
+  const mon = MONTH_ABBR[Number(map.month) - 1];
+  if (!mon) return null;
+  const hh = map.hour === "24" ? "00" : map.hour;
+  const hhmm = `${hh}${map.minute}`;
+  return `KXBTC15M-${map.year}${mon}${map.day}${hhmm}-${map.minute}`;
+}
+
 /** Bucket a seconds-to-close value into one of the fixed evaluation buckets. */
 export function bucketTimeToClose(secondsToClose: number | null | undefined): TimeBucket | null {
   if (secondsToClose == null || !Number.isFinite(secondsToClose) || secondsToClose < 0) return null;
