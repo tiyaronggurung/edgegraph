@@ -294,10 +294,10 @@ function PaperDesk() {
         <div className="border border-border rounded-lg p-3">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Our odds</div>
           <div className="mt-1 flex items-baseline gap-3">
-            <span className="text-xl font-bold text-[color:var(--color-primary)]">UP {cents(pUp)}</span>
-            <span className="text-xl font-bold text-[color:var(--color-destructive)]">DOWN {cents(pUp != null ? 1 - pUp : null)}</span>
+            <span className="text-xl font-bold text-[color:var(--color-primary)]">UP {odds.upAsk == null ? "—" : `${(odds.upAsk * 100).toFixed(1)}¢`}</span>
+            <span className="text-xl font-bold text-[color:var(--color-destructive)]">DOWN {odds.downAsk == null ? "—" : `${(odds.downAsk * 100).toFixed(1)}¢`}</span>
           </div>
-          <div className="text-[10px] text-muted-foreground mt-1">live · same engine as crypto page</div>
+          <div className="text-[10px] text-muted-foreground mt-1">p(up) {pUp == null ? "—" : `${(pUp * 100).toFixed(1)}%`} · same as crypto page</div>
         </div>
         <div className="border border-border rounded-lg p-3">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Kalshi market</div>
