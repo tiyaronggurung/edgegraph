@@ -106,7 +106,19 @@ export function LiveOddsLineChart({
     void (async () => {
       let changed = false;
       for (const h of pending) {
-        const close = new Date(Date.parse(h.window_start) + WIN_MS).toISOString();
+        const closeMs = Date.parse(h.window_start) + WIN_MS;
+        const close = new Date(closeMs).toISOString();
+        // Primary: Kalshi's official settlement for this window's ticker.
+        const ticker = tickerForWindowClose(closeMs);
+        const ks = ticker ? await fetchKalshiSettlement(ticker) : null;
+        if (ks?.finalized && ks.result) {
+          await db.from("live_odds_windows")
+            .update({ result: ks.result === "yes" ? "UP" : "DOWN", close_spot: ks.expirationValue ?? h.close_spot })
+            .eq("window_start", h.window_start);
+          changed = true;
+          continue;
+        }
+        // Fallback: our recorded model outcome for the same close time.
         const { data } = await db
           .from("btc_model_predictions").select("outcome,strike")
           .eq("close_time", close).not("outcome", "is", null).limit(1).maybeSingle();
@@ -214,7 +226,7 @@ export function LiveOddsLineChart({
             ) : null}
             {sel?.result && (
               <span className={cn("font-bold", sel.result === "UP" ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>
-                settled {sel.result}
+                settled {sel.result === "UP" ? "✓" : "✗"} {sel.result}
               </span>
             )}
           </div>
@@ -263,6 +275,16 @@ export function LiveOddsLineChart({
             </g>
           </>
         )}
+        {sel?.result && (
+          <g transform={`translate(${plotW - 14},${sel.result === "UP" ? PAD_T + 14 : PAD_T + plotH - 14})`}>
+            <circle r={11} fill={sel.result === "UP" ? "var(--color-primary)" : "var(--color-destructive)"} />
+            {sel.result === "UP" ? (
+              <path d="M-5 0 L-1.5 4 L5 -4" fill="none" stroke="var(--color-background)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+            ) : (
+              <path d="M-4 -4 L4 4 M-4 4 L4 -4" fill="none" stroke="var(--color-background)" strokeWidth={2.5} strokeLinecap="round" />
+            )}
+          </g>
+        )}
         {!viewPts.length && sel && (
           <text x={plotW / 2} y={H / 2} textAnchor="middle" fontSize="12" fill="var(--color-muted-foreground)">No line recorded for this window</text>
         )}
@@ -284,7 +306,7 @@ export function LiveOddsLineChart({
                 active ? "bg-card" : "opacity-80 hover:opacity-100",
               )}
             >
-              {isUp ? "▲" : "▼"} {fmtTime(Date.parse(h.window_start))}
+              {isUp ? "▲✓" : "▼✗"} {fmtTime(Date.parse(h.window_start))}
             </button>
           );
         })}
