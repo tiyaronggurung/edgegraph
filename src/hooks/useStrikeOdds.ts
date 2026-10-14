@@ -511,14 +511,48 @@ export function computeStrikeOdds(
 
   const agree = clamp(conviction, 0, 1);           // only positive backing lifts the cap
   const timeDone = 1 - timeWeight;                 // 0 at open, 1 at the bell
-  const pCap = P_CAP_BASE + (P_CAP_MAX - P_CAP_BASE) * agree * timeDone;
+  let pCap = P_CAP_BASE + (P_CAP_MAX - P_CAP_BASE) * agree * timeDone;
   let k = SHRINK_MIN + (1 - SHRINK_MIN) * ((conviction + 1) / 2);
   if (tape.length < WARM_SAMPLES) k *= 0.85;       // cold tape = less trust in σ
-  const pCal = 0.5 + (pRaw - 0.5) * k;
+
+  // --- Step A: closing-time fade -------------------------------------------
+  // 0 until 3 min left, ramps to 1 by the final 60s. Indicator shrink fades
+  // out and pure distance-vs-σ√T (no drift tilt) takes over.
+  const lateFade = clamp((180 - secs) / 120, 0, 1);
+  k = k + (1 - k) * lateFade;
+  const pSrc = pRaw * (1 - lateFade) + pBase * lateFade;
+
+  // --- Step B: runway-based cap (lead in σ, final 2 min) --------------------
+  const leadSigmas = sd > 0 ? b / sd : 0;
+  if (secs <= 120) {
+    const capLift = clamp(leadSigmas - 1, 0, 1); // full lift at ≥ 2σ
+    pCap = Math.max(pCap, P_CAP_BASE + (0.99 - P_CAP_BASE) * capLift);
+  }
+
+  let pLead = 0.5 + (pSrc - 0.5) * k;               // probability of current side's direction (signed via pUp)
+
+  // --- Step C: empirical last-minute dollar-lead bands ----------------------
+  const leadUsd = Math.abs(spot - strike);
+  const bandW = clamp((120 - secs) / 60, 0, 1);    // ramps in, full in final minute
+  if (bandW > 0) {
+    const sideP = side === "UP" ? pLead : 1 - pLead;
+    let lo = 0, hi = 1;
+    if (leadUsd >= 40) { lo = 0.96; hi = 0.99; }
+    else if (leadUsd >= 20) { lo = 0.90; hi = 0.95; }
+    else if (leadUsd >= 10) { lo = 0.80; hi = 0.88; }
+    else { lo = 0.5; hi = 0.70; }
+    const target = clamp(sideP, lo, hi);
+    const blended = sideP + (target - sideP) * bandW;
+    pCap = Math.max(pCap, blended);
+    pLead = side === "UP" ? blended : 1 - blended;
+  }
+
+  const pCal = pLead;
   const pUp = clamp(pCal, 1 - pCap, pCap);
   const calibNote =
     `conviction ${conviction >= 0 ? "+" : ""}${(conviction * 100).toFixed(0)}% · ` +
-    `cap ${(pCap * 100).toFixed(0)}% · raw ${(pRaw * 100).toFixed(0)}%`;
+    `cap ${(pCap * 100).toFixed(0)}% · raw ${(pRaw * 100).toFixed(0)}%` +
+    (lateFade > 0 ? ` · late ${(lateFade * 100).toFixed(0)}% · ${leadSigmas.toFixed(1)}σ` : "");
 
   const spread = SPREAD_BASE + SPREAD_K * Math.sqrt(secs / 900);
   return {
