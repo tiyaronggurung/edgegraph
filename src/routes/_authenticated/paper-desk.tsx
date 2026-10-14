@@ -11,6 +11,7 @@ import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
 import { getBtcMultiVenueVolume } from "@/lib/btcMultiVenueVolume.functions";
 import { getCompositeDayTotals } from "@/lib/compositeDayTotals.functions";
 import { DeskVolumeDetails } from "@/components/crypto/DeskVolumeDetails";
+import { BtcPriceVolumeCard } from "@/components/crypto/BtcPriceVolumeCard";
 import { QuadPaperPanel } from "@/components/crypto/QuadPaperPanel";
 import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
@@ -29,6 +30,15 @@ export const Route = createFileRoute("/_authenticated/paper-desk")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
+  // Warm the same queries the Crypto page prefetches so odds/price are live on open.
+  loader: async ({ context }) => {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) return;
+    const winStart = Math.floor(Date.now() / 900_000) * 900_000;
+    context.queryClient.prefetchQuery({ queryKey: ["btc-markets"], queryFn: () => getBtcMarkets() }).catch(() => {});
+    context.queryClient.prefetchQuery({ queryKey: ["btc-essential-snapshot", winStart], queryFn: () => getBtcEssentialSnapshot(), staleTime: 1_000 }).catch(() => {});
+    context.queryClient.prefetchQuery({ queryKey: ["btc-flow-lean-history"], queryFn: () => getBtcFlowLeanHistory() }).catch(() => {});
+  },
   component: PaperDesk,
 });
 
@@ -275,16 +285,19 @@ function PaperDesk() {
       </header>
       {s?.last_error && <p className="text-[11px] text-[color:var(--color-destructive)]">⚠ {s.last_error}</p>}
 
+      {/* Exact Crypto page card — same odds engine, same query keys */}
+      <BtcPriceVolumeCard />
+
       {/* Live data strip — identical feeds to the crypto page: our odds,
           Kalshi prices, composite price vs strike, window volume, clock */}
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="border border-border rounded-lg p-3">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Our odds</div>
           <div className="mt-1 flex items-baseline gap-3">
-            <span className="text-xl font-bold text-[color:var(--color-primary)]">UP {cents(pUp)}</span>
-            <span className="text-xl font-bold text-[color:var(--color-destructive)]">DOWN {cents(pUp != null ? 1 - pUp : null)}</span>
+            <span className="text-xl font-bold text-[color:var(--color-primary)]">UP {odds.upAsk == null ? "—" : `${(odds.upAsk * 100).toFixed(1)}¢`}</span>
+            <span className="text-xl font-bold text-[color:var(--color-destructive)]">DOWN {odds.downAsk == null ? "—" : `${(odds.downAsk * 100).toFixed(1)}¢`}</span>
           </div>
-          <div className="text-[10px] text-muted-foreground mt-1">live · same engine as crypto page</div>
+          <div className="text-[10px] text-muted-foreground mt-1">p(up) {pUp == null ? "—" : `${(pUp * 100).toFixed(1)}%`} · same as crypto page</div>
         </div>
         <div className="border border-border rounded-lg p-3">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Kalshi market</div>
