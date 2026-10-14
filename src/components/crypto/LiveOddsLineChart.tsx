@@ -65,21 +65,51 @@ export function LiveOddsLineChart({
     const { strike: k, spot: s } = latest.current;
     if (!data.length) return;
     const iso = new Date(ws).toISOString();
-    // Keep the longer recording if another tab already saved more points.
-    const existing = history.data?.find((h) => Date.parse(h.window_start) === ws);
-    const enc = encode(data, ws);
+    // Merge with whatever is already saved (other tabs / before a reload) so a
+    // fresh page never overwrites a longer recording.
+    const { data: existing } = await db
+      .from("live_odds_windows").select("points,strike,result").eq("window_start", iso).maybeSingle();
+    const merged = new Map<number, number>();
+    for (const [sec, u] of (existing?.points ?? []) as [number, number][]) merged.set(sec, u);
+    for (const [sec, u] of encode(data, ws)) merged.set(sec, u);
     const row: Record<string, unknown> = {
       window_start: iso,
       updated_at: new Date().toISOString(),
+      points: [...merged.entries()].sort((a, b) => a[0] - b[0]),
     };
-    if (!existing || (existing.points?.length ?? 0) <= enc.length) row.points = enc;
     if (k != null) row.strike = k;
-    if (final && k != null && s != null) {
+    if (final && k != null && s != null && !existing?.result) {
       row.close_spot = s;
       row.result = s >= k ? "UP" : "DOWN";
     }
     await db.from("live_odds_windows").upsert(row, { onConflict: "window_start" });
   };
+
+  // Windows that closed while the page was shut: take the settled result
+  // from the recorded window outcome so their chip still appears.
+  useEffect(() => {
+    const pending = (history.data ?? []).filter(
+      (h) => !h.result && Date.parse(h.window_start) + WIN_MS < Date.now(),
+    );
+    if (!pending.length) return;
+    void (async () => {
+      let changed = false;
+      for (const h of pending) {
+        const close = new Date(Date.parse(h.window_start) + WIN_MS).toISOString();
+        const { data } = await db
+          .from("btc_model_predictions").select("outcome,strike")
+          .eq("close_time", close).not("outcome", "is", null).limit(1).maybeSingle();
+        if (!data?.outcome) continue;
+        const result = data.outcome === "YES" ? "UP" : "DOWN";
+        await db.from("live_odds_windows")
+          .update({ result, strike: h.strike ?? data.strike })
+          .eq("window_start", h.window_start);
+        changed = true;
+      }
+      if (changed) void qc.invalidateQueries({ queryKey: ["live-odds-windows"] });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history.data]);
 
   // Rollover: settle the finished window, then start fresh. Load any points
   // already saved for the new window (e.g. page reopened mid-window).
