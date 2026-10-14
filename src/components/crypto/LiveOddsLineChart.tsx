@@ -106,7 +106,19 @@ export function LiveOddsLineChart({
     void (async () => {
       let changed = false;
       for (const h of pending) {
-        const close = new Date(Date.parse(h.window_start) + WIN_MS).toISOString();
+        const closeMs = Date.parse(h.window_start) + WIN_MS;
+        const close = new Date(closeMs).toISOString();
+        // Primary: Kalshi's official settlement for this window's ticker.
+        const ticker = tickerForWindowClose(closeMs);
+        const ks = ticker ? await fetchKalshiSettlement(ticker) : null;
+        if (ks?.finalized && ks.result) {
+          await db.from("live_odds_windows")
+            .update({ result: ks.result === "yes" ? "UP" : "DOWN", close_spot: ks.expirationValue ?? h.close_spot })
+            .eq("window_start", h.window_start);
+          changed = true;
+          continue;
+        }
+        // Fallback: our recorded model outcome for the same close time.
         const { data } = await db
           .from("btc_model_predictions").select("outcome,strike")
           .eq("close_time", close).not("outcome", "is", null).limit(1).maybeSingle();
