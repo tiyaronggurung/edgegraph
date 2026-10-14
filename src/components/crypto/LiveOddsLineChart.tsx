@@ -275,14 +275,10 @@ export function LiveOddsLineChart({
             </g>
           </>
         )}
-        {sel?.result && (
-          <g transform={`translate(${plotW - 14},${sel.result === "UP" ? PAD_T + 14 : PAD_T + plotH - 14})`}>
-            <circle r={11} fill={sel.result === "UP" ? "var(--color-primary)" : "var(--color-destructive)"} />
-            {sel.result === "UP" ? (
-              <path d="M-5 0 L-1.5 4 L5 -4" fill="none" stroke="var(--color-background)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-            ) : (
-              <path d="M-4 -4 L4 4 M-4 4 L4 -4" fill="none" stroke="var(--color-background)" strokeWidth={2.5} strokeLinecap="round" />
-            )}
+        {sel?.result && last && (
+          <g transform={`translate(${Math.min(x(last.t) + 1, plotW - 10)},${sel.result === "UP" ? y(last.up) : y(1 - last.up)})`}>
+            <circle r={9} fill={sel.result === "UP" ? "var(--color-primary)" : "var(--color-destructive)"} />
+            <path d="M-4 0.5 L-1.5 3.5 L4 -3" fill="none" stroke="var(--color-background)" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
           </g>
         )}
         {!viewPts.length && sel && (
