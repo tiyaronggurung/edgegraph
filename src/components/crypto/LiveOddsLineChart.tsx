@@ -226,7 +226,7 @@ export function LiveOddsLineChart({
             ) : null}
             {sel?.result && (
               <span className={cn("font-bold", sel.result === "UP" ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>
-                settled {sel.result}
+                settled {sel.result === "UP" ? "✓" : "✗"} {sel.result}
               </span>
             )}
           </div>
@@ -306,7 +306,7 @@ export function LiveOddsLineChart({
                 active ? "bg-card" : "opacity-80 hover:opacity-100",
               )}
             >
-              {isUp ? "▲" : "▼"} {fmtTime(Date.parse(h.window_start))}
+              {isUp ? "▲✓" : "▼✗"} {fmtTime(Date.parse(h.window_start))}
             </button>
           );
         })}
