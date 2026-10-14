@@ -29,6 +29,13 @@
       "when": 1791813835977,
       "tag": "0003_quad_confirm_paper",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792005764036,
+      "tag": "0004_live_odds_windows",
+      "breakpoints": true
     }
   ]
 }
