@@ -11,7 +11,7 @@ const usd = (v: number) => `${v < 0 ? "-" : "+"}$${Math.abs(v).toFixed(2)}`;
 const NAMES: Record<string, string> = {
   A: "A · Quad entry (ride)",
   B: "B · Pair-lock ≤85¢",
-  C: "C · Quad + late tiebreaker + hedge",
+  C: "C · Quad + late tiebreaker + equal-dollar hedge",
 };
 
 function Pill({ label, v }: { label: string; v: string | null | undefined }) {
@@ -103,7 +103,7 @@ export function QuadPaperPanel({ isAdmin }: { isAdmin: boolean }) {
             <div className="text-xs font-semibold">{NAMES[r.k]}</div>
             <div className={cn("text-2xl font-bold mt-1", r.pnl >= 0 ? "text-primary" : "text-destructive")}>{usd(r.pnl)}</div>
             <div className="text-[11px] text-muted-foreground">
-              {r.wins}/{r.n} won · {r.locks} locked pairs · open ${r.openCost.toFixed(2)}
+              {r.wins}/{r.n} won · {r.locks} {r.k === "C" ? "hedges completed" : "locked pairs"} · open ${r.openCost.toFixed(2)}
             </div>
           </div>
         ))}

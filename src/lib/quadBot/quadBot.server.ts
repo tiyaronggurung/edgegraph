@@ -4,12 +4,13 @@
 //   B  Whale ride: rn1 ≥65% (≥$30) one side + our odds ≥55% same side, entry 50–68¢, $leg1, no hedge;
 //      sells 100% at the Kalshi bid once it reaches 88¢ (no stop loss).
 //      B fills at Kalshi's real orderbook ask plus Kalshi's taker fee, so P&L is net of fees.
-//   C  Hybrid: A's entry (plus late tiebreaker) with a hedge reserve that locks at ≤ pair_max.
+//   C  Hybrid: A's entry (plus late tiebreaker), equal-dollar opposite leg at ≤ pair_max; no guaranteed lock.
 // NULL fallback: if Study OR Model is missing, the other plus odds ≥60% stands in.
 // If both are missing, or odds are stale, no new entries (open legs may still hedge).
 // Fills priced at our odds (YES = p_up, NO = 1 − p_up); settled on logged spot vs strike.
 
 import { fetchLiveAskCents, fetchLiveBidCents } from "@/lib/kalshiLiveQuote.server";
+import { sizeCEqualDollarHedge } from "./cHedgeSizing";
 
 const B_MIN_WHALE_USD = 30; // B needs at least this many dollars from the whale on its side
 const B_TAKE_PROFIT_CENTS = 88; // B sells everything once the Kalshi bid reaches this
@@ -100,7 +101,7 @@ export async function runQuadBotTick() {
   const s = claimed?.[0];
   if (!s) return { busy: true };
 
-  const leg1 = Number(s.leg1_usd), leg2 = Number(s.leg2_usd);
+  const leg1 = Number(s.leg1_usd);
   const entryMax = Number(s.entry_max), pairMax = Number(s.pair_max);
   const nowMs = Date.now();
   const wStartMs = Math.floor(nowMs / WINDOW_MS) * WINDOW_MS;
@@ -218,7 +219,7 @@ export async function runQuadBotTick() {
           const px = real?.px ?? price(side);
           // Real Kalshi fills: taker fee = ceil(0.07 × contracts × P × (1−P)) to the cent; fee counts in cost.
           const feeOf = (n: number) => (real ? Math.ceil(0.07 * n * px * (1 - px) * 100 - 1e-9) / 100 : 0);
-          let ct = Math.floor(kind === "hedge" ? Number(side === "UP" ? pos.down_ct : pos.up_ct) : usd / px);
+          let ct = strat === "C" && kind === "hedge" ? sizeCEqualDollarHedge(usd, px) : Math.floor(usd / px);
           while (real && ct > 0 && ct * px + feeOf(ct) > usd) ct--;
           if (ct < 1) return;
           const fee = feeOf(ct);
@@ -255,9 +256,9 @@ export async function runQuadBotTick() {
           const opp: Side = have === "UP" ? "DOWN" : "UP";
           const avg = have === "UP" ? Number(pos.up_cost) / Number(pos.up_ct) : Number(pos.down_cost) / Number(pos.down_ct);
           const pair = avg + price(opp);
-          const oppCost = Number(have === "UP" ? pos.up_ct : pos.down_ct) * price(opp);
-          if (pair <= pairMax && oppCost <= leg2) {
-            await buy(opp, leg2, "hedge", `hedge ${opp} · pair ${(pair * 100).toFixed(0)}¢ locks profit`, true);
+          if (pair <= pairMax) {
+            // The legacy locked flag marks hedge completion only, preventing another hedge.
+            await buy(opp, leg1, "hedge", `equal-dollar hedge ${opp} · $${leg1.toFixed(2)} budget · pair ${(pair * 100).toFixed(0)}¢ · unequal contracts, no guaranteed profit`, true);
           }
         }
       }
