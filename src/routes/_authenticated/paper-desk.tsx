@@ -329,7 +329,7 @@ function PaperDesk() {
         day={dayTotals?.ok ? dayTotals : null}
         price={spot}
       />
-      <LiveOddsLineChart upAsk={odds.upAsk} winStart={winStart} strike={strike ?? null} spot={spot} />
+      <LiveOddsLineChart upAsk={odds.upAsk} winStart={winStart} strike={strike ?? null} spot={spot} secsLeft={liveSecsLeft} />
       <QuadPaperPanel isAdmin={isAdmin} />
 
 

@@ -38,8 +38,8 @@ const decode = (raw: [number, number][], ws: number): Pt[] =>
   (raw ?? []).map(([s, u]) => ({ t: ws + s * 1000, up: u / 1000 }));
 
 export function LiveOddsLineChart({
-  upAsk, winStart, strike, spot,
-}: { upAsk: number | null; winStart: number; strike: number | null; spot: number | null }) {
+  upAsk, winStart, strike, spot, secsLeft,
+}: { upAsk: number | null; winStart: number; strike: number | null; spot: number | null; secsLeft: number }) {
   const qc = useQueryClient();
   const [pts, setPts] = useState<Pt[]>([]);
   const latest = useRef({ upAsk, strike, spot });
@@ -231,7 +231,14 @@ export function LiveOddsLineChart({
             )}
           </div>
         </div>
-        <div className="text-[11px] text-muted-foreground flex items-center gap-2">
+        {!sel && (
+          <div className="shrink-0" data-testid="odds-window-countdown">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Time left in window</div>
+            <div className="mt-1 text-xl font-bold tabular-nums">{Math.floor(secsLeft / 60)}m {secsLeft % 60}s</div>
+            <div className="text-[10px] text-muted-foreground">live 1s clock</div>
+          </div>
+        )}
+        <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-2">
           {shown ? fmtTime(shown.t) : "waiting for odds…"} · window {fmtTime(viewStart)}–{fmtTime(viewStart + WIN_MS)}
           {sel && (
             <button onClick={() => { setSelected(null); setHover(null); }} className="px-2 py-0.5 border border-border rounded uppercase tracking-widest text-[10px] hover:bg-card">
