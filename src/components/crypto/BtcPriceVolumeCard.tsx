@@ -2,7 +2,7 @@
 // BTC traded volume (BTC + USD notional). Read-only display card.
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getBtcPriceVolume } from "@/lib/btcPriceVolume.functions";
@@ -91,7 +91,6 @@ export function BtcPriceVolumeCard() {
   // Keyed by window so a rollover forces a fresh fetch instead of reusing the
   // previous window's strike, and polled fast so a new strike lands right away.
   const marketsFn = useServerFn(getBtcMarkets);
-  const qc = useQueryClient();
   const kalshi = essential?.strike;
   // The page already owns this query. Subscribing with the identical key adds
   // no extra request and gives the card a warm strike when the lightweight
