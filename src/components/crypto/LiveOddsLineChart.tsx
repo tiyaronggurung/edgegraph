@@ -154,12 +154,14 @@ export function LiveOddsLineChart({
   // Rollover: settle the finished window, then start fresh. Load any points
   // already saved for the new window (e.g. page reopened mid-window).
   const prevWin = useRef(winStart);
+  const rolled = useRef(false);
   useEffect(() => {
     const prev = prevWin.current;
     if (prev !== winStart) {
       const done = ptsRef.current.filter((p) => p.t < prev + WIN_MS);
       void save(prev, done, true).then(() => qc.invalidateQueries({ queryKey: ["live-odds-windows"] }));
       prevWin.current = winStart;
+      rolled.current = true;
     }
     setPts([]);
     void db
@@ -177,7 +179,7 @@ export function LiveOddsLineChart({
     // Don't plot until this window's own strike arrives: right after rollover
     // the strike/odds still belong to the previous window. Wait for the strike
     // to change from the rollover value, then skip one tick so odds recompute.
-    const staleStrike = latest.current.strike;
+    const staleStrike = rolled.current ? latest.current.strike : null;
     let armedAt: number | null = null;
     const id = setInterval(() => {
       const t = Date.now();
