@@ -183,16 +183,21 @@ export function useStrikeOdds(
   const area = areaRef.current;
   const win = Math.round((now / 1000 + Math.max(secondsToClose, 0)) / 900);
   if (win !== area.win) {
-    area.win = win; area.up = 0; area.total = 0; area.lastT = now; area.lastP = null;
+    area.win = win; area.up = 0; area.down = 0; area.total = 0; area.lastT = now; area.lastP = null;
   } else if (area.lastP != null) {
     const dt = Math.min((now - area.lastT) / 1000, 2);
     if (dt > 0) {
       area.total += dt;
-      if (area.lastP > 0.5) area.up += dt;
+      const m = area.lastP - 0.5;
+      if (m > 0) area.up += m * dt;
+      else area.down += -m * dt;
     }
   }
   area.lastT = now;
-  const areaUpShare = area.total >= 60 ? area.up / area.total : null;
+  // Share of the integrated area held by UP. Magnitude-weighted, so sitting
+  // at 52¢ barely moves it — dominance needs real distance from 50¢.
+  const areaTot = area.up + area.down;
+  const areaUpShare = area.total >= 60 && areaTot > 0 ? area.up / areaTot : null;
 
   // Final-15s lock: whichever side leads at 14:45 holds through the close.
   const lock = lockRef.current;
