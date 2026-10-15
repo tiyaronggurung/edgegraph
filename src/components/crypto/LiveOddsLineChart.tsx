@@ -23,9 +23,10 @@ const db = supabase as any;
 const WIN_MS = 900_000;
 const SAMPLE_MS = 1_000;
 const SAVE_MS = 10_000;
-const W = 900;
-const H = 220;
-const PAD_R = 110;
+// Desktop vs phone drawing sizes; phones get a taller, narrower canvas so
+// the graph fills the screen instead of shrinking into a thin strip.
+const DESKTOP = { W: 900, H: 220, PAD_R: 110 };
+const MOBILE = { W: 420, H: 300, PAD_R: 78 };
 const PAD_T = 12;
 const PAD_B = 24;
 
@@ -69,6 +70,15 @@ export function LiveOddsLineChart({
   const [selected, setSelected] = useState<string | null>(null);
   const [pastOpen, setPastOpen] = useState(false);
   const pastId = useId();
+  const [isPhone, setIsPhone] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const on = () => setIsPhone(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  const { W, H, PAD_R } = isPhone ? MOBILE : DESKTOP;
 
   const history = useQuery({
     queryKey: ["live-odds-windows"],
