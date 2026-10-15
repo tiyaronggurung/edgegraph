@@ -1,8 +1,9 @@
 # Roadmap
 
 ## Sign-in odds loading
-- [ ] Load the display's current-window strike and Binance volume independently using shared queries; preserve odds math and all trading paths.
-- [ ] Verify signed-in cold loading, delayed feeds and reload; published sign-in timing requires deployment and a public-site session.
+- [x] Load the display's current-window strike and Binance volume independently using shared queries; preserve odds math and all trading paths.
+- [x] Verified signed-in cold loading and reload; delayed volume no longer blocks odds, delayed strike no longer blocks price/window/venue volume, both recover without browser errors. 45 regression tests pass; build OK.
+- [ ] Verify signed-in loading on bettinggraph.app after publishing; blocked on deployment and a public-site session.
 
 ## Strategy C settled profit
 - [x] Verified all 45 recorded C settlements already match winning-contract payout minus both actual leg costs; shared the calculation between settlement and display, and exposed latest payout/cost breakdown without changing A/B or historical fills.
