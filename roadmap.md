@@ -1,5 +1,9 @@
 # Roadmap
 
+## Strategy C settled profit
+- [x] Verified all 45 recorded C settlements already match winning-contract payout minus both actual leg costs; shared the calculation between settlement and display, and exposed latest payout/cost breakdown without changing A/B or historical fills.
+- [x] 13 settlement/sizing/chart tests passed; build OK. Signed-in Paper Desk and reload both showed latest C payout $226.00 minus $182.63 cost = +$43.37, total +$371.10; no browser errors. New unattended settlement code requires publishing; no new equal-dollar C fill was available to exercise.
+
 ## Strategy C equal-dollar sizing
 - [x] Change only C's hedge to the same dollar budget as its entry; retain entry and pair-price gates, prevent repeat hedges, remove profit-lock claim.
 - [x] Seven sizing/chart tests pass, build OK; A/B trading branches unchanged. Signed-in display verified, but no actual C fill was available to verify end-to-end; unattended cron needs publishing.

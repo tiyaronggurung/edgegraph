@@ -11,6 +11,7 @@
 
 import { fetchLiveAskCents, fetchLiveBidCents } from "@/lib/kalshiLiveQuote.server";
 import { sizeCEqualDollarHedge } from "./cHedgeSizing";
+import { calculateCSettlement } from "./cSettlement";
 
 const B_MIN_WHALE_USD = 30; // B needs at least this many dollars from the whale on its side
 const B_TAKE_PROFIT_CENTS = 88; // B sells everything once the Kalshi bid reaches this
@@ -138,8 +139,9 @@ export async function runQuadBotTick() {
       if (!result && strike != null && spot != null && spot !== strike) result = spot > strike ? "UP" : "DOWN";
       if (!result) continue;
       const last = { spot: spot ?? "n/a", strike: strike ?? "n/a" };
-      const payout = result === "UP" ? Number(p.up_ct) : Number(p.down_ct);
-      const pnl = Math.round((payout - Number(p.up_cost) - Number(p.down_cost)) * 100) / 100;
+      const cSettlement = p.strategy === "C" ? calculateCSettlement({ ...p, result }) : null;
+      const payout = cSettlement?.payout ?? (result === "UP" ? Number(p.up_ct) : Number(p.down_ct));
+      const pnl = cSettlement?.pnl ?? Math.round((payout - Number(p.up_cost) - Number(p.down_cost)) * 100) / 100;
       const { data: upd } = await sb.from("qc_positions").update({ settled: true, result, payout, pnl, settled_at: new Date().toISOString() })
         .eq("id", p.id).eq("settled", false).select("id");
       if (!upd?.length) continue;

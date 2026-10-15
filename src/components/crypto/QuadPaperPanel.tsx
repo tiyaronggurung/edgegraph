@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { QuadPaperPnlChart } from "./QuadPaperPnlChart";
+import { calculateCSettlement } from "@/lib/quadBot/cSettlement";
 
 const db = supabase as any;
 const usd = (v: number) => `${v < 0 ? "-" : "+"}$${Math.abs(v).toFixed(2)}`;
@@ -35,12 +36,19 @@ export function QuadPaperPanel({ isAdmin }: { isAdmin: boolean }) {
         db.from("qc_positions").select("*").order("window_start", { ascending: false }).limit(1000),
         db.from("qc_fills").select("*").order("id", { ascending: false }).limit(40),
       ]);
-      return { s: s.data, pos: (pos.data ?? []) as any[], fills: (fills.data ?? []) as any[] };
+      const positions = ((pos.data ?? []) as any[]).map((position) => {
+        if (position.strategy !== "C" || !position.settled) return position;
+        const settlement = calculateCSettlement(position);
+        return settlement ? { ...position, payout: settlement.payout, pnl: settlement.pnl } : position;
+      });
+      return { s: s.data, pos: positions, fills: (fills.data ?? []) as any[] };
     },
   });
   const s = data?.s;
   const sig = s?.last_signals ?? {};
   const pos = data?.pos ?? [];
+  const latestC = pos.find((p) => p.strategy === "C" && p.settled && calculateCSettlement(p));
+  const latestCSettlement = latestC ? calculateCSettlement(latestC) : null;
 
   const toggle = async () => {
     const { error } = await db.rpc("qc_set_running", { p_running: !s?.running });
@@ -105,6 +113,13 @@ export function QuadPaperPanel({ isAdmin }: { isAdmin: boolean }) {
             <div className="text-[11px] text-muted-foreground">
               {r.wins}/{r.n} won · {r.locks} {r.k === "C" ? "hedges completed" : "locked pairs"} · open ${r.openCost.toFixed(2)}
             </div>
+            {r.k === "C" && latestC && latestCSettlement && (
+              <div className="text-[11px] text-muted-foreground mt-2" data-testid="c-settled-profit">
+                Last settled {latestC.result} · {new Date(latestC.window_start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                <br />
+                Payout ${latestCSettlement.payout.toFixed(2)} − both legs ${latestCSettlement.cost.toFixed(2)} = {usd(latestCSettlement.pnl)}
+              </div>
+            )}
           </div>
         ))}
       </div>
