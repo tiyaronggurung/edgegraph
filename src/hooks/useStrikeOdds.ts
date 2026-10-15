@@ -160,9 +160,10 @@ export function useStrikeOdds(
 ): StrikeOdds {
   const tapeRef = useRef<Tick[]>([]);
   const [, bump] = useState(0);
-  // Running time-share of UP odds above 50¢ in the current 15-min window.
-  const areaRef = useRef<{ win: number; up: number; total: number; lastT: number; lastP: number | null }>(
-    { win: -1, up: 0, total: 0, lastT: 0, lastP: null },
+  // Running area of UP vs DOWN odds, integrated as distance from the 50¢
+  // midline in the current 15-min window (52¢ counts far less than 99¢).
+  const areaRef = useRef<{ win: number; up: number; down: number; total: number; lastT: number; lastP: number | null }>(
+    { win: -1, up: 0, down: 0, total: 0, lastT: 0, lastP: null },
   );
   const lockRef = useRef<{ win: number; out: StrikeOdds } | null>(null);
 

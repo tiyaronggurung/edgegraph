@@ -39,17 +39,21 @@ const encode = (pts: Pt[], ws: number): [number, number][] =>
 const decode = (raw: [number, number][], ws: number): Pt[] =>
   (raw ?? []).map(([s, u]) => ({ t: ws + s * 1000, up: u / 1000 }));
 
-/** Display-only: share of area above the 50¢ midline held by UP vs DOWN. */
-function areaControl(pts: Pt[]): { upPct: number; elapsed: number } | null {
+/** Display-only: area each side has filled, measured from the 50¢ midline.
+ * 100% = the line sat at the ceiling (100¢ UP or 0¢ DOWN) the whole time;
+ * 50¢ flat the whole time = 0% for both sides. */
+function areaControl(pts: Pt[]): { upPct: number; downPct: number } | null {
   if (pts.length < 2) return null;
-  let up = 0, down = 0;
+  let up = 0, down = 0, elapsed = 0;
   for (let i = 1; i < pts.length; i++) {
     const dt = Math.min(10, Math.max(0, (pts[i].t - pts[i - 1].t) / 1000));
+    elapsed += dt;
     const m = (pts[i].up + pts[i - 1].up) / 2 - 0.5;
     if (m > 0) up += m * dt; else down += -m * dt;
   }
-  const tot = up + down;
-  return { upPct: tot > 0 ? (up / tot) * 100 : 50, elapsed: 0 };
+  const maxArea = 0.5 * elapsed;
+  if (maxArea <= 0) return null;
+  return { upPct: (up / maxArea) * 100, downPct: (down / maxArea) * 100 };
 }
 
 export function LiveOddsLineChart({
