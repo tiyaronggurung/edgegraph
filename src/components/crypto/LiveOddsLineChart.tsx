@@ -39,21 +39,21 @@ const encode = (pts: Pt[], ws: number): [number, number][] =>
 const decode = (raw: [number, number][], ws: number): Pt[] =>
   (raw ?? []).map(([s, u]) => ({ t: ws + s * 1000, up: u / 1000 }));
 
-/** Display-only: area each side has filled, measured from the 50¢ midline.
- * 100% = the line sat at the ceiling (100¢ UP or 0¢ DOWN) the whole time;
- * 50¢ flat the whole time = 0% for both sides. */
+/** Display-only: area each side has filled. UP area = integral of the UP
+ * line from 0%, DOWN area = integral of the DOWN line from 0%; both are
+ * normalized by elapsed time so they always add to 100% (52¢ all window
+ * = UP 52% / DOWN 48%). */
 function areaControl(pts: Pt[]): { upPct: number; downPct: number } | null {
   if (pts.length < 2) return null;
-  let up = 0, down = 0, elapsed = 0;
+  let up = 0, elapsed = 0;
   for (let i = 1; i < pts.length; i++) {
     const dt = Math.min(10, Math.max(0, (pts[i].t - pts[i - 1].t) / 1000));
     elapsed += dt;
-    const m = (pts[i].up + pts[i - 1].up) / 2 - 0.5;
-    if (m > 0) up += m * dt; else down += -m * dt;
+    up += ((pts[i].up + pts[i - 1].up) / 2) * dt;
   }
-  const maxArea = 0.5 * elapsed;
-  if (maxArea <= 0) return null;
-  return { upPct: (up / maxArea) * 100, downPct: (down / maxArea) * 100 };
+  if (elapsed <= 0) return null;
+  const upPct = (up / elapsed) * 100;
+  return { upPct, downPct: 100 - upPct };
 }
 
 export function LiveOddsLineChart({
