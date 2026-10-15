@@ -2,8 +2,10 @@
 // Presentation only: samples the odds already computed on the page, saves
 // each window's line + strike + result for replay. Never feeds trading,
 // model, Study or exit paths.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, History } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { fetchKalshiSettlement } from "@/lib/kalshiSettle";
@@ -48,6 +50,8 @@ export function LiveOddsLineChart({
   ptsRef.current = pts;
   const [hover, setHover] = useState<number | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [pastOpen, setPastOpen] = useState(false);
+  const pastId = useId();
 
   const history = useQuery({
     queryKey: ["live-odds-windows"],
@@ -300,11 +304,21 @@ export function LiveOddsLineChart({
           <text x={plotW / 2} y={H / 2} textAnchor="middle" fontSize="12" fill="var(--color-muted-foreground)">No line recorded for this window</text>
         )}
       </svg>
-      <div className="mt-2 w-full sm:w-80" data-testid="settled-list">
-        <div className="flex items-baseline justify-between mb-1">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Settled</span>
-          {settled.length > 0 && <span className="text-[10px] text-muted-foreground">{settled.length} windows</span>}
-        </div>
+      <div className="mt-2 w-full">
+        <Button
+          variant="outline"
+          size="sm"
+          aria-expanded={pastOpen}
+          aria-controls={pastId}
+          onClick={() => setPastOpen((open) => !open)}
+          className="gap-2 text-xs"
+        >
+          <History aria-hidden="true" />
+          Past windows
+          {settled.length > 0 && <span className="text-muted-foreground tabular-nums">({settled.length})</span>}
+          <ChevronDown aria-hidden="true" className={cn("transition-transform motion-reduce:transition-none", pastOpen && "rotate-180")} />
+        </Button>
+        <div id={pastId} hidden={!pastOpen} className="mt-2" data-testid="settled-list">
         {settled.length === 0 && <span className="text-[11px] text-muted-foreground">results appear here as windows close</span>}
         <div className="max-h-56 overflow-y-auto flex flex-col gap-1 pr-1">
           {settled.map((h) => {
@@ -332,6 +346,7 @@ export function LiveOddsLineChart({
               </button>
             );
           })}
+        </div>
         </div>
       </div>
     </section>
