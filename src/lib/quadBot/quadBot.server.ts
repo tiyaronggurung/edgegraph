@@ -1,9 +1,10 @@
 // Quad-Confirmation paper engine (PAPER ONLY — never places real orders).
 // Runs three strategies side by side on the same live signals:
 //   A  Quad entry: whale (rn1 ≥70% one side) + Study + Model + our odds >52% agree → $leg1, ride to settle.
-//   B  Whale ride: rn1 ≥65% (≥$30) one side + our odds ≥55% same side, entry 50–68¢, $leg1, no hedge;
-//      sells 100% at the Kalshi bid once it reaches 88¢ (no stop loss).
-//      B fills at Kalshi's real orderbook ask plus Kalshi's taker fee, so P&L is net of fees.
+//   B  Own-odds speed hedge (no whale): our screen odds ≥65% one side, minute 1:30–10:00, Kalshi ask 50–68¢.
+//      Single leg sells at Kalshi bid ≥88¢. If our odds peaked ≥80¢ then fell to ≤65¢, buys the same number
+//      of opposite contracts while Kalshi still lags (only if the pair guarantees profit). If our odds fall
+//      to ≤38¢, a contract-matched rescue leg caps the loss. Fills at Kalshi's real ask plus taker fee.
 //   C  Hybrid: A's entry (plus late tiebreaker), equal-dollar opposite leg at ≤ pair_max; no guaranteed lock.
 // NULL fallback: if Study OR Model is missing, the other plus odds ≥60% stands in.
 // If both are missing, or odds are stale, no new entries (open legs may still hedge).
@@ -12,8 +13,8 @@
 import { fetchLiveAskCents, fetchLiveBidCents } from "@/lib/kalshiLiveQuote.server";
 import { sizeCEqualDollarHedge } from "./cHedgeSizing";
 import { calculateCSettlement } from "./cSettlement";
+import { B_ENTRY_MAX_MS, B_ENTRY_MIN_MS, B_ENTRY_ODDS, B_REVERSAL_ODDS, decideBHedge, kalshiFee } from "./bReversal";
 
-const B_MIN_WHALE_USD = 30; // B needs at least this many dollars from the whale on its side
 const B_TAKE_PROFIT_CENTS = 88; // B sells everything once the Kalshi bid reaches this
 import { type TapeSample, computeUpProbability, effectiveVol, momentumTilt } from "@/lib/ourOdds";
 
@@ -95,16 +96,20 @@ async function liveSignals(sb: any, wStartMs: number, secsLeft: number) {
 // saved to live_odds_windows as [secondInWindow, up*1000]. Fresh only if the last
 // point is ≤20s old; otherwise null (B must not trade).
 const SCREEN_MAX_AGE_SEC = 20;
-async function screenOdds(sb: any, wStartMs: number): Promise<{ up: number; ageSec: number } | null> {
+async function screenSeries(sb: any, wStartMs: number) {
   const { data } = await sb.from("live_odds_windows").select("points")
     .eq("window_start", new Date(wStartMs).toISOString()).maybeSingle();
-  const pts = (data?.points ?? []) as [number, number][];
+  const pts = ((data?.points ?? []) as [number, number][])
+    .map(([s, u]) => [Number(s), Number(u) / 1000] as [number, number])
+    .filter(([s, u]) => Number.isFinite(s) && u > 0 && u < 1);
   if (!pts.length) return null;
-  const [sec, u] = pts.reduce((a, b) => (b[0] > a[0] ? b : a));
-  const ageSec = Math.round((Date.now() - (wStartMs + sec * 1000)) / 1000);
-  const up = Number(u) / 1000;
-  if (!(ageSec >= 0 && ageSec <= SCREEN_MAX_AGE_SEC) || !(up > 0 && up < 1)) return null;
-  return { up, ageSec };
+  const [sec, up] = pts.reduce((a, b) => (b[0] > a[0] ? b : a));
+  return { pts, up, ageSec: Math.round((Date.now() - (wStartMs + sec * 1000)) / 1000) };
+}
+async function screenOdds(sb: any, wStartMs: number): Promise<{ up: number; ageSec: number } | null> {
+  const s = await screenSeries(sb, wStartMs);
+  if (!s || !(s.ageSec >= 0 && s.ageSec <= SCREEN_MAX_AGE_SEC)) return null;
+  return { up: s.up, ageSec: s.ageSec };
 }
 
 export async function runQuadBotTick() {
@@ -208,7 +213,8 @@ export async function runQuadBotTick() {
       const { data: bp } = await sb.from("qc_positions").select("*").eq("strategy", "B").eq("window_start", wIso)
         .eq("settled", false).maybeSingle();
       const ct = bp ? Math.max(Number(bp.up_ct), Number(bp.down_ct)) : 0;
-      if (bp && ct > 0 && live.ticker && secsLeft > 5) {
+      const singleLeg = bp && !bp.locked && (Number(bp.up_ct) === 0 || Number(bp.down_ct) === 0);
+      if (bp && singleLeg && ct > 0 && live.ticker && secsLeft > 5) {
         const held: Side = Number(bp.up_ct) > 0 ? "UP" : "DOWN";
         const bidC = await fetchLiveBidCents(live.ticker, held === "UP" ? "YES" : "NO");
         if (bidC != null && bidC >= B_TAKE_PROFIT_CENTS) {
@@ -224,11 +230,39 @@ export async function runQuadBotTick() {
               reason: `take profit at Kalshi bid ${bidC}¢ · fee $${fee.toFixed(2)} · banked P&L ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}`,
               signals, ms_from_start: msIn });
           }
+        } else if (secsLeft > 15) {
+          // B 2.0 speed hedge: our screen odds turned against the held side before Kalshi repriced.
+          const series = await screenSeries(sb, wStartMs);
+          if (series && series.ageSec <= SCREEN_MAX_AGE_SEC) {
+            const entrySec = (Date.parse(bp.created_at) - wStartMs) / 1000;
+            const toHeld = (u: number) => (held === "UP" ? u : 1 - u);
+            const opp: Side = held === "UP" ? "DOWN" : "UP";
+            const nowHeld = toHeld(series.up);
+            const mayHedge = nowHeld <= B_REVERSAL_ODDS;
+            const oppAskC = mayHedge ? await fetchLiveAskCents(live.ticker, opp === "UP" ? "YES" : "NO") : null;
+            const d = mayHedge ? decideBHedge({
+              heldOddsSinceEntry: series.pts.filter(([s]) => s >= entrySec).map(([, u]) => toHeld(u)),
+              heldOddsNow: nowHeld, heldContracts: ct,
+              heldCost: Number(bp.up_cost) + Number(bp.down_cost),
+              oppAsk: oppAskC != null ? oppAskC / 100 : null,
+            }) : null;
+            if (d) {
+              const patch: any = { locked: true };
+              if (opp === "UP") { patch.up_ct = d.contracts; patch.up_cost = d.cost; }
+              else { patch.down_ct = d.contracts; patch.down_cost = d.cost; }
+              const { data: upd } = await sb.from("qc_positions").update(patch)
+                .eq("id", bp.id).eq("settled", false).eq("locked", false).select("id");
+              if (upd?.length) {
+                fills.push({ strategy: "B", window_start: wIso, side: opp, kind: "hedge", contracts: d.contracts, price: d.px,
+                  amount: d.cost, reason: `${d.why} · fee $${kalshiFee(d.contracts, d.px).toFixed(2)}`, signals, ms_from_start: msIn });
+              }
+            }
+          }
         }
       }
     }
 
-    const canEnter = fresh && msIn >= 90_000 && secsLeft > 60;
+    const canEnter = fresh && msIn >= B_ENTRY_MIN_MS && secsLeft > 60;
     if (fresh && secsLeft > 60) {
       for (const strat of STRATS) {
         const { data: pos } = await sb.from("qc_positions").select("*").eq("strategy", strat).eq("window_start", wIso).maybeSingle();
@@ -255,20 +289,17 @@ export async function runQuadBotTick() {
         if (empty) {
           if (!canEnter) continue;
           if (strat === "A" && quad && price(quad) <= entryMax) await buy(quad, leg1, "entry", `quad: ${quadWhy}`);
-          const whaleSideUsd = whale?.side ? (whale.side === "UP" ? whale.up : whale.down) : 0;
-          if (strat === "B" && whale?.side && whale.share >= 0.65 && whaleSideUsd >= B_MIN_WHALE_USD) {
-            // Whale ≥65% with ≥$30 on that side + SCREEN odds (useStrikeOdds, as saved by the
-            // live chart) ≥55% same side, entry 50–68¢, flat stake. No fresh screen odds = no trade.
-            const side = whale.side;
+          if (strat === "B" && msIn <= B_ENTRY_MAX_MS) {
+            // B 2.0: our own screen odds only (no whale). ≥65% one side, Kalshi ask 50–68¢.
             const screen = await screenOdds(sb, wStartMs);
-            const scr = screen ? (side === "UP" ? screen.up : 1 - screen.up) : null;
             signals.screenPUp = screen?.up ?? null;
             signals.screenAgeSec = screen?.ageSec ?? null;
-            // Fill strictly at Kalshi's live ask; no ask = no fill.
-            const askC = scr != null && scr >= 0.55 && live.ticker ? await fetchLiveAskCents(live.ticker, side === "UP" ? "YES" : "NO") : null;
+            const side: Side | null = !screen ? null : screen.up >= B_ENTRY_ODDS ? "UP" : 1 - screen.up >= B_ENTRY_ODDS ? "DOWN" : null;
+            const scr = side && screen ? (side === "UP" ? screen.up : 1 - screen.up) : null;
+            const askC = side && live.ticker ? await fetchLiveAskCents(live.ticker, side === "UP" ? "YES" : "NO") : null;
             const px = askC != null ? askC / 100 : null;
-            if (scr != null && scr >= 0.55 && px != null && px >= 0.5 && px <= 0.68) {
-              await buy(side, leg1, "entry", `whale ${(whale.share * 100).toFixed(0)}% ($${whaleSideUsd.toFixed(0)}) + screen odds ${(scr * 100).toFixed(1)}% (${screen!.ageSec}s old) · Kalshi ask ${askC}¢`, false, { px });
+            if (side && scr != null && px != null && px >= 0.5 && px <= 0.68) {
+              await buy(side, leg1, "entry", `own odds ${(scr * 100).toFixed(1)}% ${side} (${screen!.ageSec}s old) · Kalshi ask ${askC}¢ · speed entry`, false, { px });
             }
           }
           if (strat === "C") {

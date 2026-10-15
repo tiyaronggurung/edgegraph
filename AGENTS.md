@@ -12,3 +12,4 @@
 - Live odds chart ending-dot labels use the last plotted sample; hovered historical odds appear separately so historical numbers cannot mislabel live endpoints.
 - The odds chart Area badge uses a pure expirationWeightedArea presentation helper with the displayed window's fixed expiry; never feed this display metric into odds or trading, to keep signal behavior unchanged.
 - The live odds chart is also recorded server-side (liveOddsRecorder.server.ts, 10s cron) by calling the pure computeStrikeOdds core; never fork the odds math for the server, so the chart and the recorder can't drift apart.
+- Quad B is an own-odds speed hedge (no whale): decisions live in the pure bReversal helper, the opposite leg is contract-matched, and a reversal lock fires only when both legs plus fees cost less than the payout, so a "lock" is truly guaranteed.
