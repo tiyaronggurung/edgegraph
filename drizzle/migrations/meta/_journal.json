@@ -36,6 +36,13 @@
       "when": 1792005764036,
       "tag": "0004_live_odds_windows",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792092497624,
+      "tag": "0005_live_odds_writer_cron",
+      "breakpoints": true
     }
   ]
 }
