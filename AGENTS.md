@@ -10,3 +10,4 @@
 
 - Crypto lower-page cleanup is presentation-only: preserve shared hooks, market query fields, manual sizing defaults and order confirmation even when research panels are unmounted, because upper trading controls depend on them.
 - Live odds chart ending-dot labels use the last plotted sample; hovered historical odds appear separately so historical numbers cannot mislabel live endpoints.
+- The live odds chart is also recorded server-side (liveOddsRecorder.server.ts, 10s cron) by calling the pure computeStrikeOdds core; never fork the odds math for the server, so the chart and the recorder can't drift apart.

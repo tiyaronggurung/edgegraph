@@ -60,6 +60,7 @@ import { Route as ApiPublicHooksFlowLeanWriterRouteImport } from './routes/api/p
 import { Route as ApiPublicHooksHedgeBotTickRouteImport } from './routes/api/public/hooks/hedge-bot-tick'
 import { Route as ApiPublicHooksHourlyForecastTickRouteImport } from './routes/api/public/hooks/hourly-forecast-tick'
 import { Route as ApiPublicHooksKalshiBookTickRouteImport } from './routes/api/public/hooks/kalshi-book-tick'
+import { Route as ApiPublicHooksLiveOddsWriterRouteImport } from './routes/api/public/hooks/live-odds-writer'
 import { Route as ApiPublicHooksMarketContextTickRouteImport } from './routes/api/public/hooks/market-context-tick'
 import { Route as ApiPublicHooksMarketIntelMatchRouteImport } from './routes/api/public/hooks/market-intel-match'
 import { Route as ApiPublicHooksMartingaleTickRouteImport } from './routes/api/public/hooks/martingale-tick'
@@ -363,6 +364,12 @@ const ApiPublicHooksKalshiBookTickRoute =
     path: '/api/public/hooks/kalshi-book-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksLiveOddsWriterRoute =
+  ApiPublicHooksLiveOddsWriterRouteImport.update({
+    id: '/api/public/hooks/live-odds-writer',
+    path: '/api/public/hooks/live-odds-writer',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksMarketContextTickRoute =
   ApiPublicHooksMarketContextTickRouteImport.update({
     id: '/api/public/hooks/market-context-tick',
@@ -565,6 +572,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/hedge-bot-tick': typeof ApiPublicHooksHedgeBotTickRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
   '/api/public/hooks/kalshi-book-tick': typeof ApiPublicHooksKalshiBookTickRoute
+  '/api/public/hooks/live-odds-writer': typeof ApiPublicHooksLiveOddsWriterRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
   '/api/public/hooks/market-intel-match': typeof ApiPublicHooksMarketIntelMatchRoute
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
@@ -642,6 +650,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/hedge-bot-tick': typeof ApiPublicHooksHedgeBotTickRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
   '/api/public/hooks/kalshi-book-tick': typeof ApiPublicHooksKalshiBookTickRoute
+  '/api/public/hooks/live-odds-writer': typeof ApiPublicHooksLiveOddsWriterRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
   '/api/public/hooks/market-intel-match': typeof ApiPublicHooksMarketIntelMatchRoute
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
@@ -721,6 +730,7 @@ export interface FileRoutesById {
   '/api/public/hooks/hedge-bot-tick': typeof ApiPublicHooksHedgeBotTickRoute
   '/api/public/hooks/hourly-forecast-tick': typeof ApiPublicHooksHourlyForecastTickRoute
   '/api/public/hooks/kalshi-book-tick': typeof ApiPublicHooksKalshiBookTickRoute
+  '/api/public/hooks/live-odds-writer': typeof ApiPublicHooksLiveOddsWriterRoute
   '/api/public/hooks/market-context-tick': typeof ApiPublicHooksMarketContextTickRoute
   '/api/public/hooks/market-intel-match': typeof ApiPublicHooksMarketIntelMatchRoute
   '/api/public/hooks/martingale-tick': typeof ApiPublicHooksMartingaleTickRoute
@@ -800,6 +810,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/hedge-bot-tick'
     | '/api/public/hooks/hourly-forecast-tick'
     | '/api/public/hooks/kalshi-book-tick'
+    | '/api/public/hooks/live-odds-writer'
     | '/api/public/hooks/market-context-tick'
     | '/api/public/hooks/market-intel-match'
     | '/api/public/hooks/martingale-tick'
@@ -877,6 +888,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/hedge-bot-tick'
     | '/api/public/hooks/hourly-forecast-tick'
     | '/api/public/hooks/kalshi-book-tick'
+    | '/api/public/hooks/live-odds-writer'
     | '/api/public/hooks/market-context-tick'
     | '/api/public/hooks/market-intel-match'
     | '/api/public/hooks/martingale-tick'
@@ -955,6 +967,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/hedge-bot-tick'
     | '/api/public/hooks/hourly-forecast-tick'
     | '/api/public/hooks/kalshi-book-tick'
+    | '/api/public/hooks/live-odds-writer'
     | '/api/public/hooks/market-context-tick'
     | '/api/public/hooks/market-intel-match'
     | '/api/public/hooks/martingale-tick'
@@ -1015,6 +1028,7 @@ export interface RootRouteChildren {
   ApiPublicHooksHedgeBotTickRoute: typeof ApiPublicHooksHedgeBotTickRoute
   ApiPublicHooksHourlyForecastTickRoute: typeof ApiPublicHooksHourlyForecastTickRoute
   ApiPublicHooksKalshiBookTickRoute: typeof ApiPublicHooksKalshiBookTickRoute
+  ApiPublicHooksLiveOddsWriterRoute: typeof ApiPublicHooksLiveOddsWriterRoute
   ApiPublicHooksMarketContextTickRoute: typeof ApiPublicHooksMarketContextTickRoute
   ApiPublicHooksMarketIntelMatchRoute: typeof ApiPublicHooksMarketIntelMatchRoute
   ApiPublicHooksMartingaleTickRoute: typeof ApiPublicHooksMartingaleTickRoute
@@ -1400,6 +1414,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksKalshiBookTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/live-odds-writer': {
+      id: '/api/public/hooks/live-odds-writer'
+      path: '/api/public/hooks/live-odds-writer'
+      fullPath: '/api/public/hooks/live-odds-writer'
+      preLoaderRoute: typeof ApiPublicHooksLiveOddsWriterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/market-context-tick': {
       id: '/api/public/hooks/market-context-tick'
       path: '/api/public/hooks/market-context-tick'
@@ -1674,6 +1695,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksHedgeBotTickRoute: ApiPublicHooksHedgeBotTickRoute,
   ApiPublicHooksHourlyForecastTickRoute: ApiPublicHooksHourlyForecastTickRoute,
   ApiPublicHooksKalshiBookTickRoute: ApiPublicHooksKalshiBookTickRoute,
+  ApiPublicHooksLiveOddsWriterRoute: ApiPublicHooksLiveOddsWriterRoute,
   ApiPublicHooksMarketContextTickRoute: ApiPublicHooksMarketContextTickRoute,
   ApiPublicHooksMarketIntelMatchRoute: ApiPublicHooksMarketIntelMatchRoute,
   ApiPublicHooksMartingaleTickRoute: ApiPublicHooksMartingaleTickRoute,
