@@ -56,7 +56,7 @@ export function LiveOddsLineChart({
         .from("live_odds_windows")
         .select("window_start,strike,close_spot,result,points")
         .order("window_start", { ascending: false })
-        .limit(24);
+        .limit(96);
       if (error) throw error;
       return (data ?? []) as Saved[];
     },
@@ -300,27 +300,39 @@ export function LiveOddsLineChart({
           <text x={plotW / 2} y={H / 2} textAnchor="middle" fontSize="12" fill="var(--color-muted-foreground)">No line recorded for this window</text>
         )}
       </svg>
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">Settled</span>
+      <div className="mt-2 w-full sm:w-80" data-testid="settled-list">
+        <div className="flex items-baseline justify-between mb-1">
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Settled</span>
+          {settled.length > 0 && <span className="text-[10px] text-muted-foreground">{settled.length} windows</span>}
+        </div>
         {settled.length === 0 && <span className="text-[11px] text-muted-foreground">results appear here as windows close</span>}
-        {settled.slice(0, 16).map((h) => {
-          const isUp = h.result === "UP";
-          const active = selected === h.window_start;
-          return (
-            <button
-              key={h.window_start}
-              onClick={() => { setSelected(active ? null : h.window_start); setHover(null); }}
-              title={`${fmtTime(Date.parse(h.window_start))} · strike ${usd0(h.strike)} · close ${usd0(h.close_spot)}`}
-              className={cn(
-                "flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-semibold",
-                isUp ? "text-[color:var(--color-primary)] border-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)] border-[color:var(--color-destructive)]",
-                active ? "bg-card" : "opacity-80 hover:opacity-100",
-              )}
-            >
-              {isUp ? "▲✓" : "▼✗"} {fmtTime(Date.parse(h.window_start))}
-            </button>
-          );
-        })}
+        <div className="max-h-56 overflow-y-auto flex flex-col gap-1 pr-1">
+          {settled.map((h) => {
+            const isUp = h.result === "UP";
+            const active = selected === h.window_start;
+            const ws = Date.parse(h.window_start);
+            return (
+              <button
+                key={h.window_start}
+                onClick={() => { setSelected(active ? null : h.window_start); setHover(null); }}
+                className={cn(
+                  "flex items-center justify-between gap-2 px-2 py-1 rounded border text-left text-[11px] tabular-nums",
+                  active ? "bg-card border-foreground/40" : "border-border hover:bg-card",
+                )}
+              >
+                <span className="flex flex-col">
+                  <span className="font-semibold">
+                    {new Date(ws).toLocaleDateString([], { month: "short", day: "numeric" })} · {fmtTime(ws)}–{fmtTime(ws + WIN_MS)}
+                  </span>
+                  <span className="text-muted-foreground">strike {usd0(h.strike)} · close {usd0(h.close_spot)}</span>
+                </span>
+                <span className={cn("shrink-0 font-bold", isUp ? "text-[color:var(--color-primary)]" : "text-[color:var(--color-destructive)]")}>
+                  {isUp ? "▲ UP ✓" : "▼ DOWN ✓"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
