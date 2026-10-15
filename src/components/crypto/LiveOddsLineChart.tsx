@@ -183,8 +183,10 @@ export function LiveOddsLineChart({
 
   const last = viewPts[viewPts.length - 1];
   const shown = hover != null ? viewPts[hover] : last;
-  const upC = shown ? Math.round(shown.up * 100) : null;
+  // Ending-dot labels always describe that dot, never the hovered history.
+  const upC = last ? Math.round(last.up * 100) : null;
   const downC = upC == null ? null : 100 - upC;
+  const hoveredUpC = hover != null && shown ? Math.round(shown.up * 100) : null;
 
   const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (!viewPts.length) return;
@@ -240,6 +242,12 @@ export function LiveOddsLineChart({
         )}
         <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-2">
           {shown ? fmtTime(shown.t) : "waiting for odds…"} · window {fmtTime(viewStart)}–{fmtTime(viewStart + WIN_MS)}
+          {hoveredUpC != null && (
+            <span data-testid="odds-history-readout" className="inline-flex items-center gap-2 tabular-nums">
+              <span className="text-[color:var(--color-primary)]">UP {hoveredUpC}¢</span>
+              <span className="text-[color:var(--color-destructive)]">DOWN {100 - hoveredUpC}¢</span>
+            </span>
+          )}
           {sel && (
             <button onClick={() => { setSelected(null); setHover(null); }} className="px-2 py-0.5 border border-border rounded uppercase tracking-widest text-[10px] hover:bg-card">
               Back to live
