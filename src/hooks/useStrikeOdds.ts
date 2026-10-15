@@ -41,6 +41,7 @@ const SPREAD_SAT = 0.0008;     // fast/mid SMA separation that saturates
 const SLOPE_SAT = 0.00015;     // fast SMA moving 0.015% in a minute saturates
 const STACK_CROSS_FRESH_SEC = 8 * 60; // a fast/mid cross older than this is history
 const FLIP_STACK_BOOST = 0.12; // how far a fresh against-cross lowers the flip-risk bar
+const LOCK_SECONDS = 15;       // browser odds freeze for the final 15s of each window
 
 
 function erf(x: number): number {
@@ -163,6 +164,7 @@ export function useStrikeOdds(
   const areaRef = useRef<{ win: number; up: number; total: number; lastT: number; lastP: number | null }>(
     { win: -1, up: 0, total: 0, lastT: 0, lastP: null },
   );
+  const lockRef = useRef<{ win: number; out: StrikeOdds } | null>(null);
 
   // Keep a rolling tape of composite ticks.
   useEffect(() => {
@@ -191,8 +193,17 @@ export function useStrikeOdds(
   area.lastT = now;
   const areaUpShare = area.total >= 60 ? area.up / area.total : null;
 
+  // Final-15s lock: whichever side leads at 14:45 holds through the close.
+  const lock = lockRef.current;
+  if (lock && lock.win !== win) lockRef.current = null;
+  if (secondsToClose <= LOCK_SECONDS && lockRef.current?.win === win) {
+    return lockRef.current.out;
+  }
   const out = computeStrikeOdds(spot, strike, secondsToClose, { ...ctx, areaUpShare }, tapeRef.current);
   area.lastP = out.pUp;
+  if (secondsToClose <= LOCK_SECONDS && secondsToClose > 0 && out.pUp != null) {
+    lockRef.current = { win, out };
+  }
   return out;
 }
 
