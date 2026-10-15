@@ -242,7 +242,8 @@ export async function runQuadBotTick() {
           if (ct < 1) return;
           const fee = feeOf(ct);
           const cost = Math.round((ct * px + fee) * 100) / 100;
-          if (real) why += ` · Kalshi ask ${Math.round(px * 100)}¢ (our ${Math.round(price(side) * 100)}¢) · fee $${fee.toFixed(2)}`;
+          // B's own reason already names the Kalshi ask it paid; here we only add the fee.
+          if (real) why += ` · fee $${fee.toFixed(2)}`;
           const row: any = { strategy: strat, window_start: wIso };
           if (side === "UP") { row.up_ct = Number(pos?.up_ct ?? 0) + ct; row.up_cost = Number(pos?.up_cost ?? 0) + cost; }
           else { row.down_ct = Number(pos?.down_ct ?? 0) + ct; row.down_cost = Number(pos?.down_cost ?? 0) + cost; }
