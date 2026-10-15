@@ -39,6 +39,19 @@ const encode = (pts: Pt[], ws: number): [number, number][] =>
 const decode = (raw: [number, number][], ws: number): Pt[] =>
   (raw ?? []).map(([s, u]) => ({ t: ws + s * 1000, up: u / 1000 }));
 
+/** Display-only: share of area above the 50¢ midline held by UP vs DOWN. */
+function areaControl(pts: Pt[]): { upPct: number; elapsed: number } | null {
+  if (pts.length < 2) return null;
+  let up = 0, down = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const dt = Math.min(10, Math.max(0, (pts[i].t - pts[i - 1].t) / 1000));
+    const m = (pts[i].up + pts[i - 1].up) / 2 - 0.5;
+    if (m > 0) up += m * dt; else down += -m * dt;
+  }
+  const tot = up + down;
+  return { upPct: tot > 0 ? (up / tot) * 100 : 50, elapsed: 0 };
+}
+
 export function LiveOddsLineChart({
   upAsk, winStart, strike, spot, secsLeft,
 }: { upAsk: number | null; winStart: number; strike: number | null; spot: number | null; secsLeft: number }) {
@@ -252,6 +265,18 @@ export function LiveOddsLineChart({
               <span className="text-[color:var(--color-destructive)]">DOWN {100 - hoveredUpC}¢</span>
             </span>
           )}
+          {(() => {
+            const elapsed = sel ? 900 : (Date.now() - winStart) / 1000;
+            const ac = areaControl(viewPts);
+            if (!sel && elapsed < 180) return <span data-testid="area-control" className="px-2 py-0.5 border border-border rounded">Control: sampling…</span>;
+            if (!ac) return null;
+            const u = Math.round(ac.upPct);
+            return (
+              <span data-testid="area-control" className={cn("px-2 py-0.5 border rounded tabular-nums font-semibold", u >= 50 ? "border-[color:var(--color-primary)]" : "border-[color:var(--color-destructive)]")}>
+                Control: <span className="text-[color:var(--color-primary)]">UP {u}%</span> · <span className="text-[color:var(--color-destructive)]">{100 - u}% DN</span>
+              </span>
+            );
+          })()}
           {sel && (
             <button onClick={() => { setSelected(null); setHover(null); }} className="px-2 py-0.5 border border-border rounded uppercase tracking-widest text-[10px] hover:bg-card">
               Back to live
