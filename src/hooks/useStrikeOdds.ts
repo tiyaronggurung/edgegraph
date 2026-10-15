@@ -531,6 +531,35 @@ export function computeStrikeOdds(
 
   let pLead = 0.5 + (pSrc - 0.5) * k;               // probability of current side's direction (signed via pUp)
 
+  // --- Trend & VWAP anchor (mid-window noise filter) ------------------------
+  // When buyers' AND sellers' average prices both sit ≥ $20 on one side of the
+  // strike, a brief wick across the strike shouldn't flip the odds. Only acts
+  // with spot within $15 of strike and 3–12 min left; fades out otherwise so
+  // a real break (≥ $15 held) and the closing physics are untouched.
+  let anchorNote = "";
+  {
+    const ANCHOR_USD = 20;
+    let anchorSign = 0;
+    if (avgBuy != null && avgSell != null) {
+      if (avgBuy - strike >= ANCHOR_USD && avgSell - strike >= ANCHOR_USD) anchorSign = 1;
+      else if (strike - avgBuy >= ANCHOR_USD && strike - avgSell >= ANCHOR_USD) anchorSign = -1;
+    }
+    const gapUsd = Math.abs(spot - strike);
+    const nearW = clamp((15 - gapUsd) / 5, 0, 1);              // 1 within $10, 0 at $15+
+    const timeW = secs > 720 ? clamp((900 - secs) / 180, 0, 1) // ramp in after first 3 min
+      : clamp((secs - 180) / 120, 0, 1);                      // fade out 5→3 min left
+    if (anchorSign !== 0 && nearW > 0 && timeW > 0) {
+      // SMA stack agreeing with the anchor strengthens it; disagreeing halves it.
+      const stackAgree = stackAlign == null ? 0 : clamp(anchorSign * stackAlign, -1, 1);
+      const strength = clamp(0.75 + 0.25 * stackAgree, 0.5, 1);
+      const floor = 0.5 + 0.08 * strength;                    // anchored side holds ≥ ~56–58¢
+      const anchorP = anchorSign > 0 ? Math.max(pLead, floor) : Math.min(pLead, 1 - floor);
+      const w = nearW * timeW;
+      pLead = pLead + (anchorP - pLead) * w;
+      if (w > 0.05) anchorNote = ` · anchor ${anchorSign > 0 ? "UP" : "DN"} ${(w * 100).toFixed(0)}%`;
+    }
+  }
+
   // --- Step C: empirical last-minute dollar-lead bands ----------------------
   const leadUsd = Math.abs(spot - strike);
   const bandW = clamp((120 - secs) / 60, 0, 1);    // ramps in, full in final minute
@@ -552,7 +581,8 @@ export function computeStrikeOdds(
   const calibNote =
     `conviction ${conviction >= 0 ? "+" : ""}${(conviction * 100).toFixed(0)}% · ` +
     `cap ${(pCap * 100).toFixed(0)}% · raw ${(pRaw * 100).toFixed(0)}%` +
-    (lateFade > 0 ? ` · late ${(lateFade * 100).toFixed(0)}% · ${leadSigmas.toFixed(1)}σ` : "");
+    (lateFade > 0 ? ` · late ${(lateFade * 100).toFixed(0)}% · ${leadSigmas.toFixed(1)}σ` : "") +
+    anchorNote;
 
   const spread = SPREAD_BASE + SPREAD_K * Math.sqrt(secs / 900);
   return {
