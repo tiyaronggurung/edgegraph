@@ -2,12 +2,12 @@
 // BTC traded volume (BTC + USD notional). Read-only display card.
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getBtcPriceVolume } from "@/lib/btcPriceVolume.functions";
 import { getBtcMultiVenueVolume } from "@/lib/btcMultiVenueVolume.functions";
-import { getBtcEssentialSnapshot } from "@/lib/btcEssentialSnapshot.functions";
+import { useBtcEssentialFeeds } from "@/hooks/useBtcEssentialFeeds";
 import {
   computeFlowLean,
   flowLeanWinRate,
@@ -34,7 +34,6 @@ function compact(x: number | null | undefined): string {
 
 export function BtcPriceVolumeCard() {
   const fn = useServerFn(getBtcPriceVolume);
-  const essentialFn = useServerFn(getBtcEssentialSnapshot);
   const multiVenueFn = useServerFn(getBtcMultiVenueVolume);
   const dayTotalsFn = useServerFn(getCompositeDayTotals);
   const live = useLiveCompositeSpot();
@@ -71,30 +70,8 @@ export function BtcPriceVolumeCard() {
     placeholderData: keepPreviousData,
     retry: 1,
   });
-  const { data: essential } = useQuery({
-    queryKey: ["btc-essential-snapshot", winStart],
-    queryFn: () => essentialFn(),
-    // A miss from one upstream must never discard the other successful leg.
-    // Retry partial snapshots quickly; settle back to the normal cadence once
-    // both current-window values are present.
-    refetchInterval: (query) => {
-      const snapshot = query.state.data;
-      const complete =
-        snapshot?.strike.ok === true &&
-        snapshot.strike.strike != null &&
-        snapshot.volume.ok === true &&
-        snapshot.volume.windowStart === winStart &&
-        snapshot.volume.window != null;
-      return complete ? 5_000 : 1_000;
-    },
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    retry: 3,
-    retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
-    placeholderData: keepPreviousData,
-  });
-  const win = essential?.volume;
+  const essential = useBtcEssentialFeeds(winStart);
+  const win = essential.volume;
 
   // Context-only multi-exchange totals; separate query so it can never
   // delay price, volume or odds.
@@ -114,7 +91,6 @@ export function BtcPriceVolumeCard() {
   // Keyed by window so a rollover forces a fresh fetch instead of reusing the
   // previous window's strike, and polled fast so a new strike lands right away.
   const marketsFn = useServerFn(getBtcMarkets);
-  const qc = useQueryClient();
   const kalshi = essential?.strike;
   // The page already owns this query. Subscribing with the identical key adds
   // no extra request and gives the card a warm strike when the lightweight
@@ -126,11 +102,6 @@ export function BtcPriceVolumeCard() {
     staleTime: 1_000,
     placeholderData: keepPreviousData,
   });
-  // Drop any strike cached against an earlier window the moment we roll over.
-  useEffect(() => {
-    void qc.invalidateQueries({ queryKey: ["btc-essential-snapshot"] });
-  }, [winStart, qc]);
-
   // Only reuse a held strike inside the same window; never across a rollover.
   const lastStrikeRef = useRef<{ winStart: number; strike: number } | null>(null);
   if (kalshi?.ok && kalshi.strike != null) {

@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { useLiveCompositeSpot } from "@/hooks/useLiveCompositeSpot";
 import { useStrikeOdds } from "@/hooks/useStrikeOdds";
 import { compositeFlowBlend } from "@/lib/compositeFlowBlend";
-import { getBtcEssentialSnapshot } from "@/lib/btcEssentialSnapshot.functions";
+import { useBtcEssentialFeeds } from "@/hooks/useBtcEssentialFeeds";
+import { getKalshiCurrentStrike } from "@/lib/kalshiCurrentStrike.functions";
+import { getBtcSpotVolume } from "@/lib/btcSpotVolume.functions";
 import { getBtcFlowLeanHistory } from "@/lib/btcFlowLeanHistory.functions";
 import { getBtcMarkets } from "@/lib/cryptoBtc.functions";
 import { getBtcMultiVenueVolume } from "@/lib/btcMultiVenueVolume.functions";
@@ -37,7 +39,8 @@ export const Route = createFileRoute("/_authenticated/paper-desk")({
     if (!data.session) return;
     const winStart = Math.floor(Date.now() / 900_000) * 900_000;
     context.queryClient.prefetchQuery({ queryKey: ["btc-markets"], queryFn: () => getBtcMarkets() }).catch(() => {});
-    context.queryClient.prefetchQuery({ queryKey: ["btc-essential-snapshot", winStart], queryFn: () => getBtcEssentialSnapshot(), staleTime: 1_000 }).catch(() => {});
+    context.queryClient.prefetchQuery({ queryKey: ["btc-display-strike", winStart], queryFn: () => getKalshiCurrentStrike(), staleTime: 1_000 }).catch(() => {});
+    context.queryClient.prefetchQuery({ queryKey: ["btc-display-volume", winStart], queryFn: () => getBtcSpotVolume(), staleTime: 1_000 }).catch(() => {});
     context.queryClient.prefetchQuery({ queryKey: ["btc-flow-lean-history"], queryFn: () => getBtcFlowLeanHistory() }).catch(() => {});
   },
   component: PaperDesk,
@@ -105,7 +108,6 @@ function PaperDesk() {
   const winStart = Math.floor(nowMs / 900_000) * 900_000;
   const liveSecsLeft = Math.max(0, Math.round((winStart + 900_000 - nowMs) / 1000));
 
-  const essentialFn = useServerFn(getBtcEssentialSnapshot);
   const marketsFn = useServerFn(getBtcMarkets);
   const histFn = useServerFn(getBtcFlowLeanHistory);
   const multiVenueFn = useServerFn(getBtcMultiVenueVolume);
@@ -128,15 +130,7 @@ function PaperDesk() {
     placeholderData: keepPreviousData,
     retry: 1,
   });
-  const { data: essential } = useQuery({
-    queryKey: ["btc-essential-snapshot", winStart],
-    queryFn: () => essentialFn(),
-    refetchInterval: 5_000,
-    refetchOnWindowFocus: true,
-    retry: 3,
-    retryDelay: (a) => Math.min(200 * 2 ** a, 1_500),
-    placeholderData: keepPreviousData,
-  });
+  const essential = useBtcEssentialFeeds(winStart);
   const { data: markets } = useQuery({
     queryKey: ["btc-markets"],
     queryFn: () => marketsFn(),
