@@ -233,13 +233,18 @@ export function LiveOddsLineChart({
   const downC = upC == null ? null : 100 - upC;
   const hoveredUpC = hover != null && shown ? Math.round(shown.up * 100) : null;
 
-  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+  const scrubAt = (el: SVGSVGElement, clientX: number) => {
     if (!viewPts.length) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    const tx = viewStart + (((e.clientX - r.left) / r.width) * W / plotW) * WIN_MS;
+    const r = el.getBoundingClientRect();
+    const tx = viewStart + (((clientX - r.left) / r.width) * W / plotW) * WIN_MS;
     let best = 0;
     for (let i = 1; i < viewPts.length; i++) if (Math.abs(viewPts[i].t - tx) < Math.abs(viewPts[best].t - tx)) best = i;
     setHover(best);
+  };
+  const onMove = (e: React.MouseEvent<SVGSVGElement>) => scrubAt(e.currentTarget, e.clientX);
+  const onTouch = (e: React.TouchEvent<SVGSVGElement>) => {
+    const t = e.touches[0];
+    if (t) scrubAt(e.currentTarget, t.clientX);
   };
 
   const ticks = [0, 0.25, 0.5, 0.75, 1];
@@ -255,7 +260,7 @@ export function LiveOddsLineChart({
   const gap = !sel && spot != null && strike != null ? spot - strike : null;
 
   return (
-    <section className="border border-border rounded-lg p-4">
+    <section className="border border-border rounded-lg p-2 sm:p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
         <div>
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -313,7 +318,7 @@ export function LiveOddsLineChart({
           )}
         </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto select-none" onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto select-none" onMouseMove={onMove} onMouseLeave={() => setHover(null)} onTouchStart={onTouch} onTouchMove={onTouch} onTouchEnd={() => setHover(null)} style={{ touchAction: "pan-y" }}>
         {ticks.map((p) => (
           <g key={p}>
             <line x1={0} x2={plotW} y1={y(p)} y2={y(p)} stroke="var(--color-border)" strokeDasharray={p === 0.5 ? "4 4" : "1 5"} />
@@ -340,7 +345,7 @@ export function LiveOddsLineChart({
             <circle cx={x(last.t)} cy={y(1 - last.up)} r={4} fill="var(--color-destructive)">
               {!sel && <animate attributeName="r" values="4;6;4" dur="1.5s" repeatCount="indefinite" />}
             </circle>
-            <g transform={`translate(${Math.min(x(last.t) + 10, plotW - 70)},0)`}>
+            <g transform={`translate(${Math.min(x(last.t) + 10, plotW - (isPhone ? 60 : 70))},0)`}>
               <text y={uy - 2} fontSize="12" fontWeight="600" fill="var(--color-primary)">Up</text>
               <text y={uy + 18} fontSize="20" fontWeight="700" fill="var(--color-primary)">{upC}¢</text>
               <text y={dy - 2} fontSize="12" fontWeight="600" fill="var(--color-destructive)">Down</text>
