@@ -1,5 +1,9 @@
 # Roadmap
 
+## Sign-in odds loading
+- [ ] Load the display's current-window strike and Binance volume independently using shared queries; preserve odds math and all trading paths.
+- [ ] Verify signed-in cold loading, delayed feeds and reload; published sign-in timing requires deployment and a public-site session.
+
 ## Strategy C settled profit
 - [x] Verified all 45 recorded C settlements already match winning-contract payout minus both actual leg costs; shared the calculation between settlement and display, and exposed latest payout/cost breakdown without changing A/B or historical fills.
 - [x] 13 settlement/sizing/chart tests passed; build OK. Signed-in Paper Desk and reload both showed latest C payout $226.00 minus $182.63 cost = +$43.37, total +$371.10; no browser errors. New unattended settlement code requires publishing; no new equal-dollar C fill was available to exercise.

@@ -1,6 +1,7 @@
 # Architecture rules
 
 - Paper Desk's read-only volume display subscribes to Crypto's existing query keys and uses a dedicated presentation component; keep it separate from trading decisions to avoid changing live orders.
+- Display strike and window volume use independent shared queries through useBtcEssentialFeeds; one upstream must not block the other, and strike data is confined to its own market window.
 - The Quad-Confirmation paper engine (quadBot, qc_* tables) is paper-only and isolated from live trading code; it never places real orders, so experiments cannot change live orders.
 - C's opposite leg uses the entry dollar budget through a pure sizing helper; its legacy locked flag means hedge completed, not guaranteed profit, because equal-dollar legs can have unequal contracts.
 - C settlement and its displayed P&L share a pure helper: winning contracts minus both recorded leg costs (including any recorded fees); preserve historical fills rather than resizing old trades to current budgets.
