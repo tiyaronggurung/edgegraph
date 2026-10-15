@@ -174,11 +174,23 @@ export function LiveOddsLineChart({
   }, [winStart]);
 
   useEffect(() => {
+    // Don't plot until this window's own strike arrives: right after rollover
+    // the strike/odds still belong to the previous window. Wait for the strike
+    // to change from the rollover value, then skip one tick so odds recompute.
+    const staleStrike = latest.current.strike;
+    let armedAt: number | null = null;
     const id = setInterval(() => {
-      const v = latest.current.upAsk;
-      if (v == null || !Number.isFinite(v)) return;
       const t = Date.now();
       if (t < winStart || t >= winStart + WIN_MS) return;
+      if (armedAt == null) {
+        const k = latest.current.strike;
+        const fresh = k != null && (k !== staleStrike || ptsRef.current.length > 0);
+        if (!fresh) return;
+        armedAt = t;
+        if (ptsRef.current.length === 0) return;
+      }
+      const v = latest.current.upAsk;
+      if (v == null || !Number.isFinite(v)) return;
       setPts((p) => [...p, { t, up: v }]);
     }, SAMPLE_MS);
     const sid = setInterval(() => void save(winStart, ptsRef.current, false), SAVE_MS);
