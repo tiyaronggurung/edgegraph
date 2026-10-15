@@ -73,6 +73,8 @@ export interface StrikeOddsContext {
   compAvgOut?: number | null;
   /** Multi-SMA stack read (10/50/200 on 1m closes) from the flow log feed. */
   stack?: SmaStack | null;
+  /** 0..1 share of window time UP odds sat above 50¢ (browser hook only). */
+  areaUpShare?: number | null;
 }
 
 export interface StrikeOddsParts {
@@ -157,6 +159,10 @@ export function useStrikeOdds(
 ): StrikeOdds {
   const tapeRef = useRef<Tick[]>([]);
   const [, bump] = useState(0);
+  // Running time-share of UP odds above 50¢ in the current 15-min window.
+  const areaRef = useRef<{ win: number; up: number; total: number; lastT: number; lastP: number | null }>(
+    { win: -1, up: 0, total: 0, lastT: 0, lastP: null },
+  );
 
   // Keep a rolling tape of composite ticks.
   useEffect(() => {
@@ -170,7 +176,24 @@ export function useStrikeOdds(
     bump((n) => n + 1);
   }, [spot]);
 
-  return computeStrikeOdds(spot, strike, secondsToClose, ctx, tapeRef.current);
+  const now = Date.now();
+  const area = areaRef.current;
+  const win = Math.round((now / 1000 + Math.max(secondsToClose, 0)) / 900);
+  if (win !== area.win) {
+    area.win = win; area.up = 0; area.total = 0; area.lastT = now; area.lastP = null;
+  } else if (area.lastP != null) {
+    const dt = Math.min((now - area.lastT) / 1000, 2);
+    if (dt > 0) {
+      area.total += dt;
+      if (area.lastP > 0.5) area.up += dt;
+    }
+  }
+  area.lastT = now;
+  const areaUpShare = area.total >= 60 ? area.up / area.total : null;
+
+  const out = computeStrikeOdds(spot, strike, secondsToClose, { ...ctx, areaUpShare }, tapeRef.current);
+  area.lastP = out.pUp;
+  return out;
 }
 
 /**
@@ -560,6 +583,31 @@ export function computeStrikeOdds(
     }
   }
 
+  // --- Step 2: Area inertia tilt (browser-only; server recorder omits it) ---
+  // Share of window time UP odds sat above 50¢. Minutes 3–10: ≥70% dominance
+  // adds +2¢…+4¢ toward that side (only near strike), fading to 0 by minute 11.
+  // Combined with the anchor, the push never lifts a side past 60¢.
+  let areaNote = "";
+  {
+    const share = ctx?.areaUpShare;
+    if (share != null && Number.isFinite(share)) {
+      const elapsed = 900 - secs;
+      const timeW = elapsed < 180 ? 0 : elapsed <= 600 ? 1 : clamp((660 - elapsed) / 60, 0, 1);
+      const dom = Math.max(share, 1 - share);
+      const gapUsd = Math.abs(spot - strike);
+      const nearW = clamp((15 - gapUsd) / 5, 0, 1);
+      if (dom >= 0.7 && timeW > 0 && nearW > 0) {
+        const tilt = (0.02 + 0.02 * clamp((dom - 0.7) / 0.15, 0, 1)) * timeW * nearW;
+        if (share >= 0.5) {
+          pLead = Math.min(pLead + tilt, Math.max(pLead, 0.6));
+        } else {
+          pLead = Math.max(pLead - tilt, Math.min(pLead, 0.4));
+        }
+        if (tilt > 0.002) areaNote = ` · area ${share >= 0.5 ? "UP" : "DN"} +${(tilt * 100).toFixed(1)}¢`;
+      }
+    }
+  }
+
   // --- Step C: empirical last-minute dollar-lead bands ----------------------
   const leadUsd = Math.abs(spot - strike);
   const bandW = clamp((120 - secs) / 60, 0, 1);    // ramps in, full in final minute
@@ -582,7 +630,7 @@ export function computeStrikeOdds(
     `conviction ${conviction >= 0 ? "+" : ""}${(conviction * 100).toFixed(0)}% · ` +
     `cap ${(pCap * 100).toFixed(0)}% · raw ${(pRaw * 100).toFixed(0)}%` +
     (lateFade > 0 ? ` · late ${(lateFade * 100).toFixed(0)}% · ${leadSigmas.toFixed(1)}σ` : "") +
-    anchorNote;
+    anchorNote + areaNote;
 
   const spread = SPREAD_BASE + SPREAD_K * Math.sqrt(secs / 900);
   return {
