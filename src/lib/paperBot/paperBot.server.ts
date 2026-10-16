@@ -1,5 +1,5 @@
 // Paper Desk: two-sided Kalshi PAPER bot (port of Claude's kit edge function).
-// PAPER ONLY — reads Kalshi public data, never places orders, needs no Kalshi keys.
+// PAPER ONLY — reads Kalshi data (signed with the saved key for rate limits), never places orders.
 // Fully isolated: writes only pb_* tables. Called every ~10s by pg_cron; each call
 // polls up to RUN_SECONDS at POLL interval, guarded by a DB lock.
 import {
