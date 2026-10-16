@@ -1,5 +1,5 @@
 // Paper Desk: two-sided Kalshi PAPER bot (port of Claude's kit edge function).
-// PAPER ONLY — reads Kalshi public data, never places orders, needs no Kalshi keys.
+// PAPER ONLY — reads Kalshi data (signed with the saved key for rate limits), never places orders.
 // Fully isolated: writes only pb_* tables. Called every ~10s by pg_cron; each call
 // polls up to RUN_SECONDS at POLL interval, guarded by a DB lock.
 import {
@@ -39,12 +39,36 @@ const nowS = () => Date.now() / 1000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const r4 = (x: number | null) => (x === null ? null : Math.round(x * 1e4) / 1e4);
 
+// Signs read-only /trade-api/v2 requests with the saved Kalshi key so they count
+// against the account's own rate limit instead of the shared anonymous IP limit.
+// Read-only GETs only — this never places orders. Falls back to unsigned on any error.
+async function authHeaders(path: string): Promise<Record<string, string>> {
+  try {
+    if (!path.startsWith("/trade-api/v2")) return {};
+    const keyId = process.env.KALSHI_API_KEY_ID;
+    if (!keyId || !process.env.KALSHI_PRIVATE_KEY_PEM) return {};
+    const { getValidatedKalshiKey } = await import("@/lib/cryptoTrades.functions");
+    const { pem, constants, createSign } = await getValidatedKalshiKey();
+    const ts = Date.now().toString();
+    const signer = createSign("RSA-SHA256");
+    signer.update(`${ts}GET${path}`);
+    signer.end();
+    const signature = signer
+      .sign({ key: pem, padding: constants.RSA_PKCS1_PSS_PADDING, saltLength: constants.RSA_PSS_SALTLEN_DIGEST })
+      .toString("base64");
+    return { "KALSHI-ACCESS-KEY": keyId, "KALSHI-ACCESS-TIMESTAMP": ts, "KALSHI-ACCESS-SIGNATURE": signature };
+  } catch {
+    return {};
+  }
+}
+
 async function kget(path: string, params: Record<string, string | number> = {}): Promise<any> {
   const url = new URL(KALSHI + path);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(4000) });
+      const auth = await authHeaders(path);
+      const r = await fetch(url, { headers: { accept: "application/json", ...auth }, signal: AbortSignal.timeout(4000) });
       if (r.status === 429) { await sleep(700 * (attempt + 1)); continue; }
       if (!r.ok) throw new Error(`${r.status} ${path}`);
       return await r.json();
@@ -56,8 +80,16 @@ async function kget(path: string, params: Record<string, string | number> = {}):
   throw new Error(`rate limited ${path}`);
 }
 
-const openMarkets = async (series: string) =>
-  ((await kget("/trade-api/v2/markets", { series_ticker: series, status: "open", limit: 50 })).markets ?? []) as any[];
+// Short cache so repeated polls within one run don't re-ask Kalshi for the list.
+const OPEN_MARKETS_CACHE_MS = 5_000;
+const openMarketsCache = new Map<string, { at: number; rows: any[] }>();
+const openMarkets = async (series: string) => {
+  const hit = openMarketsCache.get(series);
+  if (hit && Date.now() - hit.at < OPEN_MARKETS_CACHE_MS) return hit.rows;
+  const rows = ((await kget("/trade-api/v2/markets", { series_ticker: series, status: "open", limit: 50 })).markets ?? []) as any[];
+  openMarketsCache.set(series, { at: Date.now(), rows });
+  return rows;
+};
 const marketInfo = async (ticker: string) => (await kget(`/trade-api/v2/markets/${ticker}`)).market ?? {};
 
 async function indexPrice(eventTicker: string, coin: string): Promise<[number, number] | null> {
