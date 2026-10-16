@@ -29,7 +29,7 @@ export function QuadPaperPanel({ isAdmin }: { isAdmin: boolean }) {
   const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ["quad-paper"],
-    refetchInterval: 2000,
+    refetchInterval: 5000,
     queryFn: async () => {
       const [s, pos, fills] = await Promise.all([
         db.from("qc_settings").select("*").eq("id", 1).maybeSingle(),

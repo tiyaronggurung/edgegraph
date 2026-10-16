@@ -39,8 +39,10 @@ export function useBtcEssentialFeeds(winStart: number) {
   // Requests spanning a rollover must not attach an old market to a new key.
   const fetchedAt = strike.dataUpdatedAt;
   const closeAt = remaining == null ? null : fetchedAt + remaining * 1_000;
+  // 60s tolerance absorbs device clock skew; windows are 15 min apart so a
+  // neighbouring market can never match.
   const belongsToWindow = closeAt != null &&
-    Math.abs(closeAt - (winStart + 900_000)) < 5_000;
+    Math.abs(closeAt - (winStart + 900_000)) < 60_000;
   return {
     strike: belongsToWindow ? currentStrike : undefined,
     volume: volume.data,
