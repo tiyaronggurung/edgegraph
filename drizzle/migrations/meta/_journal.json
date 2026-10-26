@@ -43,6 +43,13 @@
       "when": 1792092497624,
       "tag": "0005_live_odds_writer_cron",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793022891413,
+      "tag": "0006_migration",
+      "breakpoints": true
     }
   ]
 }
