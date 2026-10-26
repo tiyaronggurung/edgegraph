@@ -50,6 +50,13 @@
       "when": 1793022891413,
       "tag": "0006_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793023976783,
+      "tag": "0007_live_odds_windows_5m",
+      "breakpoints": true
     }
   ]
 }

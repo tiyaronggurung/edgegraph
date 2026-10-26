@@ -4851,6 +4851,36 @@ export type Database = {
         }
         Relationships: []
       }
+      live_odds_windows_5m: {
+        Row: {
+          close_spot: number | null
+          points: Json
+          poly_points: Json
+          result: string | null
+          strike: number | null
+          updated_at: string
+          window_start: string
+        }
+        Insert: {
+          close_spot?: number | null
+          points?: Json
+          poly_points?: Json
+          result?: string | null
+          strike?: number | null
+          updated_at?: string
+          window_start: string
+        }
+        Update: {
+          close_spot?: number | null
+          points?: Json
+          poly_points?: Json
+          result?: string | null
+          strike?: number | null
+          updated_at?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       live_predictions: {
         Row: {
           away_team: string
