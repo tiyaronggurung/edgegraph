@@ -16,6 +16,29 @@ import { DeskVolumeDetails } from "@/components/crypto/DeskVolumeDetails";
 import { BtcPriceVolumeCard } from "@/components/crypto/BtcPriceVolumeCard";
 import { QuadPaperPanel } from "@/components/crypto/QuadPaperPanel";
 import { LiveOddsLineChart } from "@/components/crypto/LiveOddsLineChart";
+import { Odds5mPanel } from "@/components/crypto/Odds5mPanel";
+
+// 15m chart stays mounted when hidden: it keeps saving odds points Option B reads.
+function OddsTabs({ tab15, spot }: { tab15: React.ReactNode; spot: number | null }) {
+  const [tab, setTab] = useState<"15" | "5">("15");
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-1 text-xs">
+        {(["15", "5"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={cn("px-3 py-1 rounded border border-border", tab === t ? "bg-primary text-primary-foreground" : "bg-muted/20 text-muted-foreground")}
+          >
+            {t === "15" ? "15m Kalshi" : "5m Polymarket"}
+          </button>
+        ))}
+      </div>
+      <div className={tab === "15" ? "" : "hidden"}>{tab15}</div>
+      {tab === "5" && <Odds5mPanel spot={spot} />}
+    </div>
+  );
+}
 import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -323,7 +346,10 @@ function PaperDesk() {
         day={dayTotals?.ok ? dayTotals : null}
         price={spot}
       />
-      <LiveOddsLineChart upAsk={odds.upAsk} winStart={winStart} strike={strike ?? null} spot={spot} secsLeft={liveSecsLeft} />
+      <OddsTabs
+        tab15={<LiveOddsLineChart upAsk={odds.upAsk} winStart={winStart} strike={strike ?? null} spot={spot} secsLeft={liveSecsLeft} />}
+        spot={spot ?? null}
+      />
       <QuadPaperPanel isAdmin={isAdmin} />
 
 
