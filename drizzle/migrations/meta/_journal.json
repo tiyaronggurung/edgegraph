@@ -64,6 +64,13 @@
       "when": 1793027407231,
       "tag": "0008_p5_live_trading",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793028290941,
+      "tag": "0009_p5_live_stake",
+      "breakpoints": true
     }
   ]
 }

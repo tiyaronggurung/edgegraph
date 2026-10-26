@@ -5899,6 +5899,7 @@ export type Database = {
           id: number
           last_status: Json | null
           live_enabled: boolean
+          live_stake: number
           running: boolean
           stake: number
           updated_at: string
@@ -5907,6 +5908,7 @@ export type Database = {
           id?: number
           last_status?: Json | null
           live_enabled?: boolean
+          live_stake?: number
           running?: boolean
           stake?: number
           updated_at?: string
@@ -5915,6 +5917,7 @@ export type Database = {
           id?: number
           last_status?: Json | null
           live_enabled?: boolean
+          live_stake?: number
           running?: boolean
           stake?: number
           updated_at?: string
@@ -7674,6 +7677,7 @@ export type Database = {
         Returns: number
       }
       p5_set_live: { Args: { p_on: boolean }; Returns: undefined }
+      p5_set_live_stake: { Args: { p_stake: number }; Returns: undefined }
       p5_update_settings: {
         Args: { p_running: boolean; p_stake: number }
         Returns: undefined
