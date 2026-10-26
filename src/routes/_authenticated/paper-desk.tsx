@@ -35,7 +35,8 @@ function OddsTabs({ tab15, spot }: { tab15: React.ReactNode; spot: number | null
         ))}
       </div>
       <div className={tab === "15" ? "" : "hidden"}>{tab15}</div>
-      {tab === "5" && <Odds5mPanel spot={spot} />}
+      {/* 5m panel also stays mounted so its graph keeps building from page load. */}
+      <div className={tab === "5" ? "" : "hidden"}><Odds5mPanel spot={spot} /></div>
     </div>
   );
 }

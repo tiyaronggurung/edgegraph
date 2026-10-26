@@ -22,7 +22,7 @@ export function Odds5mPanel({ spot }: { spot: number | null }) {
   const [strike, setStrike] = useState<{ win: number; px: number } | null>(null);
   const [poly, setPoly] = useState<Awaited<ReturnType<typeof fetchPolymarket5m>> | null>(null);
   const tapeRef = useRef<Tick[]>([]);
-  const seriesRef = useRef<{ win: number; pts: { t: number; up: number }[] }>({ win: -1, pts: [] });
+  const seriesRef = useRef<{ win: number; pts: { t: number; up: number }[]; poly: { t: number; up: number }[] }>({ win: -1, pts: [], poly: [] });
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -57,11 +57,18 @@ export function Odds5mPanel({ spot }: { spot: number | null }) {
   const odds = computeStrikeOdds(spot, k, secsLeft, undefined, tapeRef.current);
   const up = odds.upAsk;
 
+  const polyUp = poly && poly.startMs === winStart ? poly.upMid : null;
+  const gap = up != null && polyUp != null ? up - polyUp : null;
+
   const ser = seriesRef.current;
-  if (ser.win !== winStart) { ser.win = winStart; ser.pts = []; }
+  if (ser.win !== winStart) { ser.win = winStart; ser.pts = []; ser.poly = []; }
   if (up != null) {
     const lastPt = ser.pts[ser.pts.length - 1];
     if (!lastPt || now - lastPt.t >= 1000) ser.pts.push({ t: now, up });
+  }
+  if (polyUp != null) {
+    const lastP = ser.poly[ser.poly.length - 1];
+    if (!lastP || now - lastP.t >= 1000) ser.poly.push({ t: now, up: polyUp });
   }
 
   // Expiration-weighted area measured from the 50¢ midline.
@@ -76,20 +83,22 @@ export function Odds5mPanel({ spot }: { spot: number | null }) {
   }
   const areaUp = aUp + aDn > 0 ? aUp / (aUp + aDn) : null;
 
-  const polyUp = poly && poly.startMs === winStart ? poly.upMid : null;
-  const gap = up != null && polyUp != null ? up - polyUp : null;
-
   const x = (t: number) => ((t - winStart) / WIN_MS) * (W - PAD_R);
   const y = (p: number) => H - p * H;
-  const path = ser.pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.up).toFixed(1)}`).join(" ");
+  const mk = (pts: { t: number; up: number }[], f: (v: number) => number) =>
+    pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(f(p.up)).toFixed(1)}`).join(" ");
+  const upPath = mk(ser.pts, (v) => v);
+  const dnPath = mk(ser.pts, (v) => 1 - v);
+  const polyPath = mk(ser.poly, (v) => v);
   const lastPt = ser.pts[ser.pts.length - 1];
+  const lastPoly = ser.poly[ser.poly.length - 1];
 
   return (
     <section className="border border-border rounded-lg p-3 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="font-semibold">Our 5m odds · Polymarket window</div>
         <div className="text-muted-foreground font-mono">
-          {Math.floor(secsLeft / 60)}:{String(secsLeft % 60).padStart(2, "0")} left · strike {k != null ? `$${k.toFixed(2)}` : "—"}
+          {Math.floor(secsLeft / 60)}:{String(secsLeft % 60).padStart(2, "0")} left · strike {k != null ? `$${k.toFixed(2)}` : "loading…"}
           {spot != null && k != null && ` (${spot - k >= 0 ? "+" : ""}${(spot - k).toFixed(0)})`}
         </div>
       </div>
@@ -106,17 +115,29 @@ export function Odds5mPanel({ spot }: { spot: number | null }) {
           value={areaUp != null ? `${(areaUp * 100).toFixed(0)}% UP / ${((1 - areaUp) * 100).toFixed(0)}% DN` : "—"}
         />
       </div>
+      <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-primary" />Our UP</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-destructive" />Our DOWN</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 border-t border-dashed border-foreground" />Polymarket UP</span>
+      </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-40 bg-muted/10 rounded">
         <line x1={0} x2={W - PAD_R} y1={y(0.5)} y2={y(0.5)} className="stroke-muted-foreground/40" strokeDasharray="4 4" />
-        {path && <path d={path} fill="none" className="stroke-primary" strokeWidth={2} />}
+        {polyPath && <path d={polyPath} fill="none" className="stroke-foreground/70" strokeWidth={1.5} strokeDasharray="5 3" />}
+        {dnPath && <path d={dnPath} fill="none" className="stroke-destructive" strokeWidth={2} />}
+        {upPath && <path d={upPath} fill="none" className="stroke-primary" strokeWidth={2} />}
         {lastPt && (
           <>
             <circle cx={x(lastPt.t)} cy={y(lastPt.up)} r={4} className="fill-primary" />
-            <text x={x(lastPt.t) + 8} y={y(lastPt.up) + 4} className="fill-foreground text-[14px] font-mono">
+            <text x={x(lastPt.t) + 8} y={y(lastPt.up) + 4} className="fill-primary text-[14px] font-mono">
               {(lastPt.up * 100).toFixed(0)}¢
+            </text>
+            <circle cx={x(lastPt.t)} cy={y(1 - lastPt.up)} r={4} className="fill-destructive" />
+            <text x={x(lastPt.t) + 8} y={y(1 - lastPt.up) + 4} className="fill-destructive text-[14px] font-mono">
+              {((1 - lastPt.up) * 100).toFixed(0)}¢
             </text>
           </>
         )}
+        {lastPoly && <circle cx={x(lastPoly.t)} cy={y(lastPoly.up)} r={3} className="fill-foreground/70" />}
       </svg>
       <div className="text-[10px] text-muted-foreground">
         Display only — same odds math as 15m with a 5-minute clock. Strike = Polymarket official "price to beat" (Chainlink BTC at the 5m open). Not used by any bot.
