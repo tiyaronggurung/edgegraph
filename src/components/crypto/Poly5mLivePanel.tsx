@@ -42,7 +42,7 @@ export function Poly5mLivePanel({ isAdmin }: { isAdmin: boolean }) {
   const on = live.data?.on ?? false;
 
   const toggle = async () => {
-    if (!on && !window.confirm("Turn ON real-money 5m trading on Polymarket US?\n\n$${stake} per trade, one per 5-minute window, stops after $500 losses in a NY day.")) return;
+    if (!on && !window.confirm(`Turn ON real-money 5m trading on Polymarket US?\n\n$${stake} per trade, one per 5-minute window, stops after $500 losses in a NY day.`)) return;
     const { error } = await db.rpc("p5_set_live", { p_on: !on });
     if (error) return toast.error(error.message);
     toast.success(!on ? "Real-money 5m trading ON" : "Real-money 5m trading OFF");
