@@ -25,7 +25,8 @@ export const fetchPolymarket5m = createServerFn({ method: "GET" })
 
     let strike = strikeCache.get(startSec) ?? null;
     const strikeP = strike != null ? Promise.resolve(null) : j(
-      `https://polymarket.com/api/crypto/crypto-price?symbol=BTC&eventStartTime=${iso(startSec)}&variant=fiveminute&endDate=${iso(startSec + 300)}`,
+      // twapEnabled + 60s lookback = Polymarket's official "price to beat" (matches gamma eventMetadata.priceToBeat).
+      `https://polymarket.com/api/crypto/crypto-price?symbol=BTC&eventStartTime=${iso(startSec)}&variant=fiveminute&endDate=${iso(startSec + 300)}&twapEnabled=true&twapLookbackSeconds=60`,
     );
 
     let token = tokenCache.get(startSec);
