@@ -1,4 +1,4 @@
-// 5m Polymarket paper bot (PAPER ONLY — never places real orders).
+// 5m Polymarket bot. Paper by default; real orders only via live.server.ts when the live switch is ON.
 // Uses the same pure odds core as the 5m tab (computeStrikeOdds, T = seconds left)
 // and Polymarket US's real asks. Writes only p5_* tables.
 import { computeStrikeOdds, type Tick } from "@/hooks/useStrikeOdds";
@@ -9,6 +9,7 @@ import {
 } from "./decide";
 import { areaUpFromPoints, situationKey } from "./situation";
 import { addResult, isAllowed } from "./learn";
+import { liveEntry, liveManage, liveSettle } from "./live.server";
 
 const WIN_MS = P5_WIN_SEC * 1000;
 
@@ -91,6 +92,7 @@ async function settleClosed(sb: any, currentStart: number) {
       continue;
     }
     await sb.from("p5_windows").update({ result, close_spot: close, updated_at: new Date().toISOString() }).eq("window_start", w.window_start);
+    await liveSettle(sb, w.window_start, result).catch(() => undefined);
     // Learn from the window's first qualifying signal (traded or shadow), held to settle.
     if (w.situation && w.signal_side && w.signal_ask && !w.learned) {
       const { data: cur } = await sb.from("p5_situations").select("*").eq("key", w.situation).maybeSingle();
@@ -173,6 +175,10 @@ export async function runPoly5mBotTick() {
         if (!error) { row.traded = true; status = `bought ${sig.side} ${ct} @ ${Math.round(sig.ask * 100)}¢`; }
       }
     } else status = allowed ? `signal ${sig.side} (bot off — shadow only)` : `signal ${sig.side} blocked by learning (${key})`;
+    if (settings?.live_enabled && allowed) {
+      const ls = await liveEntry(sb, { iso, slug: slugFor(start), side: sig.side, ask: sig.ask }).catch((e) => `live error: ${String(e?.message ?? e).slice(0, 80)}`);
+      status = `${status} · ${ls}`;
+    }
   }
   await sb.from("p5_windows").upsert(row, { onConflict: "window_start" });
 
@@ -188,6 +194,11 @@ export async function runPoly5mBotTick() {
       await sb.from("p5_positions").update({ hedge_contracts: act.contracts, hedge_px: act.px, hedge_cost: Math.round(act.contracts * act.px * 100) / 100 }).eq("id", pos.id).is("hedge_contracts", null);
       status = `rescue hedge ${act.contracts} @ ${Math.round(act.px * 100)}¢`;
     } else status = `holding ${pos.side} @ ${Math.round(Number(pos.entry_px) * 100)}¢${pos.hedge_contracts ? " (hedged)" : ""}`;
+  }
+
+  if (settings?.live_enabled) {
+    const lm = await liveManage(sb, { iso, slug: slugFor(start), up, book: ev.book }).catch(() => null);
+    if (lm) status = `${status} · ${lm}`;
   }
 
   await sb.from("p5_settings").update({ last_status: { at: new Date().toISOString(), up, elapsed, status, book: ev.book, strike: ev.strike } }).eq("id", 1);

@@ -5765,6 +5765,72 @@ export type Database = {
         }
         Relationships: []
       }
+      p5_live_orders: {
+        Row: {
+          cost: number | null
+          created_at: string
+          error: string | null
+          filled_qty: number
+          id: number
+          intent: string
+          kind: string
+          limit_px: number
+          order_id: string | null
+          pnl: number | null
+          proceeds: number | null
+          quantity: number
+          response: Json | null
+          result: string | null
+          settled: boolean
+          settled_at: string | null
+          side: string
+          state: string
+          window_start: string
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          error?: string | null
+          filled_qty?: number
+          id?: number
+          intent: string
+          kind: string
+          limit_px: number
+          order_id?: string | null
+          pnl?: number | null
+          proceeds?: number | null
+          quantity: number
+          response?: Json | null
+          result?: string | null
+          settled?: boolean
+          settled_at?: string | null
+          side: string
+          state?: string
+          window_start: string
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          error?: string | null
+          filled_qty?: number
+          id?: number
+          intent?: string
+          kind?: string
+          limit_px?: number
+          order_id?: string | null
+          pnl?: number | null
+          proceeds?: number | null
+          quantity?: number
+          response?: Json | null
+          result?: string | null
+          settled?: boolean
+          settled_at?: string | null
+          side?: string
+          state?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       p5_positions: {
         Row: {
           closed_at: string | null
@@ -5832,6 +5898,7 @@ export type Database = {
         Row: {
           id: number
           last_status: Json | null
+          live_enabled: boolean
           running: boolean
           stake: number
           updated_at: string
@@ -5839,6 +5906,7 @@ export type Database = {
         Insert: {
           id?: number
           last_status?: Json | null
+          live_enabled?: boolean
           running?: boolean
           stake?: number
           updated_at?: string
@@ -5846,6 +5914,7 @@ export type Database = {
         Update: {
           id?: number
           last_status?: Json | null
+          live_enabled?: boolean
           running?: boolean
           stake?: number
           updated_at?: string
@@ -7604,6 +7673,7 @@ export type Database = {
         }
         Returns: number
       }
+      p5_set_live: { Args: { p_on: boolean }; Returns: undefined }
       p5_update_settings: {
         Args: { p_running: boolean; p_stake: number }
         Returns: undefined
