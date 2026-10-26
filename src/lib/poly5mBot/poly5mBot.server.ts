@@ -169,6 +169,10 @@ export async function runPoly5mBotTick() {
     Object.assign(row, { signal_side: sig.side, signal_odds: sig.odds, signal_ask: sig.ask, signal_sec: elapsed, situation: key });
     const { data: st } = await sb.from("p5_situations").select("*").eq("key", key).maybeSingle();
     const allowed = isAllowed(st ? { n: st.n, wins: st.wins, px_sum: Number(st.px_sum), pnl_per_dollar_sum: Number(st.pnl_per_dollar_sum) } : null);
+    // Fire the real order first (in parallel) so paper bookkeeping never delays the live fill.
+    const liveP = settings?.live_enabled && allowed
+      ? liveEntry(sb, { iso, slug: ev.marketSlug ?? `cpc-${slugFor(start)}`, side: sig.side, ask: sig.ask, stake: Number(settings.live_stake ?? 10) }).catch((e) => `live error: ${String(e?.message ?? e).slice(0, 80)}`)
+      : null;
     if (settings?.running && allowed) {
       const ct = contractsFor(Number(settings.stake ?? 10), sig.ask);
       if (ct >= 1) {
@@ -176,14 +180,14 @@ export async function runPoly5mBotTick() {
         if (!error) { row.traded = true; status = `bought ${sig.side} ${ct} @ ${Math.round(sig.ask * 100)}¢`; }
       }
     } else status = allowed ? `signal ${sig.side} (bot off — shadow only)` : `signal ${sig.side} blocked by learning (${key})`;
-    if (settings?.live_enabled && allowed) {
-      const ls = await liveEntry(sb, { iso, slug: ev.marketSlug ?? `cpc-${slugFor(start)}`, side: sig.side, ask: sig.ask, stake: Number(settings.live_stake ?? 10) }).catch((e) => `live error: ${String(e?.message ?? e).slice(0, 80)}`);
-      status = `${status} · ${ls}`;
-    }
+    if (liveP) status = `${status} · ${await liveP}`;
   }
   await sb.from("p5_windows").upsert(row, { onConflict: "window_start" });
 
-  // Manage the open position.
+  // Manage the open position. Live exit runs in parallel with paper bookkeeping.
+  const liveMP = settings?.live_enabled
+    ? liveManage(sb, { iso, slug: ev.marketSlug ?? `cpc-${slugFor(start)}`, up, book: ev.book }).catch(() => null)
+    : null;
   const { data: pos } = await sb.from("p5_positions").select("*").eq("window_start", iso).eq("settled", false).is("exit_kind", null).maybeSingle();
   if (pos) {
     const act = decideExit({ side: pos.side, contracts: pos.contracts, hedged: pos.hedge_contracts != null }, up, ev.book);
@@ -197,10 +201,7 @@ export async function runPoly5mBotTick() {
     } else status = `holding ${pos.side} @ ${Math.round(Number(pos.entry_px) * 100)}¢${pos.hedge_contracts ? " (hedged)" : ""}`;
   }
 
-  if (settings?.live_enabled) {
-    const lm = await liveManage(sb, { iso, slug: ev.marketSlug ?? `cpc-${slugFor(start)}`, up, book: ev.book }).catch(() => null);
-    if (lm) status = `${status} · ${lm}`;
-  }
+  if (liveMP) { const lm = await liveMP; if (lm) status = `${status} · ${lm}`; }
 
   await sb.from("p5_settings").update({ last_status: { at: new Date().toISOString(), up, elapsed, status, book: ev.book, strike: ev.strike } }).eq("id", 1);
   return { ok: true, elapsed, up, status };
