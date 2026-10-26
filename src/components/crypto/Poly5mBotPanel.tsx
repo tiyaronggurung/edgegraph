@@ -71,12 +71,13 @@ export function Poly5mBotPanel({ isAdmin }: { isAdmin: boolean }) {
         <div className="font-semibold mb-1">Trade log</div>
         <div className="max-h-56 overflow-auto">
           <table className="w-full font-mono text-[11px]">
-            <thead className="text-muted-foreground"><tr><th className="text-left">Window</th><th>Side</th><th>Ct</th><th>Entry</th><th>Exit</th><th>Result</th><th className="text-right">P&L</th></tr></thead>
+            <thead className="text-muted-foreground"><tr><th className="text-left">Window</th><th>Entered (NY)</th><th>Side</th><th>Ct</th><th>Entry</th><th>Exit</th><th>Result</th><th className="text-right">P&L</th></tr></thead>
             <tbody>
-              {pos.length === 0 && <tr><td colSpan={7} className="text-muted-foreground py-2">No paper trades yet.</td></tr>}
+              {pos.length === 0 && <tr><td colSpan={8} className="text-muted-foreground py-2">No paper trades yet.</td></tr>}
               {pos.map((p) => (
                 <tr key={p.id} className="border-t border-border/40">
                   <td>{new Date(p.window_start).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })}</td>
+                  <td className="text-center">{p.opened_at ? new Date(p.opened_at).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit", second: "2-digit" }) : "—"}</td>
                   <td className={cn("text-center", p.side === "UP" ? "text-primary" : "text-destructive")}>{p.side}</td>
                   <td className="text-center">{p.contracts}</td>
                   <td className="text-center">{Math.round(Number(p.entry_px) * 100)}¢</td>
