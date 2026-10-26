@@ -30,3 +30,16 @@ export function liveWindowPnl(p: { side: Side; filled: number; cost: number; sol
 
 export const dailyLossHit = (todayPnls: number[]) =>
   todayPnls.filter((x) => x < 0).reduce((a, x) => a - x, 0) >= LIVE_DAILY_LOSS_LIMIT_USD;
+
+export const LIVE_PRICE_BUFFER = 0.02; // room above the real ask so a 1–2¢ tick doesn't kill the fill
+export const LIVE_MIN_EDGE = 0.05; // same edge rule as the paper entry, re-checked at the real book
+
+/** Real-book entry price. Polymarket US's book is quoted in UP (YES) prices,
+ * so DOWN's real ask is 1 − best UP bid. Returns null when the edge is gone. */
+export function liveEntryPrice(side: Side, odds: number, bestUpBid: number | null, bestUpAsk: number | null, buffer = LIVE_PRICE_BUFFER) {
+  const realAsk = side === "UP" ? bestUpAsk : bestUpBid != null ? 1 - bestUpBid : null;
+  if (realAsk == null || !(realAsk > 0 && realAsk < 1)) return null;
+  if (odds - realAsk < LIVE_MIN_EDGE) return null;
+  const limit = Math.min(realAsk + buffer, odds - 0.03, 0.99);
+  return { realAsk: Math.round(realAsk * 1000) / 1000, limit: Math.round(limit * 100) / 100 };
+}
