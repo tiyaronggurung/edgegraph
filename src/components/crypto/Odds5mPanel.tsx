@@ -64,8 +64,11 @@ export function Odds5mPanel({ spot, ctx }: { spot: number | null; ctx?: StrikeOd
   const ser = seriesRef.current;
   if (ser.win !== winStart) { ser.win = winStart; ser.pts = []; ser.poly = []; }
   if (up != null) {
+    // Line endpoint follows every odds update instantly; new vertex every 250ms.
+    const tNow = Date.now();
     const lastPt = ser.pts[ser.pts.length - 1];
-    if (!lastPt || now - lastPt.t >= 1000) ser.pts.push({ t: now, up });
+    if (!lastPt || tNow - lastPt.t >= 250) ser.pts.push({ t: tNow, up });
+    else lastPt.up = up;
   }
   if (polyUp != null) {
     const lastP = ser.poly[ser.poly.length - 1];
