@@ -14,6 +14,9 @@ describe("5m live trading rules", () => {
   it("$10 at 60¢ buys 16 contracts", () => {
     expect(liveContracts(0.6)).toBe(16);
   });
+  it("$25 stake at 50¢ buys 50 contracts", () => {
+    expect(liveContracts(0.5, 25)).toBe(50);
+  });
   it("held winners pay $1 each", () => {
     expect(liveWindowPnl({ side: "UP", filled: 16, cost: 9.6, soldQty: 0, proceeds: 0 }, "UP")).toBe(6.4);
   });

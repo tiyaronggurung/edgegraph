@@ -2,7 +2,7 @@
 // UP (long/YES) price, so a DOWN order at side price p is sent as 1 - p.
 import type { Side } from "./decide";
 
-export const LIVE_STAKE_USD = 10; // flat $10 per real trade
+export const LIVE_STAKE_USD = 10; // default real stake; admin can change it on the panel
 export const LIVE_DAILY_LOSS_LIMIT_USD = 500; // matches the shared daily loss stop
 
 export type LiveAction = "buy" | "sell";
@@ -18,8 +18,8 @@ export function orderSpec(action: LiveAction, side: Side, sidePx: number): Order
 }
 
 /** Whole contracts for the flat live stake at the side's ask. */
-export const liveContracts = (ask: number) =>
-  ask > 0 && ask < 1 ? Math.floor(LIVE_STAKE_USD / ask) : 0;
+export const liveContracts = (ask: number, stake: number = LIVE_STAKE_USD) =>
+  ask > 0 && ask < 1 && stake > 0 ? Math.floor(stake / ask) : 0;
 
 /** Real P&L for one window: payout on contracts still held at settle + sale proceeds − cost. */
 export function liveWindowPnl(p: { side: Side; filled: number; cost: number; soldQty: number; proceeds: number }, result: Side | null) {

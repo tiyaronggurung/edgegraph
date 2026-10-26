@@ -13,10 +13,10 @@ async function todayLossStop(sb: any) {
   return dailyLossHit(((data ?? []) as any[]).map((r) => Number(r.pnl ?? 0)));
 }
 
-export async function liveEntry(sb: any, p: { iso: string; slug: string; side: Side; ask: number }): Promise<string> {
+export async function liveEntry(sb: any, p: { iso: string; slug: string; side: Side; ask: number; stake: number }): Promise<string> {
   if (!hasPolymarketKeys()) return "live: keys missing";
   if (await todayLossStop(sb)) return "live: daily $500 loss stop hit";
-  const qty = liveContracts(p.ask);
+  const qty = liveContracts(p.ask, p.stake);
   if (qty < 1) return "live: price too high";
   const spec = orderSpec("buy", p.side, p.ask);
   const { data: claim, error } = await sb.from("p5_live_orders")

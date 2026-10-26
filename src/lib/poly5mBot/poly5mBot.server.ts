@@ -176,7 +176,7 @@ export async function runPoly5mBotTick() {
       }
     } else status = allowed ? `signal ${sig.side} (bot off — shadow only)` : `signal ${sig.side} blocked by learning (${key})`;
     if (settings?.live_enabled && allowed) {
-      const ls = await liveEntry(sb, { iso, slug: slugFor(start), side: sig.side, ask: sig.ask }).catch((e) => `live error: ${String(e?.message ?? e).slice(0, 80)}`);
+      const ls = await liveEntry(sb, { iso, slug: slugFor(start), side: sig.side, ask: sig.ask, stake: Number(settings.live_stake ?? 10) }).catch((e) => `live error: ${String(e?.message ?? e).slice(0, 80)}`);
       status = `${status} · ${ls}`;
     }
   }

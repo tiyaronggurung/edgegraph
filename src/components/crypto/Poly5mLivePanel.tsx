@@ -1,4 +1,5 @@
 // 5m bot REAL-MONEY switch + Polymarket US account + live order log (admin only).
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -20,17 +21,28 @@ export function Poly5mLivePanel({ isAdmin }: { isAdmin: boolean }) {
     refetchInterval: 5000,
     queryFn: async () => {
       const [s, o] = await Promise.all([
-        db.from("p5_settings").select("live_enabled").eq("id", 1).maybeSingle(),
+        db.from("p5_settings").select("live_enabled,live_stake").eq("id", 1).maybeSingle(),
         db.from("p5_live_orders").select("*").order("created_at", { ascending: false }).limit(40),
       ]);
-      return { on: !!s.data?.live_enabled, orders: (o.data ?? []) as any[] };
+      return { on: !!s.data?.live_enabled, stake: Number(s.data?.live_stake ?? 10), orders: (o.data ?? []) as any[] };
     },
   });
+  const [stakeIn, setStakeIn] = useState("");
   if (!isAdmin) return null;
+  const stake = live.data?.stake ?? 10;
+  const saveStake = async () => {
+    const v = Number(stakeIn);
+    if (!(v >= 1 && v <= 1000)) return toast.error("Stake must be $1–$1000");
+    const { error } = await db.rpc("p5_set_live_stake", { p_stake: v });
+    if (error) return toast.error(error.message);
+    toast.success(`Real stake set to $${v}`);
+    setStakeIn("");
+    qc.invalidateQueries({ queryKey: ["p5-live"] });
+  };
   const on = live.data?.on ?? false;
 
   const toggle = async () => {
-    if (!on && !window.confirm("Turn ON real-money 5m trading on Polymarket US?\n\n$10 per trade, one per 5-minute window, stops after $500 losses in a NY day.")) return;
+    if (!on && !window.confirm("Turn ON real-money 5m trading on Polymarket US?\n\n$${stake} per trade, one per 5-minute window, stops after $500 losses in a NY day.")) return;
     const { error } = await db.rpc("p5_set_live", { p_on: !on });
     if (error) return toast.error(error.message);
     toast.success(!on ? "Real-money 5m trading ON" : "Real-money 5m trading OFF");
@@ -41,7 +53,12 @@ export function Poly5mLivePanel({ isAdmin }: { isAdmin: boolean }) {
   return (
     <section className={cn("border rounded-lg p-3 space-y-3 text-xs", on ? "border-destructive" : "border-border")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="font-semibold">Real money · Polymarket US · $10 per trade · $500 daily stop</div>
+        <div className="font-semibold">Real money · Polymarket US · ${stake} per trade · $500 daily stop</div>
+        <div className="flex items-center gap-1">
+          <input className="w-16 bg-background border border-border rounded px-1 py-0.5" placeholder={`$${stake}`} value={stakeIn}
+            onChange={(e) => setStakeIn(e.target.value.replace(/[^0-9.]/g, ""))} />
+          <button onClick={saveStake} disabled={!stakeIn} className="px-2 py-1 rounded border border-border">Set</button>
+        </div>
         <button onClick={toggle} className={cn("px-3 py-1 rounded border font-semibold", on ? "bg-destructive text-destructive-foreground border-destructive" : "border-border bg-muted/30")}>
           {on ? "LIVE ON — tap to stop" : "LIVE OFF"}
         </button>
@@ -51,7 +68,7 @@ export function Poly5mLivePanel({ isAdmin }: { isAdmin: boolean }) {
         <Stat label="Balance" value={a?.balance != null ? `$${a.balance.toFixed(2)}` : "—"} />
         <Stat label="Open orders" value={a ? String(a.openOrders) : "—"} />
       </div>
-      {a?.buyingPower != null && a.buyingPower < 10 && <div className="text-destructive">Buying power under $10 — live orders can't fill until you deposit.</div>}
+      {a?.buyingPower != null && a.buyingPower < stake && <div className="text-destructive">Buying power under your stake — live orders can't fill until you deposit.</div>}
       <div className="max-h-48 overflow-auto">
         <table className="w-full font-mono text-[11px]">
           <thead className="text-muted-foreground"><tr><th className="text-left">Window</th><th>Sent (NY)</th><th>Type</th><th>Side</th><th>Qty</th><th>Px</th><th>State</th><th className="text-right">P&L</th></tr></thead>
