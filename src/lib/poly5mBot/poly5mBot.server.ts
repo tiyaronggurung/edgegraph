@@ -30,7 +30,7 @@ const slugFor = (startMs: number) => {
   return `btc-updown-5m-${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}-${p2(d.getUTCHours())}${p2(d.getUTCMinutes())}z`;
 };
 
-type PolyEvent = { strike: number | null; book: Book; result: Side | null };
+type PolyEvent = { strike: number | null; book: Book; result: Side | null; marketSlug: string | null };
 
 async function fetchPolyUs(startMs: number): Promise<PolyEvent | null> {
   const ev = await j(`https://gateway.polymarket.us/v1/events/slug/${slugFor(startMs)}`);
@@ -52,6 +52,7 @@ async function fetchPolyUs(startMs: number): Promise<PolyEvent | null> {
     strike: Number.isFinite(ptb) && ptb > 0 ? ptb : null,
     book: { upAsk: m.closed ? null : num(yes?.quote?.value), downAsk: m.closed ? null : num(no?.quote?.value) },
     result,
+    marketSlug: typeof m.slug === "string" ? m.slug : null,
   };
 }
 
@@ -176,7 +177,7 @@ export async function runPoly5mBotTick() {
       }
     } else status = allowed ? `signal ${sig.side} (bot off — shadow only)` : `signal ${sig.side} blocked by learning (${key})`;
     if (settings?.live_enabled && allowed) {
-      const ls = await liveEntry(sb, { iso, slug: slugFor(start), side: sig.side, ask: sig.ask, stake: Number(settings.live_stake ?? 10) }).catch((e) => `live error: ${String(e?.message ?? e).slice(0, 80)}`);
+      const ls = await liveEntry(sb, { iso, slug: ev.marketSlug ?? `cpc-${slugFor(start)}`, side: sig.side, ask: sig.ask, stake: Number(settings.live_stake ?? 10) }).catch((e) => `live error: ${String(e?.message ?? e).slice(0, 80)}`);
       status = `${status} · ${ls}`;
     }
   }
@@ -197,7 +198,7 @@ export async function runPoly5mBotTick() {
   }
 
   if (settings?.live_enabled) {
-    const lm = await liveManage(sb, { iso, slug: slugFor(start), up, book: ev.book }).catch(() => null);
+    const lm = await liveManage(sb, { iso, slug: ev.marketSlug ?? `cpc-${slugFor(start)}`, up, book: ev.book }).catch(() => null);
     if (lm) status = `${status} · ${lm}`;
   }
 
