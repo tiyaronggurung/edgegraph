@@ -5735,6 +5735,171 @@ export type Database = {
         }
         Relationships: []
       }
+      p5_positions: {
+        Row: {
+          closed_at: string | null
+          contracts: number
+          cost: number
+          entry_px: number
+          exit_kind: string | null
+          exit_px: number | null
+          hedge_contracts: number | null
+          hedge_cost: number | null
+          hedge_px: number | null
+          id: number
+          opened_at: string
+          pnl: number | null
+          proceeds: number | null
+          result: string | null
+          settled: boolean
+          side: string
+          situation: string | null
+          window_start: string
+        }
+        Insert: {
+          closed_at?: string | null
+          contracts: number
+          cost: number
+          entry_px: number
+          exit_kind?: string | null
+          exit_px?: number | null
+          hedge_contracts?: number | null
+          hedge_cost?: number | null
+          hedge_px?: number | null
+          id?: number
+          opened_at?: string
+          pnl?: number | null
+          proceeds?: number | null
+          result?: string | null
+          settled?: boolean
+          side: string
+          situation?: string | null
+          window_start: string
+        }
+        Update: {
+          closed_at?: string | null
+          contracts?: number
+          cost?: number
+          entry_px?: number
+          exit_kind?: string | null
+          exit_px?: number | null
+          hedge_contracts?: number | null
+          hedge_cost?: number | null
+          hedge_px?: number | null
+          id?: number
+          opened_at?: string
+          pnl?: number | null
+          proceeds?: number | null
+          result?: string | null
+          settled?: boolean
+          side?: string
+          situation?: string | null
+          window_start?: string
+        }
+        Relationships: []
+      }
+      p5_settings: {
+        Row: {
+          id: number
+          last_status: Json | null
+          running: boolean
+          stake: number
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          last_status?: Json | null
+          running?: boolean
+          stake?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          last_status?: Json | null
+          running?: boolean
+          stake?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      p5_situations: {
+        Row: {
+          allowed: boolean
+          key: string
+          n: number
+          pnl_per_dollar_sum: number
+          px_sum: number
+          updated_at: string
+          wins: number
+        }
+        Insert: {
+          allowed?: boolean
+          key: string
+          n?: number
+          pnl_per_dollar_sum?: number
+          px_sum?: number
+          updated_at?: string
+          wins?: number
+        }
+        Update: {
+          allowed?: boolean
+          key?: string
+          n?: number
+          pnl_per_dollar_sum?: number
+          px_sum?: number
+          updated_at?: string
+          wins?: number
+        }
+        Relationships: []
+      }
+      p5_windows: {
+        Row: {
+          close_spot: number | null
+          learned: boolean
+          points: Json
+          result: string | null
+          signal_ask: number | null
+          signal_odds: number | null
+          signal_sec: number | null
+          signal_side: string | null
+          situation: string | null
+          strike: number | null
+          traded: boolean
+          updated_at: string
+          window_start: string
+        }
+        Insert: {
+          close_spot?: number | null
+          learned?: boolean
+          points?: Json
+          result?: string | null
+          signal_ask?: number | null
+          signal_odds?: number | null
+          signal_sec?: number | null
+          signal_side?: string | null
+          situation?: string | null
+          strike?: number | null
+          traded?: boolean
+          updated_at?: string
+          window_start: string
+        }
+        Update: {
+          close_spot?: number | null
+          learned?: boolean
+          points?: Json
+          result?: string | null
+          signal_ask?: number | null
+          signal_odds?: number | null
+          signal_sec?: number | null
+          signal_side?: string | null
+          situation?: string | null
+          strike?: number | null
+          traded?: boolean
+          updated_at?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       paper_balances: {
         Row: {
           balance_cents: number
@@ -7408,6 +7573,10 @@ export type Database = {
           source_queue: string
         }
         Returns: number
+      }
+      p5_update_settings: {
+        Args: { p_running: boolean; p_stake: number }
+        Returns: undefined
       }
       paper_bot_acquire_lock: { Args: { seconds: number }; Returns: boolean }
       paper_bot_equity: {

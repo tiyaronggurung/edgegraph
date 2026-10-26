@@ -17,10 +17,11 @@ import { BtcPriceVolumeCard } from "@/components/crypto/BtcPriceVolumeCard";
 import { QuadPaperPanel } from "@/components/crypto/QuadPaperPanel";
 import { LiveOddsLineChart } from "@/components/crypto/LiveOddsLineChart";
 import { Odds5mPanel } from "@/components/crypto/Odds5mPanel";
+import { Poly5mBotPanel } from "@/components/crypto/Poly5mBotPanel";
 import type { StrikeOddsContext } from "@/hooks/useStrikeOdds";
 
 // 15m chart stays mounted when hidden: it keeps saving odds points Option B reads.
-function OddsTabs({ tab15, spot, ctx5m }: { tab15: React.ReactNode; spot: number | null; ctx5m?: StrikeOddsContext }) {
+function OddsTabs({ tab15, spot, ctx5m, isAdmin }: { tab15: React.ReactNode; spot: number | null; ctx5m?: StrikeOddsContext; isAdmin: boolean }) {
   const [tab, setTab] = useState<"15" | "5">("15");
   return (
     <div className="space-y-2">
@@ -37,7 +38,10 @@ function OddsTabs({ tab15, spot, ctx5m }: { tab15: React.ReactNode; spot: number
       </div>
       <div className={tab === "15" ? "" : "hidden"}>{tab15}</div>
       {/* 5m panel also stays mounted so its graph keeps building from page load. */}
-      <div className={tab === "5" ? "" : "hidden"}><Odds5mPanel spot={spot} ctx={ctx5m} /></div>
+      <div className={tab === "5" ? "space-y-2" : "hidden"}>
+        <Odds5mPanel spot={spot} ctx={ctx5m} />
+        {tab === "5" && <Poly5mBotPanel isAdmin={isAdmin} />}
+      </div>
     </div>
   );
 }
@@ -357,7 +361,9 @@ function PaperDesk() {
           flowImbalance: imbM3,
           stack: hist?.live?.stack ?? null,
         }}
+        isAdmin={isAdmin}
       />
+
       <QuadPaperPanel isAdmin={isAdmin} />
 
 
