@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { computeStrikeOdds, type Tick } from "@/hooks/useStrikeOdds";
-import { fetchPolymarketBtcOdds } from "@/lib/polymarketOdds.functions";
+import { fetchPolymarket5m } from "@/lib/polymarket5m.functions";
 import { cn } from "@/lib/utils";
 
 /**
  * Display-only 5-minute odds for Polymarket's btc-updown-5m windows.
  * Reuses the pure computeStrikeOdds core (no fork) with T = seconds left in
- * the 5m window. Strike = BTC price at the 5m window open (Binance 1m open).
+ * the 5m window. Strike = Polymarket's official price to beat (Chainlink open).
  * Never feeds Model, Study, auto-trade, exits or the 15m odds.
  */
 const WIN_MS = 300_000;
@@ -15,12 +15,12 @@ const TAPE_MAX = 1200;
 const W = 900, H = 160, PAD_R = 60;
 
 export function Odds5mPanel({ spot }: { spot: number | null }) {
-  const pollFn = useServerFn(fetchPolymarketBtcOdds);
+  const pollFn = useServerFn(fetchPolymarket5m);
   const [now, setNow] = useState(Date.now());
   const winStart = Math.floor(now / WIN_MS) * WIN_MS;
   const secsLeft = Math.max(0, Math.round((winStart + WIN_MS - now) / 1000));
   const [strike, setStrike] = useState<{ win: number; px: number } | null>(null);
-  const [poly, setPoly] = useState<Awaited<ReturnType<typeof fetchPolymarketBtcOdds>>>(null);
+  const [poly, setPoly] = useState<Awaited<ReturnType<typeof fetchPolymarket5m>> | null>(null);
   const tapeRef = useRef<Tick[]>([]);
   const seriesRef = useRef<{ win: number; pts: { t: number; up: number }[] }>({ win: -1, pts: [] });
 
@@ -29,32 +29,18 @@ export function Odds5mPanel({ spot }: { spot: number | null }) {
     return () => clearInterval(id);
   }, []);
 
-  // Strike: Binance 1m candle open at the 5m window start; fallback = first spot seen.
+  // Official Polymarket strike (Chainlink "price to beat") + live UP mid, 2s poll.
   useEffect(() => {
     let cancelled = false;
-    fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&startTime=${winStart}&limit=1`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        const px = Array.isArray(j) && j[0] && Number(j[0][0]) === winStart ? Number(j[0][1]) : NaN;
-        if (!cancelled && Number.isFinite(px) && px > 0) setStrike({ win: winStart, px });
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [winStart]);
-  useEffect(() => {
-    if (spot != null && spot > 0 && strike?.win !== winStart) {
-      setStrike((s) => (s?.win === winStart ? s : { win: winStart, px: spot }));
-    }
-  }, [spot, winStart, strike?.win]);
-
-  // Polymarket live price, 2s poll.
-  useEffect(() => {
-    let cancelled = false;
-    const tick = () => pollFn().then((r) => { if (!cancelled) setPoly(r); }).catch(() => {});
+    const tick = () => pollFn({ data: { startMs: winStart } }).then((r) => {
+      if (cancelled || r.startMs !== winStart) return;
+      setPoly(r);
+      if (r.strike != null) setStrike({ win: winStart, px: r.strike });
+    }).catch(() => {});
     tick();
     const id = setInterval(tick, 2000);
     return () => { cancelled = true; clearInterval(id); };
-  }, [pollFn]);
+  }, [pollFn, winStart]);
 
   // Price tape (~1 sample / 250ms).
   useEffect(() => {
@@ -90,8 +76,7 @@ export function Odds5mPanel({ spot }: { spot: number | null }) {
   }
   const areaUp = aUp + aDn > 0 ? aUp / (aUp + aDn) : null;
 
-  const polyMatch = poly && poly.windowStartMs === winStart ? poly : null;
-  const polyUp = polyMatch ? polyMatch.effectiveUpProb : null;
+  const polyUp = poly && poly.startMs === winStart ? poly.upMid : null;
   const gap = up != null && polyUp != null ? up - polyUp : null;
 
   const x = (t: number) => ((t - winStart) / WIN_MS) * (W - PAD_R);
@@ -113,7 +98,7 @@ export function Odds5mPanel({ spot }: { spot: number | null }) {
         <Box label="Our DOWN" value={up != null ? `${((1 - up) * 100).toFixed(1)}¢` : "—"} tone="down" />
         <Box
           label="Polymarket UP"
-          value={polyUp != null ? `${(polyUp * 100).toFixed(1)}¢` : poly ? "next window" : "offline"}
+          value={polyUp != null ? `${(polyUp * 100).toFixed(1)}¢` : "offline"}
           sub={gap != null ? `Δ ${gap >= 0 ? "+" : ""}${(gap * 100).toFixed(1)}¢ vs ours` : undefined}
         />
         <Box
@@ -134,7 +119,7 @@ export function Odds5mPanel({ spot }: { spot: number | null }) {
         )}
       </svg>
       <div className="text-[10px] text-muted-foreground">
-        Display only — same odds math as 15m with a 5-minute clock. Strike = BTC at the 5m open (Polymarket uses Chainlink, may differ by a few dollars). Not used by any bot.
+        Display only — same odds math as 15m with a 5-minute clock. Strike = Polymarket official "price to beat" (Chainlink BTC at the 5m open). Not used by any bot.
       </div>
     </section>
   );
