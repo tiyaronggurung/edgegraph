@@ -76,8 +76,7 @@ export function Odds5mPanel({ spot }: { spot: number | null }) {
   }
   const areaUp = aUp + aDn > 0 ? aUp / (aUp + aDn) : null;
 
-  const polyMatch = poly && poly.windowStartMs === winStart ? poly : null;
-  const polyUp = polyMatch ? polyMatch.effectiveUpProb : null;
+  const polyUp = poly && poly.startMs === winStart ? poly.upMid : null;
   const gap = up != null && polyUp != null ? up - polyUp : null;
 
   const x = (t: number) => ((t - winStart) / WIN_MS) * (W - PAD_R);
@@ -99,7 +98,7 @@ export function Odds5mPanel({ spot }: { spot: number | null }) {
         <Box label="Our DOWN" value={up != null ? `${((1 - up) * 100).toFixed(1)}¢` : "—"} tone="down" />
         <Box
           label="Polymarket UP"
-          value={polyUp != null ? `${(polyUp * 100).toFixed(1)}¢` : poly ? "next window" : "offline"}
+          value={polyUp != null ? `${(polyUp * 100).toFixed(1)}¢` : "offline"}
           sub={gap != null ? `Δ ${gap >= 0 ? "+" : ""}${(gap * 100).toFixed(1)}¢ vs ours` : undefined}
         />
         <Box
@@ -120,7 +119,7 @@ export function Odds5mPanel({ spot }: { spot: number | null }) {
         )}
       </svg>
       <div className="text-[10px] text-muted-foreground">
-        Display only — same odds math as 15m with a 5-minute clock. Strike = BTC at the 5m open (Polymarket uses Chainlink, may differ by a few dollars). Not used by any bot.
+        Display only — same odds math as 15m with a 5-minute clock. Strike = Polymarket official "price to beat" (Chainlink BTC at the 5m open). Not used by any bot.
       </div>
     </section>
   );
