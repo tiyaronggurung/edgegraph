@@ -58,6 +58,8 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 const nz = (v: number | null | undefined) => (v != null && Number.isFinite(v) ? v : null);
 
 export interface StrikeOddsContext {
+  /** Window length in seconds for time decay. Default 900 (15m). 5m passes 300. */
+  windowSec?: number;
   /** Fast indicator read (1m candles). */
   m1?: IndicatorSnap | null;
   /** Slow indicator read (15m candles). */
@@ -259,10 +261,12 @@ export function computeStrikeOdds(
 
   // --- time constraint ----------------------------------------------------
   const secs = Math.max(secondsToClose, 0);
+  // Window length: 900s for 15m (default, unchanged); 5m passes 300.
+  const WIN = ctx?.windowSec && ctx.windowSec > 0 ? ctx.windowSec : 900;
   // Momentum needs runway: full weight early, ~0 at the bell.
-  const timeWeight = clamp(Math.sqrt(secs / 900), 0, 1);
+  const timeWeight = clamp(Math.sqrt(secs / WIN), 0, 1);
   // Fast candles matter more late in the window, slow candles early.
-  const fastW = clamp(1 - secs / 900, 0.25, 0.85);
+  const fastW = clamp(1 - secs / WIN, 0.25, 0.85);
 
   // --- technical tilt -----------------------------------------------------
   const indTilt = (snap: IndicatorSnap | null | undefined, px: number | null) => {
@@ -649,7 +653,7 @@ export function computeStrikeOdds(
     (lateFade > 0 ? ` · late ${(lateFade * 100).toFixed(0)}% · ${leadSigmas.toFixed(1)}σ` : "") +
     anchorNote + areaNote;
 
-  const spread = SPREAD_BASE + SPREAD_K * Math.sqrt(secs / 900);
+  const spread = SPREAD_BASE + SPREAD_K * Math.sqrt(secs / WIN);
   return {
     pUp,
     pRaw,

@@ -118,7 +118,7 @@ export function Odds5mPanel({ spot, ctx }: { spot: number | null; ctx?: StrikeOd
 
   const k = strike?.win === winStart ? strike.px : null;
   // Same engine as 15m, now with 1m/15m indicators, SMA stack and last-3-min taker flow tilted in.
-  const odds = computeStrikeOdds(spot, k, secsLeft, ctx, tapeRef.current);
+  const odds = computeStrikeOdds(spot, k, secsLeft, { ...ctx, windowSec: 300 }, tapeRef.current);
   const up = odds.upAsk;
 
   const polyUp = poly && poly.startMs === winStart ? poly.upMid : null;
