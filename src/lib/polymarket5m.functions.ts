@@ -14,7 +14,6 @@ async function j(url: string): Promise<any> {
   } catch { return null; }
 }
 
-const tokenCache = new Map<number, string | null>();
 const strikeCache = new Map<number, number>();
 
 export const fetchPolymarket5m = createServerFn({ method: "GET" })
