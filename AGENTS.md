@@ -15,3 +15,4 @@
 - Quad B is an own-odds speed hedge (no whale): decisions live in the pure bReversal helper, the opposite leg is contract-matched, and a reversal lock fires only when both legs plus fees cost less than the payout, so a "lock" is truly guaranteed.
 - The 5m Polymarket paper bot (poly5mBot, p5_* tables) is paper-only and isolated; rules/learning live in pure helpers and the server reuses computeStrikeOdds, so it can't drift from the 5m tab or touch live orders.
 - The 5m odds chart saves its own past windows (live_odds_windows_5m) from the browser, separate from 15m's table, and takes results from the 5m bot's settled window first; display-only so 15m history and trading stay untouched.
+- The 5m bot's real-money path lives only in poly5mBot/live.server.ts behind p5_settings.live_enabled (default off), claims a unique per-window row before sending any Polymarket US order, and sends DOWN prices as 1 − side price; this prevents duplicate or mispriced real orders.
