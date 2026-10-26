@@ -1,8 +1,8 @@
 // 5m bot REAL-MONEY path on Polymarket US. Only runs when p5_settings.live_enabled is on.
 // One entry per window (unique row claimed before sending), flat $10, $500 daily loss stop.
 import { decideExit, type Book, type Side } from "./decide";
-import { dailyLossHit, liveContracts, liveWindowPnl, orderSpec } from "./live";
-import { hasPolymarketKeys, placeIocOrder } from "./polymarketUs.server";
+import { dailyLossHit, liveContracts, liveEntryPrice, liveWindowPnl, orderSpec } from "./live";
+import { fetchBestUpQuotes, hasPolymarketKeys, placeIocOrder } from "./polymarketUs.server";
 import { nyDayStartUtc } from "@/lib/dailyLossGuard.server";
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -13,14 +13,18 @@ async function todayLossStop(sb: any) {
   return dailyLossHit(((data ?? []) as any[]).map((r) => Number(r.pnl ?? 0)));
 }
 
-export async function liveEntry(sb: any, p: { iso: string; slug: string; side: Side; ask: number; stake: number }): Promise<string> {
+export async function liveEntry(sb: any, p: { iso: string; slug: string; side: Side; odds: number; ask: number; stake: number }): Promise<string> {
   if (!hasPolymarketKeys()) return "live: keys missing";
-  if (await todayLossStop(sb)) return "live: daily $500 loss stop hit";
-  const qty = liveContracts(p.ask, p.stake);
+  const [stop, q] = await Promise.all([todayLossStop(sb), fetchBestUpQuotes(p.slug).catch(() => ({ bid: null, ask: null }))]);
+  if (stop) return "live: daily $500 loss stop hit";
+  // Re-check the edge at the REAL book ask (the page quote lags), then allow a small buffer.
+  const px = liveEntryPrice(p.side, p.odds, q.bid, q.ask);
+  if (!px) return `live: edge gone at real book (UP bid ${q.bid ?? "–"} / ask ${q.ask ?? "–"})`;
+  const qty = liveContracts(px.limit, p.stake);
   if (qty < 1) return "live: price too high";
-  const spec = orderSpec("buy", p.side, p.ask);
+  const spec = orderSpec("buy", p.side, px.limit);
   const { data: claim, error } = await sb.from("p5_live_orders")
-    .insert({ window_start: p.iso, kind: "entry", side: p.side, intent: spec.intent, limit_px: p.ask, quantity: qty })
+    .insert({ window_start: p.iso, kind: "entry", side: p.side, intent: spec.intent, limit_px: px.limit, quantity: qty })
     .select("id").maybeSingle();
   if (error || !claim) return "live: already traded this window";
   const res = await placeIocOrder({ marketSlug: p.slug, intent: spec.intent, longPx: spec.longPx, quantity: qty });
@@ -29,11 +33,13 @@ export async function liveEntry(sb: any, p: { iso: string; slug: string; side: S
     return `live: order rejected (${res.error.slice(0, 60)})`;
   }
   const filled = res.filled;
+  const avg = Number(((res.raw as any)?.executions ?? []).map((e: any) => e?.order?.avgPx?.value).find((v: any) => Number(v) > 0));
+  const fillPx = avg > 0 && avg < 1 ? (p.side === "UP" ? avg : 1 - avg) : px.limit;
   await sb.from("p5_live_orders").update({
-    order_id: res.id, state: filled > 0 ? "filled" : "unfilled", filled_qty: filled, cost: r2(filled * p.ask), response: res.raw,
+    order_id: res.id, state: filled > 0 ? "filled" : "unfilled", filled_qty: filled, cost: r2(filled * fillPx), response: res.raw,
     ...(filled > 0 ? {} : { settled: true, pnl: 0, settled_at: new Date().toISOString() }),
   }).eq("id", claim.id);
-  return filled > 0 ? `LIVE bought ${p.side} ${filled} @ ${Math.round(p.ask * 100)}¢` : "live: no fill at ask";
+  return filled > 0 ? `LIVE bought ${p.side} ${filled} @ ${Math.round(fillPx * 100)}¢ (real ask ${Math.round(px.realAsk * 100)}¢)` : "live: no fill at ask";
 }
 
 /** Take profit (88¢ bid) or rescue (sell held side) on a filled live entry. */

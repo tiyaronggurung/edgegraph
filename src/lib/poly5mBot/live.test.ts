@@ -28,3 +28,19 @@ describe("5m live trading rules", () => {
     expect(dailyLossHit([-499.99])).toBe(false);
   });
 });
+
+import { liveEntryPrice } from "./live";
+describe("liveEntryPrice", () => {
+  it("UP uses real ask plus 2¢ buffer", () => {
+    expect(liveEntryPrice("UP", 0.8, 0.6, 0.62)).toEqual({ realAsk: 0.62, limit: 0.64 });
+  });
+  it("DOWN real ask is 1 minus best UP bid", () => {
+    expect(liveEntryPrice("DOWN", 0.8, 0.4, 0.42)).toEqual({ realAsk: 0.6, limit: 0.62 });
+  });
+  it("skips when edge at real ask is under 5¢", () => {
+    expect(liveEntryPrice("UP", 0.8, 0.75, 0.76)).toBeNull();
+  });
+  it("buffer never pushes limit above odds minus 3¢", () => {
+    expect(liveEntryPrice("UP", 0.8, 0.73, 0.75)!.limit).toBe(0.77);
+  });
+});

@@ -77,3 +77,18 @@ export async function placeIocOrder(p: { marketSlug: string; intent: string; lon
   }
   return { ok: true as const, id, filled, raw: res.data };
 }
+
+/** Best UP (YES) bid/ask from the exchange's live book (signed read). */
+export async function fetchBestUpQuotes(marketSlug: string): Promise<{ bid: number | null; ask: number | null }> {
+  const r = await pmRequest("GET", `/v1/markets/${marketSlug}/book`);
+  const md = r.data?.marketData;
+  const px = (l: any) => { const n = Number(l?.[0]?.px?.value); return Number.isFinite(n) && n > 0 && n < 1 ? n : null; };
+  const book = { bid: px(md?.bids), ask: px(md?.offers) };
+  if (book.bid != null || book.ask != null) return book;
+  // New windows can 404 on the book for a few minutes; fall back to the market's fresh best bid/ask.
+  const ev = await fetch(`https://gateway.polymarket.us/v1/events/slug/${marketSlug.replace(/^cpc-/, "")}`, { headers: { accept: "application/json" } })
+    .then((x) => (x.ok ? x.json() : null)).catch(() => null);
+  const m = ev?.event?.markets?.[0];
+  const one = (q: any) => px([{ px: q }]);
+  return { bid: one(m?.bestBidQuote), ask: one(m?.bestAskQuote) };
+}

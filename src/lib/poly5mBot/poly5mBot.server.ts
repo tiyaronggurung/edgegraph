@@ -171,7 +171,7 @@ export async function runPoly5mBotTick() {
     const allowed = isAllowed(st ? { n: st.n, wins: st.wins, px_sum: Number(st.px_sum), pnl_per_dollar_sum: Number(st.pnl_per_dollar_sum) } : null);
     // Fire the real order first (in parallel) so paper bookkeeping never delays the live fill.
     const liveP = settings?.live_enabled && allowed
-      ? liveEntry(sb, { iso, slug: ev.marketSlug ?? `cpc-${slugFor(start)}`, side: sig.side, ask: sig.ask, stake: Number(settings.live_stake ?? 10) }).catch((e) => `live error: ${String(e?.message ?? e).slice(0, 80)}`)
+      ? liveEntry(sb, { iso, slug: ev.marketSlug ?? `cpc-${slugFor(start)}`, side: sig.side, odds: sig.odds, ask: sig.ask, stake: Number(settings.live_stake ?? 10) }).catch((e) => `live error: ${String(e?.message ?? e).slice(0, 80)}`)
       : null;
     if (settings?.running && allowed) {
       const ct = contractsFor(Number(settings.stake ?? 10), sig.ask);
