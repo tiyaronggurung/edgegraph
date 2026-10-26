@@ -62,6 +62,7 @@ export function Odds5mPanel({ spot, ctx }: { spot: number | null; ctx?: StrikeOd
 
   const qc = useQueryClient();
   const [sel, setSel] = useState<string | null>(null);
+  const [showPast, setShowPast] = useState(false);
   const history = useQuery({
     queryKey: ["live-odds-windows-5m"],
     refetchInterval: 60_000,
@@ -219,15 +220,29 @@ export function Odds5mPanel({ spot, ctx }: { spot: number | null; ctx?: StrikeOd
           <button onClick={() => setSel(null)} className="px-2 py-0.5 rounded border border-border">Back to live</button>
         </div>
       )}
-      <div className="flex flex-wrap gap-1">
-        {(history.data ?? []).filter((h) => Date.parse(h.window_start) !== winStart).slice(0, 24).map((h) => (
-          <button key={h.window_start} onClick={() => setSel(h.window_start)}
-            className={cn("px-1.5 py-0.5 rounded border border-border text-[10px] font-mono", sel === h.window_start && "bg-muted",
-              h.result === "UP" && "text-primary", h.result === "DOWN" && "text-destructive")}>
-            {fmtT(h.window_start)} {h.result === "UP" ? "▲" : h.result === "DOWN" ? "▼" : "…"}
-          </button>
-        ))}
+      <div className="flex gap-1 text-xs">
+        <button onClick={() => setShowPast(false)} className={cn("px-2 py-0.5 rounded border border-border", !showPast && "bg-muted")}>Chart</button>
+        <button onClick={() => setShowPast(true)} className={cn("px-2 py-0.5 rounded border border-border", showPast && "bg-muted")}>Past windows</button>
       </div>
+      {showPast && (
+        <div className="max-h-64 overflow-auto border border-border rounded">
+          <table className="w-full font-mono text-[11px]">
+            <thead className="text-muted-foreground sticky top-0 bg-background"><tr><th className="text-left px-2">Window (NY)</th><th>Strike</th><th>Close</th><th>Result</th><th></th></tr></thead>
+            <tbody>
+              {(history.data ?? []).filter((h) => h.result && Date.parse(h.window_start) !== winStart).map((h) => (
+                <tr key={h.window_start} className={cn("border-t border-border/40", sel === h.window_start && "bg-muted")}>
+                  <td className="px-2">{fmtT(h.window_start)}</td>
+                  <td className="text-center">{h.strike != null ? `$${Number(h.strike).toFixed(2)}` : "—"}</td>
+                  <td className="text-center">{h.close_spot != null ? `$${Number(h.close_spot).toFixed(2)}` : "—"}</td>
+                  <td className={cn("text-center", h.result === "UP" ? "text-primary" : "text-destructive")}>{h.result === "UP" ? "▲ UP" : "▼ DOWN"}</td>
+                  <td className="text-right px-2"><button onClick={() => { setSel(h.window_start); setShowPast(false); }} className="px-1.5 rounded border border-border">Replay</button></td>
+                </tr>
+              ))}
+              {!(history.data ?? []).some((h) => h.result) && <tr><td colSpan={5} className="px-2 py-2 text-muted-foreground">No settled windows yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
       <div className="text-[10px] text-muted-foreground">
         Display only — same odds math as 15m with a 5-minute clock, including 1m/15m RSI·MACD·SMA, the SMA 10/50/200 stack and last-3-min taker flow. Not used by any bot.
       </div>
