@@ -18,6 +18,7 @@ import { QuadPaperPanel } from "@/components/crypto/QuadPaperPanel";
 import { LiveOddsLineChart } from "@/components/crypto/LiveOddsLineChart";
 import { Odds5mPanel } from "@/components/crypto/Odds5mPanel";
 import { Poly5mBotPanel } from "@/components/crypto/Poly5mBotPanel";
+import { Poly5mLivePanel } from "@/components/crypto/Poly5mLivePanel";
 import type { StrikeOddsContext } from "@/hooks/useStrikeOdds";
 
 // 15m chart stays mounted when hidden: it keeps saving odds points Option B reads.
@@ -40,6 +41,7 @@ function OddsTabs({ tab15, spot, ctx5m, isAdmin }: { tab15: React.ReactNode; spo
       {/* 5m panel also stays mounted so its graph keeps building from page load. */}
       <div className={tab === "5" ? "space-y-2" : "hidden"}>
         <Odds5mPanel spot={spot} ctx={ctx5m} />
+        {tab === "5" && <Poly5mLivePanel isAdmin={isAdmin} />}
         {tab === "5" && <Poly5mBotPanel isAdmin={isAdmin} />}
       </div>
     </div>
