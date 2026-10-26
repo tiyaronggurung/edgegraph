@@ -3,6 +3,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { computeStrikeOdds, type Tick, type StrikeOddsContext } from "@/hooks/useStrikeOdds";
 import { fetchPolymarket5m } from "@/lib/polymarket5m.functions";
 import { cn } from "@/lib/utils";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+
+const db = supabase as any;
+type Saved5m = { window_start: string; strike: number | null; close_spot: number | null; result: string | null; points: [number, number][]; poly_points: [number, number][] };
+const enc = (pts: { t: number; up: number }[], ws: number) => pts.map((p) => [Math.round((p.t - ws) / 1000), Math.round(p.up * 1000)] as [number, number]);
+const dec = (pts: [number, number][], ws: number) => (pts ?? []).map(([s, u]) => ({ t: ws + s * 1000, up: u / 1000 }));
 
 /**
  * Display-only 5-minute odds for Polymarket's btc-updown-5m windows.
@@ -53,6 +60,61 @@ export function Odds5mPanel({ spot, ctx }: { spot: number | null; ctx?: StrikeOd
     if (tape.length > TAPE_MAX) tape.splice(0, tape.length - TAPE_MAX);
   }, [spot]);
 
+  const qc = useQueryClient();
+  const [sel, setSel] = useState<string | null>(null);
+  const history = useQuery({
+    queryKey: ["live-odds-windows-5m"],
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { data } = await db.from("live_odds_windows_5m").select("*").order("window_start", { ascending: false }).limit(48);
+      return (data ?? []) as Saved5m[];
+    },
+  });
+  const latestRef = useRef<{ k: number | null; spot: number | null }>({ k: null, spot: null });
+  const finalRef = useRef<{ win: number; pts: { t: number; up: number }[]; poly: { t: number; up: number }[]; k: number | null; spot: number | null } | null>(null);
+
+  // Save this 5m window's own history (separate table from 15m). Merges with any
+  // existing row so a reload never shortens a recording. Display data only.
+  const save5m = async (ws: number, pts: { t: number; up: number }[], poly: { t: number; up: number }[], k: number | null, s: number | null, final: boolean) => {
+    if (!pts.length) return;
+    const iso = new Date(ws).toISOString();
+    const { data: ex } = await db.from("live_odds_windows_5m").select("points,poly_points,result").eq("window_start", iso).maybeSingle();
+    const m = (a: [number, number][], b: [number, number][]) => { const mp = new Map<number, number>(); for (const [x, y] of a ?? []) mp.set(x, y); for (const [x, y] of b) mp.set(x, y); return [...mp.entries()].sort((p, q) => p[0] - q[0]); };
+    const row: Record<string, unknown> = { window_start: iso, updated_at: new Date().toISOString(), points: m(ex?.points, enc(pts, ws)), poly_points: m(ex?.poly_points, enc(poly, ws)) };
+    if (k != null) row.strike = k;
+    if (final && !ex?.result) {
+      const { data: bw } = await db.from("p5_windows").select("result,close_spot").eq("window_start", iso).maybeSingle();
+      if (bw?.result === "UP" || bw?.result === "DOWN") { row.result = bw.result; row.close_spot = bw.close_spot; }
+      else if (k != null && s != null) { row.result = s >= k ? "UP" : "DOWN"; row.close_spot = s; }
+    }
+    await db.from("live_odds_windows_5m").upsert(row, { onConflict: "window_start" });
+  };
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const ser = seriesRef.current;
+      if (ser.win > 0) void save5m(ser.win, ser.pts, ser.poly, latestRef.current.k, latestRef.current.spot, false).catch(() => {});
+    }, 10_000);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => {
+    const f = finalRef.current;
+    if (!f) return;
+    finalRef.current = null;
+    void save5m(f.win, f.pts, f.poly, f.k, f.spot, true).then(() => qc.invalidateQueries({ queryKey: ["live-odds-windows-5m"] })).catch(() => {});
+  }, [winStart, qc]);
+  // Fill results for windows that closed while the page was shut (from the bot's settled window).
+  useEffect(() => {
+    const pend = (history.data ?? []).filter((h) => !h.result && Date.parse(h.window_start) + WIN_MS < Date.now());
+    if (!pend.length) return;
+    void (async () => {
+      for (const h of pend) {
+        const { data: bw } = await db.from("p5_windows").select("result,close_spot").eq("window_start", h.window_start).maybeSingle();
+        if (bw?.result === "UP" || bw?.result === "DOWN") await db.from("live_odds_windows_5m").update({ result: bw.result, close_spot: bw.close_spot }).eq("window_start", h.window_start);
+      }
+    })().catch(() => {});
+  }, [history.data]);
+
   const k = strike?.win === winStart ? strike.px : null;
   // Same engine as 15m, now with 1m/15m indicators, SMA stack and last-3-min taker flow tilted in.
   const odds = computeStrikeOdds(spot, k, secsLeft, ctx, tapeRef.current);
@@ -62,6 +124,8 @@ export function Odds5mPanel({ spot, ctx }: { spot: number | null; ctx?: StrikeOd
   const gap = up != null && polyUp != null ? up - polyUp : null;
 
   const ser = seriesRef.current;
+  latestRef.current = { k, spot };
+  if (ser.win !== winStart && ser.win > 0 && ser.pts.length) finalRef.current = { win: ser.win, pts: ser.pts, poly: ser.poly, k: strike?.win === ser.win ? strike.px : null, spot };
   if (ser.win !== winStart) { ser.win = winStart; ser.pts = []; ser.poly = []; }
   if (up != null) {
     // Line endpoint follows every odds update instantly; new vertex every 250ms.
@@ -75,27 +139,33 @@ export function Odds5mPanel({ spot, ctx }: { spot: number | null; ctx?: StrikeOd
     if (!lastP || now - lastP.t >= 1000) ser.poly.push({ t: now, up: polyUp });
   }
 
+  const past = sel ? (history.data ?? []).find((h) => h.window_start === sel) ?? null : null;
+  const viewWs = past ? Date.parse(past.window_start) : winStart;
+  const viewPts = past ? dec(past.points, viewWs) : ser.pts;
+  const viewPoly = past ? dec(past.poly_points, viewWs) : ser.poly;
+
   // Expiration-weighted area measured from the 50¢ midline.
   let aUp = 0, aDn = 0;
-  for (let i = 1; i < ser.pts.length; i++) {
-    const a = ser.pts[i - 1], b = ser.pts[i];
+  for (let i = 1; i < viewPts.length; i++) {
+    const a = viewPts[i - 1], b = viewPts[i];
     const dt = Math.min((b.t - a.t) / 1000, 10);
-    const left = Math.max(1, (winStart + WIN_MS - b.t) / 1000);
+    const left = Math.max(1, (viewWs + WIN_MS - b.t) / 1000);
     const w = dt / Math.sqrt(left);
     const m = a.up - 0.5;
     if (m > 0) aUp += m * w; else aDn += -m * w;
   }
   const areaUp = aUp + aDn > 0 ? aUp / (aUp + aDn) : null;
 
-  const x = (t: number) => ((t - winStart) / WIN_MS) * (W - PAD_R);
+  const x = (t: number) => ((t - viewWs) / WIN_MS) * (W - PAD_R);
   const y = (p: number) => H - p * H;
   const mk = (pts: { t: number; up: number }[], f: (v: number) => number) =>
     pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(f(p.up)).toFixed(1)}`).join(" ");
-  const upPath = mk(ser.pts, (v) => v);
-  const dnPath = mk(ser.pts, (v) => 1 - v);
-  const polyPath = mk(ser.poly, (v) => v);
-  const lastPt = ser.pts[ser.pts.length - 1];
-  const lastPoly = ser.poly[ser.poly.length - 1];
+  const upPath = mk(viewPts, (v) => v);
+  const dnPath = mk(viewPts, (v) => 1 - v);
+  const polyPath = mk(viewPoly, (v) => v);
+  const lastPt = viewPts[viewPts.length - 1];
+  const lastPoly = viewPoly[viewPoly.length - 1];
+  const fmtT = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
 
   return (
     <section className="border border-border rounded-lg p-3 space-y-2">
@@ -143,6 +213,21 @@ export function Odds5mPanel({ spot, ctx }: { spot: number | null; ctx?: StrikeOd
         )}
         {lastPoly && <circle cx={x(lastPoly.t)} cy={y(lastPoly.up)} r={3} className="fill-foreground/70" />}
       </svg>
+      {past && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="font-mono">Replay {fmtT(past.window_start)} · strike {past.strike != null ? `$${Number(past.strike).toFixed(2)}` : "—"} · close {past.close_spot != null ? `$${Number(past.close_spot).toFixed(2)}` : "—"} · {past.result ?? "pending"}</span>
+          <button onClick={() => setSel(null)} className="px-2 py-0.5 rounded border border-border">Back to live</button>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-1">
+        {(history.data ?? []).filter((h) => Date.parse(h.window_start) !== winStart).slice(0, 24).map((h) => (
+          <button key={h.window_start} onClick={() => setSel(h.window_start)}
+            className={cn("px-1.5 py-0.5 rounded border border-border text-[10px] font-mono", sel === h.window_start && "bg-muted",
+              h.result === "UP" && "text-primary", h.result === "DOWN" && "text-destructive")}>
+            {fmtT(h.window_start)} {h.result === "UP" ? "▲" : h.result === "DOWN" ? "▼" : "…"}
+          </button>
+        ))}
+      </div>
       <div className="text-[10px] text-muted-foreground">
         Display only — same odds math as 15m with a 5-minute clock, including 1m/15m RSI·MACD·SMA, the SMA 10/50/200 stack and last-3-min taker flow. Not used by any bot.
       </div>
