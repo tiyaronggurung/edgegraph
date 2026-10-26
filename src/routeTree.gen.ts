@@ -70,6 +70,7 @@ import { Route as ApiPublicHooksOpsAutoTradeTickRouteImport } from './routes/api
 import { Route as ApiPublicHooksOpsDailyBacktestRouteImport } from './routes/api/public/hooks/ops-daily-backtest'
 import { Route as ApiPublicHooksPaperBotTickRouteImport } from './routes/api/public/hooks/paper-bot-tick'
 import { Route as ApiPublicHooksPinRiskShadowTickRouteImport } from './routes/api/public/hooks/pin-risk-shadow-tick'
+import { Route as ApiPublicHooksPoly5mBotTickRouteImport } from './routes/api/public/hooks/poly5m-bot-tick'
 import { Route as ApiPublicHooksPredictionRowTickRouteImport } from './routes/api/public/hooks/prediction-row-tick'
 import { Route as ApiPublicHooksQuadBotTickRouteImport } from './routes/api/public/hooks/quad-bot-tick'
 import { Route as ApiPublicHooksRecomputePredictionsRouteImport } from './routes/api/public/hooks/recompute-predictions'
@@ -424,6 +425,12 @@ const ApiPublicHooksPinRiskShadowTickRoute =
     path: '/api/public/hooks/pin-risk-shadow-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksPoly5mBotTickRoute =
+  ApiPublicHooksPoly5mBotTickRouteImport.update({
+    id: '/api/public/hooks/poly5m-bot-tick',
+    path: '/api/public/hooks/poly5m-bot-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPredictionRowTickRoute =
   ApiPublicHooksPredictionRowTickRouteImport.update({
     id: '/api/public/hooks/prediction-row-tick',
@@ -582,6 +589,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
   '/api/public/hooks/paper-bot-tick': typeof ApiPublicHooksPaperBotTickRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
+  '/api/public/hooks/poly5m-bot-tick': typeof ApiPublicHooksPoly5mBotTickRoute
   '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
   '/api/public/hooks/quad-bot-tick': typeof ApiPublicHooksQuadBotTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -660,6 +668,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
   '/api/public/hooks/paper-bot-tick': typeof ApiPublicHooksPaperBotTickRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
+  '/api/public/hooks/poly5m-bot-tick': typeof ApiPublicHooksPoly5mBotTickRoute
   '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
   '/api/public/hooks/quad-bot-tick': typeof ApiPublicHooksQuadBotTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -740,6 +749,7 @@ export interface FileRoutesById {
   '/api/public/hooks/ops-daily-backtest': typeof ApiPublicHooksOpsDailyBacktestRoute
   '/api/public/hooks/paper-bot-tick': typeof ApiPublicHooksPaperBotTickRoute
   '/api/public/hooks/pin-risk-shadow-tick': typeof ApiPublicHooksPinRiskShadowTickRoute
+  '/api/public/hooks/poly5m-bot-tick': typeof ApiPublicHooksPoly5mBotTickRoute
   '/api/public/hooks/prediction-row-tick': typeof ApiPublicHooksPredictionRowTickRoute
   '/api/public/hooks/quad-bot-tick': typeof ApiPublicHooksQuadBotTickRoute
   '/api/public/hooks/recompute-predictions': typeof ApiPublicHooksRecomputePredictionsRoute
@@ -820,6 +830,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ops-daily-backtest'
     | '/api/public/hooks/paper-bot-tick'
     | '/api/public/hooks/pin-risk-shadow-tick'
+    | '/api/public/hooks/poly5m-bot-tick'
     | '/api/public/hooks/prediction-row-tick'
     | '/api/public/hooks/quad-bot-tick'
     | '/api/public/hooks/recompute-predictions'
@@ -898,6 +909,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ops-daily-backtest'
     | '/api/public/hooks/paper-bot-tick'
     | '/api/public/hooks/pin-risk-shadow-tick'
+    | '/api/public/hooks/poly5m-bot-tick'
     | '/api/public/hooks/prediction-row-tick'
     | '/api/public/hooks/quad-bot-tick'
     | '/api/public/hooks/recompute-predictions'
@@ -977,6 +989,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ops-daily-backtest'
     | '/api/public/hooks/paper-bot-tick'
     | '/api/public/hooks/pin-risk-shadow-tick'
+    | '/api/public/hooks/poly5m-bot-tick'
     | '/api/public/hooks/prediction-row-tick'
     | '/api/public/hooks/quad-bot-tick'
     | '/api/public/hooks/recompute-predictions'
@@ -1038,6 +1051,7 @@ export interface RootRouteChildren {
   ApiPublicHooksOpsDailyBacktestRoute: typeof ApiPublicHooksOpsDailyBacktestRoute
   ApiPublicHooksPaperBotTickRoute: typeof ApiPublicHooksPaperBotTickRoute
   ApiPublicHooksPinRiskShadowTickRoute: typeof ApiPublicHooksPinRiskShadowTickRoute
+  ApiPublicHooksPoly5mBotTickRoute: typeof ApiPublicHooksPoly5mBotTickRoute
   ApiPublicHooksPredictionRowTickRoute: typeof ApiPublicHooksPredictionRowTickRoute
   ApiPublicHooksQuadBotTickRoute: typeof ApiPublicHooksQuadBotTickRoute
   ApiPublicHooksRecomputePredictionsRoute: typeof ApiPublicHooksRecomputePredictionsRoute
@@ -1484,6 +1498,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPinRiskShadowTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/poly5m-bot-tick': {
+      id: '/api/public/hooks/poly5m-bot-tick'
+      path: '/api/public/hooks/poly5m-bot-tick'
+      fullPath: '/api/public/hooks/poly5m-bot-tick'
+      preLoaderRoute: typeof ApiPublicHooksPoly5mBotTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/prediction-row-tick': {
       id: '/api/public/hooks/prediction-row-tick'
       path: '/api/public/hooks/prediction-row-tick'
@@ -1705,6 +1726,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksOpsDailyBacktestRoute: ApiPublicHooksOpsDailyBacktestRoute,
   ApiPublicHooksPaperBotTickRoute: ApiPublicHooksPaperBotTickRoute,
   ApiPublicHooksPinRiskShadowTickRoute: ApiPublicHooksPinRiskShadowTickRoute,
+  ApiPublicHooksPoly5mBotTickRoute: ApiPublicHooksPoly5mBotTickRoute,
   ApiPublicHooksPredictionRowTickRoute: ApiPublicHooksPredictionRowTickRoute,
   ApiPublicHooksQuadBotTickRoute: ApiPublicHooksQuadBotTickRoute,
   ApiPublicHooksRecomputePredictionsRoute:
