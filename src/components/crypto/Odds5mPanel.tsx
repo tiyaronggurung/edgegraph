@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { computeStrikeOdds, type Tick } from "@/hooks/useStrikeOdds";
+import { computeStrikeOdds, type Tick, type StrikeOddsContext } from "@/hooks/useStrikeOdds";
 import { fetchPolymarket5m } from "@/lib/polymarket5m.functions";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,7 @@ const WIN_MS = 300_000;
 const TAPE_MAX = 1200;
 const W = 900, H = 160, PAD_R = 60;
 
-export function Odds5mPanel({ spot }: { spot: number | null }) {
+export function Odds5mPanel({ spot, ctx }: { spot: number | null; ctx?: StrikeOddsContext }) {
   const pollFn = useServerFn(fetchPolymarket5m);
   const [now, setNow] = useState(Date.now());
   const winStart = Math.floor(now / WIN_MS) * WIN_MS;
@@ -54,7 +54,8 @@ export function Odds5mPanel({ spot }: { spot: number | null }) {
   }, [spot]);
 
   const k = strike?.win === winStart ? strike.px : null;
-  const odds = computeStrikeOdds(spot, k, secsLeft, undefined, tapeRef.current);
+  // Same engine as 15m, now with 1m/15m indicators, SMA stack and last-3-min taker flow tilted in.
+  const odds = computeStrikeOdds(spot, k, secsLeft, ctx, tapeRef.current);
   const up = odds.upAsk;
 
   const polyUp = poly && poly.startMs === winStart ? poly.upMid : null;
@@ -140,7 +141,7 @@ export function Odds5mPanel({ spot }: { spot: number | null }) {
         {lastPoly && <circle cx={x(lastPoly.t)} cy={y(lastPoly.up)} r={3} className="fill-foreground/70" />}
       </svg>
       <div className="text-[10px] text-muted-foreground">
-        Display only — same odds math as 15m with a 5-minute clock. Strike = Polymarket official "price to beat" (Chainlink BTC at the 5m open). Not used by any bot.
+        Display only — same odds math as 15m with a 5-minute clock, including 1m/15m RSI·MACD·SMA, the SMA 10/50/200 stack and last-3-min taker flow. Not used by any bot.
       </div>
     </section>
   );
