@@ -14,44 +14,33 @@ async function j(url: string): Promise<any> {
   } catch { return null; }
 }
 
-const tokenCache = new Map<number, string | null>();
 const strikeCache = new Map<number, number>();
 
 export const fetchPolymarket5m = createServerFn({ method: "GET" })
   .inputValidator((d: { startMs: number }) => ({ startMs: Math.floor(Number(d.startMs) / 300_000) * 300_000 }))
   .handler(async ({ data }) => {
     const startSec = data.startMs / 1000;
-    const iso = (s: number) => new Date(s * 1000).toISOString().replace(".000Z", "Z");
-
-    let strike = strikeCache.get(startSec) ?? null;
-    const strikeP = strike != null ? Promise.resolve(null) : j(
-      // twapEnabled + 60s lookback = Polymarket's official "price to beat" (matches gamma eventMetadata.priceToBeat).
-      `https://polymarket.com/api/crypto/crypto-price?symbol=BTC&eventStartTime=${iso(startSec)}&variant=fiveminute&endDate=${iso(startSec + 300)}&twapEnabled=true&twapLookbackSeconds=60`,
-    );
-
-    let token = tokenCache.get(startSec);
-    if (token === undefined) {
-      const ev = await j(`https://gamma-api.polymarket.com/events?slug=btc-updown-5m-${startSec}`);
-      const m = Array.isArray(ev) ? ev[0]?.markets?.[0] : null;
-      let outcomes: string[] = [], tokens: string[] = [];
-      try { outcomes = typeof m?.outcomes === "string" ? JSON.parse(m.outcomes) : m?.outcomes ?? []; } catch { /* */ }
-      try { tokens = typeof m?.clobTokenIds === "string" ? JSON.parse(m.clobTokenIds) : m?.clobTokenIds ?? []; } catch { /* */ }
-      const i = outcomes.findIndex((o) => String(o).toLowerCase() === "up");
-      token = i >= 0 && tokens[i] ? String(tokens[i]) : null;
-      if (token) tokenCache.set(startSec, token);
-      if (tokenCache.size > 20) tokenCache.delete(tokenCache.keys().next().value as number);
-    }
-
-    const [sp, mid] = await Promise.all([
-      strikeP,
-      token ? j(`https://clob.polymarket.com/midpoint?token_id=${token}`) : Promise.resolve(null),
-    ]);
-    const open = Number(sp?.openPrice);
-    if (strike == null && Number.isFinite(open) && open > 0) {
-      strike = open;
-      strikeCache.set(startSec, open);
+    // Polymarket US (polymarket.us, BRTI index) — the venue the user trades on.
+    const d = new Date(data.startMs);
+    const p2 = (n: number) => String(n).padStart(2, "0");
+    const usSlug = `btc-updown-5m-${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}-${p2(d.getUTCHours())}${p2(d.getUTCMinutes())}z`;
+    const cached = strikeCache.get(startSec) ?? null;
+    const ev = await j(`https://gateway.polymarket.us/v1/events/slug/${usSlug}`);
+    const m = ev?.event?.markets?.[0];
+    const ptb = Number(m?.assetPriceTerms?.priceToBeat?.value);
+    let strike = cached;
+    if (strike == null && Number.isFinite(ptb) && ptb > 0) {
+      strike = ptb;
+      strikeCache.set(startSec, ptb);
       if (strikeCache.size > 20) strikeCache.delete(strikeCache.keys().next().value as number);
     }
-    const up = Number(mid?.mid);
-    return { startMs: data.startMs, strike, upMid: Number.isFinite(up) && up > 0 ? up : null };
+    const sides: any[] = Array.isArray(m?.marketSides) ? m.marketSides : [];
+    const yes = sides.find((s) => s?.long === true) ?? sides[0];
+    const no = sides.find((s) => s?.long === false);
+    const yAsk = Number(yes?.quote?.value);
+    const nAsk = Number(no?.quote?.value);
+    let up: number | null = null;
+    if (Number.isFinite(yAsk) && Number.isFinite(nAsk) && yAsk > 0 && nAsk > 0) up = (yAsk + (1 - nAsk)) / 2;
+    else if (Number.isFinite(Number(yes?.price))) up = Number(yes.price);
+    return { startMs: data.startMs, strike, upMid: up != null && up > 0 && up < 1 ? up : null };
   });
