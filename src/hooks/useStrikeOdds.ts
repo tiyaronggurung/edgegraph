@@ -60,6 +60,9 @@ const nz = (v: number | null | undefined) => (v != null && Number.isFinite(v) ? 
 export interface StrikeOddsContext {
   /** Window length in seconds for time decay. Default 900 (15m). 5m passes 300. */
   windowSec?: number;
+  /** 5m only: taker BTC volume IN (buys) / OUT (sells) since the 5m window opened. */
+  win5VolIn?: number | null;
+  win5VolOut?: number | null;
   /** Fast indicator read (1m candles). */
   m1?: IndicatorSnap | null;
   /** Slow indicator read (15m candles). */
@@ -418,13 +421,15 @@ export function computeStrikeOdds(
   // --- measured velocity from the live tape (fastest signal available) -----
   // Log-return per second over the last VEL_WINDOW_MS of composite ticks.
   let velocity: number | null = null;
+  // 5m reacts on a 12s horizon; 15m keeps 30s (unchanged).
+  const velWindowMs = WIN < 900 ? 12_000 : VEL_WINDOW_MS;
   if (tape.length >= 6) {
     const last = tape[tape.length - 1] as Tick;
     let first: Tick | null = null;
     for (let i = tape.length - 1; i >= 0; i--) {
       const t = tape[i] as Tick;
       first = t;
-      if (last.t - t.t >= VEL_WINDOW_MS) break;
+      if (last.t - t.t >= velWindowMs) break;
     }
     if (first && first.t < last.t && first.p > 0 && last.p > 0) {
       const dt = (last.t - first.t) / 1000;
@@ -453,7 +458,15 @@ export function computeStrikeOdds(
   // --- drift: measured momentum + technical/volume pressure ----------------
   // Momentum only partly persists, and the technical tilt earns drift in
   // units of σ per second so it scales with how fast the tape is moving.
-  const muMeasured = velocity == null ? 0 : velocity * MOM_PERSIST;
+  let muMeasured = velocity == null ? 0 : velocity * MOM_PERSIST;
+  // 5m volume IN vs OUT (only when passed — 15m never passes it).
+  const vIn = nz(ctx?.win5VolIn), vOut = nz(ctx?.win5VolOut);
+  const vol5Net = vIn != null && vOut != null && vIn + vOut > 0 ? (vIn - vOut) / (vIn + vOut) : null;
+  if (vol5Net != null && velocity != null && velocity !== 0) {
+    const agreeV = Math.sign(velocity) * vol5Net;
+    if (agreeV <= -0.15) muMeasured *= 0.4;      // move against the money = likely fake
+    else if (agreeV >= 0.3) muMeasured *= 1.3;   // move backed by the money = real
+  }
   const muTilt = TILT_DRIFT_K * (tilt ?? 0) * sigmaSec * timeWeight;
   let drift = muMeasured * timeWeight + muTilt;
   // Never let projected drift dominate the diffusion term.
@@ -551,6 +564,7 @@ export function computeStrikeOdds(
   // Cushion in σ: a $5 cushion with 12 minutes left is not real distance.
   const cushionSigmas = sd > 0 ? clamp(b / sd, 0, 2) / 2 : 0;
   conv.push(cushionSigmas);
+  if (vol5Net != null) conv.push(clamp((sideSign * vol5Net) / 0.3, -1, 1));
   const conviction = clamp(conv.reduce((a, v) => a + v, 0) / conv.length, -1, 1);
 
   const agree = clamp(conviction, 0, 1);           // only positive backing lifts the cap
@@ -562,7 +576,8 @@ export function computeStrikeOdds(
   // --- Step A: closing-time fade -------------------------------------------
   // 0 until 3 min left, ramps to 1 by the final 60s. Indicator shrink fades
   // out and pure distance-vs-σ√T (no drift tilt) takes over.
-  const lateFade = clamp((180 - secs) / 120, 0, 1);
+  // 15m: 180s→60s (unchanged). 5m: 60s→20s.
+  const lateFade = WIN < 900 ? clamp((60 - secs) / 40, 0, 1) : clamp((180 - secs) / 120, 0, 1);
   k = k + (1 - k) * lateFade;
   const pSrc = pRaw * (1 - lateFade) + pBase * lateFade;
 
