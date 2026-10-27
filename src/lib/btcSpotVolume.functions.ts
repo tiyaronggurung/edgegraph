@@ -41,6 +41,9 @@ export interface BtcSpotVolume {
   window: SpotVolumeLeg | null;
   /** Epoch ms of the window the `window` leg belongs to. */
   windowStart: number | null;
+  /** Current 5m window (since :00/:05/…), including the in-progress minute. */
+  w5?: SpotVolumeLeg | null;
+  w5Start?: number | null;
   lastCloseTime: number | null;
   error: string | null;
 }
@@ -114,6 +117,8 @@ async function fetchBtcSpotVolume(): Promise<BtcSpotVolume> {
         m15: leg(rows.slice(-15)),
         window: leg(winRows),
         windowStart: winStart,
+        w5: leg(rows.filter((r) => r[0] >= Math.floor(now / 300_000) * 300_000)),
+        w5Start: Math.floor(now / 300_000) * 300_000,
         lastCloseTime: last ? last[6] : null,
         error: null,
       };

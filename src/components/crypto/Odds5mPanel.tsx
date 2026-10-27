@@ -55,7 +55,7 @@ export function Odds5mPanel({ spot, ctx }: { spot: number | null; ctx?: StrikeOd
     const t = Date.now();
     const tape = tapeRef.current;
     const last = tape[tape.length - 1];
-    if (last && t - last.t < 250) return;
+    if (last && t - last.t < 100) return;
     tape.push({ t, p: spot });
     if (tape.length > TAPE_MAX) tape.splice(0, tape.length - TAPE_MAX);
   }, [spot]);
@@ -174,7 +174,9 @@ export function Odds5mPanel({ spot, ctx }: { spot: number | null; ctx?: StrikeOd
         <div className="font-semibold">Our 5m odds · Polymarket window</div>
         <div className="text-muted-foreground font-mono">
           {Math.floor(secsLeft / 60)}:{String(secsLeft % 60).padStart(2, "0")} left · strike {k != null ? `$${k.toFixed(2)}` : "loading…"}
-          {spot != null && k != null && ` (${spot - k >= 0 ? "+" : ""}${(spot - k).toFixed(0)})`}
+          {spot != null && <> · BTC ${spot.toFixed(2)}</>}
+          {spot != null && k != null && <span className={spot - k >= 0 ? "text-success" : "text-destructive"}> · Δ {spot - k >= 0 ? "+" : "−"}${Math.abs(spot - k).toFixed(2)}</span>}
+          {ctx?.win5VolIn != null && ctx?.win5VolOut != null && <> · 5m flow In {ctx.win5VolIn.toFixed(1)} / Out {ctx.win5VolOut.toFixed(1)} BTC</>}
         </div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">

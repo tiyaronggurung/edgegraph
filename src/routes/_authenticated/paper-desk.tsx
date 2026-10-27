@@ -356,8 +356,10 @@ function PaperDesk() {
       />
       <OddsTabs
         tab15={<LiveOddsLineChart upAsk={odds.upAsk} winStart={winStart} strike={strike ?? null} spot={spot} secsLeft={liveSecsLeft} />}
-        spot={spot ?? null}
+        spot={liveSpot.targetSpot ?? spot ?? null}
         ctx5m={{
+          win5VolIn: win?.w5Start === Math.floor(Date.now() / 300_000) * 300_000 ? (win?.w5?.buy ?? null) : null,
+          win5VolOut: win?.w5Start === Math.floor(Date.now() / 300_000) * 300_000 ? (win?.w5?.sell ?? null) : null,
           m1: hist?.live?.m1 ?? null,
           m15: hist?.live?.m15 ?? null,
           flowImbalance: imbM3,

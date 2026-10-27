@@ -146,7 +146,7 @@ export async function runPoly5mBotTick() {
   if (up == null) {
     const odds = computeStrikeOdds(
       tape.length ? tape[tape.length - 1].p : null, ev.strike, left,
-      { windowSec: 300, m1: live?.m1 ?? null, m15: live?.m15 ?? null, avgBuyPrice: null, avgSellPrice: null, flowImbalance: vol?.m3?.imbalance ?? null, stack: live?.stack ?? null },
+      { windowSec: 300, m1: live?.m1 ?? null, m15: live?.m15 ?? null, avgBuyPrice: null, avgSellPrice: null, flowImbalance: vol?.m3?.imbalance ?? null, win5VolIn: vol?.w5?.buy ?? null, win5VolOut: vol?.w5?.sell ?? null, stack: live?.stack ?? null },
       tape,
     );
     up = odds.upAsk;
