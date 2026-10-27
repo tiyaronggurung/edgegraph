@@ -1,5 +1,7 @@
 # Architecture rules
 
+- 5m paper summary statistics paginate narrow settled-position reads independently of the recent 50-row trade log; slower summary refresh keeps full-history totals from delaying odds or trading.
+
 - Paper Desk's read-only volume display subscribes to Crypto's existing query keys and uses a dedicated presentation component; keep it separate from trading decisions to avoid changing live orders.
 - Display strike and window volume use independent shared queries through useBtcEssentialFeeds; one upstream must not block the other, and strike data is confined to its own market window.
 - The Quad-Confirmation paper engine (quadBot, qc_* tables) is paper-only and isolated from live trading code; it never places real orders, so experiments cannot change live orders.

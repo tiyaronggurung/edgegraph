@@ -5,10 +5,10 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { MIN_SAMPLES, breakEven, smoothedWinRate } from "@/lib/poly5mBot/learn";
+import { paperStats, readAllStatsPositions } from "@/lib/poly5mBot/stats";
 
 const db = supabase as any;
 const usd = (v: number) => `${v < 0 ? "-" : "+"}$${Math.abs(v).toFixed(2)}`;
-const nyDay = (d: Date) => d.toLocaleDateString("en-US", { timeZone: "America/New_York" });
 
 export function Poly5mBotPanel({ isAdmin }: { isAdmin: boolean }) {
   const qc = useQueryClient();
@@ -26,13 +26,24 @@ export function Poly5mBotPanel({ isAdmin }: { isAdmin: boolean }) {
       return { s: s.data, pos: (pos.data ?? []) as any[], sit: (sit.data ?? []) as any[] };
     },
   });
+  const statsQuery = useQuery({
+    queryKey: ["poly5m-bot-stats"],
+    enabled: isAdmin,
+    refetchInterval: 30000,
+    queryFn: () => readAllStatsPositions(async (from, to) => {
+      const { data, error } = await db.from("p5_positions")
+        .select("settled,pnl,window_start").eq("settled", true).not("pnl", "is", null)
+        .order("window_start", { ascending: true }).order("id", { ascending: true }).range(from, to);
+      if (error) throw error;
+      return data ?? [];
+    }),
+  });
   if (!isAdmin) return null;
   const s = data?.s;
   const pos = data?.pos ?? [];
-  const today = nyDay(new Date());
-  const todays = pos.filter((p) => p.settled && p.pnl != null && nyDay(new Date(p.window_start)) === today);
-  const pnlToday = todays.reduce((a, p) => a + Number(p.pnl), 0);
-  const winsToday = todays.filter((p) => Number(p.pnl) > 0).length;
+  const stats = statsQuery.data ? paperStats(statsQuery.data) : null;
+  const missingStats = statsQuery.isError ? "Unavailable" : "—";
+  const winRate = (s: { count: number; wins: number }) => s.count ? `${((s.wins / s.count) * 100).toFixed(1)}% (${s.count})` : "—";
 
   const save = async (running: boolean) => {
     const stake = stakeIn ? Number(stakeIn) : Number(s?.stake ?? 10);
@@ -60,9 +71,11 @@ export function Poly5mBotPanel({ isAdmin }: { isAdmin: boolean }) {
           </button>
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <Stat label="Today P&L" value={usd(pnlToday)} tone={pnlToday >= 0 ? "up" : "down"} />
-        <Stat label="Today win rate" value={todays.length ? `${Math.round((winsToday / todays.length) * 100)}% (${todays.length})` : "—"} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        <Stat label="All-Time P&L" value={stats ? usd(stats.all.pnl) : missingStats} tone={stats ? stats.all.pnl >= 0 ? "up" : "down" : undefined} />
+        <Stat label="All-Time Win Rate" value={stats ? winRate(stats.all) : missingStats} />
+        <Stat label="Today P&L" value={stats ? usd(stats.today.pnl) : missingStats} tone={stats ? stats.today.pnl >= 0 ? "up" : "down" : undefined} />
+        <Stat label="Today win rate" value={stats ? winRate(stats.today) : missingStats} />
         <Stat label="Our UP now" value={st?.up != null ? `${(st.up * 100).toFixed(1)}%` : "—"} />
         <Stat label="Status" value={st?.status ?? "waiting for first tick"} />
       </div>
