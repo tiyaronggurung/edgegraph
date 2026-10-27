@@ -1,5 +1,9 @@
 # Roadmap
 
+## 5m all-time statistics
+- [x] Add all-time P&L and win rate alongside today, current odds and status; paginate all settled history independently of the recent log.
+- [ ] Verify statistics tests and signed-in display; odds and trading unchanged.
+
 ## Sign-in odds loading
 - [x] Load the display's current-window strike and Binance volume independently using shared queries; preserve odds math and all trading paths.
 - [x] Verified signed-in cold loading and reload; delayed volume no longer blocks odds, delayed strike no longer blocks price/window/venue volume, both recover without browser errors. 45 regression tests pass; build OK.
