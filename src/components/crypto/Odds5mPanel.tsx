@@ -18,7 +18,7 @@ const dec = (pts: [number, number][], ws: number) => (pts ?? []).map(([s, u]) =>
  * Never feeds Model, Study, auto-trade, exits or the 15m odds.
  */
 const WIN_MS = 300_000;
-const TAPE_MAX = 1200;
+const TAPE_MAX = 6000; // ~10 min at 100ms
 const W = 900, H = 160, PAD_R = 60;
 
 export function Odds5mPanel({ spot, ctx }: { spot: number | null; ctx?: StrikeOddsContext }) {
